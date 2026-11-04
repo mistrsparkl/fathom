@@ -62,7 +62,7 @@ def program_checks():
     assert perr("to start:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr("to start:\n  otherwise: stop\n" + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr("use: nothing here\nto start:\n  stop\n" + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, maths, time")
+    assert perr("use: nothing here\nto start:\n  stop\n" + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, maths, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -76,7 +76,10 @@ def program_checks():
             script = Path(d) / "probe.imagine"
             script.write_text(source, encoding="utf-8")
             for name, other in (others or {}).items():
-                (Path(d) / name).write_text(other, encoding="utf-8")
+                if isinstance(other, bytes):
+                    (Path(d) / name).write_bytes(other)
+                else:
+                    (Path(d) / name).write_text(other, encoding="utf-8")
             direct = subprocess.run([sys.executable, str(HERE / "imagination.py"), "run", str(script)],
                                     input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
             if compiler:
@@ -177,6 +180,26 @@ def program_checks():
         except translate.ScriptError as e:
             assert translate.where(e.line) == "bad.imagine line 2", translate.where(e.line)
     assert perr("use: missing.imagine\nto start:\n  stop\n" + END)[1] == "There is no script called 'missing.imagine' next to probe.imagine."
+
+    # Sound: a short silent .wav plays (and waits) the same both ways; a missing file is a plain error.
+    import io
+    import wave
+    silent = io.BytesIO()
+    with wave.open(silent, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(8000)
+        w.writeframes(b"\0\0" * 800)
+    out = both('use: sound\nto start:\n  play the sound and wait with "quiet.wav"\n  play the sound with "quiet.wav"\n'
+               '  stop the sound\n  say "played"\n  play the sound with "nope.wav"\n' + END, others={"quiet.wav": silent.getvalue()})
+    assert out.stdout == "played\n", repr(out.stdout)
+    assert out.stderr == 'Line 7: there is no sound file called "nope.wav".\n', repr(out.stderr)
+
+    # Random items come from the list; an empty list is a plain error.
+    out = both('to start:\n  set xs to a list of (4, 4, 4)\n  say a random item of xs, random item of a list of ("z")\n'
+               '  say random item of a list of numbers\n' + END)
+    assert out.stdout == "4z\n", repr(out.stdout)
+    assert out.stderr == "Line 4: the list is empty, so I can't pick a random item.\n", repr(out.stderr)
 
     # A command can call itself.
     out = both('to start:\n  say factorial of 10, " ", factorial of 20\n' + END +

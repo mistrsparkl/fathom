@@ -157,6 +157,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `size of x` | a number without its sign, the length of a (flat) place, or how many letters text has |
 | `random number from 1 to 100` | a random whole number, both ends included |
 | `item 2 of scores` | one item of a list (counted from 1) |
+| `a random item of scores` | one item of a list, picked at random |
 | `size of scores` | how many items a list has |
 | `scores contains 5`, `name contains "ell"` | yes or no: is it in the list / in the text |
 | `contents of file "notes.txt"` | everything in a file, as text |
@@ -225,6 +226,7 @@ and the universe said i love you
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
 | `window` | A window to draw in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (gives back the page as text) |
+| `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (.wav files) |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
 
 ### The window library

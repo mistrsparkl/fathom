@@ -631,6 +631,19 @@ class Expr:
             self.i += 1
             s = tok[1:-1]
             return Value(cpp_text(tok), TEXT, lambda env: s)
+        if self.at("random", "item", "of") or self.at("a", "random", "item", "of"):
+            self.i += 4 if tok == "a" else 3
+            v = self.unary()
+            if not is_list(v.kind):
+                raise ScriptError(line, f"'random item of' needs a list, but this is {kind_name(v.kind)}.")
+            a = v.run
+
+            def pick(env):
+                items = a(env)
+                if not items:
+                    raise RunError(line, "the list is empty, so I can't pick a random item.")
+                return pyrandom.choice(items)
+            return Value(f"imagine::random_item({v.cpp}, {line})", element(v.kind), pick)
         if self.at("random", "number", "from"):
             self.i += 3
             lo = self.need(self.sum(), NUMBER, "random number")

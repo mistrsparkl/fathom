@@ -1,0 +1,48 @@
+note: Words for sound (Windows). Use them in a program with:  use: sound
+note: Sound files must be .wav files. Paths are from the folder the program runs in.
+
+code:
+  #define NOMINMAX
+include: <windows.h>
+include: <mmsystem.h>
+link: winmm
+
+code:
+  namespace imagine_sound
+  {
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size());
+  		return out;
+  	}
+
+  	inline void play(const std::string& file, bool wait, bool loop, int line)
+  	{
+  		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
+  			imagine::fail(line, "there is no sound file called \"" + file + "\".");
+  		DWORD how = SND_FILENAME | SND_NODEFAULT | (wait ? SND_SYNC : SND_ASYNC) | (loop ? SND_LOOP : 0);
+  		if (!PlaySoundW(wide(file).c_str(), nullptr, how))
+  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav file).");
+  	}
+  }
+
+python:
+  import winsound
+  def play(file, wait, loop):
+      if not os.path.isfile(file):
+          raise RunError(0, f'there is no sound file called "{file}".')
+      how = winsound.SND_FILENAME | winsound.SND_NODEFAULT | (0 if wait else winsound.SND_ASYNC) | (winsound.SND_LOOP if loop else 0)
+      try:
+          winsound.PlaySound(file, how)
+      except RuntimeError:
+          raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav file).')
+
+to play the sound, given file (text) = imagine_sound::play({file}, false, false, {line})
+  runs: play({file}, False, False)
+to play the sound and wait, given file (text) = imagine_sound::play({file}, true, false, {line})
+  runs: play({file}, True, False)
+to play the sound again and again, given file (text) = imagine_sound::play({file}, false, true, {line})
+  runs: play({file}, False, True)
+to stop the sound = PlaySoundW(nullptr, nullptr, 0)
+  runs: winsound.PlaySound(None, 0)

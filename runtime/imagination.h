@@ -374,6 +374,9 @@ namespace imagine
 		}
 	}
 
+	template <typename T>
+	const T& random_item(const std::vector<T>& items, int line);
+
 	inline double random(double lo, double hi, int line)
 	{
 		static std::mt19937_64 engine{std::random_device{}()};
@@ -381,6 +384,14 @@ namespace imagine
 		if (a > b)
 			fail(line, "there is no whole number from " + text(lo) + " to " + text(hi) + ".");
 		return static_cast<double>(std::uniform_int_distribution<long long>(static_cast<long long>(a), static_cast<long long>(b))(engine));
+	}
+
+	template <typename T>
+	const T& random_item(const std::vector<T>& items, int line)
+	{
+		if (items.empty())
+			fail(line, "the list is empty, so I can't pick a random item.");
+		return items[static_cast<size_t>(random(1, static_cast<double>(items.size()), line)) - 1];
 	}
 
 	// How many letters text has (not bytes: "é" is one letter).
