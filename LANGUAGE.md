@@ -110,6 +110,7 @@ and the universe said i love you
 | a flat place | `flat (goal minus centre of mass)` (a place with its height dropped) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
 | a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
+| a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. |
 | your own kind | `a new pet` (see above) |
 
 Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a number, not yes or no."
@@ -133,6 +134,8 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `add 5 to scores` | Put an item at the end of a list. |
 | `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
+| `set entry "Rex" of ages to 3` | Put a value in a table under a name (replacing what was there). |
+| `remove entry "Rex" from ages` | Take a name and its value out of a table. |
 | `give back total` | Leave the command, giving back an answer. |
 | `stop the loop` | Leave the `repeat`, `while` or `for each` it is inside, and carry on after it. |
 | `skip to the next one` | Go straight to the next round of the loop it is inside. |
@@ -170,6 +173,9 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `join names with ", "` | a list made into one text, with ", " between the items |
 | `sorted scores`, `reversed scores` | a copy of a list, smallest first / back to front |
 | `last item of scores` | the last item of a list |
+| `entry "Rex" of ages` | the value a table keeps under that name |
+| `keys of ages` | a table's names, as a list of text in alphabetical order |
+| `ages contains "Rex"`, `size of ages` | yes or no: does the table have that name / how many names it has |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
@@ -181,7 +187,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 

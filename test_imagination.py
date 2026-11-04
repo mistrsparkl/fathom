@@ -123,6 +123,16 @@ def program_checks():
     assert out.stderr == "Line 15: there is no letter 9 in text of 3 letters.\n", repr(out.stderr)
     assert perr("to start:\n  stop the loop\n" + END)[1] == "'stop the loop' only works inside 'repeat', 'while' or 'for each'."
 
+    # Tables.
+    out = both('to start:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Ann" of ages to 40\n'
+               '  set entry "Rex" of ages to entry "Rex" of ages plus 1\n  say ages, " | ", size of ages, " | ", keys of ages\n'
+               '  say ages contains "Ann", " ", ages contains "Bob"\n  remove entry "Ann" from ages\n  say ages\n'
+               '  set pets to a table of lists of text\n  set entry "Rex" of pets to a list of text\n'
+               '  add "sit" to entry "Rex" of pets\n  say pets\n  for each name in keys of pets: say name\n'
+               '  say entry "Bob" of ages\n' + END)
+    assert out.stdout == "Ann: 40, Rex: 4 | 2 | Ann, Rex\nyes no\nRex: 4\nRex: sit\nRex\n", repr(out.stdout)
+    assert out.stderr == 'Line 15: there is no entry "Bob" in the table.\n', repr(out.stderr)
+
     # Libraries.
     out = both('use: maths\nuse: time\nto start:\n  say round (sine of 30 times 1000), " ", power of (2, 10), " ", remainder of (17, 5)\n'
                '  say round 2.5, " ", round down -2.5, " ", round up 2.1, " ", round (pi times 100)\n'

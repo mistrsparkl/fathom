@@ -61,7 +61,7 @@ KEYWORDS = set("""set to if otherwise stop note and or not is more less than at 
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 say ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
-                  "between", "+", "-", "*", "/", "contains"}
+                  "between", "+", "-", "*", "/", "contains", "in", "from", "with"}
 UNITS = set("degrees degree cm centimetres seconds second per squared percent metres metre m s".split())
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
@@ -74,6 +74,14 @@ def element(kind):
     return kind[len("list of "):]
 
 
+def is_table(kind):
+    return kind.startswith("table of ")
+
+
+def entry_kind(kind):
+    return kind[len("table of "):]
+
+
 def is_thing(kind):
     return kind.startswith("thing ")
 
@@ -81,6 +89,8 @@ def is_thing(kind):
 def cpp_type(kind):
     if is_list(kind):
         return f"std::vector<{cpp_type(element(kind))}>"
+    if is_table(kind):
+        return f"std::map<std::string, {cpp_type(entry_kind(kind))}>"
     if is_thing(kind):
         return "".join(w.capitalize() for w in kind[6:].split())
     return CPP_TYPE[kind]
@@ -102,9 +112,9 @@ def parse_kind(text):
     phrase = " ".join(words)
     if phrase in BASIC_WORDS:
         return BASIC_WORDS[phrase]
-    if words[:2] == ["list", "of"]:
+    if words[:2] in (["list", "of"], ["table", "of"], ["lists", "of"], ["tables", "of"]):
         k = parse_kind(" ".join(words[2:]))
-        return k and "list of " + k
+        return k and f"{words[0].rstrip('s')} of " + k
     for name in (phrase, phrase[:-1] if phrase.endswith("s") else None):
         if name in THINGS:
             return "thing " + name
@@ -112,12 +122,14 @@ def parse_kind(text):
 
 
 def kind_words():
-    return ", ".join(["a number", "yes or no", "text", "a place", "a list of ..."] + [f"a {t}" for t in THINGS])
+    return ", ".join(["a number", "yes or no", "text", "a place", "a list of ...", "a table of ..."] + [f"a {t}" for t in THINGS])
 
 
 def kind_name(kind):
     if is_list(kind):
         return "a list of " + plural(element(kind))
+    if is_table(kind):
+        return "a table of " + plural(entry_kind(kind))
     if is_thing(kind):
         return "a " + kind[6:]
     return {NUMBER: "a number", YESNO: "yes or no", PLACE: "a place", FLAT: "a flat place", TEXT: "text"}[kind]
@@ -126,6 +138,8 @@ def kind_name(kind):
 def plural(kind):
     if is_list(kind):
         return "lists of " + plural(element(kind))
+    if is_table(kind):
+        return "tables of " + plural(entry_kind(kind))
     if is_thing(kind):
         return kind[6:] + "s"
     return {NUMBER: "numbers", YESNO: "yes or no", PLACE: "places", FLAT: "flat places", TEXT: "text"}[kind]
@@ -159,6 +173,8 @@ def py_zero(kind, things):
         return ""
     if is_list(kind):
         return []
+    if is_table(kind):
+        return {}
     if is_thing(kind):
         return Thing(kind[6:], things)
     return None
@@ -166,7 +182,7 @@ def py_zero(kind, things):
 
 def dup(v):
     """Lists and things are copied when they are stored, as they are in the C++."""
-    return copy.deepcopy(v) if isinstance(v, (list, Thing)) else v
+    return copy.deepcopy(v) if isinstance(v, (list, dict, Thing)) else v
 
 
 def text(v):
@@ -180,6 +196,8 @@ def text(v):
         return v
     if isinstance(v, list):
         return ", ".join(text(x) for x in v) if v else "(nothing)"
+    if isinstance(v, dict):
+        return ", ".join(f"{k}: {text(v[k])}" for k in sorted(v)) if v else "(nothing)"
     if isinstance(v, Thing):
         return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
     raise RunError(0, "this can't be shown as text when running directly.")
@@ -297,6 +315,18 @@ def split(s, by, line):
     if not by:
         raise RunError(line, "I can't split text by empty text.")
     return s.split(by)
+
+
+def entry_of(table, key, line):
+    if key not in table:
+        raise RunError(line, f'there is no entry "{key}" in the table.')
+    return table[key]
+
+
+def remove_entry(table, key, line):
+    if key not in table:
+        raise RunError(line, f'there is no entry "{key}" in the table to remove.')
+    del table[key]
 
 
 def last(items, line):
@@ -512,7 +542,8 @@ class Expr:
         if self.at("contains"):
             self.i += 1
             r = self.sum()
-            if not (v.kind == r.kind == TEXT or (is_list(v.kind) and element(v.kind) == r.kind)):
+            if not (v.kind == r.kind == TEXT or (is_list(v.kind) and element(v.kind) == r.kind)
+                    or (is_table(v.kind) and r.kind == TEXT)):
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
             return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
@@ -538,7 +569,7 @@ class Expr:
                 v = Value(f"(imagine::text({v.cpp}) + imagine::text({r.cpp}))", TEXT,
                           lambda env, a=a, b=b: text(a(env)) + text(b(env)))
                 continue
-            if v.kind != r.kind or v.kind in (YESNO, TEXT) or is_list(v.kind) or is_thing(v.kind):
+            if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
             f = operator.add if op == "+" else operator.sub
             run = (lambda env, a=a, b=b, f=f: f(a(env), b(env))) if v.kind == NUMBER else not_here(self.line, "Adding places")
@@ -646,6 +677,28 @@ class Expr:
         made = self.made()  # before names, so a name like 'a' doesn't hide 'a list of'
         if made:
             return made
+        if tok == "entry" and self.peek(1) not in ITEM_NOT_INDEX:
+            self.i += 1
+            name = self.need(self.sum(), TEXT, "entry")
+            self.take("of")
+            table = self.unary()
+            if not is_table(table.kind):
+                raise ScriptError(line, f"'entry ... of' needs a table, but this is {kind_name(table.kind)}.")
+            get, at = table.run, name.run
+
+            def put(env, x):
+                get(env)[at(env)] = dup(x)
+            v = Value(f"imagine::entry({table.cpp}, {strip_parens(name.cpp)}, {line})", entry_kind(table.kind),
+                      lambda env: entry_of(get(env), at(env), line), put if table.writable else None)
+            v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
+            return v
+        if self.at("keys", "of"):
+            self.i += 2
+            table = self.unary()
+            if not is_table(table.kind):
+                raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
+            get = table.run
+            return Value(f"imagine::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
         key, n = self.names.match(self.t, self.i)
         if key:
             self.i += n
@@ -793,7 +846,7 @@ class Expr:
                 return Value(f"({v.cpp}).Size()", NUMBER, not_here(line, "The size of a place"))
             if v.kind == TEXT:
                 return Value(f"imagine::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
-            if is_list(v.kind):
+            if is_list(v.kind) or is_table(v.kind):
                 return Value(f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
@@ -829,6 +882,15 @@ class Expr:
                         return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
+        for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
+            if self.at(*lead):
+                self.i += len(lead)
+                for n in range(min(6, len(self.t) - self.i), 0, -1):
+                    k = parse_kind(" ".join(self.t[self.i:self.i + n]))
+                    if k:
+                        self.i += n
+                        return Value(f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {})
+                raise ScriptError(self.line, f"Say what the table holds, like 'a table of numbers'. Kinds are: {kind_words()}.")
         for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of")):
             if self.at(*lead):
                 self.i += len(lead)
@@ -1420,6 +1482,17 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
         return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], lambda env: seq(env).append(dup(get(env))), None
+    if tokens[:2] == ["remove", "entry"] and "from" in tokens:
+        cut = len(tokens) - 1 - tokens[::-1].index("from")
+        table = expr_to_end(tokens, cut + 1, names, n)
+        if not is_table(table.kind) or not table.writable:
+            raise ScriptError(n, f"'remove entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
+        key = expr_to_end(tokens[:cut], 2, names, n)
+        if key.kind != TEXT:
+            raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
+        get, at = table.run, key.run
+        return ([f"{tab}imagine::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
+                lambda env: remove_entry(get(env), at(env), n), None)
     if tokens[0] == "remove" and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         target = writable_list(tokens[cut + 1:], names, n, "remove from")
@@ -1460,7 +1533,7 @@ def statement(n, text_, inner, names, declared, depth):
         args = expr_list(tokens, size + (tokens[size:size + 1] == ["with"]), names, n)
         cpp, run = call(key, args, names, n)
         return [f"{tab}{cpp};"], run, None
-    if tokens[0] == "set" and "to" in tokens and ("of" in tokens[1:tokens.index("to")] or tokens[1:2] == ["item"]):
+    if tokens[0] == "set" and "to" in tokens and ("of" in tokens[1:tokens.index("to")] or tokens[1:2] in (["item"], ["entry"])):
         cut = tokens.index("to")
         e = Expr(tokens[1:cut], names, n)
         target = e.full()
@@ -1470,7 +1543,8 @@ def statement(n, text_, inner, names, declared, depth):
         if v.kind != target.kind:
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' holds {kind_name(target.kind)}, not {kind_name(v.kind)}.")
         put, get = target.store, v.run
-        return [f"{tab}{strip_parens(target.cpp)} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
+        assign = getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
+        return [f"{tab}{assign}{strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:

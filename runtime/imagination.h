@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <map>
 #include <iostream>
 #include <random>
 #include <sstream>
@@ -66,6 +67,17 @@ namespace imagine
 		return out;
 	}
 
+	template <typename T>
+	std::string text(const std::map<std::string, T>& table)
+	{
+		if (table.empty())
+			return "(nothing)";
+		std::string out;
+		for (const auto& [key, value] : table)
+			out += (out.empty() ? "" : ", ") + key + ": " + text(value);
+		return out;
+	}
+
 	// Something went wrong while the program ran: say which line, in plain words, and stop.
 	[[noreturn]] inline void fail(int line, const std::string& message)
 	{
@@ -104,6 +116,43 @@ namespace imagine
 	bool contains(const std::vector<T>& items, const T& value) { return std::find(items.begin(), items.end(), value) != items.end(); }
 
 	inline bool contains(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+
+	template <typename T>
+	T& entry(std::map<std::string, T>& table, const std::string& key, int line)
+	{
+		auto found = table.find(key);
+		if (found == table.end())
+			fail(line, "there is no entry \"" + key + "\" in the table.");
+		return found->second;
+	}
+
+	template <typename T>
+	const T& entry(const std::map<std::string, T>& table, const std::string& key, int line)
+	{
+		auto found = table.find(key);
+		if (found == table.end())
+			fail(line, "there is no entry \"" + key + "\" in the table.");
+		return found->second;
+	}
+
+	template <typename T>
+	void remove_entry(std::map<std::string, T>& table, const std::string& key, int line)
+	{
+		if (!table.erase(key))
+			fail(line, "there is no entry \"" + key + "\" in the table to remove.");
+	}
+
+	template <typename T>
+	bool contains(const std::map<std::string, T>& table, const std::string& key) { return table.count(key) > 0; }
+
+	template <typename T>
+	std::vector<std::string> keys(const std::map<std::string, T>& table)
+	{
+		std::vector<std::string> out;
+		for (const auto& kv : table)
+			out.push_back(kv.first);
+		return out;
+	}
 
 	// 'for each' walks a copy, so changing the list inside the loop is safe.
 	template <typename T>
