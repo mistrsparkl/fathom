@@ -61,6 +61,17 @@ and the universe said i love you
 
 Then use it like any value: `scrawl "Ages added up: ", total age of shelter`. A command with one input takes it right after its name (`with` is optional). With two or more inputs, put them in brackets: `pet called with ("Rex", 3)`.
 
+**Commands for a kind of thing.** `to bounce, for a ball:` makes a command that belongs to balls. Inside it, the ball's parts are used by their own names, and changing them changes the ball it was given, not a copy:
+
+```
+to bounce, for a ball:
+  set speed to speed times -1
+  set bounces to bounces plus 1
+and the universe said i love you
+```
+
+Call it with the ball: `bounce b`, or `bounce item 1 of balls`. More inputs come after `given`, as usual: `to move along, for a ball, given steps (a number):`, called as `move along with b, 2`. Inside, the whole ball is `ball`.
+
 ## Your own kinds of things
 
 Describe what a kind of thing has, one part per line, then use it as a kind anywhere:

@@ -215,6 +215,16 @@ def program_checks():
                '  scrawl frame time is more than 0.01 and frame time is less than 0.5\n  close the window\n' + END)
     assert out.stdout == "yes\n", repr(out.stdout)
 
+    # Commands for a kind of thing change the thing itself, even one inside a list.
+    out = both('a ball has:\n  birth (a flat place)\n  speed (a flat place)\n  bounces (a number)\nand the universe said i love you\n\nto bounce, for a ball:\n  set speed of vertical to speed of vertical times -1\n  set bounces to bounces plus 1\nand the universe said i love you\n\nto move along, for a ball, given steps (a number):\n  repeat steps times:\n    set existence to existence plus speed\nand the universe said i love you\n\nto how far, for a ball, giving back a number:\n  give back size of (existence minus birth)\nand the universe said i love you\n\nto restart, for a ball:\n  set birth to 0 horizontal 0 vertical\n  set ball to ball\nand the universe said i love you\n\ngenesis:\n  set b to a new ball\n  set birth of b to 10 horizontal 10 vertical\n  set speed of b to 3 horizontal 4 vertical\n  move along with (b, 2)\n  bounce b\n  scrawl b\n  scrawl how far b\n  set balls to a list of balls\n  add b to balls\n  bounce item 1 of balls\n  restart item 1 of balls\n  scrawl item 1 of balls\nand the universe said i love you\n')
+    assert out.stdout == ("a ball (birth: 10 horizontal 10 vertical, existence: 16 horizontal 18 vertical, "
+                          "speed: 3 horizontal -4 vertical, bounces: 1)\n10\n"
+                          "a ball (birth: 0 horizontal 0 vertical, existence: 0 horizontal 0 vertical, "
+                          "speed: 3 horizontal 4 vertical, bounces: 2)\n"), repr(out.stdout)
+    assert perr("a ball has:\n  speed (a number)\n" + END + "to bounce, for a ball:\n  set speed to 1\n" + END +
+                "genesis:\n  bounce a new ball\n" + END)[1].startswith("'bounce' changes the ball it is given")
+    assert perr("to bounce, for a rock:\n  stop\n" + END + "genesis:\n  stop\n" + END)[1] == "There is no kind of thing called 'rock'."
+
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'
                '  scrawl existence is within 5 of coin, " ", existence is within 4.9 of coin, " ", 7 is within 2 of 5, " ",'

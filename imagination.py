@@ -67,6 +67,9 @@ UNITS = set("degrees degree cm centimetres seconds second per squared percent me
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
+# Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
+OWNERS = {}
+
 # The parts of a place, written after it: 'existence of horizontal'.
 PLACE_PARTS = {("horizontal",): "X", ("vertical",): "Y", ("depth",): "Z"}
 
@@ -618,6 +621,8 @@ class Names:
 
     def value(self, key):
         cpp, kind, read_only, run = self.known[key]
+        if isinstance(run, tuple):  # (get, put): a part of the thing a command is for
+            return Value(cpp, kind, run[0], None if read_only else run[1])
         if run is not None:  # a setting, an Unreal word or a library word
             return Value(cpp, kind, run, None if read_only else (lambda env, x: run(env)))
         get = lambda env: env[cpp]
@@ -1431,6 +1436,7 @@ def read_one(path, auto):
     things = []  # (name, line, [(line, field text)])
     libs, used = [], set()  # C++ that 'use:' libraries need, and their names
     THINGS = {}
+    OWNERS.clear()
     reset_fields()
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
@@ -1538,7 +1544,7 @@ def read_one(path, auto):
                               "'genesis:' has no inputs and gives nothing back.")
     functions = [function(head, n, body, names, info) for head, (_, n, body) in zip(heads, commands)]
     if program:
-        protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"
+        protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
@@ -1547,7 +1553,7 @@ def read_one(path, auto):
                          f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
-        wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"
+        wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 f"// {info['header']} declares these in {info['class']}:"] + wanted + [
@@ -1611,24 +1617,36 @@ def describe_things(things):
 
 def command_head(header, line):
     """'to greet, given name (text):' -> (['greet'], 'Greet', [(['name'], TEXT)], None)."""
-    m = re.fullmatch(r"to ([a-z ]+?)(?:, given (.+?))?(?:, giving back (.+))?:", header.lower())
+    m = re.fullmatch(r"to ([a-z ]+?)(?:, for an? ([a-z ]+?))?(?:, given (.+?))?(?:, giving back (.+))?:", header.lower())
     if not m:
         raise ScriptError(line, "A command starts like 'to steer toward, given goal (a place) and running (yes or no):'.")
     inputs = []
-    if m.group(2):
-        for part in re.split(r"\s+and\s+(?=[a-z ]+\()", m.group(2)):
+    words = m.group(1).split()
+    if m.group(2):  # a command for a kind of thing: it gets that thing and can change it
+        owner = " ".join(m.group(2).split())
+        if owner not in THINGS:
+            raise ScriptError(line, f"There is no kind of thing called '{owner}'." + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
+        inputs.append((owner.split(), "thing " + owner))
+        OWNERS["".join(w.capitalize() for w in words)] = "thing " + owner
+    if m.group(3):
+        for part in re.split(r"\s+and\s+(?=[a-z ]+\()", m.group(3)):
             pm = re.fullmatch(r"([a-z ]+?)\s*\(([a-z ]+)\)", part.strip())
             kind = pm and parse_kind(pm.group(2))
             if not kind:
                 raise ScriptError(line, f"An input looks like 'goal (a place)'. Kinds are: {kind_words()}.")
             inputs.append((pm.group(1).split(), kind))
     gives = None
-    if m.group(3):
-        gives = parse_kind(m.group(3))
+    if m.group(4):
+        gives = parse_kind(m.group(4))
         if not gives:
             raise ScriptError(line, f"'giving back' needs a kind, like 'giving back a number'. Kinds are: {kind_words()}.")
-    words = m.group(1).split()
     return words, "".join(w.capitalize() for w in words), inputs, gives
+
+
+def params(cpp, inputs):
+    """The C++ inputs of a command; the thing a command is for is passed so the command can change it."""
+    return ", ".join((f"{cpp_type(k)}& " if i == 0 and cpp in OWNERS else param_type(k) + " ") + snake(w)
+                     for i, (w, k) in enumerate(inputs))
 
 
 def function(head, line, body, names, info):
@@ -1639,10 +1657,24 @@ def function(head, line, body, names, info):
     local.gives = gives
     if any(cpp_type("thing " + t) == name for t in THINGS):
         raise ScriptError(line, f"The command '{' '.join(words)}' has the same name as a kind of thing. Give one of them another name.")
-    params = []
-    for in_words, kind in inputs:
-        params.append(f"{param_type(kind)} {snake(in_words)}")
-        local.add(in_words, snake(in_words), kind, read_only=True)
+    for k, (in_words, kind) in enumerate(inputs):
+        if k == 0 and name in OWNERS:
+            own = snake(in_words)
+
+            def put_all(env, x, own=own):
+                env[own].fields = dup(x).fields  # change the caller's thing itself, not a copy
+            local.add(in_words, own, kind, False, (lambda env, own=own: env[own], put_all))
+            for part_words, part_kind in THINGS[kind[6:]]:
+                member = snake(part_words)
+
+                def get(env, own=own, member=member):
+                    return env[own].fields[member]
+
+                def put(env, x, own=own, member=member):
+                    env[own].fields[member] = dup(x)
+                local.add(part_words, f"{own}.{member}", part_kind, False, (get, put))
+        else:
+            local.add(in_words, snake(in_words), kind, read_only=True)
     declared = {}
     code, run = statements(body, local, declared, 1)
     hoisted = [f"\t{cpp_type(k)} {c} = {zero(k)};" for c, k in declared.values()]
@@ -1663,7 +1695,7 @@ def function(head, line, body, names, info):
                 return g.value
             return py_zero(gives, things) if gives else None
         names.commands[tuple(words)].runner = runner
-    return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({', '.join(params)})", "{"]
+    return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({params(name, inputs)})", "{"]
                      + hoisted + code + end + ["}"]) + "\n"
 
 
@@ -1983,7 +2015,11 @@ def statement(n, text_, inner, names, declared, depth):
                     lambda env: put(env, load_saved(w(env), kind, things, n)), None)
     key, size = match_command(names, tokens)
     if key:
-        args = expr_list(tokens, size + (tokens[size:size + 1] == ["with"]), names, n)
+        start = size + (tokens[size:size + 1] == ["with"])
+        rest = tokens[start:]
+        if rest[:1] == ["("] and rest[-1:] == [")"] and closing_bracket(rest, 0) == len(rest) - 1 and "," in rest:
+            rest = rest[1:-1]  # 'move along with (b, 2)': the inputs may be in brackets here too
+        args = expr_list(rest, 0, names, n)
         cpp, run = call(key, args, names, n)
         return [f"{tab}{cpp};"], run, None
     if tokens[0] == "set" and "to" in tokens and ("of" in tokens[1:tokens.index("to")] or tokens[1:2] in (["item"], ["entry"])):
@@ -2015,7 +2051,7 @@ def statement(n, text_, inner, names, declared, depth):
                     x = get(env)
                     put(env, x)
                     there(env, dup(x))
-                return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}existence = {cpp};"], run, None
+                return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}{names.known[('existence',)][0]} = {cpp};"], run, None
             return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
         hint = library_hint(tokens)
         if hint:
@@ -2133,6 +2169,9 @@ def call(key, args, names, n):
     for k, (a, kind) in enumerate(zip(args, kinds), 1):
         if a.kind != kind:
             raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.")
+    if command.cpp in OWNERS and not args[0].writable:
+        raise ScriptError(n, f"'{' '.join(key)}' changes the {kind_name(kinds[0])[2:]} it is given, so give it a name "
+                             f"that holds one, like '{' '.join(key)} {kind_name(kinds[0])[2:]}'.")
     gets = [a.run for a in args]
 
     def run(env):
@@ -2201,6 +2240,16 @@ def ask(tokens, names, declared, n, tab):
         env[cpp] = reader(question)
     cpp_reader = {NUMBER: "imagine::ask_number", YESNO: "imagine::ask_yes_no", TEXT: "imagine::ask_text"}[kind]
     return [f"{tab}{cpp} = {cpp_reader}({cpp_text(tokens[1])});"], run, None
+
+
+def closing_bracket(tokens, i):
+    """Where the bracket opened at tokens[i] closes, or -1."""
+    depth = 0
+    for k in range(i, len(tokens)):
+        depth += {"(": 1, ")": -1}.get(tokens[k], 0)
+        if depth == 0:
+            return k
+    return -1
 
 
 def expr_list(tokens, start, names, n):
