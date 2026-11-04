@@ -17,6 +17,7 @@ Imagination is a programming language written in plain English words. Scripts en
   ```
 
   A program does exactly the same thing either way. The self-check runs its test programs both ways and compares what they print.
+- **A program for a web page** is made into JavaScript instead: `imagine web examples/pets.imagine site` writes `site/pets.js` and Imagination's runtime `site/imagination.js`. Load both in a page (`<script src="imagination.js"></script><script src="pets.js"></script>`), or run the program with `node pets.js`. It does the same as the other two ways (the self-check runs its programs with node too). See *Programs for web pages* below.
 - **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a folder of these into C++ (`<name>.imagine.cpp`, which you never edit) with:
 
   ```
@@ -272,6 +273,19 @@ A script can only use words its thing knows. New words (another part of the deer
 
 In a part of something else, commands can call each other too; the top of the C++ it makes lists what the class's header must declare. New kinds of things can only be described inside programs for now.
 
+## Names the whole program shares
+
+A name set inside a command belongs to that command. Names every command shares go in a `the world remembers:` block, at the top level of the script:
+
+```
+the world remembers:
+  score (a number)
+  players (a list of text)
+and the universe said i love you
+```
+
+They start empty (0, no, "", an empty list), and any command can read and set them. A program made of several scripts can have one such block in each.
+
 ## Programs made of several scripts
 
 A program can use another script's commands and kinds of things:
@@ -383,6 +397,47 @@ to wait, given seconds (a number) = std: : this_thread: : sleep_for(std: : chron
 ```
 
 `{seconds}` stands for the input, and `{line}` in the C++ is the number of the line using the word (for error messages). Other lines a library can have are `include: <header>` (a C++ header), `link: name` (a system library), `code:` and `python:` (helper code, indented below), and values like `pi = 3.14159, number, read only` (with their own `runs:` line). Use each input only once in the C++ line. A word without a `runs:` line only works in built programs.
+
+For programs made for the web, a word gets an indented `web:` line too: what it means in JavaScript (`{seconds}` and `{line}` work the same way). Helper code for those goes in a `javascript:` block, which only web programs get (and `code:`, `include:` and `link:` only built ones). A library whose words only make sense on a web page starts with the line `web only`; its words have no ` = C++` part, and using one in a program that isn't made for the web says so.
+
+## Programs for web pages
+
+`imagine web` makes a program into JavaScript, so it can be the inside of a web page or an app made with Electron. The `page` library gives it the page:
+
+```
+use: page
+
+the world remembers:
+  clicks (a number)
+and the universe said i love you
+
+to pressed, given event (a number):
+  set clicks to clicks plus 1
+  put the words in with (the element "#count", "Clicks: " plus clicks)
+and the universe said i love you
+
+genesis:
+  whenever with (the element "button", "click", the command pressed)
+and the universe said i love you
+```
+
+Every element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `whenever` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
+
+| Words (library `page`) | Means |
+|---|---|
+| `the element "sel"`, `elements matching "sel"`, `the element within with (el, "sel")`, `elements within`, `the nearest with (el, "sel")`, `parent of the element`, `the element at with (x, y)` | Finding elements (`the nearest` looks at the element and the ones around it, like CSS `closest`). `the whole window`, `the page`, `the page body` and `the focused element` are elements too. |
+| `the element made from "<li>new</li>"`, `place inside with (el, parent)`, `place first inside`, `place before`, `take away the element`, `empty the element` | Making elements from markup and putting them in the page. |
+| `put the words in with (el, "text")`, `put the markup in`, `words in the element`, `safe markup of words` | What an element holds. `safe markup of` turns `<` and `&` into markup that shows them, for words a person typed. |
+| `value of the element`, `set the value`, `the element is ticked`, `tick the element`, `enable the element`, `focus on the element`, `select all in the element`, `the selected words` | Fields, ticks and buttons. |
+| `set the attribute with (el, "name", "value")`, `drop the attribute`, `attribute of the element`, `give the look with (el, "open")`, `take away the look`, `switch the look with (el, "open", yes)`, `the element has the look`, `set the style with (el, "width", "20px")`, `style of the element` | Attributes, looks (CSS classes) and styles. |
+| `left of the element`, `top of`, `width of`, `height of`, `width of the window`, `height of the window`, `scroll into view`, `scroll to the end` | Where things are, in dots from the top left of the window. |
+| `whenever with (el, "click", the command c)`, `pointer x of the event e`, `pointer y of the event`, `key of the event`, `button of the event`, `wheel of the event`, `the element of the event`, `control held in the event`, `shift held in the event`, `alt held in the event`, `hold back the event`, `stop the event spreading`, `capture the pointer with (el, e)` | Answering the person. |
+| `after with (2, the command c)`, `every with (0.5, the command c)`, `wait for the next frame` | Later, and again and again. |
+| `animate with (el, "opacity", "0", "1", 0.3, "ease-out")`, `animate and wait` | Moving smoothly from one value to another (any CSS easing). |
+| `start drawing on with (canvas, 1)`, `drawing width`, `drawing height`, `clear the drawing`, `begin a shape`, `shape point with (x, y)`, `fill the shape`, `fill the shape fading`, `trace the shape`, `fill a dot`, `fill a box`, `fill the drawing fading`, `fill the drawing glowing` | Drawing on a canvas element (the second input of `start drawing on` is how sharp: 1 is every dot of the screen). |
+| `play the media`, `pause the media`, `the media is playing`, `media time of`, `media length of`, `set the media time`, `set the media loudness`, `local copy of address`, `loudness bands of with (el, 24)` | Sound and video elements: `local copy of` fetches a whole file into the page, and `loudness bands of` says how loud each band of pitches is (0 to 1), for a visualiser. |
+
+The `web`, `time`, `maths`, `letters`, `patterns`, `computer` and `server` words that make sense in a page work there too (`web page` fetches, `wait` waits without stopping the page). Tidal OS (in its own folder, `..\TidalOS`) has screens written this way: its desktop, windows and apps are all Imagination.
 
 ## Saving and loading
 

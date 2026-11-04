@@ -1,0 +1,359 @@
+note: Words for web pages: finding and making the parts of a page, changing them, and answering what the person does.
+note: Use them in a program with:  use: page   and make it with:  imagine web <script.imagine>
+note: Every element of the page is a number (0 means none), so elements fit in names, lists and kinds of things.
+note: Sizes and places are in dots (CSS pixels), counted from the top left of the window.
+
+web only
+
+note: ---- finding elements
+the whole window = 0, number, read only
+  web: imagine_page::number(window)
+the page = 0, number, read only
+  web: imagine_page::number(document.documentElement)
+the page body = 0, number, read only
+  web: imagine_page::number(document.body)
+the focused element = 0, number, read only
+  web: imagine_page::number(document.activeElement)
+to the element, given selector (text), giving back a number
+  web: imagine_page::number(document.querySelector({selector}))
+to elements matching, given selector (text), giving back a list of numbers
+  web: imagine_page::numbers(document.querySelectorAll({selector}))
+to the element within, given element (a number) and selector (text), giving back a number
+  web: imagine_page::number(imagine_page::get({element}, {line}).querySelector({selector}))
+to elements within, given element (a number) and selector (text), giving back a list of numbers
+  web: imagine_page::numbers(imagine_page::get({element}, {line}).querySelectorAll({selector}))
+to the nearest, given element (a number) and selector (text), giving back a number
+  web: imagine_page::number(imagine_page::get({element}, {line}).closest?.({selector}))
+to parent of the element, given element (a number), giving back a number
+  web: imagine_page::number(imagine_page::get({element}, {line}).parentElement)
+to the element at, given x (a number) and y (a number), giving back a number
+  web: imagine_page::number(document.elementFromPoint({x}, {y}))
+to the element made from, given markup (text), giving back a number
+  web: imagine_page::made({markup}, {line})
+
+note: ---- placing them
+to place inside, given element (a number) and parent (a number)
+  web: imagine_page::get({parent}, {line}).append(imagine_page::get({element}, {line}))
+to place first inside, given element (a number) and parent (a number)
+  web: imagine_page::get({parent}, {line}).prepend(imagine_page::get({element}, {line}))
+to place before, given element (a number) and other (a number)
+  web: imagine_page::get({other}, {line}).before(imagine_page::get({element}, {line}))
+to take away the element, given element (a number)
+  web: imagine_page::get({element}, {line}).remove()
+to empty the element, given element (a number)
+  web: imagine_page::get({element}, {line}).replaceChildren()
+
+note: ---- what they hold
+to put the words in, given element (a number) and words (text)
+  web: (imagine_page::get({element}, {line}).textContent = {words})
+to put the markup in, given element (a number) and markup (text)
+  web: (imagine_page::get({element}, {line}).innerHTML = {markup})
+to words in the element, given element (a number), giving back text
+  web: imagine_page::get({element}, {line}).textContent
+to safe markup of, given words (text), giving back text
+  web: imagine_page::safe({words})
+to value of the element, given element (a number), giving back text
+  web: String(imagine_page::get({element}, {line}).value ?? "")
+to set the value, given element (a number) and value (text)
+  web: (imagine_page::get({element}, {line}).value = {value})
+to the element is ticked, given element (a number), giving back yes or no
+  web: !!imagine_page::get({element}, {line}).checked
+to tick the element, given element (a number) and on (yes or no)
+  web: (imagine_page::get({element}, {line}).checked = {on})
+to enable the element, given element (a number) and on (yes or no)
+  web: (imagine_page::get({element}, {line}).disabled = !{on})
+to focus on the element, given element (a number)
+  web: imagine_page::get({element}, {line}).focus()
+to select all in the element, given element (a number)
+  web: imagine_page::get({element}, {line}).select?.()
+the selected words = 0, text, read only
+  web: String(getSelection() || "")
+
+note: ---- attributes, looks (CSS classes) and styles
+to set the attribute, given element (a number) and name (text) and value (text)
+  web: imagine_page::get({element}, {line}).setAttribute({name}, {value})
+to drop the attribute, given element (a number) and name (text)
+  web: imagine_page::get({element}, {line}).removeAttribute({name})
+to attribute of the element, given element (a number) and name (text), giving back text
+  web: (imagine_page::get({element}, {line}).getAttribute({name}) ?? "")
+to give the look, given element (a number) and look (text)
+  web: imagine_page::get({element}, {line}).classList.add(...imagine_page::looks({look}))
+to take away the look, given element (a number) and look (text)
+  web: imagine_page::get({element}, {line}).classList.remove(...imagine_page::looks({look}))
+to switch the look, given element (a number) and look (text) and on (yes or no)
+  web: imagine_page::get({element}, {line}).classList.toggle({look}, {on})
+to the element has the look, given element (a number) and look (text), giving back yes or no
+  web: imagine_page::get({element}, {line}).classList.contains({look})
+to set the style, given element (a number) and property (text) and value (text)
+  web: imagine_page::get({element}, {line}).style.setProperty({property}, {value})
+to style of the element, given element (a number) and property (text), giving back text
+  web: getComputedStyle(imagine_page::get({element}, {line})).getPropertyValue({property}).trim()
+
+note: ---- where they are and how big
+to left of the element, given element (a number), giving back a number
+  web: imagine_page::get({element}, {line}).getBoundingClientRect().left
+to top of the element, given element (a number), giving back a number
+  web: imagine_page::get({element}, {line}).getBoundingClientRect().top
+to width of the element, given element (a number), giving back a number
+  web: imagine_page::get({element}, {line}).getBoundingClientRect().width
+to height of the element, given element (a number), giving back a number
+  web: imagine_page::get({element}, {line}).getBoundingClientRect().height
+width of the window = 0, number, read only
+  web: innerWidth
+height of the window = 0, number, read only
+  web: innerHeight
+to scroll into view, given element (a number)
+  web: imagine_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
+to scroll to the end, given element (a number)
+  web: imagine_page::end({element}, {line})
+
+note: ---- answering the person: 'whenever with (button, "click", the command pressed)' where pressed is given the event
+to whenever, given element (a number) and happening (text) and then (a command given a number)
+  web: imagine_page::whenever({element}, {happening}, {then}, {line})
+to pointer x of the event, given event (a number), giving back a number
+  web: (imagine_page::event({event}, {line}).clientX ?? 0)
+to pointer y of the event, given event (a number), giving back a number
+  web: (imagine_page::event({event}, {line}).clientY ?? 0)
+to key of the event, given event (a number), giving back text
+  web: (imagine_page::event({event}, {line}).key ?? "")
+to button of the event, given event (a number), giving back a number
+  web: (imagine_page::event({event}, {line}).button ?? 0)
+to wheel of the event, given event (a number), giving back a number
+  web: (imagine_page::event({event}, {line}).deltaY ?? 0)
+to the element of the event, given event (a number), giving back a number
+  web: imagine_page::number(imagine_page::event({event}, {line}).target)
+to control held in the event, given event (a number), giving back yes or no
+  web: imagine_page::held({event}, "ctrlKey", {line})
+to shift held in the event, given event (a number), giving back yes or no
+  web: imagine_page::held({event}, "shiftKey", {line})
+to alt held in the event, given event (a number), giving back yes or no
+  web: imagine_page::held({event}, "altKey", {line})
+to hold back the event, given event (a number)
+  web: imagine_page::event({event}, {line}).preventDefault()
+to stop the event spreading, given event (a number)
+  web: imagine_page::event({event}, {line}).stopPropagation()
+to capture the pointer, given element (a number) and event (a number)
+  web: imagine_page::capture({element}, {event}, {line})
+
+note: ---- later, and every frame
+to after, given seconds (a number) and then (a command)
+  web: imagine_page::after({seconds}, {then}, {line})
+to every, given seconds (a number) and then (a command)
+  web: imagine_page::every({seconds}, {then}, {line})
+to wait for the next frame
+  web: (await new Promise((done) => requestAnimationFrame(done)))
+
+note: ---- moving smoothly: a property goes from one value to another ('ease-out', 'linear', or any CSS easing)
+to animate, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
+  web: imagine_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
+to animate and wait, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
+  web: (await imagine_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
+
+note: ---- drawing on a canvas element: start drawing on it, then shapes and dots
+to start drawing on, given element (a number) and sharpness (a number)
+  web: imagine_page::draw_on({element}, {sharpness}, {line})
+drawing width = 0, number, read only
+  web: imagine_page::pen().width
+drawing height = 0, number, read only
+  web: imagine_page::pen().height
+to clear the drawing
+  web: imagine_page::pen().clear()
+to begin a shape
+  web: imagine_page::pen().begin()
+to shape point, given x (a number) and y (a number)
+  web: imagine_page::pen().point({x}, {y})
+to fill the shape, given colour (text)
+  web: imagine_page::pen().fill({colour})
+to fill the shape fading, given top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
+  web: imagine_page::pen().fade({top colour}, {bottom colour}, {top}, {bottom})
+to trace the shape, given colour (text) and width (a number)
+  web: imagine_page::pen().trace({colour}, {width})
+to fill a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
+  web: imagine_page::pen().dot({x}, {y}, {radius}, {colour})
+to fill a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text)
+  web: imagine_page::pen().box({x}, {y}, {width}, {height}, {colour})
+to fill the drawing fading, given top colour (text) and bottom colour (text)
+  web: imagine_page::pen().all_fade({top colour}, {bottom colour})
+to fill the drawing glowing, given x (a number) and y (a number) and radius (a number) and inner colour (text) and outer colour (text)
+  web: imagine_page::pen().glow({x}, {y}, {radius}, {inner colour}, {outer colour})
+
+note: ---- sound and video elements
+to play the media, given element (a number)
+  web: (await imagine_page::get({element}, {line}).play().catch(() => {}))
+to pause the media, given element (a number)
+  web: imagine_page::get({element}, {line}).pause()
+to the media is playing, given element (a number), giving back yes or no
+  web: !imagine_page::get({element}, {line}).paused
+to media time of, given element (a number), giving back a number
+  web: (imagine_page::get({element}, {line}).currentTime || 0)
+to media length of, given element (a number), giving back a number
+  web: (imagine_page::get({element}, {line}).duration || 0)
+to set the media time, given element (a number) and seconds (a number)
+  web: (imagine_page::get({element}, {line}).currentTime = {seconds})
+to set the media loudness, given element (a number) and level (a number)
+  web: (imagine_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
+to local copy of, given address (text), giving back text
+  web: (await imagine_page::copy({address}, {line}))
+to loudness bands of, given element (a number) and bands (a number), giving back a list of numbers
+  web: imagine_page::bands({element}, {bands}, {line})
+
+javascript:
+  // Elements are numbers in a program; this keeps which number is which (weakly, so taken-away elements are let go).
+  const imagine_page = {
+    known: new Map(),
+    numbered: new WeakMap(),
+    next: 1,
+    number(el) {
+      if (!el) return 0;
+      let n = imagine_page.numbered.get(el);
+      if (!n) {
+        n = imagine_page.next++;
+        imagine_page.numbered.set(el, n);
+        imagine_page.known.set(n, new WeakRef(el));
+      }
+      return n;
+    },
+    numbers: (list) => [...list].map(imagine_page.number),
+    get(n, line) {
+      const el = n ? imagine_page.known.get(n)?.deref() : null;
+      if (!el) imagine.fail(line, n ? `element ${n} isn't on the page any more.` : "there is no element there (it is 0).");
+      return el;
+    },
+    made(markup, line) {
+      const t = document.createElement("template");
+      t.innerHTML = markup.trim();
+      if (!t.content.firstElementChild) imagine.fail(line, "the markup doesn't make an element.");
+      return imagine_page.number(t.content.firstElementChild);
+    },
+    safe: (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]),
+    looks: (s) => s.split(/\s+/).filter(Boolean),
+    end(n, line) {
+      const el = imagine_page.get(n, line);
+      el.scrollTop = el.scrollHeight;
+    },
+    // events: each one the person makes gets a number for the command answering it
+    events: new Map(),
+    next_event: 1,
+    event(n, line) {
+      const e = imagine_page.events.get(n);
+      if (!e) imagine.fail(line, `there is no event ${n} (an event is only kept for a little while).`);
+      return e;
+    },
+    held: (n, key, line) => !!imagine_page.event(n, line)[key] || (key === "ctrlKey" && !!imagine_page.event(n, line).metaKey),
+    run(then, args) {
+      Promise.resolve()
+        .then(() => then(...args))
+        .catch((e) => imagine.report(e));
+    },
+    whenever(n, happening, then, line) {
+      if (!then) imagine.fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
+      imagine_page.get(n, line).addEventListener(happening, (e) => {
+        const k = imagine_page.next_event++;
+        imagine_page.events.set(k, e);
+        imagine_page.events.delete(k - 500);
+        imagine_page.run(then, [k]);
+      });
+    },
+    capture(n, e, line) {
+      const ev = imagine_page.event(e, line);
+      try {
+        if (ev.pointerId !== undefined) imagine_page.get(n, line).setPointerCapture(ev.pointerId);
+      } catch {} // a pointer that is already up (or a made-up one) can't be held
+    },
+    after: (seconds, then, line) => setTimeout(() => imagine_page.run(then, []), Math.max(0, seconds) * 1000),
+    every: (seconds, then, line) => setInterval(() => imagine_page.run(then, []), Math.max(0.001, seconds) * 1000),
+    animate(n, property, from, to, seconds, easing, line) {
+      const name = property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      return imagine_page.get(n, line).animate([{ [name]: from }, { [name]: to }], { duration: seconds * 1000, easing });
+    },
+    // a canvas, drawn on in dots, sharp on every screen
+    canvas: null,
+    draw_on(n, sharpness, line) {
+      const el = imagine_page.get(n, line);
+      if (!el.getContext) imagine.fail(line, "only a canvas element can be drawn on.");
+      const ratio = (devicePixelRatio || 1) * Math.min(1, Math.max(0.1, sharpness)), w = el.clientWidth, h = el.clientHeight;
+      if (el.width !== Math.round(w * ratio) || el.height !== Math.round(h * ratio)) {
+        el.width = Math.round(w * ratio);
+        el.height = Math.round(h * ratio);
+      }
+      const c = el.getContext("2d");
+      c.setTransform(ratio, 0, 0, ratio, 0, 0);
+      let first = true;
+      imagine_page.canvas = {
+        width: w, height: h,
+        clear: () => c.clearRect(0, 0, w, h),
+        begin: () => { c.beginPath(); first = true; },
+        point: (x, y) => { first ? c.moveTo(x, y) : c.lineTo(x, y); first = false; },
+        fill: (colour) => { c.fillStyle = colour; c.fill(); },
+        fade(top, bottom, y0, y1) {
+          const g = c.createLinearGradient(0, y0, 0, y1);
+          g.addColorStop(0, top);
+          g.addColorStop(1, bottom);
+          c.fillStyle = g;
+          c.fill();
+        },
+        trace: (colour, width) => { c.strokeStyle = colour; c.lineWidth = width; c.stroke(); },
+        dot: (x, y, r, colour) => { c.beginPath(); c.arc(x, y, Math.max(0, r), 0, Math.PI * 2); c.fillStyle = colour; c.fill(); first = true; },
+        box: (x, y, bw, bh, colour) => { c.fillStyle = colour; c.fillRect(x, y, bw, bh); },
+        all_fade(top, bottom) {
+          const g = c.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, top);
+          g.addColorStop(1, bottom);
+          c.fillStyle = g;
+          c.fillRect(0, 0, w, h);
+        },
+        glow(x, y, r, inner, outer) {
+          const g = c.createRadialGradient(x, y, 0, x, y, Math.max(0.001, r));
+          g.addColorStop(0, inner);
+          g.addColorStop(1, outer);
+          c.fillStyle = g;
+          c.fillRect(0, 0, w, h);
+        },
+      };
+    },
+    pen() {
+      if (!imagine_page.canvas) imagine.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
+      return imagine_page.canvas;
+    },
+    // a whole file fetched into the page, so a song can be moved about in freely
+    copies: new Map(),
+    async copy(address, line) {
+      if (imagine_page.copies.has(address)) return imagine_page.copies.get(address);
+      let reply;
+      try {
+        reply = await fetch(address);
+      } catch {}
+      if (!reply || !reply.ok) imagine.fail(line, `I couldn't get "${address}".`);
+      const made = URL.createObjectURL(await reply.blob());
+      if (imagine_page.copies.size > 8) {
+        const [oldest, url] = imagine_page.copies.entries().next().value;
+        URL.revokeObjectURL(url);
+        imagine_page.copies.delete(oldest);
+      }
+      imagine_page.copies.set(address, made);
+      return made;
+    },
+    // how loud each band of pitches is in a playing sound, from 0 to 1
+    hearing: new WeakMap(),
+    bands(n, count, line) {
+      const el = imagine_page.get(n, line);
+      let ear = imagine_page.hearing.get(el);
+      if (!ear) {
+        const context = new AudioContext(), source = context.createMediaElementSource(el), analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        ear = { context, analyser, data: new Uint8Array(analyser.frequencyBinCount) };
+        imagine_page.hearing.set(el, ear);
+      }
+      if (ear.context.state === "suspended") ear.context.resume();
+      ear.analyser.getByteFrequencyData(ear.data);
+      const out = [], size = Math.max(1, Math.floor(ear.data.length * 0.75 / count));
+      for (let k = 0; k < count; k++) {
+        let total = 0;
+        for (let j = 0; j < size; j++) total += ear.data[k * size + j] || 0;
+        out.push(total / size / 255);
+      }
+      return out;
+    },
+  };

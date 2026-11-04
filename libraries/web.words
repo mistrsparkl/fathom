@@ -109,7 +109,37 @@ python:
 
 to web page, given address (text), giving back text = imagine_web::get({address}, {line})
   runs: get({address})
+  web: (await imagine_web::get({address}, {line}))
 to download, given address (text) and file (text) = imagine_web::download({address}, {file}, {line})
   runs: download({address}, {file})
+  web: (await imagine_web::download({address}, {file}, {line}))
 to send to the web page, given address (text) and message (text), giving back text = imagine_web::send({address}, {message}, {line})
   runs: send({address}, {message})
+  web: (await imagine_web::send({address}, {message}, {line}))
+
+javascript:
+  const imagine_web = {
+    async fetched(address, options, line, problem) {
+      try {
+        const reply = await fetch(address, options);
+        if (!reply.ok) throw new Error(String(reply.status));
+        return reply;
+      } catch {
+        imagine.fail(line, problem);
+      }
+    },
+    get: async (address, line) => (await imagine_web.fetched(address, {}, line, `I couldn't get the web page "${address}".`)).text(),
+    async send(address, message, line) {
+      const options = { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8" }, body: message };
+      return (await imagine_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
+    },
+    async download(address, file, line) {
+      const problem = `I couldn't download "${address}".`;
+      const bytes = new Uint8Array(await (await imagine_web.fetched(address, {}, line, problem)).arrayBuffer());
+      try {
+        require("fs").writeFileSync(file, bytes);
+      } catch {
+        imagine.fail(line, problem);
+      }
+    },
+  };

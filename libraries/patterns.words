@@ -69,9 +69,30 @@ python:
 
 to the pattern fits, given pattern (text) and text (text), giving back yes or no = imagine_patterns::fits({pattern}, {text}, {line})
   runs: make({pattern}).search({text}) is not None
+  web: imagine_patterns::make({pattern}, "", {line}).test({text})
 to matches of the pattern, given pattern (text) and text (text), giving back a list of text = imagine_patterns::matches({pattern}, {text}, {line})
   runs: matches({pattern}, {text})
+  web: imagine_patterns::matches({pattern}, {text}, {line})
 to pieces of the pattern, given pattern (text) and text (text), giving back a list of text = imagine_patterns::pieces({pattern}, {text}, {line})
   runs: pieces({pattern}, {text})
+  web: imagine_patterns::pieces({pattern}, {text}, {line})
 to replace the pattern, given pattern (text) and text (text) and with (text), giving back text = imagine_patterns::replace({pattern}, {text}, {with}, {line})
   runs: make({pattern}).sub(lambda m: {with}, {text})
+  web: imagine_patterns::replace({pattern}, {text}, {with}, {line})
+
+javascript:
+  const imagine_patterns = {
+    make(pattern, flags, line) {
+      try {
+        return new RegExp(pattern, flags);
+      } catch {
+        imagine.fail(line, 'the pattern "' + pattern + "\" isn't a pattern I understand.");
+      }
+    },
+    matches: (pattern, text, line) => [...text.matchAll(imagine_patterns.make(pattern, "g", line))].map((m) => m[0]),
+    pieces(pattern, text, line) {
+      const m = imagine_patterns.make(pattern, "", line).exec(text);
+      return m ? m.slice(1).map((g) => g || "") : [];
+    },
+    replace: (pattern, text, by, line) => text.replace(imagine_patterns.make(pattern, "g", line), () => by),  // the new text as it is: no $ codes
+  };

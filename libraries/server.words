@@ -229,7 +229,20 @@ the web message = imagine_server::message, text, read only
   runs: MESSAGE[0]
 to web decoded, given piece (text), giving back text = imagine_server::decoded({piece})
   runs: urllib.parse.unquote_plus({piece})
+  web: imagine_server_web::decoded({piece})
 to web encoded, given piece (text), giving back text = imagine_server::encoded({piece})
   runs: urllib.parse.quote({piece}, safe="-_.~")
+  web: encodeURIComponent({piece})
 to answer with the file, given name (text) = imagine_server::answer_with({name}, {line})
   runs: answer_with({name})
+
+javascript:
+  const imagine_server_web = {
+    decoded(piece) {
+      try {
+        return decodeURIComponent(piece.replace(/\+/g, " "));
+      } catch {
+        return piece;
+      }
+    },
+  };

@@ -40,6 +40,7 @@ to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nu
 
 user name = imagine_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME", "")
+  web: imagine_computer::environment("USERNAME")
 
 include: <cstdio>
 include: <filesystem>
@@ -92,11 +93,23 @@ python:
 
 the words given = imagine::arguments, a list of text, read only
   runs: list(ARGUMENTS)
+  web: imagine_computer::words_given()
 current folder = std::filesystem::current_path().string(), text, read only
   runs: os.getcwd()
+  web: imagine_computer::folder()
 to output of the command, given command (text), giving back text = imagine_computer::output_of({command}, {line})
   runs: output_of({command})
 to environment value of, given name (text), giving back text = imagine_computer::environment({name})
   runs: os.environ.get({name}, "")
+  web: imagine_computer::environment({name})
 to end the program, given code (a number) = imagine_computer::end_program({code})
   runs: end_program({code})
+  web: imagine::leave({code})
+
+javascript:
+  const imagine_computer = {
+    node: typeof process !== "undefined" && !!(process.versions && process.versions.node),
+    environment: (name) => (imagine_computer.node ? process.env[name] || "" : ""),
+    words_given: () => (imagine_computer.node ? process.argv.slice(2) : []),
+    folder: () => (imagine_computer.node ? process.cwd() : ""),
+  };

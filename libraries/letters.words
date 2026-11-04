@@ -45,5 +45,20 @@ python:
 
 to code of the letter, given letter (text), giving back a number = imagine_letters::code_of({letter}, {line})
   runs: code_of({letter})
+  web: imagine_letters::code_of({letter}, {line})
 to the letter with code, given code (a number), giving back text = imagine_letters::letter_with({code}, {line})
   runs: letter_with({code})
+  web: imagine_letters::letter_with({code}, {line})
+
+javascript:
+  const imagine_letters = {
+    code_of(s, line) {
+      if (!s) imagine.fail(line, "'code of the letter' needs a letter, but the text is empty.");
+      return s.codePointAt(0);
+    },
+    letter_with(n, line) {
+      if (n < 0 || n > 0x10FFFF || n !== Math.trunc(n) || (n >= 0xD800 && n <= 0xDFFF))
+        imagine.fail(line, "there is no letter with the code " + imagine.text(n) + ".");
+      return String.fromCodePoint(n);
+    },
+  };

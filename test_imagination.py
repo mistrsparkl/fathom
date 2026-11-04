@@ -1,4 +1,6 @@
 """Self-check for imagination.py. Run: py -3 test_imagination.py"""
+import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -90,14 +92,16 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, patterns, server, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, page, patterns, server, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
     import subprocess
-    compiler = translate.find_vcvars()
+    compiler = None if os.environ.get("IMAGINE_NO_CPP") else translate.find_vcvars()
     if not compiler:
         print("(only running directly: no C++ compiler found)")
+    node = shutil.which("node") if not os.environ.get("IMAGINE_NO_WEB") else None
+    web_skipped, web_runs = [], [0]
 
     def both(source, typed="", others=None):
         with tempfile.TemporaryDirectory() as d:
@@ -117,6 +121,17 @@ def program_checks():
                 built = subprocess.run([str(exe)], input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
                 assert (built.stdout, built.stderr, built.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
                     f"built: {built.stdout!r} {built.stderr!r} {built.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}"
+            if node:  # and made for the web: the same again, run by node
+                problem = translate.web(script)
+                if problem is None:
+                    web_runs[0] += 1
+                    made = subprocess.run([node, "probe.js"], input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
+                    assert (made.stdout, made.stderr, made.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
+                        f"web: {made.stdout!r} {made.stderr!r} {made.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}\n" \
+                        + (Path(d) / "probe.js").read_text(encoding="utf-8")
+                else:
+                    assert "can't be used in a web program" in problem, problem
+                    web_skipped.append(problem)
             return direct
 
     out = both('genesis:\n  ask "Name? " into name\n  ask "Age? " into age (a number)\n'
@@ -574,6 +589,10 @@ def program_checks():
                               "one, two 2 | 2 | two, 2 | yes no\n3\n"), repr(ran.stdout)
         assert ran.stderr == "Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.\n", repr(ran.stderr)
         assert ran.returncode == 1
+    if node:
+        print(f"(made for the web too: {web_runs[0]} programs; {len(web_skipped)} use words the web doesn't have yet)")
+        if os.environ.get("IMAGINE_SHOW_SKIPPED"):
+            print("\n".join(sorted(set(web_skipped))))
 
 
 def main():

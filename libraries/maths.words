@@ -5,25 +5,34 @@ include: <cmath>
 
 pi = 3.14159265358979323846, number, read only
   runs: math.pi
+  web: 3.141592653589793
 
 to sine of, given angle (a number), giving back a number = std::sin({angle} * 3.14159265358979323846 / 180.0)
   runs: math.sin({angle} * 3.14159265358979323846 / 180.0)
+  web: Math.sin({angle} * 3.14159265358979323846 / 180.0)
 to cosine of, given angle (a number), giving back a number = std::cos({angle} * 3.14159265358979323846 / 180.0)
   runs: math.cos({angle} * 3.14159265358979323846 / 180.0)
+  web: Math.cos({angle} * 3.14159265358979323846 / 180.0)
 to tangent of, given angle (a number), giving back a number = std::tan({angle} * 3.14159265358979323846 / 180.0)
   runs: math.tan({angle} * 3.14159265358979323846 / 180.0)
+  web: Math.tan({angle} * 3.14159265358979323846 / 180.0)
 
 to round, given x (a number), giving back a number = std::round({x})
   runs: (lambda a: math.copysign(math.floor(abs(a)) + (abs(a) - math.floor(abs(a)) >= 0.5), a))({x})
+  web: imagine_maths::round({x})
 to round down, given x (a number), giving back a number = std::floor({x})
   runs: float(math.floor({x}))
+  web: Math.floor({x})
 to round up, given x (a number), giving back a number = std::ceil({x})
   runs: float(math.ceil({x}))
+  web: Math.ceil({x})
 
 to power of, given x (a number) and power (a number), giving back a number = std::pow({x}, {power})
   runs: power_of({x}, {power})
+  web: Math.pow({x}, {power})
 to remainder of, given x (a number) and divided by (a number), giving back a number = std::fmod({x}, {divided by})
   runs: math.fmod({x}, {divided by}) if {divided by} != 0 else math.nan
+  web: (({x}) % ({divided by}))
 
 python:
   def power_of(x, p):
@@ -34,15 +43,27 @@ python:
 
 e = 2.71828182845904523536, number, read only
   runs: math.e
+  web: 2.718281828459045
 to logarithm of, given x (a number), giving back a number = (({x}) > 0 ? std::log10({x}) : std::nan(""))
   runs: math.log10({x}) if {x} > 0 else math.nan
+  web: (({x}) > 0 ? Math.log10({x}) : NaN)
 to natural logarithm of, given x (a number), giving back a number = (({x}) > 0 ? std::log({x}) : std::nan(""))
   runs: math.log({x}) if {x} > 0 else math.nan
+  web: (({x}) > 0 ? Math.log({x}) : NaN)
 to arc sine of, given x (a number), giving back a number = std::asin({x}) * 180.0 / 3.14159265358979323846
   runs: math.asin({x}) * 180.0 / 3.14159265358979323846 if -1 <= {x} <= 1 else math.nan
+  web: Math.asin({x}) * 180.0 / 3.14159265358979323846
 to arc cosine of, given x (a number), giving back a number = std::acos({x}) * 180.0 / 3.14159265358979323846
   runs: math.acos({x}) * 180.0 / 3.14159265358979323846 if -1 <= {x} <= 1 else math.nan
+  web: Math.acos({x}) * 180.0 / 3.14159265358979323846
 to arc tangent of, given x (a number), giving back a number = std::atan({x}) * 180.0 / 3.14159265358979323846
   runs: math.atan({x}) * 180.0 / 3.14159265358979323846
+  web: Math.atan({x}) * 180.0 / 3.14159265358979323846
 to whole part of, given x (a number), giving back a number = std::trunc({x})
   runs: float(math.trunc({x})) if math.isfinite({x}) else {x}
+  web: Math.trunc({x})
+
+javascript:
+  const imagine_maths = {
+    round: (x) => Math.sign(x) * Math.round(Math.abs(x)),  // halves go away from zero, as C++ does
+  };

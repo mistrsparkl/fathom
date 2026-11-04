@@ -57,6 +57,13 @@ ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVec
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT}
 UNREAL = False  # set by 'imagine unreal': libraries/unreal/ words win, and the program starts from ImagineMain()
+# Set by 'imagine web': the script is read into JavaScript instead. Every piece's .cpp then holds JavaScript; most of it
+# is written the same way in both (calls, operators, if, while), and the places where they differ check JS.
+JS = False
+JS_RESERVED = set("""function let var yield await async in of typeof instanceof void delete new this class extends super import
+export default null undefined true false arguments eval with enum implements interface package private protected public
+static imagine""".split())
+UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of running can't use it; the message follows
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
@@ -70,6 +77,7 @@ UNITS = set("degrees degree cm centimetres seconds second per squared percent me
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
+OWNER_PARAMS = set()  # the C++ names of the things commands are for ('to bounce, for a ball:' gets 'ball')
 # Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
 OWNERS = {}
 PARENTS = {}  # kind of thing -> the kind it is a kind of ('a dog is a kind of pet')
@@ -150,7 +158,61 @@ def param_type(kind):
 
 
 def zero(kind):
+    if JS:
+        return js_zero(kind)
     return ZERO.get(kind) or f"{cpp_type(kind)}()"
+
+
+def js_class(kind):
+    """A kind of thing's JavaScript class: 'thing pet' -> Kind_Pet (a prefix, so it can't meet a browser's own names)."""
+    return "Kind_" + "".join(w.capitalize() for w in kind[6:].split())
+
+
+def js_zero(kind):
+    if is_list(kind):
+        return "[]"
+    if is_table(kind):
+        return "imagine::table()"
+    if is_thing(kind):
+        return f"new {js_class(kind)}()"
+    if is_command(kind):
+        return "null"
+    return {NUMBER: "0", YESNO: "false", TEXT: '""', PLACE: "FVector(0, 0, 0)", FLAT: "FVector2D(0, 0)"}[kind]
+
+
+def is_deep(kind):
+    """Values that hold other values: they are copied when stored (C++ copies them by itself)."""
+    return kind in (PLACE, FLAT) or is_list(kind) or is_table(kind) or is_thing(kind)
+
+
+def js_copy(cpp, kind):
+    """In JavaScript a stored list, table, place or thing must be copied by hand, as C++ and Python do."""
+    return f"imagine::dup({strip_parens(cpp)})" if JS and is_deep(kind) else strip_parens(cpp)
+
+
+def js_set(target):
+    """The start of putting a value into target, in JavaScript: 'x = ', or a runtime call that the close bracket ends."""
+    return getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
+
+
+def js_dots(code):
+    """C++'s 'imagine::text' is JavaScript's 'imagine.text': turn every '::' outside text into '.'."""
+    out, k, n = [], 0, len(code)
+    while k < n:
+        c = code[k]
+        if c == '"':
+            end = k + 1
+            while end < n and code[end] != '"':
+                end += 2 if code[end] == "\\" else 1
+            out.append(code[k:end + 1])
+            k = end + 1
+        elif code.startswith("::", k):
+            out.append(".")
+            k += 2
+        else:
+            out.append(c)
+            k += 1
+    return "".join(out)
 
 
 def parse_kind(text):
@@ -849,6 +911,8 @@ class Names:
 
     def value(self, key):
         cpp, kind, read_only, run = self.known[key]
+        if cpp.startswith(UNUSABLE):
+            raise ScriptError(0, cpp[len(UNUSABLE):])
         if isinstance(run, tuple):  # (get, put): a part of the thing a command is for
             return Value(cpp, kind, run[0], None if read_only else run[1])
         if run is not None:  # a setting, an Unreal word or a library word
@@ -867,11 +931,13 @@ sizeof static struct switch template this throw true try typedef union unsigned 
 
 def snake(words):
     name = "_".join(re.sub(r"[^a-z0-9]", "", w) for w in words)
-    return name + "_" if name in CPP_RESERVED else name
+    return name + "_" if name in CPP_RESERVED or (JS and name in JS_RESERVED) else name
 
 
 def cpp_text(token):
-    """A quoted text token as a C++ string."""
+    """A quoted text token as a C++ string (or a JavaScript one)."""
+    if JS:
+        return json.dumps(token[1:-1], ensure_ascii=False)
     return "std::string(" + token.replace("\\", "\\\\") + ")"
 
 
@@ -1021,6 +1087,8 @@ class Expr:
                     self.need(v, NUMBER, "Comparing")
                     self.need(r, NUMBER, "Comparing")
                 a, b, f = v.run, r.run, COMPARE_RUN[op]
+                if JS and is_deep(v.kind):  # JavaScript's == only asks whether they are the very same list
+                    return Value(f"({'!' if op == '!=' else ''}imagine::same({v.cpp}, {r.cpp}))", YESNO, lambda env: f(a(env), b(env)))
                 return Value(f"({v.cpp} {op} {r.cpp})", YESNO, lambda env: f(a(env), b(env)))
         return v
 
@@ -1039,6 +1107,9 @@ class Expr:
                 raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
             f = operator.add if op == "+" else operator.sub
             run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
+            if JS and v.kind != NUMBER:
+                v = Value(f"imagine::{'plus' if op == '+' else 'minus'}({v.cpp}, {r.cpp})", v.kind, run)
+                continue
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
 
@@ -1053,6 +1124,9 @@ class Expr:
             a, b = v.run, r.run
             f = divide if op == "/" else operator.mul
             run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
+            if JS and v.kind != NUMBER:
+                v = Value(f"imagine::{'over' if op == '/' else 'times'}({v.cpp}, {r.cpp})", v.kind, run)
+                continue
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
 
@@ -1097,6 +1171,8 @@ class Expr:
             if v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
             a = v.run
+            if JS and v.kind != NUMBER:
+                return Value(f"imagine::negative({v.cpp})", v.kind, lambda env: -a(env))
             return Value(f"(-{v.cpp})", v.kind, lambda env: -a(env))
         v = self.primary()
         while self.at("of"):  # 'existence of horizontal': a part named after the place or thing
@@ -1127,7 +1203,12 @@ class Expr:
                     want = f"a command given {kind_name(item)} giving back " + ("yes or no" if words[0] == "kept" else "something")
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs {want}, not {kind_name(f.kind)}.")
                 a, g, line = v.run, f.run, self.line
-                if words[0] == "kept":
+                if JS:
+                    v = Value(f"(await imagine::{words[0]}_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line}))",
+                              v.kind if words[0] == "kept" else "list of " + gives,
+                              (lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env))) if words[0] == "kept" else
+                              (lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env))))
+                elif words[0] == "kept":
                     v = Value(f"imagine::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
                               lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env)))
                 else:
@@ -1175,7 +1256,7 @@ class Expr:
         for words, mark, cpp in ((("quote", "mark"), '"', '"\\""'), (("new", "line"), "\n", '"\\n"')):
             if self.at(*words):  # text can't hold these between its own quote marks
                 self.i += 2
-                return Value(f"std::string({cpp})", TEXT, lambda env, mark=mark: mark)
+                return Value(cpp if JS else f"std::string({cpp})", TEXT, lambda env, mark=mark: mark)
         if tok.startswith('"'):
             self.i += 1
             s = tok[1:-1]
@@ -1216,9 +1297,13 @@ class Expr:
                     key in self.names.known and (self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})
                                                  or place_part(self.names.known[key][1], (self.peek(n + 1),)))):
                 # 'existence of x' is x of the name existence, when there is one, not the existence of x
+                back = self.i
                 self.i += n + 1
                 owner = self.operand()
                 if owner.kind not in FIELDS[key]:
+                    if key in self.names.known or key in (("lines",), ("words",)):  # 'entry app of windows': the name app; 'words of text'
+                        self.i = back
+                        break
                     raise ScriptError(line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
                 return part_of(owner, key)
         if tok == "item" and self.peek(1) not in ITEM_NOT_INDEX:
@@ -1237,8 +1322,11 @@ class Expr:
             def put(env, x):
                 items = get(env)
                 items[index_of(items, at(env), line)] = dup(x)
-            return Value(f"imagine::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
-                         put if seq.writable else None)
+            v = Value(f"imagine::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
+                      put if seq.writable else None)
+            if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
+                v.cpp_assign, v.cpp_close = f"imagine::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
+            return v
         made = self.made()  # before names, so a name like 'a' doesn't hide 'a list of'
         if made:
             return made
@@ -1256,6 +1344,8 @@ class Expr:
             v = Value(f"imagine::entry({table.cpp}, {strip_parens(name.cpp)}, {line})", entry_kind(table.kind),
                       lambda env: entry_of(get(env), at(env), line), put if table.writable else None)
             v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
+            if JS:
+                v.cpp_assign, v.cpp_close = f"imagine::put_entry({table.cpp}, {strip_parens(name.cpp)}, ", ")"
             return v
         for stat in ("sum", "average", "biggest", "smallest"):
             if self.at(stat, "of") and not match_command(self.names, self.t[self.i:])[0]:  # a command called 'sum of' still wins
@@ -1301,13 +1391,16 @@ class Expr:
             if not gives and not getattr(self, "allow_nothing", False):
                 raise ScriptError(line, "This command doesn't give back anything, so it can't be used as a value.")
             get, gets = f.run, [a.run for a in args]
-            return Value(f"imagine::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])})", gives,
+            return Value(f"{'(await ' if JS else ''}imagine::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
                          lambda env: invoke_value(get(env), [g(env) for g in gets], line))
         key, n = self.names.match(self.t, self.i)
         command_key, command_n = match_command(self.names, self.t[self.i:])
         if key and n >= command_n:  # the longer match wins: 'balls moved down' is a command even when 'balls' is a name
             self.i += n
-            return self.names.value(key)
+            try:
+                return self.names.value(key)
+            except ScriptError as err:
+                raise ScriptError(err.line or line, err.message)
         key, n = command_key, command_n
         if key:
             self.i += n
@@ -1439,7 +1532,8 @@ class Expr:
                         if kind not in (NUMBER, TEXT):
                             raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
                         a = v.run
-                        return Value(f"imagine::sorted_by({v.cpp}, [](const auto& t) {{ return t.{member}; }})", v.kind,
+                        by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
+                        return Value(f"imagine::sorted_by({v.cpp}, {by})", v.kind,
                                      lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])])
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
@@ -1476,7 +1570,7 @@ class Expr:
             if v.kind == TEXT:
                 return Value(f"imagine::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
             if is_list(v.kind) or is_table(v.kind):
-                return Value(f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
+                return Value(f"imagine::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
             self.i += 1
@@ -1511,7 +1605,7 @@ class Expr:
                     if name in THINGS:
                         self.i += n
                         things = THINGS
-                        return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
+                        return Value(js_zero("thing " + name) if JS else f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
@@ -1521,7 +1615,7 @@ class Expr:
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return Value(f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {})
+                        return Value(zero("table of " + k) if JS else f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {})
                 raise ScriptError(self.line, f"Say what the table holds, like 'a table of numbers'. Kinds are: {kind_words()}.")
         for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of")):
             if self.at(*lead):
@@ -1538,13 +1632,14 @@ class Expr:
                             raise ScriptError(self.line, f"A list holds one kind of thing, but this mixes {kind_name(items[0].kind)} and {kind_name(v.kind)}.")
                     kind = "list of " + items[0].kind
                     runs = [v.run for v in items]
-                    return Value(f"{cpp_type(kind)}{{{', '.join(strip_parens(v.cpp) for v in items)}}}", kind,
+                    listed = ', '.join(js_copy(v.cpp, v.kind) if JS else strip_parens(v.cpp) for v in items)
+                    return Value(f"[{listed}]" if JS else f"{cpp_type(kind)}{{{listed}}}", kind,
                                  lambda env: [dup(f(env)) for f in runs])
                 for n in range(min(16, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return Value(f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: [])
+                        return Value("[]" if JS else f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: [])
                 raise ScriptError(self.line, f"Say what the list holds, like 'a list of numbers'. Kinds are: {kind_words()}.")
         self.i = start
         return None
@@ -1607,6 +1702,8 @@ def part_of(owner, key):
             fields["birth"], fields["existence"] = dup(x), dup(x)
         v.store = born
         v.cpp_assign, v.cpp_close = f"imagine::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
+        if JS:
+            v.cpp_assign = f"imagine::born({strip_parens(owner.cpp)}, "
     return v
 
 
@@ -1643,6 +1740,8 @@ def load_library(name, line, names):
              "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place}
     rows = path.read_text(encoding="utf-8").splitlines()
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
+    web = None  # the word whose 'web:' line may come next: (where, input names, set its JavaScript)
+    web_only = False  # 'web only': the library's words have no C++, only 'web:' lines
     k = 0
     while k < len(rows):
         raw = rows[k]
@@ -1651,6 +1750,18 @@ def load_library(name, line, names):
         k += 1
         where = f"In the library '{name}' ({path.name} line {n}): "
         if not stripped or stripped.startswith("note:"):
+            continue
+        if raw[:1].isspace() and stripped.startswith("web:"):
+            if not JS:  # only a program made for the web uses it
+                continue
+            if not web:
+                raise ScriptError(line, where + "'web:' goes indented under the word it is for.")
+            src, (word_where, inputs, set_web) = stripped[4:].strip(), web
+            for in_name in inputs:
+                if "{" + in_name + "}" not in src:
+                    raise ScriptError(line, where + f"the 'web:' line doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
+            set_web(src)
+            web = None
             continue
         if raw[:1].isspace() and stripped.startswith("runs:"):
             if not pending:
@@ -1665,28 +1776,36 @@ def load_library(name, line, names):
             set_run(fn)
             pending = None
             continue
-        pending = None
-        if stripped.startswith("include:"):
-            out.append(f"#include {stripped[8:].strip()}")
+        pending = web = None
+        if stripped == "web only":
+            web_only = True
+        elif stripped.startswith("include:"):
+            if not JS:
+                out.append(f"#include {stripped[8:].strip()}")
         elif stripped.startswith("link:"):
-            out.append(f'#pragma comment(lib, "{stripped[5:].strip()}")')
-        elif stripped in ("code:", "python:"):
+            if not JS:
+                out.append(f'#pragma comment(lib, "{stripped[5:].strip()}")')
+        elif stripped in ("code:", "python:", "javascript:"):
             block = []
             while k < len(rows) and (not rows[k].strip() or rows[k][:1].isspace()):
                 block.append(rows[k][2:] if rows[k].startswith("  ") else rows[k].lstrip())
                 k += 1
-            if stripped == "code:":
-                out += block
+            if stripped == "javascript:":
+                if JS:
+                    out += block
+            elif stripped == "code:":
+                if not JS:
+                    out += block
             else:
                 exec("\n".join(block), space)
-        elif stripped.startswith("to ") and " = " in stripped:
-            head, _, cpp = stripped.partition(" = ")
+        elif stripped.startswith("to ") and (" = " in stripped or web_only):
+            head, _, cpp = stripped.partition(" = ") if " = " in stripped else (stripped, "", "")
             try:
                 words, _, inputs, gives = command_head(head + ":", line)
             except ScriptError as err:
                 raise ScriptError(line, where + err.message)
             in_names = [" ".join(w) for w, _ in inputs]
-            for in_name in in_names:
+            for in_name in in_names if not web_only else []:
                 if "{" + in_name + "}" not in cpp:
                     raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
             command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
@@ -1697,6 +1816,14 @@ def load_library(name, line, names):
             command.runner = missing
             names.commands[tuple(words)] = command
             pending = (where, in_names, lambda fn, command=command: setattr(command, "runner", fn))
+            if JS:
+                command.unusable = f"'{word}' (from the library '{name}') can't be used in a web program yet."
+
+                def set_web(src, command=command):
+                    command.cpp, command.unusable = src, None
+                web = (where, in_names, set_web)
+            elif web_only:
+                command.unusable = f"'{word}' (from the library '{name}') only works in a program made for the web ('imagine web')."
         elif "=" in stripped:
             english, _, rest = stripped.partition("=")
             parts = [p.strip() for p in rest.rsplit(",", 2)]
@@ -1715,6 +1842,14 @@ def load_library(name, line, names):
             def set_value(fn, holder=holder):
                 holder["run"] = lambda env: fn()
             pending = (where, [], set_value)
+            if JS or web_only:
+                key = tuple(words)
+                said = "can't be used in a web program yet." if JS else "only works in a program made for the web ('imagine web')."
+                names.known[key] = (UNUSABLE + f"'{english.strip()}' (from the library '{name}') {said}",) + names.known[key][1:]
+
+                def set_web(src, key=key):
+                    names.known[key] = (src,) + names.known[key][1:]
+                web = (where, [], set_web)
         else:
             raise ScriptError(line, where + f"I don't understand '{stripped}'.\n{LIBRARY_HELP}")
     return out + [""]
@@ -1815,6 +1950,8 @@ def read_one(path, auto):
     names, info, settings, out = None, {}, [], []
     commands = []  # (header text, line, body)
     things = []  # (name, line, [(line, field text)])
+    remembered = []  # (line, 'score (a number)') from 'the world remembers:'
+    OWNER_PARAMS.clear()
     libs, used = [], set()  # C++ that 'use:' libraries need, and their names
     THINGS = {}
     OWNERS.clear()
@@ -1860,7 +1997,8 @@ def read_one(path, auto):
                 number = float(m.group(2))
                 names.add(words, cpp, NUMBER, True, lambda env, number=number: number)
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
-                settings.append(f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
+                settings.append(f"\t{snake(words)}: {value},{'  // ' + m.group(3) if m.group(3) else ''}" if JS else
+                                f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
             continue
         if text_.lower() == "to start:":
             raise ScriptError(n, "'to start:' is now 'genesis:'.")
@@ -1910,15 +2048,28 @@ def read_one(path, auto):
                 PARENTS[name] = parent
             things.append((name, n, fields))
             continue
+        if text_.lower() == "the world remembers:":  # names every command can use and change
+            while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
+                if lines[i].strip() and not lines[i].strip().startswith("note:"):
+                    remembered.append((numbers[i], lines[i].strip()))
+                i += 1
+            if i >= len(lines) or not is_closing(lines[i]):
+                raise ScriptError(numbers[i] if i < len(lines) else numbers[-1],
+                                  f"'the world remembers:' must end with the line '{CLOSING}', unindented.")
+            i += 1
+            continue
         if is_closing(text_):
             raise ScriptError(n, f"'{CLOSING}' closes a command, so it goes right after the command's last indented line.")
-        raise ScriptError(n, f"I don't know what to do with '{text_}'. Top-level lines are notes, 'use:', 'settings:', 'a ... has:' or 'to ...:'.")
+        raise ScriptError(n, f"I don't know what to do with '{text_}'. Top-level lines are notes, 'use:', 'settings:', 'a ... has:', 'the world remembers:' or 'to ...:'.")
     if names is None:
         raise ScriptError(1, "The script is empty.")
     program = info is None
     if things and not program:
         raise ScriptError(things[0][1], "New kinds of things can only be described in programs for now.")
     structs = describe_things(things)
+    if remembered and not program:
+        raise ScriptError(remembered[0][0], "'the world remembers:' is for programs of their own (with 'genesis:').")
+    structs += remember(remembered, names)
     heads = [command_head(text_, n) for text_, n, _ in commands]
     made = []  # the Command for each head
     for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
@@ -1954,6 +2105,9 @@ def read_one(path, auto):
         heads.append(item[0])
         commands.append(item[1])
         made.append(item[2])
+    if JS:
+        for (words, cpp, inputs, gives), command in zip(heads, made):
+            command.js = f"{cpp}_{snake(inputs[0][1][6:].split())}" if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else cpp
     if program:
         if ("start",) not in names.commands:
             raise ScriptError(main_lines or 1, "A program needs a 'genesis:' command: that is where it begins.")
@@ -1961,6 +2115,16 @@ def read_one(path, auto):
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
                               "'genesis:' has no inputs and gives nothing back.")
     functions = [function(head, n, body, names, info, command) for head, (_, n, body), command in zip(heads, commands, made)]
+    if JS:
+        if not program:
+            raise ScriptError(1, "Only programs of their own (with 'genesis:') can be made for the web.")
+        files = json.dumps(FILES, ensure_ascii=False)
+        ns = [f"const Imagine_{snake(path.stem.split())} = {{"] + settings + ["};", ""] if settings else []
+        body = js_dots("\n".join(structs + ns + out + [""] + functions))
+        top = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
+               "(async () => {",
+               'const { imagine, FMath, FVector, FVector2D } = globalThis.imagination || require("./imagination.js");', ""]
+        return "\n".join(top + libs + [body, f"await imagine.main({files}, Start);", "})();"]) + "\n", Program(names.commands)
     if program:
         protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
@@ -1979,6 +2143,39 @@ def read_one(path, auto):
                 f'#include "{info["header"]}"', ""] + libs
     ns = [f"namespace Imagine_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
     return "\n".join(head + ns + out + [""] + functions) + "\n", Program(names.commands) if program else None
+
+
+SHARED = {}  # the values of 'the world remembers:' names, while a program runs directly
+
+
+def remember(rows, names):
+    """'the world remembers:' lines: names every command shares. Returns the C++ (or JavaScript) that makes them."""
+    SHARED.clear()
+    out = []
+    for n, text_ in rows:
+        m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
+        kind = m and parse_kind(m.group(2))
+        if not kind:
+            raise ScriptError(n, f"Each name the world remembers looks like 'score (a number)'. Kinds are: {kind_words()}.")
+        words = m.group(1).split()
+        if any(w in KEYWORDS for w in words):
+            raise ScriptError(n, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
+        if tuple(words) in names.known:
+            raise ScriptError(n, f"'{' '.join(words)}' already means something, so the world can't remember it as a name.")
+        cpp = "world_" + snake(words)
+        things = THINGS
+        SHARED[cpp] = None
+
+        def get(env, cpp=cpp, kind=kind, things=things):
+            if SHARED[cpp] is None:
+                SHARED[cpp] = py_zero(kind, things)
+            return SHARED[cpp]
+
+        def put(env, x, cpp=cpp):
+            SHARED[cpp] = dup(x)
+        names.add(words, cpp, kind, False, (get, put))
+        out.append(f"let {cpp} = {js_zero(kind)};" if JS else f"inline {cpp_type(kind)} {cpp} = {zero(kind)};")
+    return out + ([""] if out else [])
 
 
 def describe_things(things):
@@ -2013,6 +2210,14 @@ def describe_things(things):
             FIELDS.setdefault(("existence",), {})["thing " + name] = ("existence", kind)
         described.add(name)
     out = []
+    if things and JS:
+        for name, _, _ in things:
+            cls = js_class("thing " + name)
+            fields = " ".join(f"this.{snake(w)} = {js_zero(k)};" for w, k in THINGS[name])
+            spec = ", ".join(json.dumps([" ".join(w), snake(w), k]) for w, k in THINGS[name])
+            out.append(f"class {cls} {{ constructor() {{ {fields} }} }}")
+            out.append(f"imagine::kind({cls}, {json.dumps(name)}, [{spec}]);")
+        return out + [""]
     if things:
         out.append("namespace imagine\n{")
         out += [f"\tstruct {cpp_type('thing ' + name)};" for name, _, _ in things]
@@ -2087,7 +2292,8 @@ def fit(v, kind):
         return v
     if is_thing(v.kind) and is_thing(kind) and is_kind_of(v.kind, kind):
         get, name, things = v.run, kind[6:], THINGS
-        return Value(f"{cpp_type(kind)}({strip_parens(v.cpp)})", kind, lambda env: as_kind(get(env), name, things))
+        made = f"imagine::as_kind({strip_parens(v.cpp)}, {js_class(kind)})" if JS else f"{cpp_type(kind)}({strip_parens(v.cpp)})"
+        return Value(made, kind, lambda env: as_kind(get(env), name, things))
     return None
 
 
@@ -2126,6 +2332,7 @@ def function(head, line, body, names, info, command=None):
             def put_all(env, x, own=own):
                 env[own].fields = dup(x).fields  # change the caller's thing itself, not a copy
             local.add(in_words, own, kind, False, (lambda env, own=own: env[own], put_all))
+            OWNER_PARAMS.add(own)
             for part_words, part_kind in THINGS[kind[6:]]:
                 member = snake(part_words)
 
@@ -2139,7 +2346,7 @@ def function(head, line, body, names, info, command=None):
             local.add(in_words, snake(in_words), kind, read_only=True)
     declared = {}
     code, run = statements(body, local, declared, 1)
-    hoisted = [f"\t{cpp_type(k)} {c} = {zero(k)};" for c, k in declared.values()]
+    hoisted = [f"\t{'let' if JS else cpp_type(k)} {c} = {zero(k)};" for c, k in declared.values()]
     owner = f"{info['class']}::" if info else ""
     end = [f"\treturn {zero(gives)};"] if gives else []
     if not info:
@@ -2157,6 +2364,10 @@ def function(head, line, body, names, info, command=None):
                 return g.value
             return py_zero(gives, things) if gives else None
         (command or names.commands[tuple(words)]).runner = runner
+    if JS:
+        title = getattr(command, "js", name) if command else name
+        return "\n".join([f"async function {title}({', '.join(snake(w) for w, _ in inputs)})", "{"]
+                         + hoisted + code + end + ["}"]) + "\n"
     return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({params(name, inputs)})", "{"]
                      + hoisted + code + end + ["}"]) + "\n"
 
@@ -2201,7 +2412,8 @@ def statements(body, names, declared, depth):
             continue
         if raw.strip().lower() == "if that went wrong:":
             raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
-        lines, run, branch = statement(n, surface(raw.strip(), n), inner, names, declared, depth)
+        said = raw.strip()
+        lines, run, branch = statement(n, said if said.startswith("note:") else surface(said, n), inner, names, declared, depth)
         out += lines
         if branch:
             which, cond = branch
@@ -2242,6 +2454,9 @@ def attempt(n, tried, handler, names, declared, depth):
             env[cpp] = err.message
             fix_run(env)
     caught = f"imagine_problem_{n}"
+    if JS:
+        return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch ({caught})", tab + "{",
+                 f"{tab}\tconst {cpp} = imagine::problem_text({caught});"] + fix_lines + [tab + "}"]), run
     return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch (const imagine::Problem& {caught})", tab + "{",
              f"{tab}\tconst std::string {cpp} = {caught}.message;"] + fix_lines + [tab + "}"]), run
 
@@ -2333,6 +2548,9 @@ def statement(n, text_, inner, names, declared, depth):
             for _ in range(int(c) if math.isfinite(c) else 0):
                 if not then(env):
                     break
+        if JS:
+            head = f"{tab}for (let {k} = 0, {k}_end = imagine::repeats({strip_parens(count.cpp)}); {k} < {k}_end; ++{k})"
+            return [head, tab + "{"] + lines + [tab + "}"], run, None
         return [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})", tab + "{"] + lines + [tab + "}"], run, None
     if colon and re.match(r"(if |otherwise\b)", text_):
         tokens = tokenize(head, n)
@@ -2374,7 +2592,7 @@ def statement(n, text_, inner, names, declared, depth):
             raise Stop()
         return [f"{tab}return;"], run, None
     if tokens == ["wait", "for", "the", "others"]:
-        return [f"{tab}imagine::wait_for_others();"], lambda env: wait_for_others(), None
+        return [f"{tab}{'await ' if JS else ''}imagine::wait_for_others();"], lambda env: wait_for_others(), None
     if tokens[0] == "meanwhile":  # 'meanwhile download with ...': the command goes on alongside the lines after this one
         rest = tokens[1 + (tokens[1:2] == [","]):]
         key, size = match_command(names, rest)
@@ -2395,6 +2613,8 @@ def statement(n, text_, inner, names, declared, depth):
             cpp, run = call(key, expr_list(more, 0, names, n), names, n)
         else:
             raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'." + library_hint(rest))
+        if JS:  # shortcut: it sees the names as they are when it runs, not a copy made when it started
+            return [f"{tab}imagine::meanwhile(async () => {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
         return [f"{tab}imagine::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
     if tokens[0] == "invoke":
         e = Expr(tokens, names, n)
@@ -2446,6 +2666,8 @@ def statement(n, text_, inner, names, declared, depth):
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
+        if JS:
+            return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], lambda env: seq(env).append(dup(get(env))), None
         return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], lambda env: seq(env).append(dup(get(env))), None
     if tokens[:2] == ["remove", "entry"] and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
@@ -2494,7 +2716,8 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             print("".join(text(g(env)) for g in gets))
-        return [f"{tab}imagine::say({{{', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)}}});"], run, None
+        shown = ', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)
+        return [f"{tab}imagine::say([{shown}]);" if JS else f"{tab}imagine::say({{{shown}}});"], run, None
     if tokens[0] == "ask":
         return ask(tokens, names, declared, n, tab)
     if tokens[0] == "load" and "from" in tokens and tokens[len(tokens) - tokens[::-1].index("from"):][:2] == ["the", "text"]:
@@ -2509,6 +2732,9 @@ def statement(n, text_, inner, names, declared, depth):
         if holds_command(target.kind):
             raise ScriptError(n, "A command can't be loaded.")
         put, kind, things, w = target.store, target.kind, THINGS, source.run
+        if JS:
+            return ([f"{tab}{js_set(target)}imagine::load_text({strip_parens(source.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
+                    lambda env: put(env, load_text(w(env), kind, things, n)), None)
         return ([f"{tab}imagine::load_text({strip_parens(target.cpp)}, {strip_parens(source.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
                 lambda env: put(env, load_text(w(env), kind, things, n)), None)
     for verb, joint in (("save", "to"), ("load", "from")):
@@ -2530,6 +2756,9 @@ def statement(n, text_, inner, names, declared, depth):
             if e.i != len(e.t) or not target.writable or getattr(target, "cpp_assign", None):
                 raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' can't be changed, so I can't load into it.")
             put, kind, things = target.store, target.kind, THINGS
+            if JS:
+                return ([f"{tab}{js_set(target)}imagine::load_file({strip_parens(where.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
+                        lambda env: put(env, load_saved(w(env), kind, things, n)), None)
             return ([f"{tab}imagine::load_file({strip_parens(target.cpp)}, {strip_parens(where.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
                     lambda env: put(env, load_saved(w(env), kind, things, n)), None)
     key, size = match_command(names, tokens)
@@ -2553,7 +2782,9 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' holds {kind_name(target.kind)}, not {kind_name(v.kind)}.")
         put, get = target.store, v.run
         assign = getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
-        return [f"{tab}{assign}{strip_parens(v.cpp)}{getattr(target, 'cpp_close', '')};"], lambda env: put(env, get(env)), None
+        if JS:
+            assign = js_set(target)
+        return [f"{tab}{assign}{js_copy(v.cpp, v.kind)}{getattr(target, 'cpp_close', '')};"], lambda env: put(env, get(env)), None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:
@@ -2572,8 +2803,10 @@ def statement(n, text_, inner, names, declared, depth):
                     x = get(env)
                     put(env, x)
                     there(env, dup(x))
-                return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}{names.known[('existence',)][0]} = {cpp};"], run, None
-            return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
+                return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};", f"{tab}{names.known[('existence',)][0]} = {js_copy(cpp, kind)};"], run, None
+            if JS and cpp in OWNER_PARAMS:  # the thing a command is for: change the caller's own
+                return [f"{tab}imagine::replace_thing({cpp}, {strip_parens(v.cpp)});"], lambda env: put(env, get(env)), None
+            return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], lambda env: put(env, get(env)), None
         hint = library_hint(tokens)
         if hint:
             raise ScriptError(n, f"I don't know '{' '.join(tokens[:tokens.index('to') + 1] if 'to' in tokens else tokens)}'." + hint)
@@ -2597,11 +2830,11 @@ def statement(n, text_, inner, names, declared, depth):
             def run(env):
                 env[cpp] = dup(get(env))
                 env["existence"] = dup(env[cpp])
-            return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}existence = {cpp};"], run, None
+            return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};", f"{tab}existence = {js_copy(cpp, v.kind)};"], run, None
 
         def run(env):
             env[cpp] = dup(get(env))
-        return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], run, None
+        return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], run, None
     if tokens[0] == "move":
         key, size = names.match(tokens, 1)
         if not key or tokens[1 + size:2 + size] != ["toward"]:
@@ -2622,7 +2855,7 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             x, by = now(env), st(env)
             put(env, min(max(g(env), x - by), x + by))
-        return [f"{tab}const double {s} = {strip_parens(step.cpp)};",
+        return [f"{tab}const {'' if JS else 'double '}{s} = {strip_parens(step.cpp)};",
                 f"{tab}{cpp} = FMath::Clamp({strip_parens(goal.cpp)}, {cpp} - {s}, {cpp} + {s});"], run, None
     hint = library_hint(tokens)
     if hint:
@@ -2650,6 +2883,8 @@ def for_each(n, head, body, names, declared, depth):
             raise ScriptError(n, f"'for each ... in' needs a list, but this is {kind_name(seq.kind)}.")
         kind = element(seq.kind)
         line = f"{tab}for (const {cpp_type(kind)} {cpp} : imagine::copy({strip_parens(seq.cpp)}))"
+        if JS:
+            line = f"{tab}for (const {cpp} of imagine::dup({strip_parens(seq.cpp)}))"
         get = seq.run
         simple = kind in (NUMBER, YESNO, TEXT)
 
@@ -2664,7 +2899,7 @@ def for_each(n, head, body, names, declared, depth):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         kind = NUMBER
         end = f"imagine_end_{n}"
-        line = f"{tab}for (double {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
+        line = f"{tab}for ({'let' if JS else 'double'} {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
         a, b = lo.run, hi.run
 
         def items(env):
@@ -2709,12 +2944,16 @@ def call(key, args, names, n):
                 err.line = n
             raise
     cpp = command.cpp
+    if getattr(command, "unusable", None):
+        raise ScriptError(n, command.unusable)
     if command.inputs is not None:  # a library word: put each input into its {input name} place
         given = {"{" + in_name + "}": f"({strip_parens(a.cpp)})" for in_name, a in zip(command.inputs, args)}
         given["{line}"] = str(n)  # so the library's C++ can say which line went wrong
         # all at once, so an input's own text is never replaced again
         cpp = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], cpp)
         return f"({cpp})", run
+    if JS:
+        return f"(await {getattr(command, 'js', cpp)}({', '.join(strip_parens(a.cpp) for a in args)}))", run
     return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})", run
 
 
@@ -2728,6 +2967,17 @@ def command_value(names, tokens, e, line):
     if c.versions is not None:
         raise ScriptError(line, f"'{' '.join(key)}' is for a kind of thing (it changes the thing it is given), so it can't be kept as a value.")
     kind = command_kind(c.kinds, c.gives)
+    if getattr(c, "unusable", None):
+        raise ScriptError(line, c.unusable)
+    if JS:
+        if c.inputs is None:
+            cpp = c.cpp
+        else:
+            given = {"{" + in_name + "}": f"(_{k})" for k, in_name in enumerate(c.inputs)}
+            given["{line}"] = str(line)
+            body = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], c.cpp) if given else c.cpp
+            cpp = f"(async ({', '.join(f'_{k}' for k in range(len(c.kinds)))}) => {body})"
+        return Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
     if c.inputs is None:  # one of the script's own commands
         cpp = f"{cpp_type(kind)}({c.cpp})"
     else:  # a library word: its C++ goes inside a small function
@@ -2909,6 +3159,26 @@ def build(script, exe):
     return None
 
 
+def web(script, folder=None):
+    """Turns a program into JavaScript: <name>.js and imagination.js (what every web program uses) in folder.
+    Returns an error message, or None. Run it with node, or load both into a page (imagination.js first)."""
+    global LOGIC, JS
+    LOGIC, JS = script.parent, True
+    try:
+        js_out, program = read_script(script)
+    except ScriptError as err:
+        return f"{where(err.line)}: {err.message}"
+    finally:
+        JS = False
+    if program is None:
+        return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
+    folder = Path(folder) if folder else script.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{script.stem}.js").write_text(js_out, encoding="utf-8")
+    shutil.copy2(HERE / "runtime" / "imagination.js", folder / "imagination.js")
+    return None
+
+
 ENGINE = Path(r"C:\Program Files\Epic Games\UE_5.8")
 WORLD = Path.home() / "Documents" / "ImaginationWorld"  # the Unreal project 'imagine unreal' builds into
 
@@ -3035,6 +3305,7 @@ USAGE = """Use:
   imagine build <script.imagine>               make it into an .exe (needs Visual Studio's C++ compiler)
   imagine check <script.imagine>               look for mistakes without running it
   imagine unreal <script.imagine>              run it inside Unreal Engine: the 3D words become a real lit world
+  imagine web <script.imagine> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
   imagine                                      try lines out, one at a time
   imagine <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
 (imagine is short for: py -3 imagination.py)"""
@@ -3061,6 +3332,17 @@ def main(argv):
             print(f"{where(err.line)}: {err.message}")
             return 1
         print(f"{Path(args[1]).name}: no mistakes found.")
+        return 0
+    if args[0] == "web" and len(args) in (2, 3):
+        script = Path(args[1])
+        if not script.exists():
+            print(f"There is no script called {script}.")
+            return 2
+        problem = web(script, args[2] if len(args) == 3 else None)
+        if problem:
+            print(problem)
+            return 1
+        print(f"Made {Path(args[2] if len(args) == 3 else script.parent) / (script.stem + '.js')}")
         return 0
     if len(args) == 2 and args[0] == "unreal":
         script = Path(args[1])
