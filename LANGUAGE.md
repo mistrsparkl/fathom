@@ -275,6 +275,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | Words | Means |
 |---|---|
 | `open a window with "Title", 800, 600` | Open a window this wide and high. |
+| `etch the picture turned with "ship.png", 300, 200, 2, 45` | The picture with its middle at 300, 200, twice as big, turned 45 degrees clockwise. (Running directly, this needs Pillow: `py -3 -m pip install pillow`.) |
 | `set the text size to 32` | Words etched after this are 32 dots high (16 at first). |
 | `consume the window with "black"` | Fill the whole window with one colour. |
 | `etch a box with x, y, width, height, "red"` | A filled box, from its top left corner. |

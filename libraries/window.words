@@ -258,6 +258,22 @@ code:
   		g.DrawImage(image, (int)std::lround(x), (int)std::lround(y), (int)image->GetWidth(), (int)image->GetHeight());
   	}
 
+  	// The picture's middle at x, y; size 2 is twice as big; angle in degrees, turning clockwise.
+  	inline void draw_picture_turned(const std::string& file, double x, double y, double size, double angle, int line)
+  	{
+  		need_window(line);
+  		if (!(size > 0 && size <= 100))
+  			imagine::fail(line, "a picture's size must be more than 0 and at most 100, not " + imagine::text(size) + ".");
+  		Gdiplus::Image* image = picture(file, line);
+  		Gdiplus::Graphics g(canvas);
+  		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+  		g.TranslateTransform((Gdiplus::REAL)x, (Gdiplus::REAL)y);
+  		g.RotateTransform((Gdiplus::REAL)angle);
+  		g.ScaleTransform((Gdiplus::REAL)size, (Gdiplus::REAL)size);
+  		Gdiplus::REAL w = (Gdiplus::REAL)image->GetWidth(), h = (Gdiplus::REAL)image->GetHeight();
+  		g.DrawImage(image, -w / 2, -h / 2, w, h);
+  	}
+
   	inline void close()
   	{
   		if (window)
@@ -407,6 +423,30 @@ python:
       image = picture(file)
       draw(lambda cv: cv.create_image(round(x), round(y), image=image, anchor="nw"))
 
+  turned = {}
+
+  def draw_picture_turned(file, x, y, size, angle):
+      need_window()
+      if not 0 < size <= 100:
+          raise RunError(0, f"a picture's size must be more than 0 and at most 100, not {text(size)}.")
+      picture(file)
+      if win["root"] is None:
+          return
+      key = (file, round(size, 3), round(angle % 360, 1))
+      if key not in turned:
+          try:
+              from PIL import Image, ImageTk
+          except ImportError:
+              raise RunError(0, "turning pictures needs Pillow when running directly. Type: py -3 -m pip install pillow"
+                                " (or build the program, which doesn't need it).")
+          if len(turned) > 500:  # shortcut: forget them all rather than track which are still used
+              turned.clear()
+          im = Image.open(file).convert("RGBA")
+          im = im.resize((max(1, round(im.width * size)), max(1, round(im.height * size))), Image.BICUBIC)
+          turned[key] = ImageTk.PhotoImage(im.rotate(-angle, resample=Image.BICUBIC, expand=True))
+      image = turned[key]
+      draw(lambda cv: cv.create_image(round(x), round(y), image=image, anchor="center"))
+
   def close():
       if win["root"] is not None:
           closed()
@@ -429,6 +469,8 @@ to show the frame = imagine_window::show({line})
   runs: show()
 to etch the picture, given file (text) and x (a number) and y (a number) = imagine_window::draw_picture({file}, {x}, {y}, {line})
   runs: draw_picture({file}, {x}, {y})
+to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = imagine_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
+  runs: draw_picture_turned({file}, {x}, {y}, {size}, {angle})
 to width of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetWidth()
   runs: size_of_picture({file}, 0)
 to height of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetHeight()

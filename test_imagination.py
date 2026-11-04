@@ -329,6 +329,9 @@ def program_checks():
                others={"red.png": png(7, 3)})
     assert out.stdout == "7 3\n7\n", repr(out.stdout)
     assert out.stderr == 'Line 9: there is no picture called "none.png".\n', repr(out.stderr)
+    out = both('genesis:\n  open a window with "Pictures", 100, 100\n  etch the picture turned with "red.png", 50, 50, 2, 30\n'
+               '  show the frame\n  etch the picture turned with "red.png", 50, 50, 0, 30\n' + END, others={"red.png": png(7, 3)})
+    assert out.stderr == "Line 5: a picture's size must be more than 0 and at most 100, not 0.\n", repr(out.stderr)
 
     # The web library, without needing the internet: a page that can't be reached fails the same both ways.
     out = both('use: web\ngenesis:\n  scrawl web page "http://localhost:1/"\n' + END)
