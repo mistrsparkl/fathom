@@ -190,6 +190,11 @@ def program_checks():
     assert out.stderr == "Line 49: I can't save infinity or not a number.\n", repr(out.stderr)
     assert perr("to start:\n  set x to 1\n  load 5 from file \"a\"\n" + END)[1] == "'5' can't be changed, so I can't load into it."
 
+    # Setting birth makes existence start there too.
+    out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  say birth, " ", existence\n'
+               '  set existence to birth\n  say existence\n' + END)
+    assert out.stdout == "(300, 200) (305, 200)\n(300, 200)\n", repr(out.stdout)
+
     # genesis:, libraries without 'use:', (x, y) places, 'birth of x' as well as 'x of birth'.
     out = both('genesis:\n  set birth to (300, 200)\n  set birth of x to birth of x minus 5\n  set y of birth to 7\n'
                '  set high to (1, 2, 3)\n  say birth, " ", high of z plus x of high, " ", round (sine of 30) times 10, " ", (2 plus 3)\n' + END)

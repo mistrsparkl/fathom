@@ -115,6 +115,8 @@ and the universe said i love you
 | a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
 | a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. |
 
+**birth and existence.** `set birth to (300, 200)` says where something starts. It also makes `existence` (where it is now) start at the same place, so you can move `existence` and later `set existence to birth` to send it back.
+
 Lists and tables can hold other lists and tables: `a list of lists of numbers` is a grid, and `item 2 of item 3 of grid` reaches inside it. When shown, the inner ones are in brackets: `(1, 2), (3, 4)`.
 | your own kind | `a new pet` (see above) |
 

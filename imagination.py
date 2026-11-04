@@ -1991,6 +1991,15 @@ def statement(n, text_, inner, names, declared, depth):
         declared[tuple(words)] = (cpp, v.kind)
         names.add(words, cpp, v.kind)
         get = v.run
+        if words == ["birth"] and ("existence",) not in names.known:
+            # birth is where something starts; existence is where it is now, and it starts at its birth
+            declared[("existence",)] = ("existence", v.kind)
+            names.add(["existence"], "existence", v.kind)
+
+            def run(env):
+                env[cpp] = dup(get(env))
+                env["existence"] = dup(env[cpp])
+            return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}existence = {cpp};"], run, None
 
         def run(env):
             env[cpp] = dup(get(env))

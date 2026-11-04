@@ -208,7 +208,6 @@ Programs can open a window and draw in it. This is a whole game: a ball you move
 genesis:
   open a window with "Ball", 600, 400
   set birth to (300, 200)
-  set existence to birth
   while the window is open:
     if key held "left": set existence of x to existence of x minus 5
     if key held "right": set existence of x to existence of x plus 5
@@ -224,7 +223,7 @@ and the universe said i love you
 
 `(300, 200)` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of x` is its across part and `existence of y` its down part. Space sends it back to its birth (a small white dot). `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
 
-`birth` and `existence` are names you choose: any words that aren't the language's own will do.
+Setting `birth` also makes `existence` start at the same place.
 
 The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
 
