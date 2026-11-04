@@ -35,6 +35,10 @@ code:
   	inline bool click_fresh = false, clicked = false;
   	inline bool mouse_down = false;
   	inline double mouse_x_now = 0, mouse_y_now = 0;
+  	inline bool right_fresh = false, right_clicked = false, right_down = false;
+  	inline double wheel_fresh = 0, wheel_now = 0;  // notches the wheel turned (away from you is more)
+  	inline bool pointer_held = false, pointer_fresh = false;  // fresh: just held, so the jump to the middle isn't a move  // 'hold the pointer': hidden, and brought back to the middle each frame
+  	inline double moved_x = 0, moved_y = 0, last_mouse_x = 0, last_mouse_y = 0;
   	inline int width = 0, height = 0;
   	inline LARGE_INTEGER last_frame{};
 
@@ -71,6 +75,14 @@ code:
   		imagine::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
   	}
 
+  	inline std::string mix(double r, double g, double b)  // 'colour from (255, 136, 0)' is "#ff8800"
+  	{
+  		auto part = [](double v) { return (int)std::lround(std::min(255.0, std::max(0.0, v))); };
+  		char out[8];
+  		std::snprintf(out, sizeof out, "#%02x%02x%02x", part(r), part(g), part(b));
+  		return out;
+  	}
+
   	inline int key_code(const std::string& name, int line)
   	{
   		std::string k = imagine::lower(name);
@@ -92,7 +104,11 @@ code:
   		case WM_CLOSE: open_now = false; DestroyWindow(hwnd); window = nullptr; return 0;
   		case WM_KEYDOWN: case WM_SYSKEYDOWN: if (!(lp & (1 << 30))) fresh[wp & 255] = true; keys[wp & 255] = true; return 0;
   		case WM_KEYUP: case WM_SYSKEYUP: keys[wp & 255] = false; return 0;
-  		case WM_KILLFOCUS: for (bool& k : keys) k = false; mouse_down = false; return 0;
+  		case WM_KILLFOCUS: for (bool& k : keys) k = false; mouse_down = right_down = false; return 0;
+  		case WM_RBUTTONDOWN: right_down = right_fresh = true; return 0;
+  		case WM_RBUTTONUP: right_down = false; return 0;
+  		case WM_MOUSEWHEEL: wheel_fresh += GET_WHEEL_DELTA_WPARAM(wp) / 120.0; return 0;
+  		case WM_SETCURSOR: if (pointer_held && LOWORD(lp) == HTCLIENT) { SetCursor(nullptr); return TRUE; } break;
   		case WM_MOUSEMOVE: mouse_x_now = (short)LOWORD(lp); mouse_y_now = (short)HIWORD(lp); return 0;
   		case WM_LBUTTONDOWN: mouse_down = click_fresh = true; SetCapture(hwnd); return 0;
   		case WM_LBUTTONUP: mouse_down = false; ReleaseCapture(); return 0;
@@ -231,6 +247,31 @@ code:
   		}
   		clicked = click_fresh;
   		click_fresh = false;
+  		right_clicked = right_fresh;
+  		right_fresh = false;
+  		wheel_now = wheel_fresh;
+  		wheel_fresh = 0;
+  		moved_x = moved_y = 0;
+  		if (window && pointer_held && GetForegroundWindow() == window)
+  		{
+  			POINT at, middle{width / 2, height / 2};
+  			GetCursorPos(&at);
+  			ScreenToClient(window, &at);
+  			moved_x = pointer_fresh ? 0 : at.x - middle.x;
+  			moved_y = pointer_fresh ? 0 : at.y - middle.y;
+  			pointer_fresh = false;
+  			ClientToScreen(window, &middle);
+  			SetCursorPos(middle.x, middle.y);
+  			mouse_x_now = width / 2;
+  			mouse_y_now = height / 2;
+  		}
+  		else if (!pointer_held)
+  		{
+  			moved_x = mouse_x_now - last_mouse_x;
+  			moved_y = mouse_y_now - last_mouse_y;
+  		}
+  		last_mouse_x = mouse_x_now;
+  		last_mouse_y = mouse_y_now;
   		LARGE_INTEGER now, freq;
   		QueryPerformanceFrequency(&freq);
   		QueryPerformanceCounter(&now);
@@ -304,7 +345,12 @@ code:
   	// (OpenGL, with a depth buffer) into a hidden picture that is laid over the window; without OpenGL they are
   	// drawn far ones first instead.
   	struct V3 { double x, y, z; };
-  	struct Item3 { bool round; std::vector<V3> pts; V3 c; double r; COLORREF col; double far_first; };
+  	struct Kept;
+  	struct Item3 { bool round; std::vector<V3> pts; V3 c; double r; COLORREF col; double far_first; V3 n{0, 0, 0}; Kept* kept = nullptr; };
+  	struct Kept { std::vector<Item3> items; GLuint list = 0; bool fresh = true; };  // shapes kept to be etched again and again
+  	inline std::map<std::string, Kept> kept;
+  	inline std::string keeping;  // the name shapes are being kept under, or nothing
+  	inline double daylight = 1;  // how bright the 3D shapes are, from 0 (dark) to 1
   	struct Shape3 { double depth; bool round; std::vector<POINT> points; int x, y, r; COLORREF col; };
   	inline std::vector<Item3> items3;
   	inline double eye_x = 0, eye_y = 1.5, eye_z = -6, eye_turn = 0, eye_tilt = 0;
@@ -341,9 +387,14 @@ code:
   	{
   		return RGB((GetRValue(c) + 255) / 2, (GetGValue(c) + 255) / 2, (GetBValue(c) + 255) / 2);
   	}
-  	inline void polygon3(const std::vector<V3>& world, COLORREF col, double far_first = 0)
+  	inline void polygon3(const std::vector<V3>& world, COLORREF col, double far_first = 0, V3 n = {0, 0, 0})
   	{
-  		items3.push_back({false, world, {}, 0, col, far_first});
+  		(keeping.empty() ? items3 : kept[keeping].items).push_back({false, world, {}, 0, col, far_first, n});
+  	}
+  	inline bool facing_away(const Item3& item)
+  	{
+  		const V3& a = item.pts[0];
+  		return (item.n.x || item.n.y || item.n.z) && item.n.x * (eye_x - a.x) + item.n.y * (eye_y - a.y) + item.n.z * (eye_z - a.z) <= 0;
   	}
 
   	// ---- drawing far ones first (without a graphics card)
@@ -391,13 +442,22 @@ code:
   	inline void painter_flush()
   	{
   		std::vector<Shape3> shapes;
+  		auto project = [&](const Item3& item) { item.round ? project_ball(item, shapes) : project_polygon(item, shapes); };
   		for (const Item3& item : items3)
-  			item.round ? project_ball(item, shapes) : project_polygon(item, shapes);
+  		{
+  			if (!item.kept)
+  				project(item);
+  			else
+  				for (const Item3& one : item.kept->items)
+  					if (one.round || !facing_away(one))
+  						project(one);
+  		}
   		std::stable_sort(shapes.begin(), shapes.end(), [](const Shape3& a, const Shape3& b) { return a.depth > b.depth; });
   		for (const Shape3& s : shapes)
   		{
-  			HBRUSH b = CreateSolidBrush(s.col);
-  			HPEN p = CreatePen(PS_SOLID, 1, s.col);
+  			COLORREF col = daylight < 1 ? shade(s.col, daylight) : s.col;
+  			HBRUSH b = CreateSolidBrush(col);
+  			HPEN p = CreatePen(PS_SOLID, 1, col);
   			HGDIOBJ ob = SelectObject(canvas, b), op = SelectObject(canvas, p);
   			if (s.round)
   				Ellipse(canvas, s.x - s.r, s.y - s.r, s.x + s.r + 1, s.y + s.r + 1);
@@ -549,7 +609,7 @@ code:
   		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, shine);
   		glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 16);
   		glShadeModel(GL_SMOOTH);
-  		for (const Item3& item : items3)
+  		auto draw = [](const Item3& item)
   		{
   			if (!item.round)
   			{
@@ -558,7 +618,7 @@ code:
   				for (const V3& p : item.pts)
   					glVertex3d(p.x, p.y, p.z);
   				glEnd();
-  				continue;
+  				return;
   			}
   			glEnable(GL_LIGHTING);  // a ball: lit smoothly by the sun, with a shine
   			glPushMatrix();
@@ -568,6 +628,44 @@ code:
   			glCallList(gl_sphere);
   			glPopMatrix();
   			glDisable(GL_LIGHTING);
+  		};
+  		for (const Item3& item : items3)
+  		{
+  			if (!item.kept)
+  			{
+  				draw(item);
+  				continue;
+  			}
+  			Kept& k = *item.kept;  // kept shapes go to the graphics card once, and are drawn from there after
+  			if (!k.list)
+  				k.list = glGenLists(1);
+  			if (k.fresh)
+  			{
+  				glNewList(k.list, GL_COMPILE);
+  				for (const Item3& one : k.items)
+  					draw(one);
+  				glEndList();
+  				k.fresh = false;
+  			}
+  			glCallList(k.list);
+  		}
+  		if (daylight < 1)  // darken what was drawn: each colour times the daylight (empty places stay empty)
+  		{
+  			glDisable(GL_DEPTH_TEST);
+  			glMatrixMode(GL_PROJECTION);
+  			glLoadIdentity();
+  			glMatrixMode(GL_MODELVIEW);
+  			glLoadIdentity();
+  			glEnable(GL_BLEND);
+  			glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+  			glColor4d(daylight, daylight, daylight, 1);
+  			glBegin(GL_QUADS);
+  			glVertex2d(-1, -1);
+  			glVertex2d(1, -1);
+  			glVertex2d(1, 1);
+  			glVertex2d(-1, 1);
+  			glEnd();
+  			glDisable(GL_BLEND);
   		}
   		glReadPixels(0, 0, width, height, 0x80E1, GL_UNSIGNED_BYTE, gl_bits);  // GL_BGRA, as a Windows picture is
   		BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
@@ -622,10 +720,10 @@ code:
   		for (const Face& f : faces)
   		{
   			double cx = (f.a.x + f.c.x) / 2, cy = (f.a.y + f.c.y) / 2, cz = (f.a.z + f.c.z) / 2;
-  			if (f.n.x * (eye_x - cx) + f.n.y * (eye_y - cy) + f.n.z * (eye_z - cz) <= 0)
-  				continue;  // facing away from the eye
+  			if (keeping.empty() && f.n.x * (eye_x - cx) + f.n.y * (eye_y - cy) + f.n.z * (eye_z - cz) <= 0)
+  				continue;  // facing away from the eye (kept shapes keep every face: the eye will move)
   			double lit = f.n.x * sun[0] + f.n.y * sun[1] + f.n.z * sun[2];
-  			polygon3({f.a, f.b, f.c, f.d}, shade(col, 0.6 + 0.4 * std::max(0.0, lit)));
+  			polygon3({f.a, f.b, f.c, f.d}, shade(col, 0.6 + 0.4 * std::max(0.0, lit)), 0, f.n);
   		}
   	}
   	inline void cube(const FVector& middle, double size, const std::string& c, int line) { block(middle, size, size, size, c, line); }
@@ -634,7 +732,53 @@ code:
   		need_open(line);
   		if (!(radius > 0))
   			imagine::fail(line, "a ball's radius must be more than 0.");
-  		items3.push_back({true, {}, v3(middle), radius, colour(c, line), 0});
+  		(keeping.empty() ? items3 : kept[keeping].items).push_back({true, {}, v3(middle), radius, colour(c, line), 0});
+  	}
+  	inline void start_keeping(const std::string& name, int line)
+  	{
+  		need_open(line);
+  		if (!keeping.empty())
+  			imagine::fail(line, "shapes are already being kept as \"" + keeping + "\". Say 'stop keeping the shapes' first.");
+  		if (name.empty())
+  			imagine::fail(line, "kept shapes need a name, like \"land\".");
+  		Kept& k = kept[name];
+  		k.items.clear();
+  		k.fresh = true;
+  		keeping = name;
+  	}
+  	inline void stop_keeping(int line)
+  	{
+  		if (keeping.empty())
+  			imagine::fail(line, "no shapes are being kept. Start with: start keeping the shapes as \"land\"");
+  		keeping.clear();
+  	}
+  	inline void etch_kept(const std::string& name, int line)
+  	{
+  		need_open(line);
+  		auto it = kept.find(name);
+  		if (it == kept.end())
+  			imagine::fail(line, "there are no shapes kept as \"" + name + "\".");
+  		if (name == keeping)
+  			imagine::fail(line, "the shapes \"" + name + "\" are still being kept. Say 'stop keeping the shapes' first.");
+  		items3.push_back({false, {}, {}, 0, 0, 0, {0, 0, 0}, &it->second});
+  	}
+  	inline void forget_kept(const std::string& name, int line)
+  	{
+  		auto it = kept.find(name);
+  		if (it == kept.end())
+  			imagine::fail(line, "there are no shapes kept as \"" + name + "\".");
+  		flush3d();  // anything waiting to be drawn may use them
+  		if (it->second.list)
+  			glDeleteLists(it->second.list, 1);
+  		if (keeping == name)
+  			keeping.clear();
+  		kept.erase(it);
+  	}
+  	inline void set_daylight(double amount, int line)
+  	{
+  		if (!(amount >= 0 && amount <= 1))
+  			imagine::fail(line, "the daylight is from 0 (dark) to 1 (full), not " + imagine::text(amount) + ".");
+  		daylight = amount;
   	}
   	inline void ground(const std::string& a, const std::string& b, int line)
   	{
@@ -657,7 +801,9 @@ python:
              "grey": "#808080", "gray": "#808080"}
   KEYS = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"}
   TK_KEYS = {"return": "enter", "shift_l": "shift", "shift_r": "shift", "control_l": "control", "control_r": "control"}
-  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0, "text size": 16, "frame time": 1.0 / 60}
+  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0, "text size": 16, "frame time": 1.0 / 60,
+         "right fresh": False, "right clicked": False, "right down": False, "wheel fresh": 0.0, "wheel": 0.0,
+         "pointer held": False, "moved": (0.0, 0.0), "last mouse": (0.0, 0.0)}
 
   def need_window():
       if not win["opened"]:
@@ -671,6 +817,10 @@ python:
       if len(low) == 7 and low[0] == "#" and all(c in "0123456789abcdef" for c in low[1:]):
           return low
       raise RunError(0, f'I don\'t know the colour "{name}". Use a name like "red" or a code like "#ff8800".')
+
+  def mix(r, g, b):
+      part = lambda v: int(math.floor(min(255.0, max(0.0, v)) + 0.5))
+      return "#%02x%02x%02x" % (part(r), part(g), part(b))
 
   def key_name(name):
       k = name.lower()
@@ -713,7 +863,10 @@ python:
           held.add(k)
       root.bind("<KeyPress>", down)
       root.bind("<KeyRelease>", lambda e: held.discard(TK_KEYS.get(e.keysym.lower(), e.keysym.lower())))
-      root.bind("<FocusOut>", lambda e: (held.clear(), win.update(down=False)))
+      root.bind("<FocusOut>", lambda e: (held.clear(), win.update({"down": False, "right down": False})))
+      canvas.bind("<ButtonPress-3>", lambda e: win.update({"right down": True, "right fresh": True}))
+      canvas.bind("<ButtonRelease-3>", lambda e: win.update({"right down": False}))
+      root.bind("<MouseWheel>", lambda e: win.update({"wheel fresh": win["wheel fresh"] + e.delta / 120.0}))
       canvas.bind("<Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
       canvas.bind("<B1-Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
       canvas.bind("<ButtonPress-1>", lambda e: win.update(down=True, click_fresh=True))
@@ -762,6 +915,20 @@ python:
       pump()
       win["pressed"], win["fresh"] = win["fresh"], set()
       win["clicked"], win["click_fresh"] = win["click_fresh"], False
+      win["right clicked"], win["right fresh"] = win["right fresh"], False
+      win["wheel"], win["wheel fresh"] = win["wheel fresh"], 0.0
+      mx, my = win["mouse"]
+      win["moved"] = (0.0, 0.0)
+      if win["root"] is not None and win["pointer held"]:
+          cx, cy = win["size"][0] // 2, win["size"][1] // 2
+          if win["root"].focus_displayof() is not None:
+              win["moved"] = (0.0, 0.0) if win.get("pointer fresh") else (mx - cx, my - cy)
+              win["pointer fresh"] = False
+              win["canvas"].event_generate("<Motion>", warp=True, x=cx, y=cy)
+              win["mouse"] = (float(cx), float(cy))
+      elif not win["pointer held"]:
+          win["moved"] = (mx - win["last mouse"][0], my - win["last mouse"][1])
+      win["last mouse"] = win["mouse"]
       wait = 1.0 / 60 - (time.monotonic() - win["last"])
       if wait > 0:
           time.sleep(wait)
@@ -819,11 +986,20 @@ python:
       if win["root"] is not None:
           closed()
 
+  def hold_pointer(holding):
+      need_window()
+      win["pointer fresh"] = holding and not win["pointer held"]
+      win["pointer held"] = holding
+      if win["root"] is not None:
+          win["canvas"].config(cursor="none" if holding else "")
+
 python:
   import ctypes
   from ctypes import wintypes
   EYE = {"x": 0.0, "y": 1.5, "z": -6.0, "turn": 0.0, "tilt": 0.0}
-  ITEMS3 = []  # (round, points or middle, radius, colour, far first), drawn when something flat comes or the frame is revealed
+  ITEMS3 = []  # (round, points or middle, radius, colour, far first, normal), drawn when something flat comes or the frame is revealed
+  KEPT = {}  # name -> {"items": [...], "list": OpenGL list or None, "fresh": yes}: shapes kept to be etched again and again
+  LIGHT = {"keeping": None, "daylight": 1.0}
   NEAR3, FAR3, PI3 = 0.05, 1000.0, 3.14159265358979323846
   SUN = (0.371, 0.743, -0.557)
   GL = {"tried": False, "ok": False}
@@ -854,8 +1030,19 @@ python:
   def lighter(col):
       return "#%02x%02x%02x" % tuple((v + 255) // 2 for v in rgb(col))
 
-  def polygon3(world, col, far_first=0.0):
-      ITEMS3.append((False, world, 0.0, col, far_first))
+  def polygon3(world, col, far_first=0.0, normal=None):
+      (ITEMS3 if LIGHT["keeping"] is None else KEPT[LIGHT["keeping"]]["items"]).append((False, world, 0.0, col, far_first, normal))
+
+  def facing_away(where, normal):
+      a = where[0]
+      return normal is not None and normal[0] * (EYE["x"] - a[0]) + normal[1] * (EYE["y"] - a[1]) + normal[2] * (EYE["z"] - a[2]) <= 0
+
+  def each_item():  # the shapes to draw, with kept ones taken out of their names
+      for item in ITEMS3:
+          if item[0] == "kept":
+              yield from KEPT[item[1]]["items"]
+          else:
+              yield item
 
   # ---- drawing far ones first (without a graphics card)
   def project_polygon(world, col, far_first, shapes):
@@ -889,11 +1076,13 @@ python:
 
   def painter_flush(cv):
       shapes = []
-      for is_round, where, radius, col, far_first in ITEMS3:
+      for is_round, where, radius, col, far_first, normal in each_item():
           if is_round:
               project_ball(where, radius, col, shapes)
-          else:
+          elif not facing_away(where, normal):
               project_polygon(where, col, far_first, shapes)
+      if LIGHT["daylight"] < 1:
+          shapes = [(d, r, pts, shade(col, LIGHT["daylight"])) for d, r, pts, col in shapes]
       shapes.sort(key=lambda s: -s[0])  # far ones first (sort keeps the order of equal ones, as the C++ does)
       for depth, is_round, points, col in shapes:
           if is_round:
@@ -966,7 +1155,8 @@ python:
               return False
           d, f = ctypes.c_double, ctypes.c_float
           for name, types in (("glVertex3d", [d, d, d]), ("glNormal3d", [d, d, d]), ("glColor3d", [d, d, d]), ("glTranslated", [d, d, d]),
-                              ("glScaled", [d, d, d]), ("glFrustum", [d] * 6), ("glClearColor", [f] * 4), ("glMaterialf", [ui, ui, f])):
+                              ("glScaled", [d, d, d]), ("glFrustum", [d] * 6), ("glClearColor", [f] * 4), ("glMaterialf", [ui, ui, f]),
+                              ("glColor4d", [d] * 4), ("glVertex2d", [d, d])):
               getattr(gl, name).argtypes = types
           gl.glLoadMatrixd.argtypes = [ctypes.POINTER(d)]
           sphere = gl.glGenLists(1)
@@ -1020,7 +1210,7 @@ python:
       gl.glMaterialfv(0x0408, 0x1202, four(0.5, 0.5, 0.5, 1))
       gl.glMaterialf(0x0408, 0x1601, 16.0)  # GL_SHININESS
       gl.glShadeModel(0x1D01)  # GL_SMOOTH
-      for is_round, where, radius, col, far_first in ITEMS3:
+      def draw(is_round, where, radius, col, far_first, normal):
           c = rgb(col)
           gl.glColor3d(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
           if not is_round:
@@ -1028,7 +1218,7 @@ python:
               for p in where:
                   gl.glVertex3d(*p)
               gl.glEnd()
-              continue
+              return
           gl.glEnable(0x0B50)  # GL_LIGHTING
           gl.glPushMatrix()
           gl.glTranslated(*where)
@@ -1036,6 +1226,34 @@ python:
           gl.glCallList(GL["sphere"])
           gl.glPopMatrix()
           gl.glDisable(0x0B50)
+      for item in ITEMS3:
+          if item[0] != "kept":
+              draw(*item)
+              continue
+          k = KEPT[item[1]]  # kept shapes go to the graphics card once, and are drawn from there after
+          if k["list"] is None:
+              k["list"] = gl.glGenLists(1)
+          if k["fresh"]:
+              gl.glNewList(k["list"], 0x1300)  # GL_COMPILE
+              for one in k["items"]:
+                  draw(*one)
+              gl.glEndList()
+              k["fresh"] = False
+          gl.glCallList(k["list"])
+      if LIGHT["daylight"] < 1:  # darken what was drawn: each colour times the daylight (empty places stay empty)
+          gl.glDisable(0x0B71)
+          gl.glMatrixMode(0x1701)
+          gl.glLoadIdentity()
+          gl.glMatrixMode(0x1700)
+          gl.glLoadIdentity()
+          gl.glEnable(0x0BE2)  # GL_BLEND
+          gl.glBlendFunc(0, 0x0300)  # GL_ZERO, GL_SRC_COLOR
+          gl.glColor4d(LIGHT["daylight"], LIGHT["daylight"], LIGHT["daylight"], 1.0)
+          gl.glBegin(0x0007)  # GL_QUADS
+          for x, y in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+              gl.glVertex2d(x, y)
+          gl.glEnd()
+          gl.glDisable(0x0BE2)
       gl.glReadPixels(0, 0, w, h, 0x1908, 0x1401, GL["pixels"])  # GL_RGBA, GL_UNSIGNED_BYTE
       picture = GL["Image"].frombuffer("RGBA", (w, h), GL["pixels"], "raw", "RGBA", 0, -1)  # OpenGL's rows start at the bottom
       photo = GL["ImageTk"].PhotoImage(picture)
@@ -1082,16 +1300,54 @@ python:
                ((0, -1, 0), (x0, y0, z1), (x1, y0, z1), (x1, y0, z0), (x0, y0, z0))]
       for n, a, b, c_, d_ in faces:
           cx, cy, cz = (a[0] + c_[0]) / 2, (a[1] + c_[1]) / 2, (a[2] + c_[2]) / 2
-          if n[0] * (EYE["x"] - cx) + n[1] * (EYE["y"] - cy) + n[2] * (EYE["z"] - cz) <= 0:
-              continue
+          if LIGHT["keeping"] is None and n[0] * (EYE["x"] - cx) + n[1] * (EYE["y"] - cy) + n[2] * (EYE["z"] - cz) <= 0:
+              continue  # facing away from the eye (kept shapes keep every face: the eye will move)
           lit = n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]
-          polygon3([a, b, c_, d_], shade(col, 0.6 + 0.4 * max(0.0, lit)))
+          polygon3([a, b, c_, d_], shade(col, 0.6 + 0.4 * max(0.0, lit)), 0.0, n)
 
   def ball(middle, radius, c):
       need_open()
       if not radius > 0:
           raise RunError(0, "a ball's radius must be more than 0.")
-      ITEMS3.append((True, tuple(middle.parts()[:3]), radius, colour(c), 0.0))
+      (ITEMS3 if LIGHT["keeping"] is None else KEPT[LIGHT["keeping"]]["items"]).append((True, tuple(middle.parts()[:3]), radius, colour(c), 0.0, None))
+
+  def start_keeping(name):
+      need_open()
+      if LIGHT["keeping"] is not None:
+          raise RunError(0, 'shapes are already being kept as "' + LIGHT["keeping"] + '". Say \'stop keeping the shapes\' first.')
+      if not name:
+          raise RunError(0, 'kept shapes need a name, like "land".')
+      k = KEPT.setdefault(name, {"items": [], "list": None, "fresh": True})
+      k["items"], k["fresh"] = [], True
+      LIGHT["keeping"] = name
+
+  def stop_keeping():
+      if LIGHT["keeping"] is None:
+          raise RunError(0, 'no shapes are being kept. Start with: start keeping the shapes as "land"')
+      LIGHT["keeping"] = None
+
+  def etch_kept(name):
+      need_open()
+      if name not in KEPT:
+          raise RunError(0, 'there are no shapes kept as "' + name + '".')
+      if name == LIGHT["keeping"]:
+          raise RunError(0, 'the shapes "' + name + '" are still being kept. Say \'stop keeping the shapes\' first.')
+      ITEMS3.append(("kept", name))
+
+  def forget_kept(name):
+      if name not in KEPT:
+          raise RunError(0, 'there are no shapes kept as "' + name + '".')
+      flush3d()  # anything waiting to be drawn may use them
+      if KEPT[name]["list"] is not None and GL["ok"]:
+          GL["gl"].glDeleteLists(KEPT[name]["list"], 1)
+      if LIGHT["keeping"] == name:
+          LIGHT["keeping"] = None
+      del KEPT[name]
+
+  def set_daylight(amount):
+      if not 0 <= amount <= 1:
+          raise RunError(0, "the daylight is from 0 (dark) to 1 (full), not " + text(amount) + ".")
+      LIGHT["daylight"] = amount
 
   def ground(a, b):
       need_open()
@@ -1173,3 +1429,35 @@ to etch the ground, given colour (text) and other colour (text) = imagine_window
   runs: ground({colour}, {other colour})
 the graphics card draws = imagine_window::on_graphics_card(), yes or no, read only
   runs: graphics_card()
+
+note: Kept shapes: etch 3D shapes once, between 'start keeping the shapes as "land"' and 'stop keeping the shapes', and they aren't drawn yet.
+note: Then 'etch the kept shapes "land"' draws them all, every frame, much faster than etching them one by one (the graphics card keeps them).
+to start keeping the shapes as, given name (text) = imagine_window::start_keeping({name}, {line})
+  runs: start_keeping({name})
+to stop keeping the shapes = imagine_window::stop_keeping({line})
+  runs: stop_keeping()
+to etch the kept shapes, given name (text) = imagine_window::etch_kept({name}, {line})
+  runs: etch_kept({name})
+to forget the kept shapes, given name (text) = imagine_window::forget_kept({name}, {line})
+  runs: forget_kept({name})
+to set the daylight to, given amount (a number) = imagine_window::set_daylight({amount}, {line})
+  runs: set_daylight({amount})
+
+note: The pointer: 'hold the pointer' hides it and keeps it in the window, for looking around; 'mouse moved across' and 'mouse moved down' say how far it was moved since the last frame, in dots.
+to hold the pointer = (imagine_window::need_window({line}), imagine_window::pointer_fresh = !imagine_window::pointer_held, imagine_window::pointer_held = true)
+  runs: hold_pointer(True)
+to let go of the pointer = (imagine_window::need_window({line}), imagine_window::pointer_held = false)
+  runs: hold_pointer(False)
+mouse moved across = imagine_window::moved_x, number, read only
+  runs: win["moved"][0]
+mouse moved down = imagine_window::moved_y, number, read only
+  runs: win["moved"][1]
+mouse right clicked = imagine_window::right_clicked, yes or no, read only
+  runs: win["right clicked"]
+mouse right held = imagine_window::right_down, yes or no, read only
+  runs: win["right down"]
+mouse wheel turned = imagine_window::wheel_now, number, read only
+  runs: win["wheel"]
+
+to colour from, given red (a number) and green (a number) and blue (a number), giving back text = imagine_window::mix({red}, {green}, {blue})
+  runs: mix({red}, {green}, {blue})

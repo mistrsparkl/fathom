@@ -83,7 +83,7 @@ code:
 python:
   def output_of(command):
       sys.stdout.flush()
-      done = subprocess.run(command, shell=True, capture_output=True)
+      done = subprocess.run(command, shell=True, stdout=subprocess.PIPE)  # what it writes as problems shows, as when built
       return done.stdout.decode("utf-8", errors="replace").replace("\r", "")
   def end_program(code):
       sys.stdout.flush()

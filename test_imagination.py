@@ -280,6 +280,9 @@ def program_checks():
     # The server library: a web server whose pages come from a command (with the computer and web libraries in the same program).
     out = both('to answer, given address (text), giving back text:\n  if address is "/hello": give back "Hello from Imagination!"\n  give back "You asked for " plus address\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8765, the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8765/hello"\n  scrawl web page "http://127.0.0.1:8765/scores?top=3"\n  end the program with 0\nand the universe said i love you\n'.replace('genesis:\n', 'genesis:\n  scrawl size of user name exceeds 0\n'))
     assert out.stdout == 'yes\nHello from Imagination!\nYou asked for /scores?top=3\n', repr(out.stdout)
+    # Files from a folder, what was sent with a request, and text inside addresses.
+    out = both('to answer, given address (text), giving back text:\n  if address begins with "/echo": give back "got " plus the web message\n  if address is "/f": answer with the file "site/index.html"\n  give back "page " plus web decoded (letters 2 to size of address of address)\nand the universe said i love you\n\ngenesis:\n  make the folder "site"\n  inscribe "body {}" into file "site/look.css"\n  inscribe "<p>home</p>" into file "site/index.html"\n  meanwhile serve the web from the folder with (8766, "site", the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8766/look.css"\n  scrawl web page "http://127.0.0.1:8766/"\n  scrawl web page "http://127.0.0.1:8766/a%20b+c"\n  scrawl web page "http://127.0.0.1:8766/f"\n  scrawl send to the web page with ("http://127.0.0.1:8766/echo", "héllo there")\n  scrawl web encoded "a b/é", " ", web decoded (web encoded "a b/é")\n  end the program with 0\nand the universe said i love you\n')
+    assert out.stdout == 'body {}\n<p>home</p>\npage a b c\n<p>home</p>\ngot héllo there\na%20b%2F%C3%A9 a b/é\n', repr(out.stdout)
 
     # Saved text: any value as JSON text, and back (for the web, or other programs).
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set name of p to "Rex " plus quote mark plus "the dog" plus quote mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus quote mark plus "name" plus quote mark plus ": " plus quote mark plus "Jo" plus quote mark plus ", " plus quote mark plus "age" plus quote mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
@@ -304,6 +307,10 @@ def program_checks():
     assert out.stdout == '2, 10, 4, 16\n5, 8\n10, 16\nHI!, THERE!\n0\n1, 5, 2, 8\n', repr(out.stdout)
     assert perr('to half, given x (text), giving back text:\n  give back x\n' + END + 'genesis:\n  scrawl a list of (1, 2) changed by the command half\n' + END)[1] == \
         "'changed by' needs a command given a number giving back something, not a command given text giving back text."
+
+    # Kept shapes (etched once, drawn every frame), daylight, and the pointer's words.
+    out = both('use: window\n\ngenesis:\n  open a world with "Kept", 640, 480\n  start keeping the shapes as "land"\n  for each x from -5 to 5:\n    for each z from 0 to 10:\n      etch a cube with (x horizontal 0 vertical z depth, 1, "green")\n  etch a ball with (0 horizontal 2 vertical 4 depth, 0.7, "yellow")\n  stop keeping the shapes\n  try:\n    stop keeping the shapes\n  if that went wrong:\n    scrawl the wound\n  try:\n    etch the kept shapes "sea"\n  if that went wrong:\n    scrawl the wound\n  try:\n    set the daylight to 2\n  if that went wrong:\n    scrawl the wound\n  set frames to 0\n  as long as the world lives and frames falls below 5:\n    set frames to frames plus 1\n    place the eye at 0 horizontal 3 vertical -6 depth\n    aim the eye with (frames times 0.3, -15)\n    consume the window with "#87ceeb"\n    set the daylight to 1 minus frames divided by 200\n    etch the kept shapes "land"\n    etch words with "right " plus mouse right clicked plus " wheel " plus mouse wheel turned, 10, 10, "white"\n    reveal the frame\n  scrawl "moved ", mouse moved across, " ", mouse moved down\n  forget the kept shapes "land"\n  try:\n    etch the kept shapes "land"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
+    assert out.stdout == 'no shapes are being kept. Start with: start keeping the shapes as "land"\nthere are no shapes kept as "sea".\nthe daylight is from 0 (dark) to 1 (full), not 2.\nmoved 0 0\nthere are no shapes kept as "land".\n', repr(out.stdout)
 
     # Places can have negative parts written straight in.
     out = both('genesis:\n  scrawl 1 horizontal -2 vertical -3 depth, " / ", 5 horizontal -1 vertical\n  set x to 3\n'
@@ -373,7 +380,7 @@ def program_checks():
     assert out.stdout == "ok\n", repr(out.stdout)
     assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
         "I don't know 'etch a triangle with'. Words that start with 'etch': etch a ball, etch a block, etch a box, etch a circle, etch a cube, etch a line, "
-        "etch a square, etch the ground, etch the picture, etch the picture turned, etch words.")
+        "etch a square, etch the ground, etch the kept shapes, etch the picture, etch the picture turned, etch words.")
 
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'

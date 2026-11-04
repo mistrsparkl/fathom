@@ -902,7 +902,20 @@ class Expr:
         return value
 
     def full(self):
-        return self.logic_or()
+        bare, self.bare = getattr(self, "bare", 0), 0  # inside brackets, 'as text' and the like belong to what is there
+        try:
+            return self.logic_or()
+        finally:
+            self.bare = bare
+
+    def operand(self):
+        """What follows 'of' or a command's name: 'as text', 'rounded to' and the like after it are left for the whole,
+        so 'item 2 of scores as text' is (item 2 of scores) as text."""
+        self.bare = getattr(self, "bare", 0) + 1
+        try:
+            return self.unary()
+        finally:
+            self.bare -= 1
 
     def logic_or(self):
         v = self.logic_and()
@@ -1094,6 +1107,8 @@ class Expr:
                 break
             self.i += 1 + len(key)
             v = part_of(v, key)
+        if getattr(self, "bare", 0):
+            return v
         if self.at("as", "a", "number") or self.at("as", "number"):
             self.i += 3 if self.at("as", "a") else 2
             if v.kind != TEXT:
@@ -1167,7 +1182,7 @@ class Expr:
             return Value(cpp_text(tok), TEXT, lambda env: s)
         if self.at("random", "item", "of") or self.at("a", "random", "item", "of"):
             self.i += 4 if tok == "a" else 3
-            v = self.unary()
+            v = self.operand()
             if not is_list(v.kind):
                 raise ScriptError(line, f"'random item of' needs a list, but this is {kind_name(v.kind)}.")
             a = v.run
@@ -1202,7 +1217,7 @@ class Expr:
                                                  or place_part(self.names.known[key][1], (self.peek(n + 1),)))):
                 # 'existence of x' is x of the name existence, when there is one, not the existence of x
                 self.i += n + 1
-                owner = self.unary()
+                owner = self.operand()
                 if owner.kind not in FIELDS[key]:
                     raise ScriptError(line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
                 return part_of(owner, key)
@@ -1210,7 +1225,7 @@ class Expr:
             self.i += 1
             index = self.need(self.sum(), NUMBER, "item")
             self.take("of")
-            seq = self.unary()
+            seq = self.operand()
             if not is_list(seq.kind):
                 raise ScriptError(line, f"'item ... of' needs a list, but this is {kind_name(seq.kind)}.")
             get, at = seq.run, index.run
@@ -1231,7 +1246,7 @@ class Expr:
             self.i += 1
             name = self.need(self.sum(), TEXT, "entry")
             self.take("of")
-            table = self.unary()
+            table = self.operand()
             if not is_table(table.kind):
                 raise ScriptError(line, f"'entry ... of' needs a table, but this is {kind_name(table.kind)}.")
             get, at = table.run, name.run
@@ -1245,14 +1260,14 @@ class Expr:
         for stat in ("sum", "average", "biggest", "smallest"):
             if self.at(stat, "of") and not match_command(self.names, self.t[self.i:])[0]:  # a command called 'sum of' still wins
                 self.i += 2
-                v = self.unary()
+                v = self.operand()
                 if v.kind != "list of number":
                     raise ScriptError(line, f"'{stat} of' needs a list of numbers, but this is {kind_name(v.kind)}.")
                 a = v.run
                 return Value(f"imagine::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line))
         if self.at("keys", "of"):
             self.i += 2
-            table = self.unary()
+            table = self.operand()
             if not is_table(table.kind):
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
@@ -1262,7 +1277,7 @@ class Expr:
             return command_value(self.names, self.t, self, line)
         if self.at("invoke"):  # 'invoke f with 4': do the command a name holds
             self.i += 1
-            f = self.unary()
+            f = self.operand()
             if not is_command(f.kind):
                 raise ScriptError(line, f"'invoke' needs a command, like 'invoke the command double with 4', not {kind_name(f.kind)}.")
             ins, gives = SIGNATURES[f.kind]
@@ -1270,7 +1285,7 @@ class Expr:
                 self.i += 1
             args = []
             if len(ins) == 1:
-                args = [self.unary()]
+                args = [self.operand()]
             elif len(ins) > 1:
                 if not self.at("("):
                     raise ScriptError(line, f"This command needs {len(ins)} inputs. Put them in brackets, like: invoke f with (1, 2)")
@@ -1302,7 +1317,7 @@ class Expr:
                 self.i += 1
             args = []
             if needs == 1:
-                args = [self.unary()]
+                args = [self.operand()]
             elif needs > 1:
                 if not self.at("("):
                     raise ScriptError(line, f"'{' '.join(key)}' needs {needs} inputs. Put them in brackets here, like: {' '.join(key)} with (1, 2)")
@@ -1340,21 +1355,21 @@ class Expr:
         if self.at("contents", "of", "file") or self.at("lines", "of", "file"):
             whole = self.at("contents")
             self.i += 3
-            where = self.need(self.unary(), TEXT, "file")
+            where = self.need(self.operand(), TEXT, "file")
             w = where.run
             if whole:
                 return Value(f"imagine::read_file({where.cpp}, {line})", TEXT, lambda env: read_file(w(env), line))
             return Value(f"imagine::read_lines({where.cpp}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)))
         if self.at("file"):
             self.i += 1
-            where = self.need(self.unary(), TEXT, "file")
+            where = self.need(self.operand(), TEXT, "file")
             self.take("exists")
             w = where.run
             return Value(f"imagine::file_exists({where.cpp})", YESNO, lambda env: os.path.isfile(w(env)))
         for words, fn, f in ((("lines", "of"), "lines_of", lines_of), (("words", "of"), "words_of", str.split)):
             if self.at(*words):
                 self.i += 2
-                v = self.need(self.unary(), TEXT, " ".join(words))
+                v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
                 return Value(f"imagine::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
         if tok in ("letter", "letters") and self.peek(1) not in ITEM_NOT_INDEX:
@@ -1365,7 +1380,7 @@ class Expr:
                 self.take("to")
                 last_ = self.need(self.sum(), NUMBER, "letters ... to")
             self.take("of")
-            v = self.need(self.unary(), TEXT, f"'{tok} ... of'")
+            v = self.need(self.operand(), TEXT, f"'{tok} ... of'")
             a, f = v.run, first.run
             if last_ is None:
                 return Value(f"imagine::letter({v.cpp}, {strip_parens(first.cpp)}, {line})", TEXT, lambda env: letter(a(env), f(env), line))
@@ -1374,20 +1389,20 @@ class Expr:
                          lambda env: letters_from(a(env), f(env), b(env), line))
         if self.at("trimmed"):  # 'trimmed line': without spaces, tabs and line breaks at either end
             self.i += 1
-            v = self.need(self.unary(), TEXT, "trimmed")
+            v = self.need(self.operand(), TEXT, "trimmed")
             a = v.run
             return Value(f"imagine::trimmed({v.cpp})", TEXT, lambda env: a(env).strip(" \t\r\n"))
         for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
             if self.at(*words):
                 self.i += 3
-                v = self.need(self.unary(), TEXT, " ".join(words))
+                v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
                 return Value(f"imagine::{fn}({v.cpp})", TEXT, lambda env, table=table: a(env).translate(table))
         if self.at("position", "of"):
             self.i += 2
             part = self.need(self.sum(), TEXT, "position of")
             self.take("in")
-            v = self.need(self.unary(), TEXT, "position of ... in")
+            v = self.need(self.operand(), TEXT, "position of ... in")
             a, b = v.run, part.run
             return Value(f"imagine::position({v.cpp}, {part.cpp})", NUMBER, lambda env: float(a(env).find(b(env)) + 1))
         if self.at("replace"):
@@ -1396,23 +1411,23 @@ class Expr:
             self.take("with")
             new = self.need(self.sum(), TEXT, "replace ... with")
             self.take("in")
-            v = self.need(self.unary(), TEXT, "replace ... in")
+            v = self.need(self.operand(), TEXT, "replace ... in")
             a, o, w = v.run, old.run, new.run
             return Value(f"imagine::replace_all({v.cpp}, {old.cpp}, {new.cpp}, {line})", TEXT,
                          lambda env: replace_all(a(env), o(env), w(env), line))
         if self.at("join"):
             self.i += 1
-            v = self.unary()
+            v = self.operand()
             if not is_list(v.kind):
                 raise ScriptError(line, f"'join' needs a list, but this is {kind_name(v.kind)}.")
             self.take("with")
-            between = self.need(self.unary(), TEXT, "join ... with")
+            between = self.need(self.operand(), TEXT, "join ... with")
             a, b = v.run, between.run
             return Value(f"imagine::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
         if self.at("sorted"):
             start = self.i
             self.i += 1
-            v = self.unary()
+            v = self.operand()
             if self.at("by") and is_list(v.kind) and is_thing(element(v.kind)):
                 self.i += 1
                 thing = element(v.kind)
@@ -1431,7 +1446,7 @@ class Expr:
         for word in ("sorted", "reversed"):
             if self.at(word):
                 self.i += 1
-                v = self.unary()
+                v = self.operand()
                 if not is_list(v.kind) or (word == "sorted" and element(v.kind) not in (NUMBER, TEXT)):
                     need = " of numbers or text" if word == "sorted" else ""
                     raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
@@ -1440,7 +1455,7 @@ class Expr:
                 return Value(f"imagine::{word}({v.cpp})", v.kind, run)
         if self.at("last", "item", "of"):
             self.i += 3
-            v = self.unary()
+            v = self.operand()
             if not is_list(v.kind):
                 raise ScriptError(line, f"'last item of' needs a list, but this is {kind_name(v.kind)}.")
             a = v.run
@@ -1465,7 +1480,7 @@ class Expr:
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
             self.i += 1
-            v = self.need(self.unary(), PLACE, "flat")
+            v = self.need(self.operand(), PLACE, "flat")
             a = v.run
             return Value(f"FVector2D({v.cpp})", FLAT, lambda env: Place(*a(env).parts()[:2]))
         if self.at("direction", "of"):

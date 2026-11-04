@@ -1,18 +1,94 @@
 note: Words for being a web server: other programs (and web browsers) on this computer can ask it for pages.
 note: Use them in a program with:  use: server
 note: The command it is given gets the address asked for (like "/hello" or "/scores?top=3") and gives back the page, as text.
+note: What a page is (a web page, a style sheet, a script, a picture) is told to the browser from the address's ending (.css, .js, .png ...).
 
 code:
   #define NOMINMAX
 include: <winsock2.h>
 include: <ws2tcpip.h>
 include: <windows.h>
+include: <filesystem>
+include: <fstream>
 link: ws2_32
 
 code:
   namespace imagine_server
   {
-  	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line)
+  	inline std::string message;  // what was sent with the request being answered ('the web message')
+  	inline std::string file_asked;  // 'answer with the file': sent instead of the answer's text
+
+  	inline std::string kind_of_page(const std::string& path)
+  	{
+  		std::string name = path.substr(0, path.find('?'));
+  		std::string end = name.substr(name.find_last_of('.') == std::string::npos ? name.size() : name.find_last_of('.'));
+  		static const std::pair<const char*, const char*> kinds[] = {
+  			{".css", "text/css; charset=utf-8"}, {".js", "text/javascript; charset=utf-8"}, {".json", "application/json; charset=utf-8"},
+  			{".svg", "image/svg+xml"}, {".png", "image/png"}, {".jpg", "image/jpeg"}, {".jpeg", "image/jpeg"}, {".gif", "image/gif"},
+  			{".ico", "image/x-icon"}, {".woff2", "font/woff2"}, {".woff", "font/woff"}, {".ttf", "font/ttf"}, {".mp3", "audio/mpeg"},
+  			{".wav", "audio/wav"}, {".txt", "text/plain; charset=utf-8"}, {".webp", "image/webp"}};
+  		for (const auto& [e, k] : kinds)
+  			if (imagine::lower(end) == e)
+  				return k;
+  		return "text/html; charset=utf-8";
+  	}
+
+  	inline std::string decoded(const std::string& s)
+  	{
+  		std::string out;
+  		for (size_t i = 0; i < s.size(); ++i)
+  		{
+  			if (s[i] == '+')
+  				out += ' ';
+  			else if (s[i] == '%' && i + 2 < s.size() && std::isxdigit((unsigned char)s[i + 1]) && std::isxdigit((unsigned char)s[i + 2]))
+  			{
+  				out += (char)std::stoi(s.substr(i + 1, 2), nullptr, 16);
+  				i += 2;
+  			}
+  			else
+  				out += s[i];
+  		}
+  		return out;
+  	}
+
+  	inline std::string encoded(const std::string& s)
+  	{
+  		static const char* hex = "0123456789ABCDEF";
+  		std::string out;
+  		for (unsigned char c : s)
+  		{
+  			if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+  				out += (char)c;
+  			else
+  			{
+  				out += '%';
+  				out += hex[c >> 4];
+  				out += hex[c & 15];
+  			}
+  		}
+  		return out;
+  	}
+
+  	// The file in folder that path names, if there is one (and it is inside the folder).
+  	inline bool file_for(const std::string& folder, const std::string& path, std::string& bytes)
+  	{
+  		if (folder.empty())
+  			return false;
+  		std::string name = decoded(path.substr(0, path.find('?')));
+  		if (name == "/")
+  			name = "/index.html";
+  		if (name.find("..") != std::string::npos)
+  			return false;
+  		std::filesystem::path file = std::filesystem::u8path(folder + name);
+  		std::error_code e;
+  		if (!std::filesystem::is_regular_file(file, e))
+  			return false;
+  		std::ifstream in(file, std::ios::binary);
+  		bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  		return true;
+  	}
+
+  	inline void serve_from(double port, const std::string& folder, const std::function<std::string(std::string)>& answer, int line)
   	{
   		WSADATA data;
   		WSAStartup(MAKEWORD(2, 2), &data);
@@ -37,11 +113,36 @@ code:
   					break;
   				asked.append(chunk, got);
   			}
+  			size_t head_end = asked.find("\r\n\r\n");
+  			size_t length = 0;
+  			std::string low = imagine::lower(asked.substr(0, head_end));
+  			size_t at = low.find("content-length:");
+  			if (at != std::string::npos)
+  				length = (size_t)std::strtoul(low.c_str() + at + 15, nullptr, 10);
+  			message = head_end == std::string::npos ? "" : asked.substr(head_end + 4);
+  			while (message.size() < length)
+  			{
+  				int got = recv(client, chunk, sizeof chunk, 0);
+  				if (got <= 0)
+  					break;
+  				message.append(chunk, got);
+  			}
   			size_t a = asked.find(' '), b = a == std::string::npos ? a : asked.find(' ', a + 1);
   			std::string path = b == std::string::npos ? "/" : asked.substr(a + 1, b - a - 1);
-  			std::string page = imagine::invoke(answer, line, path);
-  			std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " +
-  				std::to_string(page.size()) + "\r\nConnection: close\r\n\r\n" + page;
+  			std::string page, kind = kind_of_page(path == "/" && !folder.empty() ? "/index.html" : path);
+  			if (!file_for(folder, path, page))
+  			{
+  				file_asked.clear();
+  				page = imagine::invoke(answer, line, path);
+  				if (!file_asked.empty())
+  				{
+  					std::ifstream in(std::filesystem::u8path(file_asked), std::ios::binary);
+  					page.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  					kind = kind_of_page(file_asked);
+  				}
+  			}
+  			std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: " + kind +
+  				"\r\nCache-Control: no-store\r\nContent-Length: " + std::to_string(page.size()) + "\r\nConnection: close\r\n\r\n" + page;
   			for (size_t sent = 0; sent < reply.size();)
   			{
   				int put = send(client, reply.data() + sent, (int)(reply.size() - sent), 0);
@@ -53,16 +154,60 @@ code:
   			closesocket(client);
   		}
   	}
+  	inline void answer_with(const std::string& name, int line)
+  	{
+  		std::error_code e;
+  		if (!std::filesystem::is_regular_file(std::filesystem::u8path(name), e))
+  			imagine::fail(line, "there is no file called " + name + ".");
+  		file_asked = name;
+  	}
+  	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line) { serve_from(port, "", answer, line); }
   }
 
 python:
-  import http.server
-  def serve(port, answer):
+  import http.server, os.path, urllib.parse
+  MESSAGE = [""]
+  FILE_ASKED = [""]
+  def answer_with(name):
+      if not os.path.isfile(name):
+          raise RunError(0, "there is no file called " + name + ".")
+      FILE_ASKED[0] = name
+  KINDS = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+           ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+           ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".mp3": "audio/mpeg",
+           ".wav": "audio/wav", ".txt": "text/plain; charset=utf-8", ".webp": "image/webp"}
+  def kind_of_page(path):
+      return KINDS.get(os.path.splitext(path.split("?")[0])[1].lower(), "text/html; charset=utf-8")
+  def file_for(folder, path):
+      if not folder:
+          return None
+      name = urllib.parse.unquote_plus(path.split("?")[0])
+      if name == "/":
+          name = "/index.html"
+      if ".." in name:
+          return None
+      file = folder + name
+      if not os.path.isfile(file):
+          return None
+      with open(file, "rb") as f:
+          return f.read()
+  def serve_from(port, folder, answer):
       class Handler(http.server.BaseHTTPRequestHandler):
           def do_GET(self):
-              page = answer(self.path).encode("utf-8")
+              length = int(self.headers.get("Content-Length") or 0)
+              MESSAGE[0] = self.rfile.read(length).decode("utf-8", "replace") if length else ""
+              page = file_for(folder, self.path)
+              kind = kind_of_page("/index.html" if self.path == "/" and folder else self.path)
+              if page is None:
+                  FILE_ASKED[0] = ""
+                  page = answer(self.path).encode("utf-8", "surrogateescape")
+                  if FILE_ASKED[0]:
+                      with open(FILE_ASKED[0], "rb") as f:
+                          page = f.read()
+                      kind = kind_of_page(FILE_ASKED[0])
               self.send_response(200)
-              self.send_header("Content-Type", "text/html; charset=utf-8")
+              self.send_header("Content-Type", kind)
+              self.send_header("Cache-Control", "no-store")
               self.send_header("Content-Length", str(len(page)))
               self.send_header("Connection", "close")
               self.end_headers()
@@ -77,4 +222,14 @@ python:
       server.serve_forever()
 
 to serve the web, given port (a number) and answer (a command given text giving back text) = imagine_server::serve({port}, {answer}, {line})
-  runs: serve({port}, {answer})
+  runs: serve_from({port}, "", {answer})
+to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text giving back text) = imagine_server::serve_from({port}, {folder}, {answer}, {line})
+  runs: serve_from({port}, {folder}, {answer})
+the web message = imagine_server::message, text, read only
+  runs: MESSAGE[0]
+to web decoded, given piece (text), giving back text = imagine_server::decoded({piece})
+  runs: urllib.parse.unquote_plus({piece})
+to web encoded, given piece (text), giving back text = imagine_server::encoded({piece})
+  runs: urllib.parse.quote({piece}, safe="-_.~")
+to answer with the file, given name (text) = imagine_server::answer_with({name}, {line})
+  runs: answer_with({name})

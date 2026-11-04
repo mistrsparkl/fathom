@@ -17,9 +17,17 @@ code:
   		if (!fs::is_directory(path(folder), problem))
   			imagine::fail(line, "there is no folder called \"" + folder + "\".");
   		std::vector<std::string> found;
-  		for (const auto& entry : fs::directory_iterator(path(folder), problem))
-  			if (entry.is_directory() == folders)
-  				found.push_back(name_of(entry.path().filename()));
+  		fs::directory_iterator it(path(folder), fs::directory_options::skip_permission_denied, problem);
+  		if (problem)
+  			imagine::fail(line, "I couldn't look inside the folder \"" + folder + "\".");
+  		for (; it != fs::directory_iterator(); it.increment(problem))
+  		{
+  			if (problem)
+  				break;
+  			std::error_code kind;
+  			if (it->is_directory(kind) == folders && !kind)
+  				found.push_back(name_of(it->path().filename()));
+  		}
   		std::sort(found.begin(), found.end());
   		return found;
   	}
@@ -98,7 +106,11 @@ python:
   def inside(folder, folders):
       if not os.path.isdir(folder):
           raise RunError(0, 'there is no folder called "' + folder + '".')
-      return sorted(n for n in os.listdir(folder) if os.path.isdir(os.path.join(folder, n)) == folders)
+      try:
+          names = os.listdir(folder)
+      except OSError:
+          raise RunError(0, "I couldn't look inside the folder \"" + folder + "\".")
+      return sorted(n for n in names if os.path.isdir(os.path.join(folder, n)) == folders)
   def make(folder):
       try:
           os.makedirs(folder, exist_ok=True)

@@ -1,0 +1,475 @@
+whisper: Driftstone: an island made of blocks, to dig into, build on and wander, from dawn to night and back.
+whisper: W A S D walk, the mouse looks, space jumps (and swims). Click digs, right-click builds.
+whisper: 1 to 9 (or the wheel) picks a block. C opens the workbench. K keeps the island in a file. Escape lets go of the pointer.
+whisper: The island is 48 by 48 blocks and 24 high. Cell kinds: 0 air, 1 turf, 2 loam, 3 slate, 4 sand, 5 driftwood,
+whisper: 6 canopy, 7 planks, 8 brick, 9 glass, 10 water, 11 deepstone (the floor, which can't be dug).
+
+use: window
+use: maths
+
+a land has:
+  cells (a list of numbers)
+  stale (a list of numbers)
+  ready (a list of numbers)
+  bag (a list of numbers)
+  colours (a list of text)
+  shades (a list of text)
+  names (a list of text)
+  hardness (a list of numbers)
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- the shape of the island
+
+to hash, given x (a number) and z (a number) and seed (a number), giving back a number:
+  set v to (sine of (x times 127.1 plus z times 311.7 plus seed times 74.7)) times 43758.5453
+  give back v minus (round down v)
+and the universe said i love you
+
+to noise, given x (a number) and z (a number) and cell (a number) and seed (a number), giving back a number:
+  set gx to round down (x divided by cell)
+  set gz to round down (z divided by cell)
+  set fx to x divided by cell minus gx
+  set fz to z divided by cell minus gz
+  set fx to fx times fx times (3 minus 2 times fx)
+  set fz to fz times fz times (3 minus 2 times fz)
+  set nw to hash with (gx, gz, seed)
+  set ne to hash with (gx plus 1, gz, seed)
+  set sw to hash with (gx, gz plus 1, seed)
+  set se to hash with (gx plus 1, gz plus 1, seed)
+  set top to nw plus (ne minus nw) times fx
+  set bottom to sw plus (se minus sw) times fx
+  give back top plus (bottom minus top) times fz
+and the universe said i love you
+
+to cell kind, for a land, given x (a number) and y (a number) and z (a number), giving back a number:
+  if y falls below 0: give back 11
+  if y is at least 24: give back 0
+  if x falls below 0 or z falls below 0 or x is at least 48 or z is at least 48: give back 10
+  give back item (1 plus x plus z times 48 plus y times 2304) of cells
+and the universe said i love you
+
+to put, for a land, given x (a number) and y (a number) and z (a number) and kind (a number):
+  if x falls below 0 or z falls below 0 or y falls below 0 or x is at least 48 or z is at least 48 or y is at least 24: cease
+  set item (1 plus x plus z times 48 plus y times 2304) of cells to kind
+and the universe said i love you
+
+to plant a tree, for a land, given x (a number) and y (a number) and z (a number):
+  for each dy from 2 to 4:
+    for each dx from -2 to 2:
+      for each dz from -2 to 2:
+        set corner to (size of dx) is 2 and (size of dz) is 2
+        if dy is 4 and ((size of dx) is 2 or (size of dz) is 2): move on
+        if corner and dy is 2: move on
+        if cell kind with (land, x plus dx, y plus dy, z plus dz) is 0: put with (land, x plus dx, y plus dy, z plus dz, 6)
+  for each dy from 0 to 3: put with (land, x, y plus dy, z, 5)
+and the universe said i love you
+
+to shape, for a land:
+  set cells to a list of numbers
+  echo 55296 times: gather 0 into cells
+  for each x from 0 to 47:
+    for each z from 0 to 47:
+      set dx to (x minus 23.5) divided by 23.5
+      set dz to (z minus 23.5) divided by 23.5
+      set reach to dx times dx plus dz times dz
+      set height to 4 plus (noise with (x, z, 14, 1)) times 11 plus (noise with (x, z, 5, 2)) times 3 minus reach times 9
+      set height to round (clamp height between 2 and 19)
+      put with (land, x, 0, z, 11)
+      for each y from 1 to height minus 1:
+        set kind to 3
+        if y is at least height minus 3: set kind to 2
+        if y is height minus 1:
+          set kind to 1
+          if y is at most 7: set kind to 4
+        put with (land, x, y, z, kind)
+      if height is at most 6:
+        for each y from height to 6: put with (land, x, y, z, 10)
+  for each x from 3 to 44:
+    for each z from 3 to 44:
+      if (hash with (x, z, 9)) exceeds 0.965:
+        set y to 23
+        as long as y exceeds 0 and cell kind with (land, x, y, z) is 0: set y to y minus 1
+        if cell kind with (land, x, y, z) is 1 and y is at most 17: plant a tree with (land, x, y plus 1, z)
+and the universe said i love you
+
+to make the island, giving back a land:
+  set land to conjure a land
+  set colours of land to a list of ("#62bb5c", "#8a5a3b", "#8d9298", "#e3d29a", "#7b5a3a", "#3f9a4c", "#c89d66", "#b5523b", "#c3ecf5", "#2f78c4", "#3d4047")
+  set shades of land to a list of ("#58ae53", "#7f5236", "#83898f", "#d9c78e", "#715234", "#398f45", "#bd935d", "#a84a35", "#b5e3ee", "#2b6fb6", "#373a40")
+  set names of land to a list of ("turf", "loam", "slate", "sand", "driftwood", "canopy", "planks", "brick", "glass", "water", "deepstone")
+  set hardness of land to a list of (0.3, 0.35, 0.9, 0.3, 0.6, 0.15, 0.5, 0.9, 0.25, 0, 0)
+  set bag of land to a list of (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+  if file "driftstone island.json" exists:
+    set cells of land to a list of numbers
+    load cells of land from the text contents of file "driftstone island.json"
+  otherwise:
+    shape land
+  for each n from 0 to 35:
+    gather n into stale of land
+    gather 0 into ready of land
+  give back land
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- drawing the island, a chunk of 8 by 8 columns at a time
+
+to see through, given kind (a number), giving back yes or no:
+  give back kind is 0 or kind is 6 or kind is 9 or kind is 10
+and the universe said i love you
+
+to build chunk, for a land, given chunk (a number):
+  set cx to (remainder of (chunk, 6)) times 8
+  set cz to (round down (chunk divided by 6)) times 8
+  start keeping the shapes as "chunk " plus chunk
+  for each x from cx to cx plus 7:
+    for each z from cz to cz plus 7:
+      for each y from 1 to 23:
+        set here to cell kind with (land, x, y, z)
+        if here is 0 or here is 10: move on
+        set open to see through with (cell kind with (land, x, y plus 1, z))
+        if not open: set open to see through with (cell kind with (land, x plus 1, y, z))
+        if not open: set open to see through with (cell kind with (land, x minus 1, y, z))
+        if not open: set open to see through with (cell kind with (land, x, y, z plus 1))
+        if not open: set open to see through with (cell kind with (land, x, y, z minus 1))
+        if not open: set open to see through with (cell kind with (land, x, y minus 1, z))
+        if open:
+          set colour to item here of colours
+          if (remainder of (x plus y plus z, 2)) is 1: set colour to item here of shades
+          etch a cube with ((x plus 0.5) horizontal (y plus 0.5) vertical (z plus 0.5) depth, 1, colour)
+  stop keeping the shapes
+  set item (chunk plus 1) of ready to 1
+and the universe said i love you
+
+to touch chunks, for a land, given x (a number) and z (a number):
+  whisper: the chunk holding this column, and the ones beside it when it is on an edge, need drawing again
+  for each dx from -1 to 1:
+    for each dz from -1 to 1:
+      set nx to x plus dx
+      set nz to z plus dz
+      if nx is at least 0 and nz is at least 0 and nx falls below 48 and nz falls below 48:
+        set chunk to (round down (nx divided by 8)) plus (round down (nz divided by 8)) times 6
+        if not (stale contains chunk): gather chunk into stale
+and the universe said i love you
+
+to rebuild the stale ones, for a land:
+  as long as size of stale exceeds 0:
+    build chunk with (land, item 1 of stale)
+    banish item 1 from stale
+and the universe said i love you
+
+to edge, given one (a place) and other (a place):
+  set p to screen place of one
+  set q to screen place of other
+  etch a line with (p of horizontal, p of vertical, q of horizontal, q of vertical, "#ffffff")
+and the universe said i love you
+
+to face, given one (a place) and two (a place) and three (a place) and four (a place):
+  edge with (one, two)
+  edge with (two, three)
+  edge with (three, four)
+  edge with (four, one)
+and the universe said i love you
+
+to outline, given x (a number) and y (a number) and z (a number) and eye spot (a place) and look (a place):
+  whisper: the eight corners must all be in front of the eye, or they have no place on the screen
+  for each cx from 0 to 1:
+    for each cy from 0 to 1:
+      for each cz from 0 to 1:
+        set gap to ((x plus cx) horizontal (y plus cy) vertical (z plus cz) depth) minus eye spot
+        if (gap of horizontal) times (look of horizontal) plus (gap of vertical) times (look of vertical) plus (gap of depth) times (look of depth) falls below 0.1: cease
+  whisper: only the edges of the faces turned toward the eye, a hair outside the block so they aren't hidden in it
+  set lo to x minus 0.003
+  set hi to x plus 1.003
+  set down to y minus 0.003
+  set up to y plus 1.003
+  set near to z minus 0.003
+  set far to z plus 1.003
+  set ex to eye spot of horizontal
+  set ey to eye spot of vertical
+  set ez to eye spot of depth
+  if ey exceeds y plus 1: face with (lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, lo horizontal up vertical far depth)
+  if ey falls below y: face with (lo horizontal down vertical near depth, hi horizontal down vertical near depth, hi horizontal down vertical far depth, lo horizontal down vertical far depth)
+  if ex falls below x: face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, lo horizontal up vertical far depth, lo horizontal down vertical far depth)
+  if ex exceeds x plus 1: face with (hi horizontal down vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
+  if ez falls below z: face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal down vertical near depth)
+  if ez exceeds z plus 1: face with (lo horizontal down vertical far depth, lo horizontal up vertical far depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- walking, digging and building
+
+to solid, given kind (a number), giving back yes or no:
+  give back kind is not 0 and kind is not 10
+and the universe said i love you
+
+to crowded, for a land, given spot (a place), giving back yes or no:
+  whisper: does a body 0.6 wide and 1.75 high, standing at spot, overlap a solid block (or the edge of the island)?
+  set low x to round down ((spot of horizontal) minus 0.3)
+  set high x to round down ((spot of horizontal) plus 0.3)
+  set low z to round down ((spot of depth) minus 0.3)
+  set high z to round down ((spot of depth) plus 0.3)
+  set low y to round down (spot of vertical)
+  set high y to round down ((spot of vertical) plus 1.75)
+  if low x falls below 0 or low z falls below 0 or high x exceeds 47 or high z exceeds 47: give back yes
+  for each x from low x to high x:
+    for each z from low z to high z:
+      for each y from low y to high y:
+        if solid with (cell kind with (land, x, y, z)): give back yes
+  give back no
+and the universe said i love you
+
+to aimed cell, for a land, given origin (a place) and look (a place), giving back a list of numbers:
+  whisper: the first solid block along the look, within 6 metres, and the empty cell just before it
+  set prior x to round down (origin of horizontal)
+  set prior y to round down (origin of vertical)
+  set prior z to round down (origin of depth)
+  set travelled to 0
+  as long as travelled falls below 6:
+    set spot to origin plus look times travelled
+    set x to round down (spot of horizontal)
+    set y to round down (spot of vertical)
+    set z to round down (spot of depth)
+    if solid with (cell kind with (land, x, y, z)): give back a list of (x, y, z, prior x, prior y, prior z)
+    set prior x to x
+    set prior y to y
+    set prior z to z
+    set travelled to travelled plus 0.03
+  give back a list of numbers
+and the universe said i love you
+
+to craft, for a land, given recipe (a number), giving back text:
+  set first to item recipe of a list of (5, 3, 4, 6)
+  set first count to item recipe of a list of (1, 3, 2, 2)
+  set second to item recipe of a list of (0, 0, 0, 2)
+  set second count to item recipe of a list of (0, 0, 0, 1)
+  set made to item recipe of a list of (7, 8, 9, 1)
+  set made count to item recipe of a list of (4, 2, 1, 1)
+  if item first of bag falls below first count: give back "You need " plus first count plus " " plus item first of names plus "."
+  if second exceeds 0 and item second of bag falls below second count: give back "You need " plus second count plus " " plus item second of names plus "."
+  set item first of bag to item first of bag minus first count
+  if second exceeds 0: set item second of bag to item second of bag minus second count
+  set item made of bag to item made of bag plus made count
+  give back "Made " plus made count plus " " plus item made of names plus "."
+and the universe said i love you
+
+to two digits, given n (a number), giving back text:
+  if n falls below 10: give back "0" plus n
+  give back n as text
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- the game
+
+genesis:
+  open a world with "Driftstone", 960, 540
+  consume the window with "#0b1a24"
+  set the text size to 28
+  etch words with "Shaping the island...", 340, 250, "#9fe8ff"
+  reveal the frame
+  set land to make the island
+  set feet to 24.5 horizontal 23 vertical 24.5 depth
+  as long as feet of vertical exceeds 1 and not (crowded with (land, feet minus 0 horizontal 0.1 vertical 0 depth)):
+    set feet to feet minus 0 horizontal 0.1 vertical 0 depth
+  set fall speed to 0
+  set on ground to no
+  set turn to 30
+  set tilt to -12
+  set chosen to 1
+  set crafting to no
+  set clock to 0.08
+  set day to 1
+  set digging time to 0
+  set dig target to -1
+  set message to "Welcome to Driftstone. Dig with a click, build with a right-click."
+  set message time to 6
+  set walk speed to 4.3
+  hold the pointer
+  set pointer held to yes
+  as long as the world lives:
+    set dt to smaller of frame time and 0.05
+
+    whisper: -------- the pointer, and looking around
+    if key pressed "escape" and pointer held:
+      let go of the pointer
+      set pointer held to no
+    otherwise if mouse clicked and not pointer held:
+      hold the pointer
+      set pointer held to yes
+    if pointer held:
+      set turn to turn plus mouse moved across times 0.15
+      set tilt to clamp (tilt minus mouse moved down times 0.15) between -89 and 89
+
+    whisper: -------- walking and falling
+    set forward to (sine of turn) horizontal 0 vertical (cosine of turn) depth
+    set rightward to (cosine of turn) horizontal 0 vertical (0 minus sine of turn) depth
+    set wish to 0 horizontal 0 vertical 0 depth
+    if pointer held:
+      if key held "w" or key held "up": set wish to wish plus forward
+      if key held "s" or key held "down": set wish to wish minus forward
+      if key held "d" or key held "right": set wish to wish plus rightward
+      if key held "a" or key held "left": set wish to wish minus rightward
+    set swimming to cell kind with (land, round down (feet of horizontal), round down ((feet of vertical) plus 0.4), round down (feet of depth)) is 10
+    set pace to walk speed
+    if swimming: set pace to walk speed times 0.55
+    if size of wish exceeds 0: set wish to wish divided by (size of wish) times (pace times dt)
+    set step to (wish of horizontal) horizontal 0 vertical 0 depth
+    if not (crowded with (land, feet plus step)): set feet to feet plus step
+    set step to 0 horizontal 0 vertical (wish of depth) depth
+    if not (crowded with (land, feet plus step)): set feet to feet plus step
+    if swimming:
+      set fall speed to fall speed minus 8 times dt
+      if key held "space" and pointer held: set fall speed to 3.2
+      set fall speed to clamp fall speed between -2.5 and 3.2
+    otherwise:
+      set fall speed to fall speed minus 24 times dt
+      if key held "space" and on ground and pointer held: set fall speed to 8
+    set step to 0 horizontal (fall speed times dt) vertical 0 depth
+    set on ground to no
+    if crowded with (land, feet plus step):
+      if fall speed falls below 0: set on ground to yes
+      set fall speed to 0
+    otherwise:
+      set feet to feet plus step
+    if feet of vertical falls below -10:
+      set feet to 24.5 horizontal 23 vertical 24.5 depth
+      set fall speed to 0
+
+    whisper: -------- what the eye sees, and digging and building
+    set eye spot to feet plus 0 horizontal 1.6 vertical 0 depth
+    set look to ((cosine of tilt) times (sine of turn)) horizontal (sine of tilt) vertical ((cosine of tilt) times (cosine of turn)) depth
+    set target to aimed cell with (land, eye spot, look)
+    set aiming to size of target is 6 and pointer held
+    if aiming:
+      set tx to item 1 of target
+      set ty to item 2 of target
+      set tz to item 3 of target
+      set target id to tx plus ty times 100 plus tz times 10000
+      set kind to cell kind with (land, tx, ty, tz)
+      if mouse held and not crafting:
+        if target id is not dig target:
+          set dig target to target id
+          set digging time to 0
+        set digging time to digging time plus dt
+        set needed to item kind of hardness of land
+        if needed exceeds 0 and digging time is at least needed:
+          put with (land, tx, ty, tz, 0)
+          if ty is at most 6 and (cell kind with (land, tx plus 1, ty, tz) is 10 or cell kind with (land, tx minus 1, ty, tz) is 10 or cell kind with (land, tx, ty, tz plus 1) is 10 or cell kind with (land, tx, ty, tz minus 1) is 10 or cell kind with (land, tx, ty plus 1, tz) is 10):
+            put with (land, tx, ty, tz, 10)
+          set item kind of bag of land to item kind of bag of land plus 1
+          touch chunks with (land, tx, tz)
+          rebuild the stale ones land
+          set digging time to 0
+          set dig target to -1
+        if needed is 0 and mouse clicked:
+          set message to "Deepstone is the floor of the world: it can't be dug."
+          set message time to 2
+      otherwise:
+        set digging time to 0
+        set dig target to -1
+      if mouse right clicked and not crafting:
+        set px to item 4 of target
+        set py to item 5 of target
+        set pz to item 6 of target
+        if item chosen of bag of land falls below 1:
+          set message to "You have no " plus item chosen of names of land plus ". Dig some, or make some at the workbench (C)."
+          set message time to 2.5
+        otherwise if py is at least 24:
+          set message to "That is as high as the sky goes."
+          set message time to 2
+        otherwise:
+          set was to cell kind with (land, px, py, pz)
+          put with (land, px, py, pz, chosen)
+          if crowded with (land, feet):
+            put with (land, px, py, pz, was)
+          otherwise:
+            set item chosen of bag of land to item chosen of bag of land minus 1
+            touch chunks with (land, px, pz)
+            rebuild the stale ones land
+    otherwise:
+      set digging time to 0
+      set dig target to -1
+
+    whisper: -------- picking a block, the workbench, keeping the island
+    if key pressed "c":
+      set crafting to not crafting
+    for each n from 1 to 9:
+      if key pressed (n as text):
+        if crafting and n is at most 4:
+          set message to craft with (land, n)
+          set message time to 2.5
+        otherwise:
+          set chosen to n
+    if mouse wheel turned is not 0:
+      set chosen to chosen minus mouse wheel turned
+      set chosen to (remainder of (round chosen minus 1 plus 90, 9)) plus 1
+    if key pressed "k":
+      inscribe (cells of land) as saved text into file "driftstone island.json"
+      set message to "The island is kept in 'driftstone island.json'. It comes back next time."
+      set message time to 3
+    if message time exceeds 0: set message time to message time minus dt
+
+    whisper: -------- the time of day: one day is five minutes
+    set clock to clock plus dt divided by 300
+    if clock is at least 1:
+      set clock to clock minus 1
+      set day to day plus 1
+    set sun height to sine of (clock times 360)
+    set light to clamp (0.28 plus sun height times 1.6) between 0.28 and 1
+    set bright to (light minus 0.28) divided by 0.72
+    set warmth to clamp (1 minus (size of sun height) times 3.5) between 0 and 1
+    set sky to colour from (12 plus 108 times bright plus 90 times warmth, 16 plus 172 times bright plus 30 times warmth, 40 plus 195 times bright minus 10 times warmth)
+
+    whisper: -------- drawing
+    consume the window with sky
+    place the eye at eye spot
+    aim the eye with (turn, tilt)
+    set the daylight to light
+    set sun way to (cosine of (clock times 360)) horizontal sun height vertical 0.35 depth
+    etch a ball with (eye spot plus sun way times 160, 9, "#ffe38a")
+    etch a ball with (eye spot minus sun way times 160, 6, "#e8eef7")
+    etch a block with (24 horizontal 6.9 vertical 24 depth, 700, 0.1, 700, "#2f78c4")
+    if size of stale of land exceeds 0:
+      build chunk with (land, item 1 of stale of land)
+      banish item 1 from stale of land
+    for each n from 0 to 35:
+      if item (n plus 1) of ready of land is 1: etch the kept shapes "chunk " plus n
+    if aiming: outline with (tx, ty, tz, eye spot, look)
+
+    whisper: -------- the things on top: the cross in the middle, the blocks you carry, the workbench
+    set w to width of the world
+    set h to height of the world
+    if pointer held:
+      etch a box with (w divided by 2 minus 9, h divided by 2 minus 1, 18, 2, "#ffffff")
+      etch a box with (w divided by 2 minus 1, h divided by 2 minus 9, 2, 18, "#ffffff")
+    if aiming and digging time exceeds 0 and item kind of hardness of land exceeds 0:
+      set part to clamp (digging time divided by (item kind of hardness of land)) between 0 and 1
+      etch a box with (w divided by 2 minus 30, h divided by 2 plus 18, 60, 6, "#0b1a24")
+      etch a box with (w divided by 2 minus 30, h divided by 2 plus 18, 60 times part, 6, "#3ef2e6")
+    set slot left to (w minus 9 times 52 minus 8 times 6) divided by 2
+    set slot top to h minus 66
+    set the text size to 13
+    for each n from 1 to 9:
+      set sx to slot left plus (n minus 1) times 58
+      if n is chosen: etch a box with (sx minus 3, slot top minus 3, 58, 58, "#3ef2e6")
+      etch a box with (sx, slot top, 52, 52, "#16222c")
+      etch a box with (sx plus 11, slot top plus 8, 30, 30, item n of colours of land)
+      etch words with n as text, sx plus 4, slot top plus 2, "#8fa3b0"
+      etch words with (item n of bag of land) as text, sx plus 30, slot top plus 36, "#ffffff"
+    set the text size to 16
+    etch words with item chosen of names of land plus " (" plus item chosen of bag of land plus ")", slot left, slot top minus 26, "#ffffff"
+    set hours to round down (remainder of (clock times 24 plus 6, 24))
+    set minutes to round down (remainder of (clock times 1440, 60))
+    etch words with "Driftstone   day " plus day plus "   " plus two digits with hours plus ":" plus two digits with minutes, 14, 10, "#ffffff"
+    if size of stale of land exceeds 0: etch words with "shaping the island... " plus (36 minus size of stale of land) plus " of 36", 14, 34, "#9fe8ff"
+    if message time exceeds 0: etch words with message, 14, h minus 128, "#ffffff"
+    if crafting:
+      etch a box with (w minus 330, 60, 310, 196, "#0b1a24")
+      etch a box with (w minus 330, 60, 310, 3, "#3ef2e6")
+      etch words with "Workbench: press a number", w minus 314, 74, "#3ef2e6"
+      etch words with "1   1 driftwood  ->  4 planks", w minus 314, 106, "#ffffff"
+      etch words with "2   3 slate  ->  2 brick", w minus 314, 132, "#ffffff"
+      etch words with "3   2 sand  ->  1 glass", w minus 314, 158, "#ffffff"
+      etch words with "4   2 canopy + 1 loam  ->  1 turf", w minus 314, 184, "#ffffff"
+      etch words with "C closes the workbench", w minus 314, 222, "#8fa3b0"
+    if not pointer held:
+      etch a box with (w divided by 2 minus 200, h divided by 2 minus 40, 400, 80, "#0b1a24")
+      etch words with "Paused. Click to carry on.", w divided by 2 minus 110, h divided by 2 minus 12, "#3ef2e6"
+    reveal the frame
+and the universe said i love you

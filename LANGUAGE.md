@@ -260,7 +260,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `ball touches coin` | yes or no: do two things' circles overlap? Each needs a `birth` (giving it an `existence`) and a `radius`. A place on its own counts as a dot (or uses `radius`, inside a thing's command). |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
-`of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
+`of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Words that change a whole value (`as text`, `as a number`, `as saved text`, `rounded to`, `changed by`, `kept by`) belong to everything before them: `item 2 of scores as text` is `(item 2 of scores) as text`, and `round x as text` is `(round x) as text`. Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
 
 ## Names
 
@@ -307,7 +307,7 @@ and the universe said i love you
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"`, `the bytes of the file "cat.png"` (the file as a list of numbers from 0 to 255, for files that aren't text), `fill the file with ("out.bin", numbers)` (the other way) |
 | `letters` | `code of the letter "A"` (65: the number behind a letter), `the letter with code 233` ("é") |
 | `patterns` | Finding text by its shape (`"[0-9]+"` is one or more digits, `"."` any letter, `"(...)"` a piece to keep): `the pattern fits with ("[0-9]+", line)` (yes or no), `matches of the pattern with ("[0-9]+", line)` (every match, as a list of text), `pieces of the pattern with ("([a-z]+)=([0-9]+)", line)` (the bracketed pieces of the first match), `replace the pattern with ("[0-9]+", line, "#")` |
-| `server` | `serve the web with (8080, the command answer)` makes the program a web server for this computer: open `http://127.0.0.1:8080/hello` in a browser and `answer` (a command given text giving back text) is given `"/hello"` and gives back the page. It serves until the program ends, so start it with `meanwhile` to do other things too. |
+| `server` | `serve the web with (8080, the command answer)` makes the program a web server for this computer: open `http://127.0.0.1:8080/hello` in a browser and `answer` (a command given text giving back text) is given `"/hello"` and gives back the page. It serves until the program ends, so start it with `meanwhile` to do other things too. `serve the web from the folder with (8080, "site", the command answer)` also sends the files in that folder (`/` is `index.html`), and asks `answer` only about addresses that aren't files. Inside `answer`, `the web message` is what a form or `fetch` sent along (empty for a plain visit), `answer with the file "song.mp3"` sends a file from anywhere instead of the text given back, and `web decoded "a%20b"` ("a b") and `web encoded` turn addresses into text and back. The Tidal OS system side uses these. |
 
 ### The window library
 
@@ -346,9 +346,12 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `reveal the frame` | Show what was etched, then wait so the window shows 60 frames a second. |
 | `the world lives` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
-| `consume the window with "black"` | The same as `consume the window with`. |
 | `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
 | `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
+| `mouse right held`, `mouse right clicked` | The same for the right button. |
+| `mouse wheel turned` | How many notches the wheel turned since the frame before: more than 0 away from you, less than 0 toward you. |
+| `hold the pointer`, `let go of the pointer` | Hide the pointer and keep it in the window, for looking around in a 3D game. While it is held, `mouse moved across` and `mouse moved down` say how far the mouse moved since the frame before. |
+| `colour from (255, 136, 0)` | The colour with that much red, green and blue (each 0 to 255), as `"#ff8800"`. Good for colours that change, like a sky at dusk. |
 | `end the world` | Close it yourself. |
 
 **3D.** The window can show a 3D world too. Places are across (`horizontal`), up (`vertical`, more is higher, unlike flat window places) and away (`depth`). The picture is seen from **the eye**:
@@ -362,9 +365,11 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `etch a block with (middle, width, height, depth, "brown")` | A box of any size. |
 | `etch a ball with (middle, radius, "yellow")` | A ball. |
 | `the graphics card draws` | yes or no: are the 3D shapes drawn by the graphics card? |
+| `set the daylight to 0.3` | How bright the 3D world is, from 0 (dark) to 1 (full, at first). It dims every 3D shape, not the words etched on top. |
+| `start keeping the shapes as "house"` … `stop keeping the shapes` | The 3D shapes etched in between aren't drawn now: they are kept under that name. `etch the kept shapes "house"` then draws them all at once, every frame, far faster than etching each one again, so worlds of many thousands of blocks stay smooth. Keeping under the same name again replaces them, and `forget the kept shapes "house"` lets them go. |
 | `screen place of 3 horizontal 1 vertical 5 depth` | Where a place shows on the window, as a flat place (`not a number` when it is behind the eye). |
 
-3D shapes are drawn just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. They are drawn by the **graphics card** (OpenGL, which every Windows has): things hide behind each other properly and balls are smoothly lit. Running directly, this also needs Pillow (`py -3 -m pip install pillow`). Without them, the same shapes are drawn far ones first instead, which looks a little plainer. `the graphics card draws` is yes or no (once a world is open), and setting the environment value `IMAGINE_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.imagine` is a small 3D game.
+3D shapes are drawn just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. They are drawn by the **graphics card** (OpenGL, which every Windows has): things hide behind each other properly and balls are smoothly lit. Running directly, this also needs Pillow (`py -3 -m pip install pillow`). Without them, the same shapes are drawn far ones first instead, which looks a little plainer. `the graphics card draws` is yes or no (once a world is open), and setting the environment value `IMAGINE_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.imagine` is a small 3D game. `examples/driftstone.imagine` is a bigger one: an island of blocks to dig, build on and craft with, with day and night (left button digs, right button places, 1 to 9 or the wheel choose, C opens the workbench, K keeps the island).
 
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
