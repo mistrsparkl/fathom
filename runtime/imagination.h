@@ -805,6 +805,11 @@ namespace imagine
 		return items;
 	}
 
+	// 'a is within 30 of b': the distance between them is 30 or less.
+	inline bool within(double a, double b, double reach) { return std::fabs(a - b) <= reach; }
+	inline bool within(const FVector& a, const FVector& b, double reach) { return (a - b).Size() <= reach; }
+	inline bool within(const FVector2D& a, const FVector2D& b, double reach) { return (a - b).Size() <= reach; }
+
 	// Setting a thing's birth puts its existence there too.
 	template <typename T>
 	void born(T& birth, T& existence, const T& where)

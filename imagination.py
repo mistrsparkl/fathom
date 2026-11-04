@@ -710,6 +710,16 @@ class Expr:
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
             return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+        if self.at("is", "within"):  # 'existence is within 30 of coin': close enough to touch
+            self.i += 2
+            reach = self.need(self.sum(), NUMBER, "within")
+            self.take("of")
+            r = self.sum()
+            if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
+                raise ScriptError(self.line, f"'within' compares two numbers or two places, not {kind_name(v.kind)} and {kind_name(r.kind)}.")
+            a, b, c = v.run, r.run, reach.run
+            gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
+            return Value(f"imagine::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env))
         for words, op in self.COMPARE:
             if self.at(*words):
                 self.i += len(words)

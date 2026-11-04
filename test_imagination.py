@@ -200,6 +200,12 @@ def program_checks():
     assert out.stdout == ("a ball (birth: (10, 20), existence: (99, 20), speed: 0)\n(1, 2)\n"
                           "a ball (birth: (5, 5), existence: (5, 5), speed: 0)\n(4, 4)\n"), repr(out.stdout)
 
+    out = both('genesis:\n  set birth to (0, 0)\n  set coin to (3, 4)\n'
+               '  scrawl existence is within 5 of coin, " ", existence is within 4.9 of coin, " ", 7 is within 2 of 5, " ",'
+               ' (1, 1, 1) is within 1 of (1, 1, 2), " ", not (10 is within 2 of 5)\n' + END)
+    assert out.stdout == "yes no yes yes yes\n", repr(out.stdout)
+    assert perr("genesis:\n  scrawl 1 is within 2 of (1, 2)\n" + END)[1] == "'within' compares two numbers or two places, not a number and a flat place."
+
     # Setting birth makes existence start there too.
     out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  scrawl birth, " ", existence\n'
                '  set existence to birth\n  scrawl existence\n' + END)

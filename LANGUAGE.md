@@ -206,6 +206,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `direction of flat place` | its compass angle in degrees |
 | `angle from a to b` | the turn from angle a to angle b, -180 to 180 degrees |
 | `a is more than b`, `is less than`, `is at least`, `is at most`, `is`, `is not` | yes or no |
+| `existence is within 30 of coin` | yes or no: are two places (or numbers) 30 or less apart? Good for things touching. |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
 `of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
