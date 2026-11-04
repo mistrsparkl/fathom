@@ -805,6 +805,14 @@ namespace imagine
 		return items;
 	}
 
+	// Setting a thing's birth puts its existence there too.
+	template <typename T>
+	void born(T& birth, T& existence, const T& where)
+	{
+		birth = where;
+		existence = where;
+	}
+
 	template <typename T, typename Part>
 	std::vector<T> sorted_by(std::vector<T> items, Part part)
 	{

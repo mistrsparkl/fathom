@@ -854,7 +854,9 @@ class Expr:
             return v
         for n in range(min(6, len(self.t) - self.i), 0, -1):
             key = tuple(self.t[self.i:self.i + n])
-            if key in FIELDS and self.peek(n) == "of":
+            if key in FIELDS and self.peek(n) == "of" and not (
+                    key in self.names.known and self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})):
+                # 'existence of x' is x of the name existence, when there is one, not the existence of x
                 self.i += n + 1
                 owner = self.unary()
                 if owner.kind not in FIELDS[key]:
@@ -1214,7 +1216,14 @@ def part_of(owner, key):
 
     def put(env, x):
         get(env).fields[member] = dup(x)
-    return Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+    v = Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+    if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:
+        def born(env, x):
+            fields = get(env).fields
+            fields["birth"], fields["existence"] = dup(x), dup(x)
+        v.store = born
+        v.cpp_assign, v.cpp_close = f"imagine::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
+    return v
 
 
 def library_hint(tokens):
@@ -1554,6 +1563,10 @@ def describe_things(things):
                 raise ScriptError(fn, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
             THINGS[name].append((words, kind))
             FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
+        if any(w == ["birth"] for w, _ in THINGS[name]) and not any(w == ["existence"] for w, _ in THINGS[name]):
+            kind = next(k for w, k in THINGS[name] if w == ["birth"])  # where it is now, next to where it started
+            THINGS[name].insert(next(i for i, (w, _) in enumerate(THINGS[name]) if w == ["birth"]) + 1, (["existence"], kind))
+            FIELDS.setdefault(("existence",), {})["thing " + name] = ("existence", kind)
         described.add(name)
     out = []
     if things:
@@ -1969,7 +1982,7 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' holds {kind_name(target.kind)}, not {kind_name(v.kind)}.")
         put, get = target.store, v.run
         assign = getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
-        return [f"{tab}{assign}{strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
+        return [f"{tab}{assign}{strip_parens(v.cpp)}{getattr(target, 'cpp_close', '')};"], lambda env: put(env, get(env)), None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:
@@ -1980,6 +1993,14 @@ def statement(n, text_, inner, names, declared, depth):
             if v.kind != kind:
                 raise ScriptError(n, f"'{' '.join(key)}' holds {kind_name(kind)}, not {kind_name(v.kind)}.")
             put, get = names.value(key).store, v.run
+            if key == ("birth",) and names.known.get(("existence",), (None, None))[1] == kind:
+                there = names.value(("existence",)).store
+
+                def run(env):
+                    x = get(env)
+                    put(env, x)
+                    there(env, dup(x))
+                return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}existence = {cpp};"], run, None
             return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
         if "to" not in tokens:
             raise ScriptError(n, "'set' looks like 'set speed to 5'.")

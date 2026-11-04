@@ -195,6 +195,11 @@ def program_checks():
     assert perr("genesis:\n  scrawl\n" + END)[1] == "'scrawl' needs something to show, like: scrawl \"hello\"."
     assert perr("genesis:\n  say 1\n" + END)[1] == "'say' is now 'scrawl', like: scrawl \"hello\"."
 
+    # Things with a birth get an existence; setting birth (of a thing, or on its own) moves existence there.
+    out = both('a ball has:\n  birth (a flat place)\n  speed (a number)\nand the universe said i love you\n\ngenesis:\n  set b to a new ball\n  set birth of b to (10, 20)\n  set existence of b of x to 99\n  scrawl b\n  set birth of b to (1, 2)\n  scrawl existence of b\n  set balls to a list of balls\n  add b to balls\n  set birth of item 1 of balls to (5, 5)\n  scrawl item 1 of balls\n  set birth to (3, 3)\n  set existence of x to 7\n  set birth to (4, 4)\n  scrawl existence\nand the universe said i love you\n')
+    assert out.stdout == ("a ball (birth: (10, 20), existence: (99, 20), speed: 0)\n(1, 2)\n"
+                          "a ball (birth: (5, 5), existence: (5, 5), speed: 0)\n(4, 4)\n"), repr(out.stdout)
+
     # Setting birth makes existence start there too.
     out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  scrawl birth, " ", existence\n'
                '  set existence to birth\n  scrawl existence\n' + END)
