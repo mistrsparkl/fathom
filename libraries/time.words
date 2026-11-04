@@ -42,3 +42,34 @@ month now = imagine_time::part_of_today(4), number, read only
   runs: part_of_today(4)
 year now = imagine_time::part_of_today(5), number, read only
   runs: part_of_today(5)
+
+code:
+  namespace imagine_time
+  {
+  	inline std::string stamp(const char* shape)
+  	{
+  		std::time_t now = std::time(nullptr);
+  		std::tm parts{};
+  		localtime_s(&parts, &now);
+  		char out[64];
+  		std::strftime(out, sizeof out, shape, &parts);
+  		return out;
+  	}
+  	inline std::string weekday()
+  	{
+  		std::time_t now = std::time(nullptr);
+  		std::tm parts{};
+  		localtime_s(&parts, &now);
+  		const char* names[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+  		return names[parts.tm_wday];
+  	}
+  }
+
+today = imagine_time::stamp("%Y-%m-%d"), text, read only
+  runs: time.strftime("%Y-%m-%d")
+the time now = imagine_time::stamp("%H:%M:%S"), text, read only
+  runs: time.strftime("%H:%M:%S")
+day of the week = imagine_time::weekday(), text, read only
+  runs: ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[time.localtime().tm_wday]
+seconds since 1970 = (double)std::time(nullptr), number, read only
+  runs: float(int(time.time()))

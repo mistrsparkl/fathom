@@ -263,12 +263,13 @@ and the universe said i love you
 | Library | Words |
 |---|---|
 | `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `whole part of`, `power of (2, 10)`, `remainder of (17, 5)`, `e`, `logarithm of` (base 10), `natural logarithm of`, `arc sine of`, `arc cosine of`, `arc tangent of` (degrees) |
-| `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
+| `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now`, `today` (like `2026-11-04`), `the time now` (like `14:05:09`), `day of the week` (like `Wednesday`), `seconds since 1970` |
 | `window` | A window to etch in, for games and pictures. See below. |
-| `web` | `web page "https://example.com"` (gives back the page as text) |
+| `web` | `web page "https://example.com"` (gives back the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, gives back the answer) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `imagine game.imagine easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"` |
+| `patterns` | Finding text by its shape (`"[0-9]+"` is one or more digits, `"."` any letter, `"(...)"` a piece to keep): `the pattern fits with ("[0-9]+", line)` (yes or no), `matches of the pattern with ("[0-9]+", line)` (every match, as a list of text), `pieces of the pattern with ("([a-z]+)=([0-9]+)", line)` (the bracketed pieces of the first match), `replace the pattern with ("[0-9]+", line, "#")` |
 
 ### The window library
 

@@ -1,0 +1,77 @@
+note: Words for patterns: finding and changing parts of text by their shape. Use them in a program with:  use: patterns
+note: A pattern is text that describes text: "[0-9]+" is one or more digits, "[a-z]+" a run of small letters,
+note: "." any letter, "a*" any number of a's, "^" the start and "$" the end, "(...)" a piece to keep.
+
+include: <regex>
+
+code:
+  namespace imagine_patterns
+  {
+  	inline std::regex make(const std::string& pattern, int line)
+  	{
+  		try
+  		{
+  			return std::regex(pattern, std::regex::ECMAScript);
+  		}
+  		catch (const std::regex_error&)
+  		{
+  			imagine::fail(line, "the pattern \"" + pattern + "\" isn't a pattern I understand.");
+  		}
+  	}
+  	inline bool fits(const std::string& pattern, const std::string& text, int line)
+  	{
+  		return std::regex_search(text, make(pattern, line));
+  	}
+  	inline std::vector<std::string> matches(const std::string& pattern, const std::string& text, int line)
+  	{
+  		std::regex r = make(pattern, line);
+  		std::vector<std::string> found;
+  		for (std::sregex_iterator it(text.begin(), text.end(), r), end; it != end; ++it)
+  			found.push_back(it->str());
+  		return found;
+  	}
+  	inline std::vector<std::string> pieces(const std::string& pattern, const std::string& text, int line)
+  	{
+  		std::smatch m;
+  		std::vector<std::string> found;
+  		if (std::regex_search(text, m, make(pattern, line)))
+  			for (size_t k = 1; k < m.size(); ++k)
+  				found.push_back(m[k].str());
+  		return found;
+  	}
+  	inline std::string replace(const std::string& pattern, const std::string& text, const std::string& with, int line)
+  	{
+  		std::regex r = make(pattern, line);
+  		std::string out;
+  		auto last = text.begin();
+  		for (std::sregex_iterator it(text.begin(), text.end(), r), end; it != end; ++it)
+  		{
+  			out.append(last, (*it)[0].first);
+  			out += with;  // the new text as it is: no $ codes
+  			last = (*it)[0].second;
+  		}
+  		return out.append(last, text.end());
+  	}
+  }
+
+python:
+  import re
+  def make(pattern):
+      try:
+          return re.compile(pattern)
+      except re.error:
+          raise RunError(0, 'the pattern "' + pattern + "\" isn't a pattern I understand.")
+  def matches(pattern, text):
+      return [m.group(0) for m in make(pattern).finditer(text)]
+  def pieces(pattern, text):
+      m = make(pattern).search(text)
+      return [g or "" for g in m.groups()] if m else []
+
+to the pattern fits, given pattern (text) and text (text), giving back yes or no = imagine_patterns::fits({pattern}, {text}, {line})
+  runs: make({pattern}).search({text}) is not None
+to matches of the pattern, given pattern (text) and text (text), giving back a list of text = imagine_patterns::matches({pattern}, {text}, {line})
+  runs: matches({pattern}, {text})
+to pieces of the pattern, given pattern (text) and text (text), giving back a list of text = imagine_patterns::pieces({pattern}, {text}, {line})
+  runs: pieces({pattern}, {text})
+to replace the pattern, given pattern (text) and text (text) and with (text), giving back text = imagine_patterns::replace({pattern}, {text}, {with}, {line})
+  runs: make({pattern}).sub(lambda m: {with}, {text})

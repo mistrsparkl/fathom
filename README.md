@@ -20,6 +20,6 @@ and the universe said i love you
 - `imagine` on its own lets you try lines out one at a time.
 - `imagine check game.imagine` looks for mistakes without running it.
 
-Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders) are in `libraries/`.
+Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, patterns) are in `libraries/`.
 
 Checking Imagination itself: `py -3 test_imagination.py` runs every test program both ways (directly and built) and checks they print exactly the same.

@@ -90,7 +90,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, patterns, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -261,6 +261,16 @@ def program_checks():
                '  scrawl arc sine of 0.5 rounded to 6 places, " ", arc cosine of 0, " ", arc tangent of 1, " ", arc sine of 2\n'
                '  scrawl whole part of -3.7, " ", whole part of 3.7\n' + END)
     assert out.stdout == "3 1 not a number\n30 90 45 not a number\n-3 3\n", repr(out.stdout)
+
+    # The patterns library.
+    out = both('genesis:\n  set line to "Sam is 31, Jo is 7 and Ann is 102."\n  scrawl the pattern fits with ("[0-9]+", line)\n'
+               '  scrawl the pattern fits with ("^[0-9]", line)\n  scrawl matches of the pattern with ("[0-9]+", line)\n'
+               '  scrawl pieces of the pattern with ("([A-Z][a-z]+) is ([0-9]+)", line)\n  scrawl size of pieces of the pattern with ("zzz(z)", line)\n'
+               '  scrawl replace the pattern with ("[0-9]+", line, "$$")\n  try:\n    scrawl the pattern fits with ("([a-z", line)\n'
+               '  if that went wrong:\n    scrawl the wound\n' + END)
+    assert out.stdout == 'yes\nno\n31, 7, 102\nSam, 31\n0\nSam is $$, Jo is $$ and Ann is $$.\nthe pattern "([a-z" isn\'t a pattern I understand.\n', repr(out.stdout)
+    out = both('genesis:\n  scrawl size of today, " ", size of the time now, " ", seconds since 1970 exceeds 1000000\n' + END)
+    assert out.stdout == "10 8 yes\n", repr(out.stdout)
 
     # The folders library.
     out = both('genesis:\n  make the folder "box/inner"\n  inscribe "hello" into file "box/a.txt"\n'

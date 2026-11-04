@@ -31,6 +31,54 @@ code:
   		DeleteFileW(file);
   		return all.str();
   	}
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring w(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), w.data(), (int)w.size());
+  		return w;
+  	}
+  	inline void download(const std::string& address, const std::string& name, int line)
+  	{
+  		std::wstring w = wide(address);
+  		DeleteUrlCacheEntryW(w.c_str());
+  		if (URLDownloadToFileW(nullptr, w.c_str(), wide(name).c_str(), 0, nullptr) != S_OK)
+  			imagine::fail(line, "I couldn't download \"" + address + "\".");
+  	}
+  	inline std::string send(const std::string& address, const std::string& body, int line)
+  	{
+  		std::wstring w = wide(address);
+  		URL_COMPONENTSW parts{sizeof parts};
+  		wchar_t host[256] = {}, path[2048] = {};
+  		parts.lpszHostName = host;
+  		parts.dwHostNameLength = 256;
+  		parts.lpszUrlPath = path;
+  		parts.dwUrlPathLength = 2048;
+  		std::string all;
+  		bool ok = false;
+  		if (InternetCrackUrlW(w.c_str(), 0, 0, &parts))
+  		{
+  			HINTERNET net = InternetOpenW(L"Imagination", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+  			HINTERNET site = net ? InternetConnectW(net, host, parts.nPort, nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0) : nullptr;
+  			DWORD flags = INTERNET_FLAG_RELOAD | (parts.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0);
+  			HINTERNET ask = site ? HttpOpenRequestW(site, L"POST", path, nullptr, nullptr, nullptr, flags, 0) : nullptr;
+  			const wchar_t* header = L"Content-Type: text/plain; charset=utf-8\r\n";
+  			if (ask && HttpSendRequestW(ask, header, (DWORD)-1, (void*)body.data(), (DWORD)body.size()))
+  			{
+  				DWORD status = 0, size = sizeof status;
+  				HttpQueryInfoW(ask, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status, &size, nullptr);
+  				char chunk[4096];
+  				for (DWORD got = 0; InternetReadFile(ask, chunk, sizeof chunk, &got) && got > 0;)
+  					all.append(chunk, got);
+  				ok = status < 400;
+  			}
+  			for (HINTERNET h : {ask, site, net})
+  				if (h)
+  					InternetCloseHandle(h);
+  		}
+  		if (!ok)
+  			imagine::fail(line, "I couldn't send to the web page \"" + address + "\".");
+  		return all;
+  	}
   }
 
 python:
@@ -42,6 +90,25 @@ python:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t get the web page "{address}".')
+  def download(address, name):
+      try:
+          request = urllib.request.Request(address, headers={"User-Agent": "Imagination"})
+          with urllib.request.urlopen(request, timeout=60) as reply, open(name, "wb") as out:
+              out.write(reply.read())
+      except Exception:
+          raise RunError(0, f'I couldn\'t download "{address}".')
+  def send(address, message):
+      try:
+          request = urllib.request.Request(address, data=message.encode("utf-8"), method="POST",
+                                           headers={"User-Agent": "Imagination", "Content-Type": "text/plain; charset=utf-8"})
+          with urllib.request.urlopen(request, timeout=30) as reply:
+              return reply.read().decode("utf-8", errors="replace")
+      except Exception:
+          raise RunError(0, f'I couldn\'t send to the web page "{address}".')
 
 to web page, given address (text), giving back text = imagine_web::get({address}, {line})
   runs: get({address})
+to download, given address (text) and file (text) = imagine_web::download({address}, {file}, {line})
+  runs: download({address}, {file})
+to send to the web page, given address (text) and message (text), giving back text = imagine_web::send({address}, {message}, {line})
+  runs: send({address}, {message})
