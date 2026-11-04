@@ -1,0 +1,19 @@
+note: Words that scripts which are "part of: creature body" can use.
+note: Each line is: the words = what they mean in C++, their type, and "read only" if a script may not change them.
+note: Types are: number, yes or no, place, flat.
+
+class: ATerranovaCreatureBody
+header: TerranovaCreatureBody.h
+
+fallen = bFallen, yes or no, read only
+wandering = bWander, yes or no
+time since standing up = SinceGetUpS, number, read only
+settle time = GetUpSettleS, number, read only
+centre of mass = ComputeStats().CenterOfMassCm, place, read only
+heading = FMath::RadiansToDegrees(HeadingRad), number, read only
+body facing = FMath::RadiansToDegrees(TrunkYawRad), number, read only
+head turn = LookYawDeg, number
+turn rate = TurnRateDegS, number
+walk speed = WalkSpeedCmS, number
+run speed = Gait.RunSpeedCmS, number, read only
+frame time = GetWorld()->GetDeltaSeconds(), number, read only

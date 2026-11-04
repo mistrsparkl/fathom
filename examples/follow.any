@@ -1,0 +1,54 @@
+note: Following: the deer walks or runs toward a goal, looking at it. The game calls this every frame while a deer follows.
+
+this is part of: creature body
+
+settings:
+  walking speed: 60 cm per second
+  running speed: 170 cm per second
+  sharp turn speed: 30 cm per second
+  acceleration: 40 cm per second squared
+  stop distance: 300 cm
+  turn gain: 2 degrees per second for each degree off course
+  turn per speed: 2 degrees per second for each cm per second
+  turn limit: 25 degrees per second
+  sharp turn angle: 45 degrees
+  sharp turn limit: 30 degrees per second
+  running turn limit: 8 degrees per second
+  turn slew: 20 degrees per second squared
+  look limit: 30 degrees
+  note: shortcut: the flying trot holds to about 188 cm/s, turning only 8 degrees per second at full speed; faster and sharper needs a gallop controller.
+
+to steer toward, given goal (a place) and running (yes or no):
+  set wandering to no
+  note: Speed must not build up while down, and a turn started before the legs have taken the weight back topples it again.
+  if fallen or time since standing up is less than settle time: stop
+
+  set gap to flat (goal minus centre of mass)
+  set turn needed to angle from heading to direction of gap
+  note: Snapping the head far round swings enough mass to topple it.
+  set head turn to clamp (angle from body facing to direction of gap) between -look limit and look limit
+
+  note: Sharp turns are only stable at a slow trot.
+  set sharp to size of turn needed is more than sharp turn angle
+  note: Turning on the spot topples it, so the turn allowed grows with speed.
+  if walk speed is at least run speed:
+    set top turn to running turn limit
+  otherwise if sharp:
+    set top turn to sharp turn limit
+  otherwise:
+    set top turn to turn limit
+  set top turn to smaller of walk speed times turn per speed and top turn
+  note: A turn rate stepped in at once (follow start, sharp goal) topples it.
+  set wanted turn to clamp (turn needed times turn gain) between -top turn and top turn
+  move turn rate toward wanted turn by at most turn slew times frame time
+
+  if sharp:
+    set cruise to sharp turn speed
+  otherwise if running:
+    set cruise to running speed
+  otherwise:
+    set cruise to walking speed
+  note: Brakes early enough to stop at the stop distance.
+  set distance left to larger of 0 and (size of gap) minus stop distance
+  set braking speed to square root of 2 times acceleration times distance left
+  move walk speed toward smaller of cruise and braking speed by at most acceleration times frame time
