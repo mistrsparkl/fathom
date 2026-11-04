@@ -89,15 +89,26 @@ namespace imagine
 	}
 
 	// Something went wrong while the program ran: say which line, in plain words, and stop.
+	// What went wrong, and on which line. 'try:' can catch it; otherwise the program stops and reports it.
+	struct Problem
+	{
+		int line;
+		std::string message;
+	};
+
 	[[noreturn]] inline void fail(int line, const std::string& message)
 	{
+		throw Problem{line, message};
+	}
+
+	inline void report(const Problem& problem)
+	{
 		std::cout << std::flush;
-		if (line < 100000 || line / 100000 >= static_cast<int>(files.size()))
-			std::cerr << "Line " << line;
+		if (problem.line < 100000 || problem.line / 100000 >= static_cast<int>(files.size()))
+			std::cerr << "Line " << problem.line;
 		else
-			std::cerr << files[line / 100000] << " line " << line % 100000;
-		std::cerr << ": " << message << std::endl;
-		std::exit(1);
+			std::cerr << files[problem.line / 100000] << " line " << problem.line % 100000;
+		std::cerr << ": " << problem.message << std::endl;
 	}
 
 	template <typename T>

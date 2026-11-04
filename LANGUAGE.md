@@ -192,7 +192,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 
@@ -283,5 +283,17 @@ to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::dur
 ## When something goes wrong while running
 
 The program stops with the line and a plain reason, such as `Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.`
+
+To carry on instead, put the lines that might go wrong under `try:`, and what to do instead under `if that went wrong:` (at the same indent, right after). Inside it, `the problem` is the reason, as text:
+
+```
+try:
+  set notes to contents of file "notes.txt"
+if that went wrong:
+  say "I couldn't read the notes: ", the problem
+  set notes to ""
+```
+
+The lines under `try:` stop at the first problem, even one deep inside a command they use.
 
 Checking the translator itself: `py -3 test_imagination.py`.

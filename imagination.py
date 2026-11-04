@@ -57,7 +57,7 @@ BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place":
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 say ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -1250,7 +1250,8 @@ def read_script(path):
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
-        functions.append(f"int main()\n{{\n\timagine::begin({{{files}}});\n\tStart();\n\treturn 0;\n}}\n")
+        functions.append(f"int main()\n{{\n\timagine::begin({{{files}}});\n\ttry\n\t{{\n\t\tStart();\n\t}}\n"
+                         f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
         wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"
@@ -1379,6 +1380,27 @@ def statements(body, names, declared, depth):
         while k < len(rows) and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) > indent:
             inner.append(rows[k])
             k += 1
+        if raw.strip().lower() == "try:":
+            handler = None
+            if k < len(rows) and rows[k][1].strip().lower() == "if that went wrong:" \
+                    and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) == indent:
+                hn = rows[k][0]
+                k += 1
+                handler = []
+                while k < len(rows) and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) > indent:
+                    handler.append(rows[k])
+                    k += 1
+            if handler is None:
+                raise ScriptError(n, "'try:' needs an 'if that went wrong:' line after its indented lines, at the same indent.")
+            if not inner or not handler:
+                raise ScriptError(n if not inner else hn, "Say what to do on the indented lines below the ':'.")
+            lines, run = attempt(n, inner, handler, names, declared, depth)
+            out += lines
+            chain = None
+            runs.append(run)
+            continue
+        if raw.strip().lower() == "if that went wrong:":
+            raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
         lines, run, branch = statement(n, raw.strip(), inner, names, declared, depth)
         out += lines
         if branch:
@@ -1397,6 +1419,31 @@ def statements(body, names, declared, depth):
             chain = None
             runs.append(guard(run, n))
     return out, block(runs)
+
+
+def attempt(n, tried, handler, names, declared, depth):
+    """try: ... if that went wrong: ...  Inside the second part, 'the problem' is what went wrong, as text."""
+    tab = "\t" * depth
+    try_lines, try_run = statements(tried, names, declared, depth + 1)
+    key = ("the", "problem")
+    if key in names.known:
+        raise ScriptError(n, "There is a 'try:' inside the 'if that went wrong:' of another one. Put it in a command of its own.")
+    cpp = f"the_problem_{n}"
+    names.add(key, cpp, TEXT, read_only=True)
+    try:
+        fix_lines, fix_run = statements(handler, names, declared, depth + 1)
+    finally:
+        del names.known[key]
+
+    def run(env):
+        try:
+            try_run(env)
+        except RunError as err:
+            env[cpp] = err.message
+            fix_run(env)
+    caught = f"imagine_problem_{n}"
+    return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch (const imagine::Problem& {caught})", tab + "{",
+             f"{tab}\tconst std::string {cpp} = {caught}.message;"] + fix_lines + [tab + "}"]), run
 
 
 def choose(chain):

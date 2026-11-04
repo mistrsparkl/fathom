@@ -100,6 +100,20 @@ def program_checks():
                "maybe\n YES \nn\n").stdout
     assert out == "Again? Please type yes or no.\nAgain? yes\nSure? yes\n", repr(out)
 
+    # try: / if that went wrong: catches problems the same both ways, even from inside commands and libraries.
+    out = both('use: web\nto start:\n  for each n from 1 to 3:\n    try:\n      say item n of a list of (10, 20)\n'
+               '    if that went wrong:\n      say "Oops: ", the problem\n  try:\n    set x to contents of file "nope.txt"\n'
+               '    say "not here"\n  if that went wrong:\n    say the problem\n  try:\n    risky\n  if that went wrong:\n'
+               '    say "caught ", the problem\n  try:\n    say web page "http://localhost:1/"\n  if that went wrong:\n'
+               '    say "no web"\n  say item 7 of a list of (1)\n' + END +
+               'to risky:\n  say "before"\n  say letter 5 of "abc"\n  say "after"\n' + END)
+    assert out.stdout == ("10\n20\nOops: there is no item 3 in a list of 2 items. Items are counted from 1.\n"
+                          'there is no file called "nope.txt" (or it can\'t be opened).\n'
+                          "before\ncaught there is no letter 5 in text of 3 letters.\nno web\n"), repr(out.stdout)
+    assert out.stderr == "Line 21: there is no item 7 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
+    assert perr("to start:\n  try:\n    stop\n  say 1\n" + END)[1].startswith("'try:' needs an 'if that went wrong:' line")
+    assert perr("to start:\n  if that went wrong:\n    stop\n" + END)[1].startswith("'if that went wrong:' goes right after")
+
     # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
     out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
                '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'
