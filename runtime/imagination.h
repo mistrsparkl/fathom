@@ -360,6 +360,21 @@ namespace imagine
 		return line;
 	}
 
+	inline bool ask_yes_no(const std::string& question)
+	{
+		for (;;)
+		{
+			std::string answer = lower(ask_text(question));
+			answer.erase(0, answer.find_first_not_of(" \t"));
+			answer.erase(answer.find_last_not_of(" \t") + 1);
+			if (answer == "yes" || answer == "y")
+				return true;
+			if (answer == "no" || answer == "n")
+				return false;
+			std::cout << "Please type yes or no." << std::endl;
+		}
+	}
+
 	inline double ask_number(const std::string& question)
 	{
 		for (;;)

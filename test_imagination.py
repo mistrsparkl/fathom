@@ -96,6 +96,10 @@ def program_checks():
                '  say "Next year you are ", age plus 1, ". Grown up: ", age is at least 18\n' + END, "Sam\nlots\n20.5\n").stdout
     assert out == "Name? Age? Please type a number.\nAge? Hello, Sam!\nHello, Sam!\nNext year you are 21.5. Grown up: yes\n", repr(out)
 
+    out = both('to start:\n  ask "Again? " into again (yes or no)\n  say again\n  ask "Sure? " into again\n  say not again\n' + END,
+               "maybe\n YES \nn\n").stdout
+    assert out == "Again? Please type yes or no.\nAgain? yes\nSure? yes\n", repr(out)
+
     # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
     out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
                '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'

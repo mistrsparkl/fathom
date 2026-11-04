@@ -23,6 +23,7 @@ Imagination is a programming language written in plain English words. Scripts en
   py -3 imagination.py <scripts folder> <output folder>
   ```
 
+- **Checking for mistakes** without running: `imagine check examples/guess.imagine`.
 - **Trying things out:** type just `imagine` for a prompt. Each line you type is done straight away, and names are kept from line to line. Type a value on its own (`5 plus 3`) to see it. A line ending in `:` takes the indented lines after it, finished with an empty line. `bye` finishes.
 
 A mistake stops with a plain message, such as:
@@ -128,6 +129,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `say "Score: ", score` | Show things on the screen, one after another, then start a new line. |
 | `ask "Your name? " into name` | Show the question and keep what the person types, as text. |
 | `ask "Your age? " into age (a number)` | The same, as a number. It asks again until a number is typed. |
+| `ask "Again? " into again (yes or no)` | The same, as yes or no (`yes`, `y`, `no` or `n`). |
 | `repeat 10 times:` | Do the indented lines below 10 times. |
 | `while guess is not secret:` | Keep doing the indented lines below while it is yes. |
 | `greet with name, 3` | Do your own command `greet`, giving it its inputs in order. A command without inputs is just its name: `greet`. |

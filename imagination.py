@@ -261,6 +261,16 @@ def ask_text(question):
     return line.rstrip("\n").rstrip("\r")
 
 
+def ask_yes_no(question):
+    while True:
+        answer = ask_text(question).strip().translate(ASCII_DOWN)
+        if answer in ("yes", "y"):
+            return True
+        if answer in ("no", "n"):
+            return False
+        print("Please type yes or no.")
+
+
 def ask_number(question):
     while True:
         answer = ask_text(question)
@@ -1766,13 +1776,13 @@ def ask(tokens, names, declared, n, tab):
     if rest[-1:] == [")"] and "(" in rest:
         cut = rest.index("(")
         kind = parse_kind(" ".join(rest[cut + 1:-1]))
-        if kind not in (TEXT, NUMBER):
-            raise ScriptError(n, "'ask' can keep a number or text, like: into age (a number)")
+        if kind not in (TEXT, NUMBER, YESNO):
+            raise ScriptError(n, "'ask' can keep a number, text or yes or no, like: into age (a number)")
         rest = rest[:cut]
     key, size = names.match(rest, 0)
     if key and size == len(rest):
         cpp, have, read_only, _ = names.known[key]
-        if read_only or have not in (TEXT, NUMBER):
+        if read_only or have not in (TEXT, NUMBER, YESNO):
             raise ScriptError(n, f"'{' '.join(key)}' can't hold an answer.")
         if "(" in tokens and have != kind:
             raise ScriptError(n, f"'{' '.join(key)}' already holds {kind_name(have)}, so it can't hold {kind_name(kind)}.")
@@ -1784,11 +1794,11 @@ def ask(tokens, names, declared, n, tab):
         declared[tuple(rest)] = (cpp, kind)
         names.add(rest, cpp, kind)
     question = tokens[1][1:-1]
-    reader = ask_number if kind == NUMBER else ask_text
+    reader = {NUMBER: ask_number, YESNO: ask_yes_no, TEXT: ask_text}[kind]
 
     def run(env):
         env[cpp] = reader(question)
-    cpp_reader = "imagine::ask_number" if kind == NUMBER else "imagine::ask_text"
+    cpp_reader = {NUMBER: "imagine::ask_number", YESNO: "imagine::ask_yes_no", TEXT: "imagine::ask_text"}[kind]
     return [f"{tab}{cpp} = {cpp_reader}({cpp_text(tokens[1])});"], run, None
 
 
@@ -1972,6 +1982,8 @@ USAGE = """Use:
   imagine <script.imagine>                     run a program
   imagine run <script.imagine>                 the same
   imagine build <script.imagine>               make it into an .exe (needs Visual Studio's C++ compiler)
+  imagine check <script.imagine>               look for mistakes without running it
+  imagine                                      try lines out, one at a time
   imagine <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
 (imagine is short for: py -3 imagination.py)"""
 
@@ -1983,6 +1995,18 @@ def main(argv):
         return try_it()
     if len(args) == 1 and args[0].lower().endswith(".imagine"):
         args = ["run", args[0]]
+    if len(args) == 2 and args[0] == "check":
+        LOGIC = Path(args[1]).parent
+        try:
+            read_script(Path(args[1]))
+        except FileNotFoundError:
+            print(f"There is no script called {args[1]}.")
+            return 2
+        except ScriptError as err:
+            print(f"{where(err.line)}: {err.message}")
+            return 1
+        print(f"{Path(args[1]).name}: no mistakes found.")
+        return 0
     if len(args) == 2 and args[0] in ("run", "build"):
         script = Path(args[1])
         if not script.exists():
