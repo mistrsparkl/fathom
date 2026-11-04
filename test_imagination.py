@@ -71,10 +71,12 @@ def program_checks():
     if not compiler:
         print("(only running directly: no C++ compiler found)")
 
-    def both(source, typed=""):
+    def both(source, typed="", others=None):
         with tempfile.TemporaryDirectory() as d:
             script = Path(d) / "probe.imagine"
             script.write_text(source, encoding="utf-8")
+            for name, other in (others or {}).items():
+                (Path(d) / name).write_text(other, encoding="utf-8")
             direct = subprocess.run([sys.executable, str(HERE / "imagination.py"), "run", str(script)],
                                     input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
             if compiler:
@@ -153,6 +155,28 @@ def program_checks():
     # The web library, without needing the internet: a page that can't be reached fails the same both ways.
     out = both('use: web\nto start:\n  say web page "http://localhost:1/"\n' + END)
     assert out.stderr == 'Line 3: I couldn\'t get the web page "http://localhost:1/".\n', repr(out.stderr)
+
+    # Programs made of several scripts: used scripts bring their kinds and commands (not their start),
+    # are read once even when used twice, and errors name the script they are in.
+    shapes = ('use: maths\nuse: helpers.imagine\na square has:\n  side (a number)\n' + END +
+              'to start:\n  say "shapes on its own"\n' + END +
+              'to area of, given s (a square), giving back a number:\n  give back power of (side of s, 2)\n' + END +
+              'to check, given s (a square):\n  if side of s is less than 0: say item 5 of a list of (1)\n' + END)
+    helpers = 'use: shapes.imagine\nto shout, given words (text):\n  say upper case of words plus "!"\n' + END
+    out = both('use: shapes.imagine\nuse: helpers.imagine\nto start:\n  set s to a new square\n  set side of s to 3\n'
+               '  say area of s\n  shout with "hi"\n  check with s\n  set side of s to -1\n  check with s\n' + END,
+               others={"shapes.imagine": shapes, "helpers.imagine": helpers})
+    assert out.stdout == "9\nHI!\n", repr(out.stdout)
+    assert out.stderr == "shapes.imagine line 13: there is no item 5 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "bad.imagine").write_text("to oops:\n  say nothing here\n" + END, encoding="utf-8")
+        (Path(d) / "main.imagine").write_text("use: bad.imagine\nto start:\n  oops\n" + END, encoding="utf-8")
+        try:
+            translate.read_script(Path(d) / "main.imagine")
+            raise AssertionError("expected a script error")
+        except translate.ScriptError as e:
+            assert translate.where(e.line) == "bad.imagine line 2", translate.where(e.line)
+    assert perr("use: missing.imagine\nto start:\n  stop\n" + END)[1] == "There is no script called 'missing.imagine' next to probe.imagine."
 
     # A command can call itself.
     out = both('to start:\n  say factorial of 10, " ", factorial of 20\n' + END +

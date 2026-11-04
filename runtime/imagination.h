@@ -37,9 +37,12 @@ extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
 
 namespace imagine
 {
+	inline std::vector<std::string> files;  // the program's script, then each script it uses
+
 	// Called first by every program: text is UTF-8, so the console should show it as UTF-8.
-	inline void begin()
+	inline void begin(std::initializer_list<std::string> scripts)
 	{
+		files = scripts;
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
 	}
@@ -89,7 +92,11 @@ namespace imagine
 	[[noreturn]] inline void fail(int line, const std::string& message)
 	{
 		std::cout << std::flush;
-		std::cerr << "Line " << line << ": " << message << std::endl;
+		if (line < 100000 || line / 100000 >= static_cast<int>(files.size()))
+			std::cerr << "Line " << line;
+		else
+			std::cerr << files[line / 100000] << " line " << line % 100000;
+		std::cerr << ": " << message << std::endl;
 		std::exit(1);
 	}
 

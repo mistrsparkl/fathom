@@ -195,6 +195,16 @@ A script can only use words its thing knows. New words (another part of the deer
 
 Commands can only call each other, and new kinds of things can only be described, inside programs for now.
 
+## Programs made of several scripts
+
+A program can use another script's commands and kinds of things:
+
+```
+use: shapes.imagine
+```
+
+The other script is looked for next to this one. It can have its own `to start:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.imagine line 13: ...`.
+
 ## Libraries
 
 A library gives a program more words. Put `use: <library>` near the top of the program:

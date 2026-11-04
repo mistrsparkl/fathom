@@ -1070,10 +1070,55 @@ def translate(path):
     return read_script(path)[0]
 
 
+FILES = []  # the script, then each script it uses ('use: shapes.imagine'), in the order they were read
+PER_FILE = 100000  # a line number n in FILES[k] is kept as k * PER_FILE + n
+
+
+def where(line):
+    """'guess.imagine line 3' for a kept line number."""
+    k, n = divmod(line, PER_FILE)
+    return f"{FILES[k] if k < len(FILES) else '?'} line {n}"
+
+
+def run_where(line):
+    """How an error while running names its line: 'Line 3' in the program itself, 'shapes.imagine line 3' in a used script."""
+    return f"Line {line}" if line < PER_FILE else where(line)
+
+
+def gather(path, from_line=None, seen=None):
+    """The lines of a script with every 'use: other.imagine' line replaced by that script's lines.
+
+    Returns (lines, numbers): numbers[i] is the kept line number of lines[i]."""
+    seen = set() if seen is None else seen
+    seen.add(path.resolve())
+    k = len(FILES)
+    FILES.append(path.name)
+    own = path.read_text(encoding="utf-8").splitlines()
+    if len(own) >= PER_FILE:
+        raise ScriptError(k * PER_FILE + 1, f"A script can have at most {PER_FILE - 1} lines.")
+    lines, numbers = [], []
+    for n, raw in enumerate(own, 1):
+        m = re.fullmatch(r"\s*use:\s*(.+\.imagine)\s*", raw, re.IGNORECASE)
+        if m and not raw[:1].isspace():
+            other = path.parent / m.group(1).strip()
+            if not other.exists():
+                raise ScriptError(k * PER_FILE + n, f"There is no script called '{m.group(1).strip()}' next to {path.name}.")
+            if other.resolve() not in seen:  # a script used twice (or by itself) is read once
+                more, more_numbers = gather(other, k * PER_FILE + n, seen)
+                lines += more
+                numbers += more_numbers
+            continue
+        lines.append(raw)
+        numbers.append(k * PER_FILE + n)
+    return lines, numbers
+
+
 def read_script(path):
     """Reads one .imagine file. Returns (C++ text, Program or None), or raises ScriptError."""
     global THINGS
-    lines = path.read_text(encoding="utf-8").splitlines()
+    FILES.clear()
+    lines, numbers = gather(path)
+    main_lines = sum(1 for x in numbers if x < PER_FILE)
     names, info, settings, out = None, {}, [], []
     commands = []  # (header text, line, body)
     things = []  # (name, line, [(line, field text)])
@@ -1087,7 +1132,7 @@ def read_script(path):
     while i < len(lines):
         raw = lines[i]
         text_ = raw.strip()
-        n = i + 1
+        n = numbers[i]
         i += 1
         if not text_:
             continue
@@ -1111,7 +1156,7 @@ def read_script(path):
                     continue
                 m = re.fullmatch(r"([a-z][a-z' ]*):\s*(-?\d+(?:\.\d+)?)\s*(.*)", s.lower())
                 if not m:
-                    raise ScriptError(i, "A setting looks like 'name: number', e.g. 'look limit: 30 degrees'.")
+                    raise ScriptError(numbers[i - 1], "A setting looks like 'name: number', e.g. 'look limit: 30 degrees'.")
                 words = m.group(1).split()
                 cpp = f"Imagine_{snake(path.stem.split())}::{snake(words)}"
                 number = float(m.group(2))
@@ -1122,15 +1167,16 @@ def read_script(path):
         if text_.startswith("to ") and text_.endswith(":"):
             body = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
-                body.append((i + 1, lines[i]))
+                body.append((numbers[i], lines[i]))
                 i += 1
-            commands.append((text_, n, body))
+            if not (n >= PER_FILE and text_.lower() == "to start:"):  # a used script's own start is left out
+                commands.append((text_, n, body))
             if i >= len(lines) or not is_closing(lines[i]):
-                raise ScriptError(i + 1 if i < len(lines) else len(lines),
+                raise ScriptError(numbers[i] if i < len(lines) else numbers[-1],
                                   f"The command '{text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
             i += 1
             continue
-        if text_.lower().startswith("use:"):
+        if text_.lower().startswith("use:"):  # a library ('use: x.imagine' lines were already replaced by gather)
             lib = " ".join(text_[4:].split()).lower()
             if lib in used:
                 raise ScriptError(n, f"The library '{lib}' is already used above.")
@@ -1142,10 +1188,10 @@ def read_script(path):
             fields = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
                 if lines[i].strip() and not lines[i].strip().startswith("note:"):
-                    fields.append((i + 1, lines[i].strip()))
+                    fields.append((numbers[i], lines[i].strip()))
                 i += 1
             if i >= len(lines) or not is_closing(lines[i]):
-                raise ScriptError(i + 1 if i < len(lines) else len(lines),
+                raise ScriptError(numbers[i] if i < len(lines) else numbers[-1],
                                   f"The description of '{m.group(1)}' must end with the line '{CLOSING}', unindented.")
             i += 1
             name = " ".join(m.group(1).split())
@@ -1170,7 +1216,7 @@ def read_script(path):
                 raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
             names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
         if ("start",) not in names.commands:
-            raise ScriptError(len(lines) or 1, "A program needs a 'to start:' command: that is where it begins.")
+            raise ScriptError(main_lines or 1, "A program needs a 'to start:' command: that is where it begins.")
         if names.commands[("start",)].kinds or names.commands[("start",)].gives:
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
                               "'to start:' has no inputs and gives nothing back.")
@@ -1180,7 +1226,8 @@ def read_script(path):
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
-        functions.append("int main()\n{\n\timagine::begin();\n\tStart();\n\treturn 0;\n}\n")
+        files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
+        functions.append(f"int main()\n{{\n\timagine::begin({{{files}}});\n\tStart();\n\treturn 0;\n}}\n")
     else:
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 f'#include "{info["header"]}"', ""] + libs
@@ -1768,7 +1815,7 @@ def run_program(script):
     try:
         _, program = read_script(script)
     except ScriptError as err:
-        print(f"{script.name} line {err.line}: {err.message}")
+        print(f"{where(err.line)}: {err.message}")
         return 1
     if program is None:
         print(f"{script.name} is part of something else ('this is part of:'), so it can't run on its own.")
@@ -1783,7 +1830,7 @@ def run_program(script):
             program.start()
         except RunError as err:
             sys.stdout.flush()
-            print(f"Line {err.line}: {err.message}", file=sys.stderr)
+            print(f"{run_where(err.line)}: {err.message}", file=sys.stderr)
             result["code"] = 1
         except SystemExit as done:
             result["code"] = done.code or 0
@@ -1817,7 +1864,7 @@ def build(script, exe):
     try:
         cpp_out, program = read_script(script)
     except ScriptError as err:
-        return f"{script.name} line {err.line}: {err.message}"
+        return f"{where(err.line)}: {err.message}"
     if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
     vcvars = find_vcvars()
@@ -1880,7 +1927,7 @@ def main(argv):
         try:
             cpp_out = translate(path)
         except ScriptError as err:
-            print(f"{path.name} line {err.line}: {err.message}")
+            print(f"{where(err.line)}: {err.message}")
             failed = True
             continue
         if not target.exists() or target.read_text(encoding="utf-8") != cpp_out:
