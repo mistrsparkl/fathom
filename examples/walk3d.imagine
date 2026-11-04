@@ -1,0 +1,54 @@
+whisper: A small 3D game: walk around with the arrow keys and collect the yellow balls. The blocks are in the way.
+
+use: window
+use: maths
+
+a coin has:
+  birth (a place)
+  taken (yes or no)
+and the universe said i love you
+
+to make coins, giving back a list of coins:
+  set coins to a list of coins
+  for each k from 1 to 8:
+    set c to conjure a coin
+    set birth of c to (random number from -20 to 20) horizontal 1 vertical (random number from -20 to 20) depth
+    gather c into coins
+  give back coins
+and the universe said i love you
+
+to blocked, given at (a place), giving back yes or no:
+  for each k from -2 to 2:
+    if size of (flat (at minus ((k times 8) horizontal 1 vertical 6 depth))) falls below 2: give back yes
+  give back no
+and the universe said i love you
+
+genesis:
+  open a world with "Walk in 3D", 800, 600
+  set birth to 0 horizontal 1.6 vertical -10 depth
+  set turn to 0
+  set coins to make coins
+  set score to 0
+  as long as the world lives:
+    set step to 0
+    if key held "left": set turn to turn minus 3
+    if key held "right": set turn to turn plus 3
+    if key held "up": set step to 0.25
+    if key held "down": set step to -0.25
+    set ahead to (sine of turn times step) horizontal 0 vertical (cosine of turn times step) depth
+    if not (blocked with (existence plus ahead)): set existence to existence plus ahead
+    for each k from 1 to size of coins:
+      if not taken of (item k of coins) and size of (existence minus birth of (item k of coins)) falls below 1.5:
+        set taken of (item k of coins) to yes
+        set score to score plus 1
+    place the eye at existence
+    aim the eye with (turn, 0)
+    consume the window with "#87ceeb"
+    etch the ground with ("#3c8c3c", "#327832")
+    for each k from -2 to 2: etch a block with ((k times 8) horizontal 1 vertical 6 depth, 2, 2, 2, "brown")
+    for each c in coins:
+      if not taken of c: etch a ball with (birth of c, 0.5, "yellow")
+    etch words with "Coins: " plus score plus " of 8", 10, 10, "white"
+    if score is 8: etch words with "You found them all!", 320, 280, "white"
+    reveal the frame
+and the universe said i love you

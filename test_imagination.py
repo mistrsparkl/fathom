@@ -305,6 +305,27 @@ def program_checks():
     assert perr('to half, given x (text), giving back text:\n  give back x\n' + END + 'genesis:\n  scrawl a list of (1, 2) changed by the command half\n' + END)[1] == \
         "'changed by' needs a command given a number giving back something, not a command given text giving back text."
 
+    # Places can have negative parts written straight in.
+    out = both('genesis:\n  scrawl 1 horizontal -2 vertical -3 depth, " / ", 5 horizontal -1 vertical\n  set x to 3\n'
+               '  scrawl (1 horizontal 2 vertical) of horizontal - x\n' + END)
+    assert out.stdout == "1 horizontal -2 vertical -3 depth / 5 horizontal -1 vertical\n-2\n", repr(out.stdout)
+
+    # 3D: the eye, where places land on the screen, and the 3D shapes.
+    out = both('genesis:\n  open a world with "x", 800, 600\n  place the eye at 0 horizontal 0 vertical 0 depth\n  aim the eye with (0, 0)\n'
+               '  scrawl screen place of 0 horizontal 0 vertical 10 depth\n'
+               '  set p to screen place of 1 horizontal 1 vertical 10 depth\n'
+               '  scrawl p of horizontal rounded to 2 places, " ", p of vertical rounded to 2 places\n'
+               '  scrawl screen place of 0 horizontal 0 vertical -5 depth\n'
+               '  aim the eye with (90, 0)\n  scrawl screen place of 10 horizontal 0 vertical 0 depth\n'
+               '  aim the eye with (0, 200)\n  set q to screen place of 0 horizontal 10 vertical 0.1 depth\n  scrawl q of vertical falls below 300\n'
+               '  consume the window with "black"\n  etch the ground with ("green", "#00ff00")\n'
+               '  etch a cube with (0 horizontal 0 vertical 5 depth, 1, "red")\n  etch a block with (2 horizontal 0 vertical 5 depth, 1, 2, 3, "blue")\n'
+               '  etch a ball with (0 horizontal 1 vertical 3 depth, 0.5, "yellow")\n  etch words with "hi", 10, 10, "white"\n  reveal the frame\n'
+               '  try:\n    etch a ball with (0 horizontal 1 vertical 3 depth, 0, "yellow")\n  if that went wrong:\n    scrawl the wound\n'
+               '  end the world\n' + END)
+    assert out.stdout == ("400 horizontal 300 vertical\n451.96 248.04\nnot a number horizontal not a number vertical\n"
+                          "400 horizontal 300 vertical\nyes\na ball's radius must be more than 0.\n"), repr(out.stdout)
+
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
                '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'
@@ -351,8 +372,8 @@ def program_checks():
                '  end the world\n  scrawl "ok"\n' + END)
     assert out.stdout == "ok\n", repr(out.stdout)
     assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
-        "I don't know 'etch a triangle with'. Words that start with 'etch': etch a box, etch a circle, etch a line, "
-        "etch a square, etch the picture, etch the picture turned, etch words.")
+        "I don't know 'etch a triangle with'. Words that start with 'etch': etch a ball, etch a block, etch a box, etch a circle, etch a cube, etch a line, "
+        "etch a square, etch the ground, etch the picture, etch the picture turned, etch words.")
 
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'

@@ -1041,17 +1041,28 @@ class Expr:
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
 
+    def signed(self):
+        """A part of a place, which may be negative: '0 horizontal -2 vertical -10 depth'."""
+        if self.peek() != "-":
+            return self.single()
+        self.i += 1
+        x = self.single()
+        if x.kind != NUMBER:
+            raise ScriptError(self.line, f"Only a number can be negative, not {kind_name(x.kind)}.")
+        a = x.run
+        return Value(f"(-{x.cpp})", NUMBER, lambda env: -a(env))
+
     def unary(self):
         v = self.single()
         if v.kind != NUMBER or not self.at("horizontal"):
             return v
         self.i += 1  # 300 horizontal 200 vertical (5 depth): a place
-        parts = [v, self.need(self.single(), NUMBER, "a place")]
+        parts = [v, self.need(self.signed(), NUMBER, "a place")]
         self.take("vertical")
         start = self.i
-        if self.peek() not in (None, ",", ")") and self.peek() not in ITEM_NOT_INDEX:
+        if self.peek() not in (None, ",", ")") and (self.peek() not in ITEM_NOT_INDEX or self.peek() == "-"):
             try:
-                third = self.single()
+                third = self.signed()
             except ScriptError:  # 'the place touches b': what follows isn't a depth
                 third = None
             if third and third.kind == NUMBER and self.at("depth"):
@@ -1611,7 +1622,7 @@ def load_library(name, line, names):
         raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
     out = [f"// From the library '{name}'"]
     space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
-             "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS}
+             "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place}
     rows = path.read_text(encoding="utf-8").splitlines()
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
     k = 0

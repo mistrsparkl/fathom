@@ -351,6 +351,20 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
 | `end the world` | Close it yourself. |
 
+**3D.** The window can show a 3D world too. Places are across (`horizontal`), up (`vertical`, more is higher, unlike flat window places) and away (`depth`). The picture is seen from **the eye**:
+
+| Words | Means |
+|---|---|
+| `place the eye at 0 horizontal 1.6 vertical -10 depth` | Where the picture is seen from. |
+| `aim the eye with (turn, tilt)` | Which way the eye looks, in degrees: turn 0 looks along depth, 90 looks along horizontal (to the right); tilt up is more, from -89 to 89. Walking forward at a turn is `(sine of turn) horizontal 0 vertical (cosine of turn) depth`. |
+| `etch the ground with ("green", "#2a7a2a")` | A checkered floor at vertical 0 around the eye, in two colours. It is always under everything else. |
+| `etch a cube with (middle, size, "red")` | A cube around a middle place. Its sides are shaded by the light. |
+| `etch a block with (middle, width, height, depth, "brown")` | A box of any size. |
+| `etch a ball with (middle, radius, "yellow")` | A ball. |
+| `screen place of 3 horizontal 1 vertical 5 depth` | Where a place shows on the window, as a flat place (`not a number` when it is behind the eye). |
+
+3D shapes are drawn far ones first, just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.imagine` is a small 3D game.
+
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
 ### Making a library
