@@ -271,13 +271,72 @@ def letters(s):
     return float(len(s))
 
 
-class Stop(Exception):
+ASCII_UP = str.maketrans("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+ASCII_DOWN = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def letter(s, number, line):
+    if math.floor(number) != number or number < 1 or number > len(s):
+        raise RunError(line, f"there is no letter {text(number)} in text of {len(s)} letters.")
+    return s[int(number) - 1]
+
+
+def letters_from(s, first, last, line):
+    if math.floor(first) != first or math.floor(last) != last or first < 1 or last > len(s) or first > last + 1:
+        raise RunError(line, f"there are no letters {text(first)} to {text(last)} in text of {len(s)} letters.")
+    return s[int(first) - 1:int(last)]
+
+
+def replace_all(s, old, new, line):
+    if not old:
+        raise RunError(line, "I can't replace empty text.")
+    return s.replace(old, new)
+
+
+def split(s, by, line):
+    if not by:
+        raise RunError(line, "I can't split text by empty text.")
+    return s.split(by)
+
+
+def last(items, line):
+    if not items:
+        raise RunError(line, "the list is empty, so it has no last item.")
+    return items[-1]
+
+
+class Flow(Exception):
+    """Leaving a command or a loop early (not an error)."""
+
+
+class Stop(Flow):
     pass
 
 
-class GiveBack(Exception):
+class GiveBack(Flow):
     def __init__(self, value):
         self.value = value
+
+
+class LeaveLoop(Flow):
+    pass
+
+
+class NextRound(Flow):
+    pass
+
+
+def looped(then):
+    """One round of a loop. Returns False when the loop should end ('stop the loop')."""
+    def step(env):
+        try:
+            then(env)
+        except LeaveLoop:
+            return False
+        except NextRound:
+            pass
+        return True
+    return step
 
 
 def not_here(line, what):
@@ -338,6 +397,7 @@ class Names:
         self.known = {}  # words tuple -> (cpp, kind, read_only, run or None for a name kept in env)
         self.commands = {}  # words tuple -> Command
         self.gives = None  # what the command being read gives back
+        self.loops = 0  # how many loops the line being read is inside
 
     def add(self, words, cpp, kind, read_only=False, run=None):
         self.known[tuple(words)] = (cpp, kind, read_only, run)
@@ -518,6 +578,12 @@ class Expr:
             self.i += 2
             a = v.run
             return Value(f"imagine::text({v.cpp})", TEXT, lambda env: text(a(env)))
+        if self.at("split", "by"):
+            self.i += 2
+            self.need(v, TEXT, "split by")
+            by = self.need(self.primary(), TEXT, "split by")
+            a, b, line = v.run, by.run, self.line
+            return Value(f"imagine::split({v.cpp}, {by.cpp}, {line})", "list of text", lambda env: split(a(env), b(env), line))
         return v
 
     def primary(self):
@@ -648,6 +714,70 @@ class Expr:
                 v = self.need(self.unary(), TEXT, " ".join(words))
                 a = v.run
                 return Value(f"imagine::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
+        if tok in ("letter", "letters") and self.peek(1) not in ITEM_NOT_INDEX:
+            self.i += 1
+            first = self.need(self.sum(), NUMBER, tok)
+            last_ = None
+            if tok == "letters":
+                self.take("to")
+                last_ = self.need(self.sum(), NUMBER, "letters ... to")
+            self.take("of")
+            v = self.need(self.unary(), TEXT, f"'{tok} ... of'")
+            a, f = v.run, first.run
+            if last_ is None:
+                return Value(f"imagine::letter({v.cpp}, {strip_parens(first.cpp)}, {line})", TEXT, lambda env: letter(a(env), f(env), line))
+            b = last_.run
+            return Value(f"imagine::letters_from({v.cpp}, {strip_parens(first.cpp)}, {strip_parens(last_.cpp)}, {line})", TEXT,
+                         lambda env: letters_from(a(env), f(env), b(env), line))
+        for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
+            if self.at(*words):
+                self.i += 3
+                v = self.need(self.unary(), TEXT, " ".join(words))
+                a = v.run
+                return Value(f"imagine::{fn}({v.cpp})", TEXT, lambda env, table=table: a(env).translate(table))
+        if self.at("position", "of"):
+            self.i += 2
+            part = self.need(self.sum(), TEXT, "position of")
+            self.take("in")
+            v = self.need(self.unary(), TEXT, "position of ... in")
+            a, b = v.run, part.run
+            return Value(f"imagine::position({v.cpp}, {part.cpp})", NUMBER, lambda env: float(a(env).find(b(env)) + 1))
+        if self.at("replace"):
+            self.i += 1
+            old = self.need(self.sum(), TEXT, "replace")
+            self.take("with")
+            new = self.need(self.sum(), TEXT, "replace ... with")
+            self.take("in")
+            v = self.need(self.unary(), TEXT, "replace ... in")
+            a, o, w = v.run, old.run, new.run
+            return Value(f"imagine::replace_all({v.cpp}, {old.cpp}, {new.cpp}, {line})", TEXT,
+                         lambda env: replace_all(a(env), o(env), w(env), line))
+        if self.at("join"):
+            self.i += 1
+            v = self.unary()
+            if not is_list(v.kind):
+                raise ScriptError(line, f"'join' needs a list, but this is {kind_name(v.kind)}.")
+            self.take("with")
+            between = self.need(self.unary(), TEXT, "join ... with")
+            a, b = v.run, between.run
+            return Value(f"imagine::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
+        for word in ("sorted", "reversed"):
+            if self.at(word):
+                self.i += 1
+                v = self.unary()
+                if not is_list(v.kind) or (word == "sorted" and element(v.kind) not in (NUMBER, TEXT)):
+                    need = " of numbers or text" if word == "sorted" else ""
+                    raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
+                a = v.run
+                run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
+                return Value(f"imagine::{word}({v.cpp})", v.kind, run)
+        if self.at("last", "item", "of"):
+            self.i += 3
+            v = self.unary()
+            if not is_list(v.kind):
+                raise ScriptError(line, f"'last item of' needs a list, but this is {kind_name(v.kind)}.")
+            a = v.run
+            return Value(f"imagine::last({v.cpp}, {line})", element(v.kind), lambda env: last(a(env), line))
         if self.at("square", "root", "of"):
             self.i += 3
             v = self.need(self.sum(), NUMBER, "square root")
@@ -987,7 +1117,7 @@ def read_script(path):
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
-        functions.append("int main()\n{\n\tStart();\n\treturn 0;\n}\n")
+        functions.append("int main()\n{\n\timagine::begin();\n\tStart();\n\treturn 0;\n}\n")
     else:
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 f'#include "{info["header"]}"', ""] + libs
@@ -1155,7 +1285,7 @@ def guard(run, n):
     def guarded(env):
         try:
             run(env)
-        except (RunError, Stop, GiveBack, SystemExit, KeyboardInterrupt):
+        except (RunError, Flow, SystemExit, KeyboardInterrupt):
             raise
         except RecursionError:
             raise RunError(n, "commands called each other too many times in a row (they may never stop).")
@@ -1171,7 +1301,14 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}// {text_[5:].strip()}"], None, None
     head, colon, rest = split_colon(text_)
 
-    def body():
+    def body(loop=False):
+        if loop:
+            names.loops += 1
+            try:
+                lines, run = body()
+            finally:
+                names.loops -= 1
+            return lines, looped(run)
         if rest.strip():
             lines, run, branch = statement(n, rest.strip(), [], names, declared, depth + 1)
             if branch:
@@ -1190,26 +1327,28 @@ def statement(n, text_, inner, names, declared, depth):
             v = expr_to_end(tokens, 1, names, n)
             if v.kind != YESNO:
                 raise ScriptError(n, f"'while' needs something that is yes or no, but this is {kind_name(v.kind)}.")
-            lines, then = body()
+            lines, then = body(loop=True)
             cond = v.run
 
             def run(env):
                 while cond(env):
-                    then(env)
+                    if not then(env):
+                        break
             return [f"{tab}while ({strip_parens(v.cpp)})", tab + "{"] + lines + [tab + "}"], run, None
         if tokens[-1:] != ["times"]:
             raise ScriptError(n, "'repeat' looks like 'repeat 10 times:'.")
         count = expr_to_end(tokens[:-1], 1, names, n)
         if count.kind != NUMBER:
             raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
-        lines, then = body()
+        lines, then = body(loop=True)
         k = f"imagine_count_{depth}_{n}"
         times = count.run
 
         def run(env):
             c = times(env)
             for _ in range(int(c) if math.isfinite(c) else 0):
-                then(env)
+                if not then(env):
+                    break
         return [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})", tab + "{"] + lines + [tab + "}"], run, None
     if colon and re.match(r"(if |otherwise\b)", text_):
         tokens = tokenize(head, n)
@@ -1234,6 +1373,14 @@ def statement(n, text_, inner, names, declared, depth):
     if inner:
         raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'while' and 'for each' lines can have indented lines under them.")
     tokens = tokenize(text_, n)
+    if tokens in (["stop", "the", "loop"], ["skip", "to", "the", "next", "one"], ["skip", "to", "the", "next"]):
+        if not names.loops:
+            raise ScriptError(n, f"'{' '.join(tokens)}' only works inside 'repeat', 'while' or 'for each'.")
+        leave = tokens[0] == "stop"
+
+        def run(env):
+            raise LeaveLoop() if leave else NextRound()
+        return [f"{tab}{'break' if leave else 'continue'};"], run, None
     if tokens == ["stop"]:
         if names.gives:
             raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, so leave it with 'give back ...' instead of 'stop'.")
@@ -1416,13 +1563,14 @@ def for_each(n, head, body, names, declared, depth):
                 yield x
                 x += 1
     names.add(words, cpp, kind, read_only=True)
-    lines, then = body()
+    lines, then = body(loop=True)
     del names.known[tuple(words)]
 
     def run(env):
         for x in items(env):
             env[cpp] = x
-            then(env)
+            if not then(env):
+                break
     return [line, tab + "{"] + lines + [tab + "}"], run, None
 
 
@@ -1550,6 +1698,9 @@ def run_program(script):
         print(f"{script.name} is part of something else ('this is part of:'), so it can't run on its own.")
         return 1
     result = {"code": 0}
+    # Text is UTF-8 everywhere, as in built programs (Windows would otherwise use its old code page when piped).
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
 
     def go():
         try:

@@ -76,12 +76,12 @@ def program_checks():
             script = Path(d) / "probe.imagine"
             script.write_text(source, encoding="utf-8")
             direct = subprocess.run([sys.executable, str(HERE / "imagination.py"), "run", str(script)],
-                                    input=typed, capture_output=True, text=True, cwd=d)
+                                    input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
             if compiler:
                 exe = Path(d) / "probe.exe"
                 problem = translate.build(script, exe)
                 assert problem is None, problem
-                built = subprocess.run([str(exe)], input=typed, capture_output=True, text=True, cwd=d)
+                built = subprocess.run([str(exe)], input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
                 assert (built.stdout, built.stderr, built.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
                     f"built: {built.stdout!r} {built.stderr!r} {built.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}"
             return direct
@@ -108,6 +108,20 @@ def program_checks():
                '  set boxes to a list of (a, b)\n  add 3 to items of item 1 of boxes\n  say a, " ", b, " ", boxes\n'
                '  say a is item 1 of boxes, " ", b is item 2 of boxes\n' + END).stdout
     assert out == ("a box (items: 1) a box (items: 1, 2) a box (items: 1, 3), a box (items: 1, 2)\nno yes\n"), repr(out)
+
+    # Text and list tools; leaving loops early.
+    out = both('to start:\n  set s to "Héllo wörld, hello"\n'
+               '  say upper case of s, " | ", lower case of "ABC é", " | ", letter 2 of s, " | ", letters 7 to 11 of s\n'
+               '  say position of "llo" in s, " ", position of "zz" in s, " | ", replace "llo" with "LP" in s\n'
+               '  set parts to s split by ", "\n  say size of parts, " ", item 2 of parts, " | ", join parts with "+"\n'
+               '  say sorted a list of (3, 1, 2), " | ", reversed a list of ("a", "b"), " | ", last item of parts, " | ", letters 3 to 2 of "abc", "."\n'
+               '  for each n from 1 to 10:\n    if n is 2: skip to the next one\n    if n is 5: stop the loop\n    say n\n'
+               '  repeat 3 times:\n    while yes: stop the loop\n    say "r"\n'
+               '  say letter 9 of "abc"\n' + END)
+    assert out.stdout == ("HéLLO WöRLD, HELLO | abc é | é | wörld\n3 0 | HéLP wörld, heLP\n"
+                          "2 hello | Héllo wörld+hello\n1, 2, 3 | b, a | hello | .\n1\n3\n4\nr\nr\nr\n"), repr(out.stdout)
+    assert out.stderr == "Line 15: there is no letter 9 in text of 3 letters.\n", repr(out.stderr)
+    assert perr("to start:\n  stop the loop\n" + END)[1] == "'stop the loop' only works inside 'repeat', 'while' or 'for each'."
 
     # Libraries.
     out = both('use: maths\nuse: time\nto start:\n  say round (sine of 30 times 1000), " ", power of (2, 10), " ", remainder of (17, 5)\n'

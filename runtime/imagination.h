@@ -30,8 +30,18 @@ namespace FMath
 	}
 }
 
+extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
+extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
+
 namespace imagine
 {
+	// Called first by every program: text is UTF-8, so the console should show it as UTF-8.
+	inline void begin()
+	{
+		SetConsoleOutputCP(65001);
+		SetConsoleCP(65001);
+	}
+
 	inline std::string text(const std::string& s) { return s; }
 	inline std::string text(bool b) { return b ? "yes" : "no"; }
 	inline std::string text(double d)
@@ -159,6 +169,116 @@ namespace imagine
 		std::ofstream out(std::filesystem::u8path(path), std::ios::binary | std::ios::app);
 		if (!(out << s << "\n"))
 			fail(line, "I couldn't add to the file \"" + path + "\".");
+	}
+
+	inline double letters(const std::string& s);
+
+	// Text is UTF-8; these split it into letters (not bytes), so "é" is one letter.
+	inline std::vector<std::string> letters_in(const std::string& s)
+	{
+		std::vector<std::string> out;
+		for (unsigned char c : s)
+		{
+			if ((c & 0xC0) != 0x80 || out.empty())
+				out.emplace_back();
+			out.back() += static_cast<char>(c);
+		}
+		return out;
+	}
+
+	inline std::string upper(std::string s)
+	{
+		for (char& c : s)
+			if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+		return s;
+	}
+
+	inline std::string lower(std::string s)
+	{
+		for (char& c : s)
+			if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+		return s;
+	}
+
+	inline std::string letter(const std::string& s, double number, int line)
+	{
+		std::vector<std::string> all = letters_in(s);
+		if (std::floor(number) != number || number < 1 || number > static_cast<double>(all.size()))
+			fail(line, "there is no letter " + text(number) + " in text of " + text(static_cast<double>(all.size())) + " letters.");
+		return all[static_cast<size_t>(number) - 1];
+	}
+
+	inline std::string letters_from(const std::string& s, double first, double last, int line)
+	{
+		std::vector<std::string> all = letters_in(s);
+		double size = static_cast<double>(all.size());
+		if (std::floor(first) != first || std::floor(last) != last || first < 1 || last > size || first > last + 1)
+			fail(line, "there are no letters " + text(first) + " to " + text(last) + " in text of " + text(size) + " letters.");
+		std::string out;
+		for (size_t k = static_cast<size_t>(first) - 1; k < static_cast<size_t>(last); ++k)
+			out += all[k];
+		return out;
+	}
+
+	inline double position(const std::string& s, const std::string& part)
+	{
+		size_t at = s.find(part);
+		return at == std::string::npos ? 0.0 : letters(s.substr(0, at)) + 1;
+	}
+
+	inline std::string replace_all(std::string s, const std::string& from, const std::string& to, int line)
+	{
+		if (from.empty())
+			fail(line, "I can't replace empty text.");
+		for (size_t at = s.find(from); at != std::string::npos; at = s.find(from, at + to.size()))
+			s.replace(at, from.size(), to);
+		return s;
+	}
+
+	inline std::vector<std::string> split(const std::string& s, const std::string& by, int line)
+	{
+		if (by.empty())
+			fail(line, "I can't split text by empty text.");
+		std::vector<std::string> out;
+		size_t start = 0;
+		for (size_t at = s.find(by); at != std::string::npos; at = s.find(by, start))
+		{
+			out.push_back(s.substr(start, at - start));
+			start = at + by.size();
+		}
+		out.push_back(s.substr(start));
+		return out;
+	}
+
+	template <typename T>
+	std::string join(const std::vector<T>& items, const std::string& between)
+	{
+		std::string out;
+		for (size_t k = 0; k < items.size(); ++k)
+			out += (k ? between : std::string()) + text(items[k]);
+		return out;
+	}
+
+	template <typename T>
+	const T& last(const std::vector<T>& items, int line)
+	{
+		if (items.empty())
+			fail(line, "the list is empty, so it has no last item.");
+		return items.back();
+	}
+
+	template <typename T>
+	std::vector<T> sorted(std::vector<T> items)
+	{
+		std::stable_sort(items.begin(), items.end());
+		return items;
+	}
+
+	template <typename T>
+	std::vector<T> reversed(std::vector<T> items)
+	{
+		std::reverse(items.begin(), items.end());
+		return items;
 	}
 
 	inline void say(std::initializer_list<std::string> parts)

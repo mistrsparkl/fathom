@@ -134,6 +134,8 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
 | `give back total` | Leave the command, giving back an answer. |
+| `stop the loop` | Leave the `repeat`, `while` or `for each` it is inside, and carry on after it. |
+| `skip to the next one` | Go straight to the next round of the loop it is inside. |
 | `write "hello" to file "notes.txt"` | Make or replace a file with this text. |
 | `add "a line" to file "log.txt"` | Add a line to the end of a file (making it if needed). |
 | `stop` | Leave the command now (only in commands that don't give back anything). |
@@ -160,6 +162,14 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `lines of text`, `words of text` | text split into lines or words, as a list of text |
 | `answer as a number` | text turned into a number (`"42"` gives 42) |
 | `score as text` | a number or yes or no written out as text |
+| `letter 2 of name`, `letters 2 to 4 of name` | one letter, or some letters, of text (counted from 1) |
+| `upper case of name`, `lower case of name` | text in CAPITALS / small letters (A to Z only) |
+| `position of "lo" in name` | where it first appears, counted from 1 (0 if it isn't there) |
+| `replace "a" with "b" in name` | text with every "a" changed to "b" |
+| `line split by ", "` | text cut into a list of text at every ", " |
+| `join names with ", "` | a list made into one text, with ", " between the items |
+| `sorted scores`, `reversed scores` | a copy of a list, smallest first / back to front |
+| `last item of scores` | the last item of a list |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
@@ -171,7 +181,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 
