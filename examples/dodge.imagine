@@ -14,6 +14,11 @@ to start:
   set player x to 240
   set balls to a list of balls
   set score to 0
+  set best to 0
+  try:
+    load best from file "dodge best.json"
+  if that went wrong:
+    set best to 0
   set playing to yes
   while the window is open:
     if playing:
@@ -24,6 +29,9 @@ to start:
       set balls to every ball moved down from balls
       for each ball in balls:
         if hits the player with (ball, player x): set playing to no
+      if not playing and score is more than best:
+        set best to score
+        save best to file "dodge best.json"
       set score to score plus 1
     otherwise if key held "space":
       set balls to a list of balls
@@ -33,6 +41,7 @@ to start:
     for each ball in balls: draw a circle with x of ball, y of ball, 14, "orange"
     draw a box with player x minus 30, 600, 60, 16, "#5ad1ff"
     draw words with "Score: " plus score, 12, 10, "white"
+    draw words with "Best: " plus best, 380, 10, "white"
     if not playing: draw words with "Ouch! Press space to play again.", 120, 300, "yellow"
     show the frame
 and the universe said i love you
