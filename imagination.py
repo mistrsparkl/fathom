@@ -1386,6 +1386,14 @@ def library_hint(tokens):
     return f" '{best[0]}' is a word from the {best[1]} library: put the line 'use: {best[1]}' at the top of the script."
 
 
+def similar_words(tokens, names):
+    """' Words that start with 'etch': ...' when a line starts like known words but goes on differently."""
+    found = sorted({" ".join(k) for k in names.commands if k[0] == tokens[0]})
+    if not found:
+        return ""
+    return f" Words that start with '{tokens[0]}': " + ", ".join(found) + "."
+
+
 def load_library(name, line, names):
     """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file."""
     path = next((p for p in (LOGIC / f"{name}.words", HERE / "libraries" / f"{name}.words") if p.exists()), None)
@@ -2242,6 +2250,9 @@ def statement(n, text_, inner, names, declared, depth):
     hint = library_hint(tokens)
     if hint:
         raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
+    near = similar_words(tokens, names)
+    if near:
+        raise ScriptError(n, f"I don't know '{' '.join(tokens[:4])}'." + near)
     raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, gather, banish, inscribe, if, otherwise, echo, as long as, for each, try, give back, cease, whisper or the name of a command.")
 
 

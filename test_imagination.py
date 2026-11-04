@@ -231,6 +231,13 @@ def program_checks():
     assert perr("genesis:\n  set birth to 1 horizontal 1 vertical\n  scrawl existence touches a side\n" + END)[1] == \
         "'touches a side' needs to know how big the thing is: set radius first, like 'set radius to 20'."
 
+    out = both('genesis:\n  open a world with "x", 40, 40\n  etch a square with 20, 20, 5, "purple"\n  reveal the frame\n'
+               '  end the world\n  scrawl "ok"\n' + END)
+    assert out.stdout == "ok\n", repr(out.stdout)
+    assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
+        "I don't know 'etch a triangle with'. Words that start with 'etch': etch a box, etch a circle, etch a line, "
+        "etch a square, etch the picture, etch the picture turned, etch words.")
+
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'
                '  scrawl existence is within 5 of coin, " ", existence is within 4.9 of coin, " ", 7 is within 2 of 5, " ",'

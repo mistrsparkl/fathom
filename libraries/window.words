@@ -461,6 +461,8 @@ to consume the window, given colour (text) = imagine_window::clear({colour}, {li
   runs: clear({colour})
 to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = imagine_window::box({x}, {y}, {width}, {height}, {colour}, {line})
   runs: box({x}, {y}, {width}, {height}, {colour})
+to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
+  runs: box({x} - {radius}, {y} - {radius}, 2 * {radius}, 2 * {radius}, {colour})
 to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::circle({x}, {y}, {radius}, {colour}, {line})
   runs: circle({x}, {y}, {radius}, {colour})
 to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = imagine_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
