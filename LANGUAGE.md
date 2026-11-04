@@ -29,11 +29,13 @@ to steer toward, given goal (a place) and running (yes or no):
   set wandering to no
   if fallen: stop
   ...
+and the universe said i love you
 ```
 
 1. **`this is part of:`** names the thing the script belongs to. Its words (what it already knows, like `fallen` or `walk speed`) are listed in `<name>.words` next to the script, e.g. `examples/creature body.words`.
 2. **`settings:`** are named numbers you can tune. Anything after the number (`degrees`, `cm per second`) is a description for you.
 3. **`to ...:`** is a command. Its lines are indented under it. After `given` come its inputs, each with its kind in brackets.
+4. **`and the universe said i love you`** may follow a command's last indented line, unindented, to mark where the command ends. It is optional: the indentation already ends it.
 
 ## Kinds of things
 

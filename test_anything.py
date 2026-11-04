@@ -39,6 +39,9 @@ def main():
     assert error("to check:\n  set fallen to yes\n") == (4, "'fallen' can't be changed by a script.")
     assert error("to check:\n  if turn rate: stop\n")[1].startswith("'if' needs something that is yes or no")
     assert error("to check:\n  jump\n")[1].startswith("I don't know how to start a line with 'jump'")
+    closed = run("to check:\n  set turn rate to 1\n\nAnd the universe said I love you.\n\nto other:\n  stop\nand the universe said i love you\n")
+    assert "::Check()" in closed and "::Other()" in closed, closed
+    assert error("and the universe said i love you\n")[1].startswith("'and the universe said i love you' closes a command")
     print("anything.py self-check passed")
 
 
