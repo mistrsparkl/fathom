@@ -130,7 +130,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `move turn rate toward 20 by at most 5` | Change a number toward a goal, but by no more than the step. |
 | `if fallen: stop` | Do the part after the colon only when it is yes. |
 | `if ...:` / `otherwise if ...:` / `otherwise:` | With indented lines below, for longer choices. |
-| `say "Score: ", score` | Show things on the screen, one after another, then start a new line. |
+| `scrawl "Score: ", score` | Show things on the screen, one after another, then start a new line. `say` does the same. |
 | `ask "Your name? " into name` | Show the question and keep what the person types, as text. |
 | `ask "Your age? " into age (a number)` | The same, as a number. It asks again until a number is typed. |
 | `ask "Again? " into again (yes or no)` | The same, as yes or no (`yes`, `y`, `no` or `n`). |

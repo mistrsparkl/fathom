@@ -60,7 +60,7 @@ FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
 KEYWORDS = set("""try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
-say ask into repeat while with random for each in contains list empty new remove file write as""".split())
+say scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
                   "between", "+", "-", "*", "/", "contains", "in", "from", "with"}
 UNITS = set("degrees degree cm centimetres seconds second per squared percent metres metre m s".split())
@@ -1919,10 +1919,10 @@ def statement(n, text_, inner, names, declared, depth):
             if x in items:
                 items.remove(x)
         return [f"{tab}imagine::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
-    if tokens[0] == "say":
+    if tokens[0] in ("say", "scrawl"):  # scrawl is another word for say
         parts = expr_list(tokens, 1, names, n)
         if not parts:
-            raise ScriptError(n, "'say' needs something to say, like: say \"hello\".")
+            raise ScriptError(n, f"'{tokens[0]}' needs something to show, like: {tokens[0]} \"hello\".")
         gets = [p.run for p in parts]
 
         def run(env):
@@ -2029,7 +2029,7 @@ def statement(n, text_, inner, names, declared, depth):
     hint = library_hint(tokens)
     if hint:
         raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
-    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, say, ask, add, remove, write, if, otherwise, repeat, while, for each, give back, stop, note or the name of a command.")
+    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl (or say), ask, add, remove, write, if, otherwise, repeat, while, for each, give back, stop, note or the name of a command.")
 
 
 def for_each(n, head, body, names, declared, depth):

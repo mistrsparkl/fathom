@@ -12,7 +12,7 @@ imagine hello.imagine
 
 ```imagination
 genesis:
-  say "Hello!"
+  scrawl "Hello!"
 and the universe said i love you
 ```
 
@@ -22,7 +22,7 @@ Hello!
 
 A program is made of **commands**. `genesis:` is where every program begins (`to start:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
 
-`say` shows something on the screen. Text goes between quote marks.
+`scrawl` shows something on the screen (`say` does the same). Text goes between quote marks.
 
 ## 2. Remembering things
 
@@ -30,8 +30,8 @@ A program is made of **commands**. `genesis:` is where every program begins (`to
 genesis:
   set name to "Sam"
   set age to 11
-  say "This is ", name, "."
-  say "Next year ", name, " will be ", age plus 1, "."
+  scrawl "This is ", name, "."
+  scrawl "Next year ", name, " will be ", age plus 1, "."
 and the universe said i love you
 ```
 
@@ -40,7 +40,7 @@ This is Sam.
 Next year Sam will be 12.
 ```
 
-`set ... to ...` remembers a value under a name. A name can be several words, like `best score`. `say` can show several things one after another, with commas between them.
+`set ... to ...` remembers a value under a name. A name can be several words, like `best score`. `scrawl` can show several things one after another, with commas between them.
 
 ## 3. Choosing
 
@@ -48,11 +48,11 @@ Next year Sam will be 12.
 genesis:
   set temperature to 31
   if temperature is more than 30:
-    say "It's hot."
+    scrawl "It's hot."
   otherwise if temperature is less than 10:
-    say "It's cold."
+    scrawl "It's cold."
   otherwise:
-    say "It's nice."
+    scrawl "It's nice."
 and the universe said i love you
 ```
 
@@ -67,9 +67,9 @@ It's hot.
 ```imagination
 genesis:
   repeat 3 times:
-    say "Hip hip hooray!"
+    scrawl "Hip hip hooray!"
   for each n from 1 to 5:
-    say n, " times 7 is ", n times 7
+    scrawl n, " times 7 is ", n times 7
 and the universe said i love you
 ```
 
@@ -92,11 +92,11 @@ Hip hip hooray!
 genesis:
   set shopping to a list of ("milk", "eggs")
   add "bread" to shopping
-  say "I need ", size of shopping, " things: ", shopping
+  scrawl "I need ", size of shopping, " things: ", shopping
   for each thing in shopping:
-    say "- ", thing
-  if shopping contains "eggs": say "Don't drop the eggs!"
-  say "The first thing is ", item 1 of shopping, "."
+    scrawl "- ", thing
+  if shopping contains "eggs": scrawl "Don't drop the eggs!"
+  scrawl "The first thing is ", item 1 of shopping, "."
 and the universe said i love you
 ```
 
@@ -117,11 +117,11 @@ A list keeps several values in order. Items are counted from 1.
 genesis:
   greet with "Sam"
   greet with "Ann"
-  say "Double 21 is ", double 21
+  scrawl "Double 21 is ", double 21
 and the universe said i love you
 
 to greet, given who (text):
-  say "Hello, ", who, "!"
+  scrawl "Hello, ", who, "!"
 and the universe said i love you
 
 to double, given x (a number), giving back a number:
@@ -149,8 +149,8 @@ genesis:
   set rex to a new pet
   set name of rex to "Rex"
   set age of rex to 3
-  say rex
-  say name of rex, " is ", age of rex, " years old."
+  scrawl rex
+  scrawl name of rex, " is ", age of rex, " years old."
 and the universe said i love you
 ```
 
@@ -169,7 +169,7 @@ Programs can ask the person using them a question:
 genesis:
   ask "What's your name? " into name
   ask "How old are you? " into age (a number)
-  say "Hi ", name, "! In ten years you'll be ", age plus 10, "."
+  scrawl "Hi ", name, "! In ten years you'll be ", age plus 10, "."
 and the universe said i love you
 ```
 
@@ -188,10 +188,10 @@ A problem while it runs stops it with the line where it happened. To carry on in
 ```imagination
 genesis:
   try:
-    say contents of file "missing.txt"
+    scrawl contents of file "missing.txt"
   if that went wrong:
-    say "No luck: ", the problem
-  say "Still going."
+    scrawl "No luck: ", the problem
+  scrawl "Still going."
 and the universe said i love you
 ```
 
