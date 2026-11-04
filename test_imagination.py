@@ -231,6 +231,16 @@ def program_checks():
     assert perr("genesis:\n  set birth to 1 horizontal 1 vertical\n  scrawl existence touches a side\n" + END)[1] == \
         "'touches a side' needs to know how big the thing is: set radius first, like 'set radius to 20'."
 
+    # Two things touch when their circles (existence and radius) overlap; a place uses the radius in reach.
+    out = both('a ball has:\n  birth (a flat place)\n  radius (a number)\n' + END +
+               'to near, for a ball, given other (a ball), giving back a yes or no:\n  give back existence touches other\n' + END +
+               'genesis:\n  set a to conjure a ball\n  set b to conjure a ball\n  set birth of a to 0 horizontal 0 vertical\n'
+               '  set birth of b to 25 horizontal 0 vertical\n  set radius of a to 10\n  set radius of b to 10\n'
+               '  scrawl a touches b\n  set radius of b to 15\n  scrawl a touches b\n  scrawl near with (a, b)\n'
+               '  scrawl 0 horizontal 0 vertical touches b\n' + END)
+    assert out.stdout == "no\nyes\nyes\nno\n", repr(out.stdout)
+    assert perr("genesis:\n  scrawl 3 touches 4\n" + END)[1] == "'touches' needs a thing or a place, not a number."
+
     out = both('genesis:\n  open a world with "x", 40, 40\n  etch a square with 20, 20, 5, "purple"\n  reveal the frame\n'
                '  end the world\n  scrawl "ok"\n' + END)
     assert out.stdout == "ok\n", repr(out.stdout)

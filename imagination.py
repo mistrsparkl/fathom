@@ -819,6 +819,22 @@ class Expr:
     COMPARE = [(("is", "more", "than"), ">"), (("is", "less", "than"), "<"), (("is", "at", "least"), ">="),
                (("is", "at", "most"), "<="), (("is", "not"), "!="), (("is",), "==")]
 
+    def circle(self, v):
+        """Where something is and how big it is, for 'touches': a thing's existence and radius, or a place and the radius in reach."""
+        if is_thing(v.kind):
+            for part in ("existence", "radius"):
+                if v.kind not in FIELDS.get((part,), {}):
+                    raise ScriptError(self.line, f"'touches' needs {kind_name(v.kind)} to have {'a birth' if part == 'existence' else 'a radius'}.")
+            at, size = part_of(v, ("existence",)), part_of(v, ("radius",))
+        elif v.kind in (PLACE, FLAT):
+            at, size = v, (self.names.value(("radius",)) if self.names.known.get(("radius",), (None, None))[1] == NUMBER
+                           else Value("0", NUMBER, lambda env: 0))
+        else:
+            raise ScriptError(self.line, f"'touches' needs a thing or a place, not {kind_name(v.kind)}.")
+        if at.kind != PLACE and at.kind != FLAT or size.kind != NUMBER:
+            raise ScriptError(self.line, "'touches' needs an existence that is a place and a radius that is a number.")
+        return at, size
+
     def compare(self):
         v = self.sum()
         if self.at("contains"):
@@ -846,6 +862,13 @@ class Expr:
                 a, b, c = at.run, r.run, far.run
                 return Value(f"({at.cpp} <= {r.cpp} || {at.cpp} >= {far.cpp} - {r.cpp})", YESNO,
                              lambda env: a(env) <= b(env) or a(env) >= c(env) - b(env))
+        if self.at("touches"):  # 'ball touches coin': the two circles (existence and radius) overlap
+            self.i += 1
+            r = self.sum()
+            (pa, ra), (pb, rb) = self.circle(v), self.circle(r)
+            a, b, c, d = pa.run, pb.run, ra.run, rb.run
+            return Value(f"imagine::within({pa.cpp}, {pb.cpp}, {ra.cpp} + {rb.cpp})", YESNO,
+                         lambda env: (a(env) - b(env)).size() <= c(env) + d(env))
         if self.at("is", "within"):  # 'existence is within 30 of coin': close enough to touch
             self.i += 2
             reach = self.need(self.sum(), NUMBER, "within")
@@ -908,8 +931,11 @@ class Expr:
         self.take("vertical")
         start = self.i
         if self.peek() not in (None, ",", ")") and self.peek() not in ITEM_NOT_INDEX:
-            third = self.single()
-            if third.kind == NUMBER and self.at("depth"):
+            try:
+                third = self.single()
+            except ScriptError:  # 'the place touches b': what follows isn't a depth
+                third = None
+            if third and third.kind == NUMBER and self.at("depth"):
                 self.i += 1
                 parts.append(third)
             else:
