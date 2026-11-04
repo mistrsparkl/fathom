@@ -276,7 +276,7 @@ CLOSING = "and the universe said i love you"
 
 
 def is_closing(line):
-    """The optional line that marks where a command ends (indentation already ends it)."""
+    """The line every command must end with."""
     return line.strip().lower().rstrip(".") == CLOSING
 
 
@@ -326,8 +326,10 @@ def translate(path):
                 body.append((i + 1, lines[i]))
                 i += 1
             functions.append(function(text, n, body, names, info))
-            if i < len(lines) and is_closing(lines[i]):
-                i += 1
+            if i >= len(lines) or not is_closing(lines[i]):
+                raise ScriptError(i + 1 if i < len(lines) else len(lines),
+                                  f"The command '{text[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
+            i += 1
             continue
         if is_closing(text):
             raise ScriptError(n, f"'{CLOSING}' closes a command, so it goes right after the command's last indented line.")
