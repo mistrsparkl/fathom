@@ -247,6 +247,11 @@ def main():
     assert error(END)[1].startswith("'and the universe said i love you' closes a command")
     assert error("to check:\n  stop\n")[1].startswith("The command 'to check' must end with the line 'and the universe said i love you'")
     assert error("to check:\n  stop\nto other:\n  stop\n" + END)[0] == 5
+    called = run("to check:\n  set turn rate to half of 10\n  calm down with 2\n" + END +
+                 "to half of, given x (a number), giving back a number:\n  give back x divided by 2\n" + END +
+                 "to calm down, given by (a number):\n  set walk speed to walk speed minus by\n" + END)
+    assert "TurnRateDegS = HalfOf(10.0);" in called and "\tCalmDown(2.0);" in called, called
+    assert "//   double HalfOf(double x);" in called, called
     program_checks()
     print("imagination.py self-check passed")
 

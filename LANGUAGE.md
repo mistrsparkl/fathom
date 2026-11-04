@@ -194,7 +194,7 @@ Names can be several words (`turn needed`, `braking speed`). They can't use the 
 
 A script can only use words its thing knows. New words (another part of the deer's state, a new ability) are added to the `.words` file; a new physical ability (jumping, a gallop) needs C++ underneath first, then it gets a word.
 
-Commands can only call each other, and new kinds of things can only be described, inside programs for now.
+In a part of something else, commands can call each other too; the top of the C++ it makes lists what the class's header must declare. New kinds of things can only be described inside programs for now.
 
 ## Programs made of several scripts
 

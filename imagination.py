@@ -1223,11 +1223,11 @@ def read_script(path):
         raise ScriptError(things[0][1], "New kinds of things can only be described in programs for now.")
     structs = describe_things(things)
     heads = [command_head(text_, n) for text_, n, _ in commands]
+    for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
+        if tuple(words) in names.commands:
+            raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
+        names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
     if program:
-        for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
-            if tuple(words) in names.commands:
-                raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
-            names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
         if ("start",) not in names.commands:
             raise ScriptError(main_lines or 1, "A program needs a 'to start:' command: that is where it begins.")
         if names.commands[("start",)].kinds or names.commands[("start",)].gives:
@@ -1242,7 +1242,11 @@ def read_script(path):
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
         functions.append(f"int main()\n{{\n\timagine::begin({{{files}}});\n\tStart();\n\treturn 0;\n}}\n")
     else:
+        # The class's header must declare each command, so they can call each other (C++ needs that).
+        wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"
+                  for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
+                f"// {info['header']} declares these in {info['class']}:"] + wanted + [
                 f'#include "{info["header"]}"', ""] + libs
     ns = [f"namespace Imagine_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
     return "\n".join(head + ns + out + [""] + functions) + "\n", Program(names.commands) if program else None
