@@ -52,3 +52,4 @@ to steer toward, given goal (a place) and running (yes or no):
   set distance left to larger of 0 and (size of gap) minus stop distance
   set braking speed to square root of 2 times acceleration times distance left
   move walk speed toward smaller of cruise and braking speed by at most acceleration times frame time
+and the universe said i love you

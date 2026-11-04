@@ -272,6 +272,14 @@ def load_words(name, line):
     return names, info
 
 
+CLOSING = "and the universe said i love you"
+
+
+def is_closing(line):
+    """The optional line that marks where a command ends (indentation already ends it)."""
+    return line.strip().lower().rstrip(".") == CLOSING
+
+
 def translate(path):
     """Returns the C++ text for one .any file, or raises ScriptError."""
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -318,7 +326,11 @@ def translate(path):
                 body.append((i + 1, lines[i]))
                 i += 1
             functions.append(function(text, n, body, names, info))
+            if i < len(lines) and is_closing(lines[i]):
+                i += 1
             continue
+        if is_closing(text):
+            raise ScriptError(n, f"'{CLOSING}' closes a command, so it goes right after the command's last indented line.")
         raise ScriptError(n, f"I don't know what to do with '{text}'. Top-level lines are notes, 'settings:' or 'to ...:'.")
     if names is None:
         raise ScriptError(1, "The script is empty.")
