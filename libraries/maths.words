@@ -14,7 +14,7 @@ to tangent of, given angle (a number), giving back a number = std::tan({angle} *
   runs: math.tan({angle} * 3.14159265358979323846 / 180.0)
 
 to round, given x (a number), giving back a number = std::round({x})
-  runs: float(math.floor(abs({x}) + 0.5) * (1 if {x} >= 0 else -1))
+  runs: (lambda a: math.copysign(math.floor(abs(a)) + (abs(a) - math.floor(abs(a)) >= 0.5), a))({x})
 to round down, given x (a number), giving back a number = std::floor({x})
   runs: float(math.floor({x}))
 to round up, given x (a number), giving back a number = std::ceil({x})

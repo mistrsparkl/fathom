@@ -11,7 +11,7 @@ imagine hello.imagine
 ## 1. Saying something
 
 ```imagination
-to start:
+genesis:
   say "Hello!"
 and the universe said i love you
 ```
@@ -20,14 +20,14 @@ and the universe said i love you
 Hello!
 ```
 
-A program is made of **commands**. `to start:` is the command every program begins with. The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
+A program is made of **commands**. `genesis:` is where every program begins (`to start:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
 
 `say` shows something on the screen. Text goes between quote marks.
 
 ## 2. Remembering things
 
 ```imagination
-to start:
+genesis:
   set name to "Sam"
   set age to 11
   say "This is ", name, "."
@@ -45,7 +45,7 @@ Next year Sam will be 12.
 ## 3. Choosing
 
 ```imagination
-to start:
+genesis:
   set temperature to 31
   if temperature is more than 30:
     say "It's hot."
@@ -65,7 +65,7 @@ It's hot.
 ## 4. Doing things again
 
 ```imagination
-to start:
+genesis:
   repeat 3 times:
     say "Hip hip hooray!"
   for each n from 1 to 5:
@@ -89,7 +89,7 @@ Hip hip hooray!
 ## 5. Lists
 
 ```imagination
-to start:
+genesis:
   set shopping to a list of ("milk", "eggs")
   add "bread" to shopping
   say "I need ", size of shopping, " things: ", shopping
@@ -114,7 +114,7 @@ A list keeps several values in order. Items are counted from 1.
 ## 6. Your own commands
 
 ```imagination
-to start:
+genesis:
   greet with "Sam"
   greet with "Ann"
   say "Double 21 is ", double 21
@@ -145,7 +145,7 @@ a pet has:
   age (a number)
 and the universe said i love you
 
-to start:
+genesis:
   set rex to a new pet
   set name of rex to "Rex"
   set age of rex to 3
@@ -166,7 +166,7 @@ Rex is 3 years old.
 Programs can ask the person using them a question:
 
 ```
-to start:
+genesis:
   ask "What's your name? " into name
   ask "How old are you? " into age (a number)
   say "Hi ", name, "! In ten years you'll be ", age plus 10, "."
@@ -186,7 +186,7 @@ guess.imagine line 4: I don't know 'scroe'. Did you mean 'score'?
 A problem while it runs stops it with the line where it happened. To carry on instead, use `try:`:
 
 ```imagination
-to start:
+genesis:
   try:
     say contents of file "missing.txt"
   if that went wrong:
@@ -202,24 +202,26 @@ Still going.
 
 ## 10. A game
 
-Libraries give a program more words. `use: window` gives it a window to draw in. This is a whole game: a ball you move with the arrow keys.
+Programs can open a window and draw in it. This is a whole game: a ball you move with the arrow keys.
 
 ```
-use: window
-
-to start:
+genesis:
   open a window with "Ball", 600, 400
-  set where to a flat place at (300, 200)
+  set birth to (300, 200)
   while the window is open:
-    if key held "left": set x of where to x of where minus 5
-    if key held "right": set x of where to x of where plus 5
-    if key held "up": set y of where to y of where minus 5
-    if key held "down": set y of where to y of where plus 5
-    clear the window with "black"
-    draw a circle with x of where, y of where, 20, "orange"
+    if key held "left": set birth of x to birth of x minus 5
+    if key held "right": set birth of x to birth of x plus 5
+    if key held "up": set birth of y to birth of y minus 5
+    if key held "down": set birth of y to birth of y plus 5
+    consume the window with "black"
+    draw a circle with birth of x, birth of y, 20, "orange"
     show the frame
 and the universe said i love you
 ```
+
+`(300, 200)` is a place on the screen: 300 across, 200 down. `birth of x` is its across part and `birth of y` its down part. `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+
+The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
 
 `examples/dodge.imagine` is a bigger game: dodge the falling balls.
 

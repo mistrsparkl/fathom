@@ -1,0 +1,14 @@
+use: window
+
+to start:
+  open a window with "Ball", 600, 400
+  set where to a flat place at (300, 200)
+  while the window is open:
+    if key held "left": set x of where to x of where minus 5
+    if key held "right": set x of where to x of where plus 5
+    if key held "up": set y of where to y of where minus 5
+    if key held "down": set y of where to y of where plus 5
+    clear the window with "black"
+    draw a circle with x of where, y of where, 20, "orange"
+    show the frame
+and the universe said i love you

@@ -65,7 +65,7 @@ def program_checks():
     assert 'name = imagine::ask_text(std::string("Name? "));' in cpp, cpp
     assert "Greet(name, 2.0);" in cpp, cpp
     assert "int main()" in cpp, cpp
-    assert perr("to begin:\n  stop\n" + END)[1].startswith("A program needs a 'to start:' command")
+    pass
     assert perr("to start:\n  greet with 1\n" + END)[1].startswith("I don't know how to start a line with 'greet'")
     assert perr("to start:\n  hi with 1\n" + END + "to hi, given who (text):\n  stop\n" + END) == (2, "Input 1 of 'hi' must be text, not a number.")
     assert perr("to start:\n  hi\n" + END + "to hi, given who (text):\n  stop\n" + END) == (2, "'hi' needs 1 input, but this gives it 0.")
@@ -190,11 +190,12 @@ def program_checks():
     assert out.stderr == "Line 49: I can't save infinity or not a number.\n", repr(out.stderr)
     assert perr("to start:\n  set x to 1\n  load 5 from file \"a\"\n" + END)[1] == "'5' can't be changed, so I can't load into it."
 
-    # Forgetting 'use:' says which library a word comes from.
-    assert perr("to start:\n  open a window with \"x\", 10, 10\n" + END)[1] == (
-        "I don't know how to start a line with 'open'. 'open a window' is a word from the window library: "
-        "put the line 'use: window' at the top of the script.")
-    assert perr("to start:\n  say sine of 30\n" + END)[1].endswith("put the line 'use: maths' at the top of the script.")
+    # genesis:, libraries without 'use:', (x, y) places, 'birth of x' as well as 'x of birth'.
+    out = both('genesis:\n  set birth to (300, 200)\n  set birth of x to birth of x minus 5\n  set y of birth to 7\n'
+               '  set high to (1, 2, 3)\n  say birth, " ", high of z plus x of high, " ", round (sine of 30) times 10, " ", (2 plus 3)\n' + END)
+    assert out.stdout == "(295, 7) 4 0 5\n", repr(out.stdout)
+    assert perr("genesis:\n  say (1, 2, 3, 4)\n" + END)[1] == "A place has 2 numbers, like (300, 200), or 3, like (1, 2, 3)."
+    assert perr("to begin:\n  stop\n" + END)[1].startswith("A program needs a 'genesis:' (or 'to start:') command")
 
     # Lists of lists and tables of lists: the inner ones are shown in brackets.
     out = both('to start:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'

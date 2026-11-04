@@ -762,6 +762,13 @@ class Expr:
             a = v.run
             return Value(f"(-{v.cpp})", v.kind, lambda env: -a(env))
         v = self.primary()
+        while self.at("of"):  # 'birth of x': a part named after the thing
+            key = next((tuple(self.t[self.i + 1:self.i + 1 + n]) for n in range(min(6, len(self.t) - self.i - 1), 0, -1)
+                        if v.kind in FIELDS.get(tuple(self.t[self.i + 1:self.i + 1 + n]), {})), None)
+            if not key:
+                break
+            self.i += 1 + len(key)
+            v = part_of(v, key)
         if self.at("as", "a", "number") or self.at("as", "number"):
             self.i += 3 if self.at("as", "a") else 2
             if v.kind != TEXT:
@@ -831,6 +838,18 @@ class Expr:
         if tok == "(":
             self.i += 1
             v = self.full()
+            if self.at(","):  # (300, 200) or (1, 2, 3): a place
+                parts = [self.need(v, NUMBER, "a place")]
+                while self.at(","):
+                    self.i += 1
+                    parts.append(self.need(self.full(), NUMBER, "a place"))
+                self.take(")")
+                if len(parts) not in (2, 3):
+                    raise ScriptError(line, "A place has 2 numbers, like (300, 200), or 3, like (1, 2, 3).")
+                runs = [x.run for x in parts]
+                cpp = "FVector" if len(parts) == 3 else "FVector2D"
+                return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
+                             lambda env: Place(*[f(env) for f in runs]))
             self.take(")")
             return v
         for n in range(min(6, len(self.t) - self.i), 0, -1):
@@ -840,12 +859,7 @@ class Expr:
                 owner = self.unary()
                 if owner.kind not in FIELDS[key]:
                     raise ScriptError(line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
-                member, kind = FIELDS[key][owner.kind]
-                get = owner.run
-
-                def put(env, x, get=get, member=member):
-                    get(env).fields[member] = dup(x)
-                return Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+                return part_of(owner, key)
         if tok == "item" and self.peek(1) not in ITEM_NOT_INDEX:
             self.i += 1
             index = self.need(self.sum(), NUMBER, "item")
@@ -1193,6 +1207,16 @@ LIBRARY_HELP = """A library is <name>.words, next to the script or in Imaginatio
     runs: time.sleep({seconds})       (indented under a word) what it does when the program runs directly"""
 
 
+def part_of(owner, key):
+    """One part of a thing or place, like 'x of birth' or 'birth of x'."""
+    member, kind = FIELDS[key][owner.kind]
+    get = owner.run
+
+    def put(env, x):
+        get(env).fields[member] = dup(x)
+    return Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+
+
 def library_hint(tokens):
     """If the words at the start of tokens belong to a library the script doesn't use, says which one."""
     best = None  # the longest matching word wins: 'open a window' over 'open'
@@ -1363,7 +1387,21 @@ def gather(path, from_line=None, seen=None):
 
 
 def read_script(path):
-    """Reads one .imagine file. Returns (C++ text, Program or None), or raises ScriptError."""
+    """Reads one .imagine file. Returns (C++ text, Program or None), or raises ScriptError.
+
+    A program that uses a library's words without 'use:' gets that library by itself."""
+    auto = []
+    while True:
+        try:
+            return read_one(path, auto)
+        except ScriptError as err:
+            m = re.search(r"put the line 'use: (\w+)' at the top", err.message)
+            if not m or m.group(1) in auto or len(auto) > 20:
+                raise
+            auto.append(m.group(1))
+
+
+def read_one(path, auto):
     global THINGS
     FILES.clear()
     lines, numbers = gather(path)
@@ -1377,6 +1415,9 @@ def read_script(path):
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
         names, info = Names(), None  # a program of its own
+        for lib in auto:
+            used.add(lib)
+            libs += load_library(lib, 1, names)
     i = 0
     while i < len(lines):
         raw = lines[i]
@@ -1413,6 +1454,8 @@ def read_script(path):
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
                 settings.append(f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
             continue
+        if text_.lower() == "genesis:":
+            text_ = "to start:"
         if text_.startswith("to ") and text_.endswith(":"):
             body = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
@@ -1427,6 +1470,8 @@ def read_script(path):
             continue
         if text_.lower().startswith("use:"):  # a library ('use: x.imagine' lines were already replaced by gather)
             lib = " ".join(text_[4:].split()).lower()
+            if lib in auto:
+                continue
             if lib in used:
                 raise ScriptError(n, f"The library '{lib}' is already used above.")
             used.add(lib)
@@ -1465,7 +1510,7 @@ def read_script(path):
         names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
     if program:
         if ("start",) not in names.commands:
-            raise ScriptError(main_lines or 1, "A program needs a 'to start:' command: that is where it begins.")
+            raise ScriptError(main_lines or 1, "A program needs a 'genesis:' (or 'to start:') command: that is where it begins.")
         if names.commands[("start",)].kinds or names.commands[("start",)].gives:
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
                               "'to start:' has no inputs and gives nothing back.")

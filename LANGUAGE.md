@@ -2,7 +2,7 @@
 
 Imagination is a programming language written in plain English words. Scripts end in `.imagine`. There are two sorts of script:
 
-- **A program** stands on its own and begins at its `to start:` command. Run it with:
+- **A program** stands on its own and begins at its `genesis:` command (`to start:` means the same). Run it with:
 
   ```
   imagine examples/guess.imagine
@@ -109,8 +109,8 @@ and the universe said i love you
 |---|---|
 | a number | `60`, `2.5`, `walk speed`, `30 degrees` |
 | yes or no | `yes`, `no`, `fallen`, `speed is more than 10` |
-| a place | `a place at (1, 2, 3)`, `centre of mass`, `goal` (a point in space: x, y and z) |
-| a flat place | `a flat place at (1, 2)`, `flat (goal minus centre of mass)` (x and y only) |
+| a place | `(1, 2, 3)`, `a place at (1, 2, 3)`, `centre of mass`, `goal` (a point in space: x, y and z) |
+| a flat place | `(300, 200)`, `a flat place at (1, 2)`, `flat (goal minus centre of mass)` (x and y only) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
 | a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
 | a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. |
@@ -187,7 +187,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `keys of ages` | a table's names, as a list of text in alphabetical order |
 | `ages contains "Rex"`, `size of ages` | yes or no: does the table have that name / how many names it has |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
-| `x of p`, `y of p`, `z of p` | one part of a place (`set x of p to 5` changes it) |
+| `x of p`, `y of p`, `z of p` (or `p of x`, ...) | one part of a place (`set p of x to 5` changes it) |
 | `p plus q`, `p minus q`, `p times 2`, `p divided by 2`, `-p` | places added, taken away, made bigger or smaller |
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
@@ -219,7 +219,7 @@ The other script is looked for next to this one. It can have its own `to start:`
 
 ## Libraries
 
-A library gives a program more words. Put `use: <library>` near the top of the program:
+A library gives a program more words. A library loads by itself as soon as the program uses one of its words; `use: <library>` near the top says so out loud:
 
 ```
 use: time
@@ -271,6 +271,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `show the frame` | Show what was drawn, then wait so the window shows 60 frames a second. |
 | `the window is open` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
+| `consume the window with "black"` | The same as `clear the window with`. |
 | `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
 | `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
 | `close the window` | Close it yourself. |
