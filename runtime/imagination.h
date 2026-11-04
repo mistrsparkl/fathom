@@ -86,8 +86,8 @@ namespace imagine
 
 	inline std::string text(const std::string& s) { return s; }
 	inline std::string text(double d);
-	inline std::string text(const FVector& v) { return "(" + text(v.X) + ", " + text(v.Y) + ", " + text(v.Z) + ")"; }
-	inline std::string text(const FVector2D& v) { return "(" + text(v.X) + ", " + text(v.Y) + ")"; }
+	inline std::string text(const FVector& v) { return text(v.X) + " horizontal " + text(v.Y) + " vertical " + text(v.Z) + " depth"; }
+	inline std::string text(const FVector2D& v) { return text(v.X) + " horizontal " + text(v.Y) + " vertical"; }
 	inline std::string text(bool b) { return b ? "yes" : "no"; }
 	inline std::string text(double d)
 	{

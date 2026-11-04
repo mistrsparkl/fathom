@@ -1,7 +1,7 @@
 note: Guess the number. The computer picks a number from 1 to 100 and you try to guess it.
 note: Run it with: py -3 imagination.py run examples/guess.imagine
 
-to start:
+genesis:
   scrawl "I'm thinking of a number from 1 to 100."
   set secret to random number from 1 to 100
   set tries to 0

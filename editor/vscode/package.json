@@ -2,7 +2,7 @@
   "name": "imagination",
   "displayName": "Imagination",
   "description": "Colours, indenting and shortcuts for the Imagination language (.imagine files).",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "speda",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Programming Languages", "Snippets"],

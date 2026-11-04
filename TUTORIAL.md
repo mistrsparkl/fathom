@@ -20,7 +20,7 @@ and the universe said i love you
 Hello!
 ```
 
-A program is made of **commands**. `genesis:` is where every program begins (`to start:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
+A program is made of **commands**. `genesis:` is where every program begins (`genesis:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
 
 `scrawl` shows something on the screen. Text goes between quote marks.
 
@@ -207,21 +207,21 @@ Programs can open a window and draw in it. This is a whole game: a ball you move
 ```
 genesis:
   open a window with "Ball", 600, 400
-  set birth to (300, 200)
+  set birth to 300 horizontal 200 vertical
   while the window is open:
-    if key held "left": set existence of x to existence of x minus 5
-    if key held "right": set existence of x to existence of x plus 5
-    if key held "up": set existence of y to existence of y minus 5
-    if key held "down": set existence of y to existence of y plus 5
+    if key held "left": set existence of horizontal to existence of horizontal minus 5
+    if key held "right": set existence of horizontal to existence of horizontal plus 5
+    if key held "up": set existence of vertical to existence of vertical minus 5
+    if key held "down": set existence of vertical to existence of vertical plus 5
     if key pressed "space": set existence to birth
     consume the window with "black"
-    draw a circle with birth of x, birth of y, 4, "white"
-    draw a circle with existence of x, existence of y, 20, "orange"
+    draw a circle with birth of horizontal, birth of vertical, 4, "white"
+    draw a circle with existence of horizontal, existence of vertical, 20, "orange"
     show the frame
 and the universe said i love you
 ```
 
-`(300, 200)` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of x` is its across part and `existence of y` its down part. Space sends it back to its birth (a small white dot). `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
 
 Setting `birth` also makes `existence` start at the same place.
 

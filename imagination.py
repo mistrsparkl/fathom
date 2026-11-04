@@ -58,7 +58,7 @@ BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place":
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -67,13 +67,13 @@ UNITS = set("degrees degree cm centimetres seconds second per squared percent me
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
+# The parts of a place, written after it: 'existence of horizontal'.
+PLACE_PARTS = {("horizontal",): "X", ("vertical",): "Y", ("depth",): "Z"}
+
+
 def reset_fields():
-    """Forget the last script's kinds of things; places always have x, y (and z) parts."""
+    """Forget the last script's kinds of things."""
     FIELDS.clear()
-    for letter_ in "xyz":
-        FIELDS[(letter_,)] = {PLACE: (letter_.upper(), NUMBER)}
-        if letter_ != "z":
-            FIELDS[(letter_,)][FLAT] = (letter_.upper(), NUMBER)
 
 
 def is_list(kind):
@@ -254,7 +254,7 @@ def text(v):
     if isinstance(v, dict):
         return ", ".join(f"{k}: {part_text(v[k])}" for k in sorted(v)) if v else "(nothing)"
     if isinstance(v, Place):
-        return "(" + ", ".join(text(x) for x in v.parts()) + ")"
+        return " ".join(f"{text(x)} {w}" for x, w in zip(v.parts(), ("horizontal", "vertical", "depth")))
     if isinstance(v, Thing):
         return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
     raise RunError(0, "this can't be shown as text when running directly.")
@@ -764,17 +764,38 @@ class Expr:
         return v
 
     def unary(self):
+        v = self.single()
+        if v.kind != NUMBER or not self.at("horizontal"):
+            return v
+        self.i += 1  # 300 horizontal 200 vertical (5 depth): a place
+        parts = [v, self.need(self.single(), NUMBER, "a place")]
+        self.take("vertical")
+        start = self.i
+        if self.peek() not in (None, ",", ")") and self.peek() not in ITEM_NOT_INDEX:
+            third = self.single()
+            if third.kind == NUMBER and self.at("depth"):
+                self.i += 1
+                parts.append(third)
+            else:
+                self.i = start
+        runs = [x.run for x in parts]
+        cpp = "FVector" if len(parts) == 3 else "FVector2D"
+        return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
+                     lambda env: Place(*[f(env) for f in runs]))
+
+    def single(self):
         if self.peek() in ("-", "minus"):
             self.i += 1
-            v = self.unary()
+            v = self.single()
             if v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
             a = v.run
             return Value(f"(-{v.cpp})", v.kind, lambda env: -a(env))
         v = self.primary()
-        while self.at("of"):  # 'birth of x': a part named after the thing
+        while self.at("of"):  # 'existence of horizontal': a part named after the place or thing
             key = next((tuple(self.t[self.i + 1:self.i + 1 + n]) for n in range(min(6, len(self.t) - self.i - 1), 0, -1)
-                        if v.kind in FIELDS.get(tuple(self.t[self.i + 1:self.i + 1 + n]), {})), None)
+                        if v.kind in FIELDS.get(tuple(self.t[self.i + 1:self.i + 1 + n]), {})
+                        or place_part(v.kind, tuple(self.t[self.i + 1:self.i + 1 + n]))), None)
             if not key:
                 break
             self.i += 1 + len(key)
@@ -848,24 +869,15 @@ class Expr:
         if tok == "(":
             self.i += 1
             v = self.full()
-            if self.at(","):  # (300, 200) or (1, 2, 3): a place
-                parts = [self.need(v, NUMBER, "a place")]
-                while self.at(","):
-                    self.i += 1
-                    parts.append(self.need(self.full(), NUMBER, "a place"))
-                self.take(")")
-                if len(parts) not in (2, 3):
-                    raise ScriptError(line, "A place has 2 numbers, like (300, 200), or 3, like (1, 2, 3).")
-                runs = [x.run for x in parts]
-                cpp = "FVector" if len(parts) == 3 else "FVector2D"
-                return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
-                             lambda env: Place(*[f(env) for f in runs]))
+            if self.at(","):
+                raise ScriptError(line, "A place is written like 300 horizontal 200 vertical (and 5 depth, for a place with depth).")
             self.take(")")
             return v
         for n in range(min(6, len(self.t) - self.i), 0, -1):
             key = tuple(self.t[self.i:self.i + n])
             if key in FIELDS and self.peek(n) == "of" and not (
-                    key in self.names.known and self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})):
+                    key in self.names.known and (self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})
+                                                 or place_part(self.names.known[key][1], (self.peek(n + 1),)))):
                 # 'existence of x' is x of the name existence, when there is one, not the existence of x
                 self.i += n + 1
                 owner = self.unary()
@@ -1129,22 +1141,6 @@ class Expr:
                         return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
-        for lead, kind in ((("a", "place", "at"), PLACE), (("a", "flat", "place", "at"), FLAT)):
-            if self.at(*lead):
-                self.i += len(lead)
-                self.take("(")
-                parts = [self.need(self.full(), NUMBER, "a place at")]
-                while self.at(","):
-                    self.i += 1
-                    parts.append(self.need(self.full(), NUMBER, "a place at"))
-                self.take(")")
-                need = 3 if kind == PLACE else 2
-                if len(parts) != need:
-                    raise ScriptError(self.line, f"{kind_name(kind).capitalize()} has {need} numbers, like {'a place at (1, 2, 3)' if need == 3 else 'a flat place at (1, 2)'}.")
-                runs = [x.run for x in parts]
-                cpp = "FVector" if kind == PLACE else "FVector2D"
-                return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", kind,
-                             lambda env: Place(*[f(env) for f in runs]))
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
             if self.at(*lead):
                 self.i += len(lead)
@@ -1219,9 +1215,14 @@ LIBRARY_HELP = """A library is <name>.words, next to the script or in Imaginatio
     runs: time.sleep({seconds})       (indented under a word) what it does when the program runs directly"""
 
 
+def place_part(kind, key):
+    """True if a place of this kind has this part ('depth' only for places with depth)."""
+    return kind in (PLACE, FLAT) and key in PLACE_PARTS and not (kind == FLAT and key == ("depth",))
+
+
 def part_of(owner, key):
-    """One part of a thing or place, like 'x of birth' or 'birth of x'."""
-    member, kind = FIELDS[key][owner.kind]
+    """One part of a thing ('name of rex') or of a place ('existence of horizontal')."""
+    member, kind = (PLACE_PARTS[key], NUMBER) if place_part(owner.kind, key) else FIELDS[key][owner.kind]
     get = owner.run
 
     def put(env, x):
@@ -1473,6 +1474,8 @@ def read_one(path, auto):
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
                 settings.append(f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
             continue
+        if text_.lower() == "to start:":
+            raise ScriptError(n, "'to start:' is now 'genesis:'.")
         if text_.lower() == "genesis:":
             text_ = "to start:"
         if text_.startswith("to ") and text_.endswith(":"):
@@ -1529,10 +1532,10 @@ def read_one(path, auto):
         names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
     if program:
         if ("start",) not in names.commands:
-            raise ScriptError(main_lines or 1, "A program needs a 'genesis:' (or 'to start:') command: that is where it begins.")
+            raise ScriptError(main_lines or 1, "A program needs a 'genesis:' command: that is where it begins.")
         if names.commands[("start",)].kinds or names.commands[("start",)].gives:
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
-                              "'to start:' has no inputs and gives nothing back.")
+                              "'genesis:' has no inputs and gives nothing back.")
     functions = [function(head, n, body, names, info) for head, (_, n, body) in zip(heads, commands)]
     if program:
         protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"

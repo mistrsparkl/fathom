@@ -2,7 +2,7 @@
 
 Imagination is a programming language written in plain English words. Scripts end in `.imagine`. There are two sorts of script:
 
-- **A program** stands on its own and begins at its `genesis:` command (`to start:` means the same). Run it with:
+- **A program** stands on its own and begins at its `genesis:` command. Run it with:
 
   ```
   imagine examples/guess.imagine
@@ -37,7 +37,7 @@ Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.ima
 ## A program, top to bottom
 
 ```
-to start:
+genesis:
   ask "What's your name? " into name
   greet with name
 and the universe said i love you
@@ -109,13 +109,13 @@ and the universe said i love you
 |---|---|
 | a number | `60`, `2.5`, `walk speed`, `30 degrees` |
 | yes or no | `yes`, `no`, `fallen`, `speed is more than 10` |
-| a place | `(1, 2, 3)`, `a place at (1, 2, 3)`, `centre of mass`, `goal` (a point in space: x, y and z) |
-| a flat place | `(300, 200)`, `a flat place at (1, 2)`, `flat (goal minus centre of mass)` (x and y only) |
+| a place | `1 horizontal 2 vertical 3 depth`, `centre of mass`, `goal` (a point in space: across, down and deep) |
+| a flat place | `300 horizontal 200 vertical`, `flat (goal minus centre of mass)` (across and down only) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
 | a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
 | a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. |
 
-**birth and existence.** `set birth to (300, 200)` says where something starts, and puts `existence` (where it is now) at the same place. Move `existence`, and `set existence to birth` sends it back.
+**birth and existence.** `set birth to 300 horizontal 200 vertical` says where something starts, and puts `existence` (where it is now) at the same place. Move `existence`, and `set existence to birth` sends it back.
 
 Your own kinds of things can have them too. Give the kind a `birth` part and it gets an `existence` part by itself:
 
@@ -126,7 +126,7 @@ a ball has:
 and the universe said i love you
 ```
 
-`set birth of ball to (100, 50)` puts the ball's existence there too. Then move `existence of ball`, and `x of existence of ball` is how far across it is.
+`set birth of ball to 100 horizontal 50 vertical` puts the ball's existence there too. Then move `existence of ball`, and `(existence of ball) of horizontal` is how far across it is.
 
 Lists and tables can hold other lists and tables: `a list of lists of numbers` is a grid, and `item 2 of item 3 of grid` reaches inside it. When shown, the inner ones are in brackets: `(1, 2), (3, 4)`.
 | your own kind | `a new pet` (see above) |
@@ -173,7 +173,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `smaller of a and b`, `larger of a and b` | the smaller or larger number |
 | `clamp x between low and high` | x, kept inside the range |
 | `square root of x` | the square root |
-| `size of x` | a number without its sign, the distance of a place from (0, 0, 0), the length of a (flat) place, or how many letters text has |
+| `size of x` | a number without its sign, the distance of a place from 0 horizontal 0 vertical 0 depth, the length of a (flat) place, or how many letters text has |
 | `random number from 1 to 100` | a random whole number, both ends included |
 | `item 2 of scores` | one item of a list (counted from 1) |
 | `a random item of scores` | one item of a list, picked at random |
@@ -200,7 +200,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `keys of ages` | a table's names, as a list of text in alphabetical order |
 | `ages contains "Rex"`, `size of ages` | yes or no: does the table have that name / how many names it has |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
-| `x of p`, `y of p`, `z of p` (or `p of x`, ...) | one part of a place (`set p of x to 5` changes it) |
+| `p of horizontal`, `p of vertical`, `p of depth` | one part of a place: across, down (on a screen, down is more), deep. `set p of horizontal to 5` changes it. |
 | `p plus q`, `p minus q`, `p times 2`, `p divided by 2`, `-p` | places added, taken away, made bigger or smaller |
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
@@ -229,7 +229,7 @@ A program can use another script's commands and kinds of things:
 use: shapes.imagine
 ```
 
-The other script is looked for next to this one. It can have its own `to start:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.imagine line 13: ...`.
+The other script is looked for next to this one. It can have its own `genesis:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.imagine line 13: ...`.
 
 ## Libraries
 
@@ -239,7 +239,7 @@ A library gives a program more words. A library loads by itself as soon as the p
 use: time
 use: maths
 
-to start:
+genesis:
   wait 2 seconds
   scrawl "Sine of 30 is ", sine of 30
 and the universe said i love you
@@ -259,12 +259,12 @@ and the universe said i love you
 ```
 use: window
 
-to start:
+genesis:
   open a window with "My game", 800, 600
   set x to 400
   while the window is open:
     if key held "right": set x to x plus 5
-    clear the window with "black"
+    consume the window with "black"
     draw a circle with x, 300, 20, "orange"
     show the frame
 and the universe said i love you
@@ -275,7 +275,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | Words | Means |
 |---|---|
 | `open a window with "Title", 800, 600` | Open a window this wide and high. |
-| `clear the window with "black"` | Fill the whole window with one colour. |
+| `consume the window with "black"` | Fill the whole window with one colour. |
 | `draw a box with x, y, width, height, "red"` | A filled box, from its top left corner. |
 | `draw a circle with x, y, radius, "blue"` | A filled circle around a middle point. |
 | `draw a line with x, y, to x, to y, "white"` | A line from one place to another. |
@@ -285,7 +285,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `show the frame` | Show what was drawn, then wait so the window shows 60 frames a second. |
 | `the window is open` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
-| `consume the window with "black"` | The same as `clear the window with`. |
+| `consume the window with "black"` | The same as `consume the window with`. |
 | `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
 | `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
 | `close the window` | Close it yourself. |

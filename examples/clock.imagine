@@ -4,7 +4,7 @@ note: Run it with: imagine examples/clock.imagine
 use: time
 use: maths
 
-to start:
+genesis:
   scrawl "Hello, it is ", hour now, ":", two digits with minute now, "."
   for each n from 1 to 3:
     scrawl 4 minus n, "..."

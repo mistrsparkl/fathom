@@ -24,7 +24,7 @@
     "body": [
       "genesis:",
       "  open a window with \"${1:My Game}\", 600, 400",
-      "  set birth to (300, 200)",
+      "  set birth to 300 horizontal 200 vertical",
       "  while the window is open:",
       "    consume the window with \"black\"",
       "    $0",

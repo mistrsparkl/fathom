@@ -7,7 +7,7 @@ a pet has:
   tricks (a list of text)
 and the universe said i love you
 
-to start:
+genesis:
   set shelter to a list of pets
   add pet called with ("Rex", 3) to shelter
   add pet called with ("Mittens", 12) to shelter
