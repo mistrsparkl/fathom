@@ -2883,7 +2883,7 @@ TRY_HELLO = """Imagination: type a line and press Enter to see what it does. For
   set name to "Sam"
   scrawl "Hello, " plus name
   5 plus 3 times 2
-A line ending in ':' (like 'repeat 3 times:') takes the indented lines after it; finish them with an empty line.
+A line ending in ':' (like 'echo 3 times:') takes the indented lines after it; finish them with an empty line.
 'use: maths' brings in a library. Type 'bye' to finish."""
 
 
@@ -2924,16 +2924,26 @@ def try_it(read=input, show=print):
                 load_library(" ".join(line.strip()[4:].split()).lower(), n, names)
                 show(f"(the words of '{line.strip()[4:].strip()}' can be used now)")
                 continue
-            v = None
-            if len(rows) == 1:
-                try:  # a value on its own (like '5 plus 3' or 'round 2.6') is shown
-                    v = expr_to_end(tokenize(line.strip(), n), 0, names, n)
-                except ScriptError:
+            for _ in range(20):  # a library's word loads its library, as in a script
+                try:
                     v = None
-            if v is not None:
-                run = lambda env, get=v.run: show(text(get(env)))
-            else:
-                _, run = statements(rows, names, declared, 1)
+                    if len(rows) == 1:
+                        try:  # a value on its own (like '5 plus 3' or 'round 2.6') is shown
+                            v = expr_to_end(tokenize(surface(line.strip(), n), n), 0, names, n)
+                        except ScriptError as err:
+                            if "put the line 'use: " in err.message:
+                                raise
+                            v = None
+                    if v is not None:
+                        run = lambda env, get=v.run: show(text(get(env)))
+                    else:
+                        _, run = statements(rows, names, declared, 1)
+                    break
+                except ScriptError as err:
+                    m = re.search(r"put the line 'use: (\w+)' at the top", err.message)
+                    if not m:
+                        raise
+                    load_library(m.group(1), n, names)
             for cpp, kind in declared.values():
                 env.setdefault(cpp, py_zero(kind, THINGS))
             run(env)

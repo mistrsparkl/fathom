@@ -576,7 +576,7 @@ def main():
     assert "//   double HalfOf(double x);" in called, called
     # Try-it mode: each typed line is done straight away; names are kept; blocks end with an empty line.
     typed = iter(['set name to "Sam"', 'scrawl "Hi " plus name', "5 plus 3 times 2", "echo 2 times:", "scrawl name", "",
-                  "scrawl nme", "scrawl item 3 of a list of (1)", "use: maths", "round 2.6", "break free", "bye"])
+                  "scrawl nme", "scrawl item 3 of a list of (1)", "use: maths", "round 2.6", "break free", "5 exceeds 3", "scrawl size of today", "bye"])
     import contextlib
     import io
     screen = io.StringIO()
@@ -586,7 +586,7 @@ def main():
     assert shown == ["Hi Sam", "11", "Sam", "Sam", "I don't know 'nme'. Did you mean 'name'?",
                          "There is no item 3 in a list of 1 item. Items are counted from 1.",
                          "(the words of 'maths' can be used now)", "3",
-                         "'break free' only works inside 'echo', 'as long as' or 'for each'."], shown
+                         "'break free' only works inside 'echo', 'as long as' or 'for each'.", "yes", "10"], shown
     translate.THINGS = {}
     tutorial_checks()
     program_checks()
