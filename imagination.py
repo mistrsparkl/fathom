@@ -189,8 +189,8 @@ def text(v):
     if isinstance(v, bool):
         return "yes" if v else "no"
     if isinstance(v, (int, float)):
-        if math.isfinite(v) and math.floor(v) == v and abs(v) < 1e15:
-            return str(int(v))
+        if math.isfinite(v) and math.floor(v) == v and abs(v) < 1e21:
+            return "%.0f" % v if v else "0"
         return "%.15g" % v
     if isinstance(v, str):
         return v

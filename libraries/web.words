@@ -1,0 +1,47 @@
+note: Words for the internet. Use them in a program with:  use: web
+
+code:
+  #define NOMINMAX
+include: <windows.h>
+include: <urlmon.h>
+include: <wininet.h>
+link: urlmon
+link: wininet
+
+code:
+  namespace imagine_web
+  {
+  	inline std::string get(const std::string& address, int line)
+  	{
+  		wchar_t folder[MAX_PATH], file[MAX_PATH];
+  		GetTempPathW(MAX_PATH, folder);
+  		GetTempFileNameW(folder, L"img", 0, file);
+  		std::wstring w(MultiByteToWideChar(CP_UTF8, 0, address.c_str(), (int)address.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, address.c_str(), (int)address.size(), w.data(), (int)w.size());
+  		DeleteUrlCacheEntryW(w.c_str());
+  		if (URLDownloadToFileW(nullptr, w.c_str(), file, 0, nullptr) != S_OK)
+  		{
+  			DeleteFileW(file);
+  			imagine::fail(line, "I couldn't get the web page \"" + address + "\".");
+  		}
+  		std::ifstream in(file, std::ios::binary);
+  		std::ostringstream all;
+  		all << in.rdbuf();
+  		in.close();
+  		DeleteFileW(file);
+  		return all.str();
+  	}
+  }
+
+python:
+  import urllib.request
+  def get(address):
+      try:
+          request = urllib.request.Request(address, headers={"User-Agent": "Imagination"})
+          with urllib.request.urlopen(request, timeout=30) as reply:
+              return reply.read().decode("utf-8", errors="replace")
+      except Exception:
+          raise RunError(0, f'I couldn\'t get the web page "{address}".')
+
+to web page, given address (text), giving back text = imagine_web::get({address}, {line})
+  runs: get({address})

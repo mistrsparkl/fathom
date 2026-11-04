@@ -150,6 +150,16 @@ def program_checks():
     assert out.stderr == 'Line 16: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
     assert both('use: window\nto start:\n  show the frame\n' + END).stderr.startswith("Line 3: there is no window yet.")
 
+    # The web library, without needing the internet: a page that can't be reached fails the same both ways.
+    out = both('use: web\nto start:\n  say web page "http://localhost:1/"\n' + END)
+    assert out.stderr == 'Line 3: I couldn\'t get the web page "http://localhost:1/".\n', repr(out.stderr)
+
+    # A command can call itself.
+    out = both('to start:\n  say factorial of 10, " ", factorial of 20\n' + END +
+               'to factorial of, given n (a number), giving back a number:\n  if n is at most 1: give back 1\n'
+               '  give back n times factorial of (n minus 1)\n' + END)
+    assert out.stdout == "3628800 2432902008176640000\n", repr(out.stdout)
+
     # Lists, kinds of things, giving back, files, and a plain error while running.
     if True:
         ran = both('a pet has:\n  name (text)\n  ages (a list of numbers)\n' + END +

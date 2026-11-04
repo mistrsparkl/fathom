@@ -2,6 +2,7 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -48,8 +49,14 @@ namespace imagine
 	inline std::string text(double d)
 	{
 		// Whole numbers show as "5", not "5.0" or "5e+00".
-		if (std::floor(d) == d && std::fabs(d) < 1e15)
-			return std::to_string(static_cast<long long>(d));
+		if (std::floor(d) == d && std::fabs(d) < 1e21)
+		{
+			if (d == 0)
+				return "0";  // not "-0"
+			char digits[32];
+			std::snprintf(digits, sizeof digits, "%.0f", d);
+			return digits;
+		}
 		std::ostringstream out;
 		out.precision(15);
 		out << d;

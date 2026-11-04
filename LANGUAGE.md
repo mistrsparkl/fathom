@@ -214,6 +214,7 @@ and the universe said i love you
 | `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `power of (2, 10)`, `remainder of (17, 5)` |
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
 | `window` | A window to draw in, for games and pictures. See below. |
+| `web` | `web page "https://example.com"` (gives back the page as text) |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
 
 ### The window library
