@@ -179,6 +179,8 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `join names with ", "` | a list made into one text, with ", " between the items |
 | `sorted scores`, `reversed scores` | a copy of a list, smallest first / back to front |
 | `last item of scores` | the last item of a list |
+| `sum of scores`, `average of scores`, `biggest of scores`, `smallest of scores` | worked out from a list of numbers |
+| `sorted pets by age` | a copy of a list of things, smallest part first (things with the same part keep their order) |
 | `entry "Rex" of ages` | the value a table keeps under that name |
 | `keys of ages` | a table's names, as a list of text in alphabetical order |
 | `ages contains "Rex"`, `size of ages` | yes or no: does the table have that name / how many names it has |
@@ -195,7 +197,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 

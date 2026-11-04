@@ -399,6 +399,42 @@ namespace imagine
 		return items;
 	}
 
+	template <typename T, typename Part>
+	std::vector<T> sorted_by(std::vector<T> items, Part part)
+	{
+		std::stable_sort(items.begin(), items.end(), [&](const T& a, const T& b) { return part(a) < part(b); });
+		return items;
+	}
+
+	inline double sum_of(const std::vector<double>& items, int)
+	{
+		double total = 0;
+		for (double x : items)
+			total += x;
+		return total;
+	}
+
+	inline double average_of(const std::vector<double>& items, int line)
+	{
+		if (items.empty())
+			fail(line, "the list is empty, so it has no average.");
+		return sum_of(items, line) / static_cast<double>(items.size());
+	}
+
+	inline double biggest_of(const std::vector<double>& items, int line)
+	{
+		if (items.empty())
+			fail(line, "the list is empty, so it has no biggest.");
+		return *std::max_element(items.begin(), items.end());
+	}
+
+	inline double smallest_of(const std::vector<double>& items, int line)
+	{
+		if (items.empty())
+			fail(line, "the list is empty, so it has no smallest.");
+		return *std::min_element(items.begin(), items.end());
+	}
+
 	template <typename T>
 	std::vector<T> reversed(std::vector<T> items)
 	{

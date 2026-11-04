@@ -147,6 +147,19 @@ def program_checks():
     assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
     assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
 
+    # List maths, and sorting things by one of their parts (ties keep their order).
+    out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +
+               'to start:\n  set xs to a list of (4, 1.5, 9, 2)\n  set sum to 1\n'
+               '  say sum of xs, " ", average of xs, " ", biggest of xs, " ", smallest of xs, " ", sum of a list of numbers, " ", sum\n'
+               '  set pets to a list of (pet called with ("Rex", 3), pet called with ("Ann", 9), pet called with ("Bo", 3))\n'
+               '  for each p in sorted pets by age: say name of p\n  say sorted pets by name\n'
+               '  say average of a list of numbers\n' + END +
+               'to pet called, given name (text) and age (a number), giving back a pet:\n  set p to a new pet\n'
+               '  set name of p to name\n  set age of p to age\n  give back p\n' + END)
+    assert out.stdout == ("16.5 4.125 9 1.5 0 1\nRex\nBo\nAnn\n"
+                          "a pet (name: Ann, age: 9), a pet (name: Bo, age: 3), a pet (name: Rex, age: 3)\n"), repr(out.stdout)
+    assert out.stderr == "Line 12: the list is empty, so it has no average.\n", repr(out.stderr)
+
     # Places in programs.
     out = both('to start:\n  set p to a place at (3, 4, 12)\n  set q to a place at (1, 1, 1)\n'
                '  say p, " ", size of p, " ", p plus q, " ", p minus q times 2, " ", -q, " ", p divided by 2\n'

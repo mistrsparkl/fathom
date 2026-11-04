@@ -403,6 +403,19 @@ def remove_entry(table, key, line):
     del table[key]
 
 
+def list_stat(stat, items, line):
+    if stat == "sum":
+        total = 0.0
+        for x in items:  # one at a time, in order, as the C++ does
+            total += x
+        return total
+    if not items:
+        raise RunError(line, f"the list is empty, so it has no {stat}.")
+    if stat == "average":
+        return list_stat("sum", items, line) / len(items)
+    return max(items) if stat == "biggest" else min(items)
+
+
 def last(items, line):
     if not items:
         raise RunError(line, "the list is empty, so it has no last item.")
@@ -789,6 +802,14 @@ class Expr:
                       lambda env: entry_of(get(env), at(env), line), put if table.writable else None)
             v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
             return v
+        for stat in ("sum", "average", "biggest", "smallest"):
+            if self.at(stat, "of") and not match_command(self.names, self.t[self.i:])[0]:  # a command called 'sum of' still wins
+                self.i += 2
+                v = self.unary()
+                if v.kind != "list of number":
+                    raise ScriptError(line, f"'{stat} of' needs a list of numbers, but this is {kind_name(v.kind)}.")
+                a = v.run
+                return Value(f"imagine::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line))
         if self.at("keys", "of"):
             self.i += 2
             table = self.unary()
@@ -912,6 +933,25 @@ class Expr:
             between = self.need(self.unary(), TEXT, "join ... with")
             a, b = v.run, between.run
             return Value(f"imagine::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
+        if self.at("sorted"):
+            start = self.i
+            self.i += 1
+            v = self.unary()
+            if self.at("by") and is_list(v.kind) and is_thing(element(v.kind)):
+                self.i += 1
+                thing = element(v.kind)
+                for n in range(min(6, len(self.t) - self.i), 0, -1):
+                    key = tuple(self.t[self.i:self.i + n])
+                    if key in FIELDS and thing in FIELDS[key]:
+                        self.i += n
+                        member, kind = FIELDS[key][thing]
+                        if kind not in (NUMBER, TEXT):
+                            raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
+                        a = v.run
+                        return Value(f"imagine::sorted_by({v.cpp}, [](const auto& t) {{ return t.{member}; }})", v.kind,
+                                     lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])])
+                raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
+            self.i = start
         for word in ("sorted", "reversed"):
             if self.at(word):
                 self.i += 1
