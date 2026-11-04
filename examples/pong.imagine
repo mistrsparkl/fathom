@@ -1,0 +1,59 @@
+whisper: Pong for two players. Left paddle: W and S. Right paddle: up and down arrows.
+whisper: First to 5 wins. Space starts a new game.
+
+genesis:
+  open a world with "Pong", 800, 500
+  set radius to 10
+  set birth to 400 horizontal 250 vertical
+  set speed to 5 horizontal 3 vertical
+  set left y to 250
+  set right y to 250
+  set left score to 0
+  set right score to 0
+  set the text size to 40
+  as long as the world lives:
+    whisper: the paddles
+    if key held "w": set left y to left y minus 7
+    if key held "s": set left y to left y plus 7
+    if key held "up": set right y to right y minus 7
+    if key held "down": set right y to right y plus 7
+    set left y to clamp left y between 50 and 450
+    set right y to clamp right y between 50 and 450
+
+    whisper: the ball moves, and bounces off the top and bottom
+    if left score falls below 5 and right score falls below 5:
+      set existence to existence plus speed
+    if existence touches the top or bottom: set speed of vertical to speed of vertical times -1
+
+    whisper: the ball hits a paddle: it goes back the other way, a little faster
+    if existence of horizontal falls below 50 and existence of vertical is within 60 of left y and speed of horizontal falls below 0:
+      set speed of horizontal to speed of horizontal times -1.05
+    if existence of horizontal exceeds 750 and existence of vertical is within 60 of right y and speed of horizontal exceeds 0:
+      set speed of horizontal to speed of horizontal times -1.05
+
+    whisper: the ball gets past a paddle: the other player scores, and the ball starts again from the middle
+    if existence touches a side:
+      if existence of horizontal falls below 400:
+        set right score to right score plus 1
+        set speed to 5 horizontal 3 vertical
+      otherwise:
+        set left score to left score plus 1
+        set speed to -5 horizontal 3 vertical
+      set birth to 400 horizontal 250 vertical
+
+    if key pressed "space":
+      set left score to 0
+      set right score to 0
+      set birth to 400 horizontal 250 vertical
+
+    consume the window with "black"
+    etch a line with 400, 0, 400, 500, "#333333"
+    etch a box with 22, left y minus 50, 16, 100, "white"
+    etch a box with 762, right y minus 50, 16, 100, "white"
+    etch a circle with existence of horizontal, existence of vertical, radius, "white"
+    etch words with left score as text, 340, 20, "white"
+    etch words with right score as text, 440, 20, "white"
+    if left score is 5: etch words with "Left player wins! Press space.", 170, 220, "yellow"
+    if right score is 5: etch words with "Right player wins! Press space.", 160, 220, "yellow"
+    reveal the frame
+and the universe said i love you
