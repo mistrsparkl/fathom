@@ -5,11 +5,11 @@ use: time
 use: maths
 
 to start:
-  say "Hello, it is ", hour now, ":", two digits with minute now, "."
+  scrawl "Hello, it is ", hour now, ":", two digits with minute now, "."
   for each n from 1 to 3:
-    say 4 minus n, "..."
+    scrawl 4 minus n, "..."
     wait 1 second
-  say "Done! That took about ", round (seconds since start), " seconds."
+  scrawl "Done! That took about ", round (seconds since start), " seconds."
 and the universe said i love you
 
 to two digits, given x (a number), giving back text:

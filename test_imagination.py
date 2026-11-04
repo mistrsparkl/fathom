@@ -60,7 +60,7 @@ def program_checks():
     prog = lambda body: run(body, "")
     perr = lambda body: error(body, "")
     cpp = prog('to start:\n  ask "Name? " into name\n  repeat 3 times:\n    greet with name, 2\nand the universe said i love you\n\n'
-               'to greet, given who (text) and times (a number):\n  say "Hi " plus who, "! x", times\n' + END)
+               'to greet, given who (text) and times (a number):\n  scrawl "Hi " plus who, "! x", times\n' + END)
     assert "void Greet(const std::string& who, double times);" in cpp, cpp
     assert 'name = imagine::ask_text(std::string("Name? "));' in cpp, cpp
     assert "Greet(name, 2.0);" in cpp, cpp
@@ -69,7 +69,7 @@ def program_checks():
     assert perr("to start:\n  greet with 1\n" + END)[1].startswith("I don't know how to start a line with 'greet'")
     assert perr("to start:\n  hi with 1\n" + END + "to hi, given who (text):\n  stop\n" + END) == (2, "Input 1 of 'hi' must be text, not a number.")
     assert perr("to start:\n  hi\n" + END + "to hi, given who (text):\n  stop\n" + END) == (2, "'hi' needs 1 input, but this gives it 0.")
-    assert perr('to start:\n  say "oops\n' + END)[1].startswith("This text has no closing")
+    assert perr('to start:\n  scrawl "oops\n' + END)[1].startswith("This text has no closing")
     assert perr('to start:\n  set x to "a" minus 1\n' + END)[1] == "I can't subtract a number from text."
     assert perr('to start:\n  while 5:\n    stop\n' + END)[1].startswith("'while' needs something that is yes or no")
     assert perr('to start:\n  repeat "x" times:\n    stop\n' + END)[1].startswith("'repeat' needs a number of times")
@@ -83,7 +83,7 @@ def program_checks():
     assert perr("to start:\n  set s to a list of numbers\n  add \"x\" to s\n" + END)[1] == "This list holds numbers, so I can't add text to it."
     assert perr("to start:\n  set s to a list of (1, \"a\")\n" + END)[1] == "A list holds one kind of thing, but this mixes a number and text."
     assert perr("to start:\n  for each n in 5:\n    stop\n" + END)[1] == "'for each ... in' needs a list, but this is a number."
-    assert perr("a pet has:\n  name (text)\n" + END + "to start:\n  set p to a new pet\n  say age of p\n" + END)[1].startswith("I don't know 'age")
+    assert perr("a pet has:\n  name (text)\n" + END + "to start:\n  set p to a new pet\n  scrawl age of p\n" + END)[1].startswith("I don't know 'age")
     assert perr("a pet has:\n  name (text)\n" + END + "to start:\n  set p to a new dog\n" + END)[1].startswith("There is no kind of thing called 'dog'")
     assert perr("a pet has:\n  best friend (a pet)\n" + END + "to start:\n  stop\n" + END)[1].startswith("A pet can't hold a whole pet")
     assert perr("a pet has:\n  name (text)\n\nto start:\n  stop\n" + END)[1].startswith("The description of 'pet' must end with")
@@ -120,40 +120,40 @@ def program_checks():
             return direct
 
     out = both('to start:\n  ask "Name? " into name\n  ask "Age? " into age (a number)\n'
-               '  repeat 2 times: say "Hello, " plus name plus "!"\n'
-               '  say "Next year you are ", age plus 1, ". Grown up: ", age is at least 18\n' + END, "Sam\nlots\n20.5\n").stdout
+               '  repeat 2 times: scrawl "Hello, " plus name plus "!"\n'
+               '  scrawl "Next year you are ", age plus 1, ". Grown up: ", age is at least 18\n' + END, "Sam\nlots\n20.5\n").stdout
     assert out == "Name? Age? Please type a number.\nAge? Hello, Sam!\nHello, Sam!\nNext year you are 21.5. Grown up: yes\n", repr(out)
 
-    out = both('to start:\n  ask "Again? " into again (yes or no)\n  say again\n  ask "Sure? " into again\n  say not again\n' + END,
+    out = both('to start:\n  ask "Again? " into again (yes or no)\n  scrawl again\n  ask "Sure? " into again\n  scrawl not again\n' + END,
                "maybe\n YES \nn\n").stdout
     assert out == "Again? Please type yes or no.\nAgain? yes\nSure? yes\n", repr(out)
 
     # try: / if that went wrong: catches problems the same both ways, even from inside commands and libraries.
-    out = both('use: web\nto start:\n  for each n from 1 to 3:\n    try:\n      say item n of a list of (10, 20)\n'
-               '    if that went wrong:\n      say "Oops: ", the problem\n  try:\n    set x to contents of file "nope.txt"\n'
-               '    say "not here"\n  if that went wrong:\n    say the problem\n  try:\n    risky\n  if that went wrong:\n'
-               '    say "caught ", the problem\n  try:\n    say web page "http://localhost:1/"\n  if that went wrong:\n'
-               '    say "no web"\n  say item 7 of a list of (1)\n' + END +
-               'to risky:\n  say "before"\n  say letter 5 of "abc"\n  say "after"\n' + END)
+    out = both('use: web\nto start:\n  for each n from 1 to 3:\n    try:\n      scrawl item n of a list of (10, 20)\n'
+               '    if that went wrong:\n      scrawl "Oops: ", the problem\n  try:\n    set x to contents of file "nope.txt"\n'
+               '    scrawl "not here"\n  if that went wrong:\n    scrawl the problem\n  try:\n    risky\n  if that went wrong:\n'
+               '    scrawl "caught ", the problem\n  try:\n    scrawl web page "http://localhost:1/"\n  if that went wrong:\n'
+               '    scrawl "no web"\n  scrawl item 7 of a list of (1)\n' + END +
+               'to risky:\n  scrawl "before"\n  scrawl letter 5 of "abc"\n  scrawl "after"\n' + END)
     assert out.stdout == ("10\n20\nOops: there is no item 3 in a list of 2 items. Items are counted from 1.\n"
                           'there is no file called "nope.txt" (or it can\'t be opened).\n'
                           "before\ncaught there is no letter 5 in text of 3 letters.\nno web\n"), repr(out.stdout)
     assert out.stderr == "Line 21: there is no item 7 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
-    assert perr("to start:\n  try:\n    stop\n  say 1\n" + END)[1].startswith("'try:' needs an 'if that went wrong:' line")
+    assert perr("to start:\n  try:\n    stop\n  scrawl 1\n" + END)[1].startswith("'try:' needs an 'if that went wrong:' line")
     assert perr("to start:\n  if that went wrong:\n    stop\n" + END)[1].startswith("'if that went wrong:' goes right after")
 
-    out = both('to start:\n  say (2 divided by 3) rounded to 2 places, " ", 2.675 rounded to 2 places, " ", 1234.5 rounded to 0 places,'
-               ' " ", -1.25 rounded to 1 place\n  say 1 rounded to 1.5 places\n' + END)
+    out = both('to start:\n  scrawl (2 divided by 3) rounded to 2 places, " ", 2.675 rounded to 2 places, " ", 1234.5 rounded to 0 places,'
+               ' " ", -1.25 rounded to 1 place\n  scrawl 1 rounded to 1.5 places\n' + END)
     assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
     assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
 
     # List maths, and sorting things by one of their parts (ties keep their order).
     out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +
                'to start:\n  set xs to a list of (4, 1.5, 9, 2)\n  set sum to 1\n'
-               '  say sum of xs, " ", average of xs, " ", biggest of xs, " ", smallest of xs, " ", sum of a list of numbers, " ", sum\n'
+               '  scrawl sum of xs, " ", average of xs, " ", biggest of xs, " ", smallest of xs, " ", sum of a list of numbers, " ", sum\n'
                '  set pets to a list of (pet called with ("Rex", 3), pet called with ("Ann", 9), pet called with ("Bo", 3))\n'
-               '  for each p in sorted pets by age: say name of p\n  say sorted pets by name\n'
-               '  say average of a list of numbers\n' + END +
+               '  for each p in sorted pets by age: scrawl name of p\n  scrawl sorted pets by name\n'
+               '  scrawl average of a list of numbers\n' + END +
                'to pet called, given name (text) and age (a number), giving back a pet:\n  set p to a new pet\n'
                '  set name of p to name\n  set age of p to age\n  give back p\n' + END)
     assert out.stdout == ("16.5 4.125 9 1.5 0 1\nRex\nBo\nAnn\n"
@@ -166,21 +166,21 @@ def program_checks():
                'to start:\n  set q to quote mark\n  set h to a new home\n'
                '  set name of owner of h to "Rex " plus q plus "the" plus q plus " dog\\" plus new line\n'
                '  add "sit" to tricks of owner of h\n  add owner of h to pets of h\n  set spot of h to a place at (1.5, -0, 0.1)\n'
-               '  save h to file "home.json"\n  say contents of file "home.json"\n  set again to a new home\n'
-               '  load again from file "home.json"\n  say again is h\n'
+               '  save h to file "home.json"\n  scrawl contents of file "home.json"\n  set again to a new home\n'
+               '  load again from file "home.json"\n  scrawl again is h\n'
                '  set xs to a list of (0.1, 1 divided by 100000, 1 divided by 10000, 123.25, 10000000000000000, 12345678901234567,'
                ' -1 divided by 100000, 1 divided by 3, 10000000000000000 times 1000, 7)\n'
-               '  save xs to file "xs.json"\n  say contents of file "xs.json"\n  set ys to a list of numbers\n  load ys from file "xs.json"\n'
-               '  say ys is xs\n  set t to a table of yes or no\n  set entry "b" of t to yes\n  set entry "a" of t to no\n'
-               '  save t to file "t.json"\n  say contents of file "t.json"\n'
+               '  save xs to file "xs.json"\n  scrawl contents of file "xs.json"\n  set ys to a list of numbers\n  load ys from file "xs.json"\n'
+               '  scrawl ys is xs\n  set t to a table of yes or no\n  set entry "b" of t to yes\n  set entry "a" of t to no\n'
+               '  save t to file "t.json"\n  scrawl contents of file "t.json"\n'
                '  write "{" plus q plus "name" plus q plus ": " plus q plus "Bo" plus q plus ", " plus q plus "tricks" plus q'
                ' plus ": [" plus q plus "\\u00e9\\ud83d\\ude00" plus q plus "], " plus q plus "age" plus q plus ": 2, "'
                ' plus q plus "age" plus q plus ": 3, " plus q plus "other" plus q plus ": null}" to file "p.json"\n'
-               '  set p to a new pet\n  load p from file "p.json"\n  say p\n'
+               '  set p to a new pet\n  load p from file "p.json"\n  scrawl p\n'
                '  for each bad in a list of ("[1, 2", "[1, true]", "[NaN]", "[01]", "{}", "  [ ]  x", "[1.]", "[" plus q plus "a" plus q plus "]"):\n'
                '    write bad to file "bad.json"\n    try:\n      load ys from file "bad.json"\n'
-               '    if that went wrong:\n      say the problem\n  write "  [ 4 , 5e1, -0.5E+1 ]  " to file "ok.json"\n'
-               '  load ys from file "ok.json"\n  say ys\n  set zero to 0\n  set n to 1 divided by zero\n  save n to file "n.json"\n' + END)
+               '    if that went wrong:\n      scrawl the problem\n  write "  [ 4 , 5e1, -0.5E+1 ]  " to file "ok.json"\n'
+               '  load ys from file "ok.json"\n  scrawl ys\n  set zero to 0\n  set n to 1 divided by zero\n  save n to file "n.json"\n' + END)
     assert out.stdout == (
         '{"owner": {"name": "Rex \\"the\\" dog\\\\\\n", "age": 0, "tricks": ["sit"]}, "pets": [{"name": "Rex \\"the\\" dog\\\\\\n", '
         '"age": 0, "tricks": ["sit"]}], "spot": [1.5, 0, 0.1]}\n\nyes\n'
@@ -195,60 +195,60 @@ def program_checks():
     assert perr("genesis:\n  scrawl\n" + END)[1] == "'scrawl' needs something to show, like: scrawl \"hello\"."
 
     # Setting birth makes existence start there too.
-    out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  say birth, " ", existence\n'
-               '  set existence to birth\n  say existence\n' + END)
+    out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  scrawl birth, " ", existence\n'
+               '  set existence to birth\n  scrawl existence\n' + END)
     assert out.stdout == "(300, 200) (305, 200)\n(300, 200)\n", repr(out.stdout)
 
     # genesis:, libraries without 'use:', (x, y) places, 'birth of x' as well as 'x of birth'.
     out = both('genesis:\n  set birth to (300, 200)\n  set birth of x to birth of x minus 5\n  set y of birth to 7\n'
-               '  set high to (1, 2, 3)\n  say birth, " ", high of z plus x of high, " ", round (sine of 30) times 10, " ", (2 plus 3)\n' + END)
+               '  set high to (1, 2, 3)\n  scrawl birth, " ", high of z plus x of high, " ", round (sine of 30) times 10, " ", (2 plus 3)\n' + END)
     assert out.stdout == "(295, 7) 4 0 5\n", repr(out.stdout)
-    assert perr("genesis:\n  say (1, 2, 3, 4)\n" + END)[1] == "A place has 2 numbers, like (300, 200), or 3, like (1, 2, 3)."
+    assert perr("genesis:\n  scrawl (1, 2, 3, 4)\n" + END)[1] == "A place has 2 numbers, like (300, 200), or 3, like (1, 2, 3)."
     assert perr("to begin:\n  stop\n" + END)[1].startswith("A program needs a 'genesis:' (or 'to start:') command")
 
     # Lists of lists and tables of lists: the inner ones are shown in brackets.
     out = both('to start:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'
-               '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  say grid, " / ", item 2 of item 3 of grid\n'
-               '  set teams to a table of lists of text\n  set entry "red" of teams to a list of ("Ann", "Bo")\n  say teams\n' + END)
+               '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  scrawl grid, " / ", item 2 of item 3 of grid\n'
+               '  set teams to a table of lists of text\n  set entry "red" of teams to a list of ("Ann", "Bo")\n  scrawl teams\n' + END)
     assert out.stdout == "(9, 2), (nothing), (3, 4) / 4\nred: (Ann, Bo)\n", repr(out.stdout)
 
     # Places in programs.
     out = both('to start:\n  set p to a place at (3, 4, 12)\n  set q to a place at (1, 1, 1)\n'
-               '  say p, " ", size of p, " ", p plus q, " ", p minus q times 2, " ", -q, " ", p divided by 2\n'
-               '  set f to flat p\n  say f, " ", size of f, " ", direction of a flat place at (0, 5), " ", x of p plus z of p\n'
-               '  set y of p to 100\n  say p, " ", a place at (1, 2, 0) divided by 0\n  set route to a list of (p, q)\n'
-               '  say route\n' + END)
+               '  scrawl p, " ", size of p, " ", p plus q, " ", p minus q times 2, " ", -q, " ", p divided by 2\n'
+               '  set f to flat p\n  scrawl f, " ", size of f, " ", direction of a flat place at (0, 5), " ", x of p plus z of p\n'
+               '  set y of p to 100\n  scrawl p, " ", a place at (1, 2, 0) divided by 0\n  set route to a list of (p, q)\n'
+               '  scrawl route\n' + END)
     assert out.stdout == ("(3, 4, 12) 13 (4, 5, 13) (1, 2, 10) (-1, -1, -1) (1.5, 2, 6)\n(3, 4) 5 90 15\n"
                           "(3, 100, 12) (infinity, infinity, not a number)\n(3, 100, 12), (1, 1, 1)\n"), repr(out.stdout)
-    assert perr("to start:\n  say a place at (1, 2)\n" + END)[1] == "A place has 3 numbers, like a place at (1, 2, 3)."
+    assert perr("to start:\n  scrawl a place at (1, 2)\n" + END)[1] == "A place has 3 numbers, like a place at (1, 2, 3)."
 
     # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
-    out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
-               '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'
-               '  for each n from 1 to 4:\n    if n is 1: say "one"\n    otherwise if n is 2:\n      say "two"\n    otherwise: say "many"\n'
-               '  say first big in a list of (1, 5, 9, 2)\n  count down with 3\n' + END +
+    out = both('to start:\n  scrawl 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
+               '  scrawl size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'
+               '  for each n from 1 to 4:\n    if n is 1: scrawl "one"\n    otherwise if n is 2:\n      scrawl "two"\n    otherwise: scrawl "many"\n'
+               '  scrawl first big in a list of (1, 5, 9, 2)\n  count down with 3\n' + END +
                'to first big in, given xs (a list of numbers), giving back a number:\n'
                '  for each x in xs:\n    if x is more than 4: give back x\n  give back 0\n' + END +
-               'to count down, given from (a number):\n  set left to from\n  while yes:\n    say left\n'
+               'to count down, given from (a number):\n  set left to from\n  while yes:\n    scrawl left\n'
                '    set left to left minus 1\n    if left is 0: stop\n' + END).stdout
     assert out == ("0.333333333333333 2.5 0.2 1000000000000 0\n5 a1yes yes no\none\ntwo\nmany\nmany\n5\n3\n2\n1\n"), repr(out)
 
     # Lists of things are copied when stored, the same both ways.
     out = both('a box has:\n  items (a list of numbers)\n' + END +
                'to start:\n  set a to a new box\n  add 1 to items of a\n  set b to a\n  add 2 to items of b\n'
-               '  set boxes to a list of (a, b)\n  add 3 to items of item 1 of boxes\n  say a, " ", b, " ", boxes\n'
-               '  say a is item 1 of boxes, " ", b is item 2 of boxes\n' + END).stdout
+               '  set boxes to a list of (a, b)\n  add 3 to items of item 1 of boxes\n  scrawl a, " ", b, " ", boxes\n'
+               '  scrawl a is item 1 of boxes, " ", b is item 2 of boxes\n' + END).stdout
     assert out == ("a box (items: 1) a box (items: 1, 2) a box (items: 1, 3), a box (items: 1, 2)\nno yes\n"), repr(out)
 
     # Text and list tools; leaving loops early.
     out = both('to start:\n  set s to "Héllo wörld, hello"\n'
-               '  say upper case of s, " | ", lower case of "ABC é", " | ", letter 2 of s, " | ", letters 7 to 11 of s\n'
-               '  say position of "llo" in s, " ", position of "zz" in s, " | ", replace "llo" with "LP" in s\n'
-               '  set parts to s split by ", "\n  say size of parts, " ", item 2 of parts, " | ", join parts with "+"\n'
-               '  say sorted a list of (3, 1, 2), " | ", reversed a list of ("a", "b"), " | ", last item of parts, " | ", letters 3 to 2 of "abc", "."\n'
-               '  for each n from 1 to 10:\n    if n is 2: skip to the next one\n    if n is 5: stop the loop\n    say n\n'
-               '  repeat 3 times:\n    while yes: stop the loop\n    say "r"\n'
-               '  say letter 9 of "abc"\n' + END)
+               '  scrawl upper case of s, " | ", lower case of "ABC é", " | ", letter 2 of s, " | ", letters 7 to 11 of s\n'
+               '  scrawl position of "llo" in s, " ", position of "zz" in s, " | ", replace "llo" with "LP" in s\n'
+               '  set parts to s split by ", "\n  scrawl size of parts, " ", item 2 of parts, " | ", join parts with "+"\n'
+               '  scrawl sorted a list of (3, 1, 2), " | ", reversed a list of ("a", "b"), " | ", last item of parts, " | ", letters 3 to 2 of "abc", "."\n'
+               '  for each n from 1 to 10:\n    if n is 2: skip to the next one\n    if n is 5: stop the loop\n    scrawl n\n'
+               '  repeat 3 times:\n    while yes: stop the loop\n    scrawl "r"\n'
+               '  scrawl letter 9 of "abc"\n' + END)
     assert out.stdout == ("HéLLO WöRLD, HELLO | abc é | é | wörld\n3 0 | HéLP wörld, heLP\n"
                           "2 hello | Héllo wörld+hello\n1, 2, 3 | b, a | hello | .\n1\n3\n4\nr\nr\nr\n"), repr(out.stdout)
     assert out.stderr == "Line 15: there is no letter 9 in text of 3 letters.\n", repr(out.stderr)
@@ -256,28 +256,28 @@ def program_checks():
 
     # Tables.
     out = both('to start:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Ann" of ages to 40\n'
-               '  set entry "Rex" of ages to entry "Rex" of ages plus 1\n  say ages, " | ", size of ages, " | ", keys of ages\n'
-               '  say ages contains "Ann", " ", ages contains "Bob"\n  remove entry "Ann" from ages\n  say ages\n'
+               '  set entry "Rex" of ages to entry "Rex" of ages plus 1\n  scrawl ages, " | ", size of ages, " | ", keys of ages\n'
+               '  scrawl ages contains "Ann", " ", ages contains "Bob"\n  remove entry "Ann" from ages\n  scrawl ages\n'
                '  set pets to a table of lists of text\n  set entry "Rex" of pets to a list of text\n'
-               '  add "sit" to entry "Rex" of pets\n  say pets\n  for each name in keys of pets: say name\n'
-               '  say entry "Bob" of ages\n' + END)
+               '  add "sit" to entry "Rex" of pets\n  scrawl pets\n  for each name in keys of pets: scrawl name\n'
+               '  scrawl entry "Bob" of ages\n' + END)
     assert out.stdout == "Ann: 40, Rex: 4 | 2 | Ann, Rex\nyes no\nRex: 4\nRex: (sit)\nRex\n", repr(out.stdout)
     assert out.stderr == 'Line 15: there is no entry "Bob" in the table.\n', repr(out.stderr)
 
     # Libraries.
-    out = both('use: maths\nuse: time\nto start:\n  say round (sine of 30 times 1000), " ", power of (2, 10), " ", remainder of (17, 5)\n'
-               '  say round 2.5, " ", round down -2.5, " ", round up 2.1, " ", round (pi times 100)\n'
-               '  wait 0.01 seconds\n  say seconds since start is more than 0, " ", year now is more than 2000\n' + END).stdout
+    out = both('use: maths\nuse: time\nto start:\n  scrawl round (sine of 30 times 1000), " ", power of (2, 10), " ", remainder of (17, 5)\n'
+               '  scrawl round 2.5, " ", round down -2.5, " ", round up 2.1, " ", round (pi times 100)\n'
+               '  wait 0.01 seconds\n  scrawl seconds since start is more than 0, " ", year now is more than 2000\n' + END).stdout
     assert out == "500 1024 2\n3 -3 3 314\nyes yes\n", repr(out)
 
     # A window: opens, draws, shows frames and closes the same both ways (it flashes up for a moment).
     out = both('use: window\nto start:\n  open a window with "Test ✓", 200, 100\n'
-               '  say the window is open, " ", mouse held, " ", key held "space"\n  repeat 3 times:\n'
-               '    say key pressed "space", " ", mouse clicked\n'
+               '  scrawl the window is open, " ", mouse held, " ", key held "space"\n  repeat 3 times:\n'
+               '    scrawl key pressed "space", " ", mouse clicked\n'
                '    clear the window with "black"\n    draw a box with 10, 10, 50, 20, "#ff8800"\n'
                '    draw a circle with 100, 50, 20, "blue"\n    draw a line with 0, 0, 200, 100, "white"\n'
                '    draw words with "héllo", 120, 10, "yellow"\n    show the frame\n  close the window\n'
-               '  say the window is open\n  draw a circle with 1, 1, 1, "red"\n  say "ok"\n  draw a circle with 1, 1, 1, "reddish"\n' + END)
+               '  scrawl the window is open\n  draw a circle with 1, 1, 1, "red"\n  scrawl "ok"\n  draw a circle with 1, 1, 1, "reddish"\n' + END)
     assert out.stdout == "yes no no\nno no\nno no\nno no\nno\nok\n", repr(out.stdout)
     assert out.stderr == 'Line 17: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
     assert both('use: window\nto start:\n  show the frame\n' + END).stderr.startswith("Line 3: there is no window yet.")
@@ -292,31 +292,31 @@ def program_checks():
         rows = b"".join(b"\0" + b"\xff\x00\x00" * width for _ in range(height))
         return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
-    out = both('use: window\nto start:\n  say width of picture "red.png", " ", height of picture "red.png"\n'
+    out = both('use: window\nto start:\n  scrawl width of picture "red.png", " ", height of picture "red.png"\n'
                '  open a window with "Pictures", 100, 100\n  draw the picture with "red.png", 10, 10\n  show the frame\n'
-               '  close the window\n  say width of picture "red.png"\n  say width of picture "none.png"\n' + END,
+               '  close the window\n  scrawl width of picture "red.png"\n  scrawl width of picture "none.png"\n' + END,
                others={"red.png": png(7, 3)})
     assert out.stdout == "7 3\n7\n", repr(out.stdout)
     assert out.stderr == 'Line 9: there is no picture called "none.png".\n', repr(out.stderr)
 
     # The web library, without needing the internet: a page that can't be reached fails the same both ways.
-    out = both('use: web\nto start:\n  say web page "http://localhost:1/"\n' + END)
+    out = both('use: web\nto start:\n  scrawl web page "http://localhost:1/"\n' + END)
     assert out.stderr == 'Line 3: I couldn\'t get the web page "http://localhost:1/".\n', repr(out.stderr)
 
     # Programs made of several scripts: used scripts bring their kinds and commands (not their start),
     # are read once even when used twice, and errors name the script they are in.
     shapes = ('use: maths\nuse: helpers.imagine\na square has:\n  side (a number)\n' + END +
-              'to start:\n  say "shapes on its own"\n' + END +
+              'to start:\n  scrawl "shapes on its own"\n' + END +
               'to area of, given s (a square), giving back a number:\n  give back power of (side of s, 2)\n' + END +
-              'to check, given s (a square):\n  if side of s is less than 0: say item 5 of a list of (1)\n' + END)
-    helpers = 'use: shapes.imagine\nto shout, given words (text):\n  say upper case of words plus "!"\n' + END
+              'to check, given s (a square):\n  if side of s is less than 0: scrawl item 5 of a list of (1)\n' + END)
+    helpers = 'use: shapes.imagine\nto shout, given words (text):\n  scrawl upper case of words plus "!"\n' + END
     out = both('use: shapes.imagine\nuse: helpers.imagine\nto start:\n  set s to a new square\n  set side of s to 3\n'
-               '  say area of s\n  shout with "hi"\n  check with s\n  set side of s to -1\n  check with s\n' + END,
+               '  scrawl area of s\n  shout with "hi"\n  check with s\n  set side of s to -1\n  check with s\n' + END,
                others={"shapes.imagine": shapes, "helpers.imagine": helpers})
     assert out.stdout == "9\nHI!\n", repr(out.stdout)
     assert out.stderr == "shapes.imagine line 13: there is no item 5 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
     with tempfile.TemporaryDirectory() as d:
-        (Path(d) / "bad.imagine").write_text("to oops:\n  say nothing here\n" + END, encoding="utf-8")
+        (Path(d) / "bad.imagine").write_text("to oops:\n  scrawl nothing here\n" + END, encoding="utf-8")
         (Path(d) / "main.imagine").write_text("use: bad.imagine\nto start:\n  oops\n" + END, encoding="utf-8")
         try:
             translate.read_script(Path(d) / "main.imagine")
@@ -335,18 +335,18 @@ def program_checks():
         w.setframerate(8000)
         w.writeframes(b"\0\0" * 800)
     out = both('use: sound\nto start:\n  play the sound and wait with "quiet.wav"\n  play the sound with "quiet.wav"\n'
-               '  stop the sound\n  say "played"\n  play the sound with "nope.wav"\n' + END, others={"quiet.wav": silent.getvalue()})
+               '  stop the sound\n  scrawl "played"\n  play the sound with "nope.wav"\n' + END, others={"quiet.wav": silent.getvalue()})
     assert out.stdout == "played\n", repr(out.stdout)
     assert out.stderr == 'Line 7: there is no sound file called "nope.wav".\n', repr(out.stderr)
 
     # Random items come from the list; an empty list is a plain error.
-    out = both('to start:\n  set xs to a list of (4, 4, 4)\n  say a random item of xs, random item of a list of ("z")\n'
-               '  say random item of a list of numbers\n' + END)
+    out = both('to start:\n  set xs to a list of (4, 4, 4)\n  scrawl a random item of xs, random item of a list of ("z")\n'
+               '  scrawl random item of a list of numbers\n' + END)
     assert out.stdout == "4z\n", repr(out.stdout)
     assert out.stderr == "Line 4: the list is empty, so I can't pick a random item.\n", repr(out.stderr)
 
     # A command can call itself.
-    out = both('to start:\n  say factorial of 10, " ", factorial of 20\n' + END +
+    out = both('to start:\n  scrawl factorial of 10, " ", factorial of 20\n' + END +
                'to factorial of, given n (a number), giving back a number:\n  if n is at most 1: give back 1\n'
                '  give back n times factorial of (n minus 1)\n' + END)
     assert out.stdout == "3628800 2432902008176640000\n", repr(out.stdout)
@@ -355,13 +355,13 @@ def program_checks():
     if True:
         ran = both('a pet has:\n  name (text)\n  ages (a list of numbers)\n' + END +
                           'to start:\n  set p to a new pet\n  set name of p to "Rex"\n  add 3 to ages of p\n  add 4 to ages of p\n'
-                          '  say p\n  say total of ages of p, " ", item 2 of ages of p, " ", size of ages of p\n'
-                          '  for each n from 1 to 3: add n times 10 to ages of p\n  remove item 1 from ages of p\n  say ages of p\n'
-                          '  say ages of p contains 20, " ", "hello" contains "ell"\n'
+                          '  scrawl p\n  scrawl total of ages of p, " ", item 2 of ages of p, " ", size of ages of p\n'
+                          '  for each n from 1 to 3: add n times 10 to ages of p\n  remove item 1 from ages of p\n  scrawl ages of p\n'
+                          '  scrawl ages of p contains 20, " ", "hello" contains "ell"\n'
                           '  write "" to file "t.txt"\n  add "one" to file "t.txt"\n  add "two 2" to file "t.txt"\n  set got to lines of file "t.txt"\n'
-                          '  say got, " | ", size of got, " | ", words of item 2 of got, " | ", file "t.txt" exists, " ", file "nope.txt" exists\n'
-                          '  say (item 2 of words of item 2 of got) as a number plus 1\n'
-                          '  say item 9 of ages of p\n' + END +
+                          '  scrawl got, " | ", size of got, " | ", words of item 2 of got, " | ", file "t.txt" exists, " ", file "nope.txt" exists\n'
+                          '  scrawl (item 2 of words of item 2 of got) as a number plus 1\n'
+                          '  scrawl item 9 of ages of p\n' + END +
                           'to total of, given xs (a list of numbers), giving back a number:\n  set sum to 0\n'
                           '  for each x in xs: set sum to sum plus x\n  give back sum\n' + END)
         assert ran.stdout == ("a pet (name: Rex, ages: 3, 4)\n7 4 2\n4, 10, 20, 30\nyes yes\n"
@@ -397,8 +397,8 @@ def main():
     assert "TurnRateDegS = HalfOf(10.0);" in called and "\tCalmDown(2.0);" in called, called
     assert "//   double HalfOf(double x);" in called, called
     # Try-it mode: each typed line is done straight away; names are kept; blocks end with an empty line.
-    typed = iter(['set name to "Sam"', 'say "Hi " plus name', "5 plus 3 times 2", "repeat 2 times:", "say name", "",
-                  "say nme", "say item 3 of a list of (1)", "use: maths", "round 2.6", "stop the loop", "bye"])
+    typed = iter(['set name to "Sam"', 'scrawl "Hi " plus name', "5 plus 3 times 2", "repeat 2 times:", "scrawl name", "",
+                  "scrawl nme", "scrawl item 3 of a list of (1)", "use: maths", "round 2.6", "stop the loop", "bye"])
     import contextlib
     import io
     screen = io.StringIO()

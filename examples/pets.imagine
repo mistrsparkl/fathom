@@ -16,14 +16,14 @@ to start:
   add "roll over" to tricks of item 1 of shelter
 
   for each pet in shelter:
-    say name of pet, " is ", age of pet, " and knows: ", tricks of pet
+    scrawl name of pet, " is ", age of pet, " and knows: ", tricks of pet
 
-  say "Oldest: ", name of oldest in shelter
-  say "Ages added up: ", total age of shelter
+  scrawl "Oldest: ", name of oldest in shelter
+  scrawl "Ages added up: ", total age of shelter
   set item 3 of shelter to pet called with ("Goldie", 2)
   remove item 2 from shelter
-  say "Left: ", names in shelter
-  if names in shelter contains "Goldie": say "Goldie found a home here."
+  scrawl "Left: ", names in shelter
+  if names in shelter contains "Goldie": scrawl "Goldie found a home here."
 and the universe said i love you
 
 to pet called, given name (text) and age (a number), giving back a pet:

@@ -2,7 +2,7 @@ note: Guess the number. The computer picks a number from 1 to 100 and you try to
 note: Run it with: py -3 imagination.py run examples/guess.imagine
 
 to start:
-  say "I'm thinking of a number from 1 to 100."
+  scrawl "I'm thinking of a number from 1 to 100."
   set secret to random number from 1 to 100
   set tries to 0
   set guess to 0
@@ -10,12 +10,12 @@ to start:
     ask "Your guess? " into guess (a number)
     set tries to tries plus 1
     give a hint with guess, secret
-  say "You got it in ", tries, " tries!"
+  scrawl "You got it in ", tries, " tries!"
 and the universe said i love you
 
 to give a hint, given guess (a number) and secret (a number):
   if guess is less than secret:
-    say "Too low."
+    scrawl "Too low."
   otherwise if guess is more than secret:
-    say "Too high."
+    scrawl "Too high."
 and the universe said i love you

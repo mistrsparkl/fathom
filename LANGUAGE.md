@@ -43,7 +43,7 @@ to start:
 and the universe said i love you
 
 to greet, given who (text):
-  say "Hello, " plus who plus "!"
+  scrawl "Hello, " plus who plus "!"
 and the universe said i love you
 ```
 
@@ -59,7 +59,7 @@ to total age of, given pets (a list of pets), giving back a number:
 and the universe said i love you
 ```
 
-Then use it like any value: `say "Ages added up: ", total age of shelter`. A command with one input takes it right after its name (`with` is optional). With two or more inputs, put them in brackets: `pet called with ("Rex", 3)`.
+Then use it like any value: `scrawl "Ages added up: ", total age of shelter`. A command with one input takes it right after its name (`with` is optional). With two or more inputs, put them in brackets: `pet called with ("Rex", 3)`.
 
 ## Your own kinds of things
 
@@ -78,7 +78,7 @@ and the universe said i love you
 | `set rex to a new pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
 | `name of rex` | One of its parts. `set name of rex to "Rex"` changes it. |
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
-| `say rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
+| `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
 ## A part of something else, top to bottom
 
@@ -130,7 +130,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `move turn rate toward 20 by at most 5` | Change a number toward a goal, but by no more than the step. |
 | `if fallen: stop` | Do the part after the colon only when it is yes. |
 | `if ...:` / `otherwise if ...:` / `otherwise:` | With indented lines below, for longer choices. |
-| `scrawl "Score: ", score` | Show things on the screen, one after another, then start a new line. `say` does the same. |
+| `scrawl "Score: ", score` | Show things on the screen, one after another, then start a new line. |
 | `ask "Your name? " into name` | Show the question and keep what the person types, as text. |
 | `ask "Your age? " into age (a number)` | The same, as a number. It asks again until a number is typed. |
 | `ask "Again? " into again (yes or no)` | The same, as yes or no (`yes`, `y`, `no` or `n`). |
@@ -201,7 +201,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, scrawl, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 
@@ -229,7 +229,7 @@ use: maths
 
 to start:
   wait 2 seconds
-  say "Sine of 30 is ", sine of 30
+  scrawl "Sine of 30 is ", sine of 30
 and the universe said i love you
 ```
 
@@ -304,7 +304,7 @@ load high scores from file "scores.json"
 
 `load` needs a name that already holds the right kind of value (here, a table of numbers). Lists, tables, places and your own kinds of things all work, even inside each other. A thing whose file lacks one of its parts gets that part empty, so adding a part to a kind of thing doesn't spoil old saves. If the file holds something else, the problem is `the file "scores.json" doesn't hold a table of numbers.` Use `try:` to carry on instead.
 
-The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `say "She said " plus quote mark plus "hi" plus quote mark`.
+The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `scrawl "She said " plus quote mark plus "hi" plus quote mark`.
 
 ## When something goes wrong while running
 
@@ -316,7 +316,7 @@ To carry on instead, put the lines that might go wrong under `try:`, and what to
 try:
   set notes to contents of file "notes.txt"
 if that went wrong:
-  say "I couldn't read the notes: ", the problem
+  scrawl "I couldn't read the notes: ", the problem
   set notes to ""
 ```
 

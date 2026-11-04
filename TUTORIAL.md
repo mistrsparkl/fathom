@@ -22,7 +22,7 @@ Hello!
 
 A program is made of **commands**. `genesis:` is where every program begins (`to start:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
 
-`scrawl` shows something on the screen (`say` does the same). Text goes between quote marks.
+`scrawl` shows something on the screen. Text goes between quote marks.
 
 ## 2. Remembering things
 
