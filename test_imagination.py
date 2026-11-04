@@ -90,7 +90,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, patterns, server, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, patterns, server, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -282,6 +282,14 @@ def program_checks():
     # Saved text: any value as JSON text, and back (for the web, or other programs).
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set name of p to "Rex " plus quote mark plus "the dog" plus quote mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus quote mark plus "name" plus quote mark plus ": " plus quote mark plus "Jo" plus quote mark plus ", " plus quote mark plus "age" plus quote mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == '{"Rex": 3, "Tom": 12.5}\nRex: 3, Tom: 12.5\n{"name": "Rex \\"the dog\\"", "age": 0}\na pet (name: Jo, age: 4)\n1, 2.5, -3\nthe text doesn\'t hold a list of numbers.\n', repr(out.stdout)
+
+    # The letters library: the numbers behind letters.
+    out = both('genesis:\n  scrawl code of the letter "A", " ", code of the letter "abc", " ", code of the letter "é", " ", code of the letter "😀"\n  scrawl the letter with code 72 plus the letter with code 105, " ", the letter with code 233, " ", the letter with code 128512\n  set secret to ""\n  for each c in a list of ("H", "A", "L"):\n    set secret to secret plus the letter with code (code of the letter c plus 1)\n  scrawl secret\n  try:\n    scrawl the letter with code -1\n  if that went wrong:\n    scrawl the wound\n  scrawl code of the letter ""\nand the universe said i love you\n')
+    assert (out.stdout, out.stderr) == ('65 97 233 128512\nHi \u00e9 \U0001f600\nIBM\nthere is no letter with the code -1.\n',
+                                        "Line 12: 'code of the letter' needs a letter, but the text is empty.\n"), repr((out.stdout, out.stderr))
+    # Bytes: files as lists of numbers from 0 to 255.
+    out = both('genesis:\n  fill the file with ("data.bin", a list of (0, 255, 10, 13, 65))\n  scrawl the bytes of the file "data.bin", " / ", bytes in the file "data.bin"\n  set all to the bytes of the file "data.bin"\n  gather 66 into all\n  fill the file with ("data.bin", all)\n  scrawl contents of file "data.bin" ends with "AB"\n  try:\n    fill the file with ("bad.bin", a list of (1, 256))\n  if that went wrong:\n    scrawl the wound\n  scrawl file "bad.bin" exists\nand the universe said i love you\n')
+    assert out.stdout == '0, 255, 10, 13, 65 / 5\nyes\na byte is a whole number from 0 to 255, not 256.\nno\n', repr(out.stdout)
 
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'

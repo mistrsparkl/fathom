@@ -1,0 +1,49 @@
+note: Words for the numbers behind letters (Unicode). Use them in a program with:  use: letters
+note: "A" is 65, "a" is 97, " " is 32, "é" is 233, "😀" is 128512.
+
+code:
+  namespace imagine_letters
+  {
+  	inline double code_of(const std::string& s, int line)
+  	{
+  		if (s.empty())
+  			imagine::fail(line, "'code of the letter' needs a letter, but the text is empty.");
+  		unsigned char c = (unsigned char)s[0];
+  		int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
+  		unsigned code = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
+  		for (int k = 1; k <= extra && k < (int)s.size(); ++k)
+  			code = (code << 6) | ((unsigned char)s[k] & 0x3F);
+  		return (double)code;
+  	}
+  	inline std::string letter_with(double number, int line)
+  	{
+  		if (number < 0 || number > 0x10FFFF || number != (double)(long long)number || (number >= 0xD800 && number <= 0xDFFF))
+  			imagine::fail(line, "there is no letter with the code " + imagine::text(number) + ".");
+  		unsigned c = (unsigned)number;
+  		std::string out;
+  		if (c < 0x80)
+  			out += (char)c;
+  		else if (c < 0x800)
+  			out += (char)(0xC0 | (c >> 6)), out += (char)(0x80 | (c & 0x3F));
+  		else if (c < 0x10000)
+  			out += (char)(0xE0 | (c >> 12)), out += (char)(0x80 | ((c >> 6) & 0x3F)), out += (char)(0x80 | (c & 0x3F));
+  		else
+  			out += (char)(0xF0 | (c >> 18)), out += (char)(0x80 | ((c >> 12) & 0x3F)), out += (char)(0x80 | ((c >> 6) & 0x3F)), out += (char)(0x80 | (c & 0x3F));
+  		return out;
+  	}
+  }
+
+python:
+  def code_of(s):
+      if not s:
+          raise RunError(0, "'code of the letter' needs a letter, but the text is empty.")
+      return float(ord(s[0]))
+  def letter_with(number):
+      if number < 0 or number > 0x10FFFF or number != int(number) or 0xD800 <= number <= 0xDFFF:
+          raise RunError(0, "there is no letter with the code " + text(number) + ".")
+      return chr(int(number))
+
+to code of the letter, given letter (text), giving back a number = imagine_letters::code_of({letter}, {line})
+  runs: code_of({letter})
+to the letter with code, given code (a number), giving back text = imagine_letters::letter_with({code}, {line})
+  runs: letter_with({code})

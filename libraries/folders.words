@@ -3,6 +3,7 @@ note: Names of files and folders are text, like "saves/slot 1.json". A name with
 
 include: <filesystem>
 include: <algorithm>
+include: <fstream>
 
 code:
   namespace imagine_folders
@@ -67,6 +68,29 @@ code:
   			imagine::fail(line, "there is no file called \"" + name + "\".");
   		return (double)size;
   	}
+  	inline std::vector<double> bytes_of(const std::string& name, int line)
+  	{
+  		std::ifstream in(path(name), std::ios::binary);
+  		if (!in)
+  			imagine::fail(line, "there is no file called \"" + name + "\".");
+  		std::vector<double> out;
+  		for (char c; in.get(c);)
+  			out.push_back((double)(unsigned char)c);
+  		return out;
+  	}
+  	inline void fill(const std::string& name, const std::vector<double>& numbers, int line)
+  	{
+  		std::string all;
+  		for (double x : numbers)
+  		{
+  			if (x < 0 || x > 255 || x != (double)(int)x)
+  				imagine::fail(line, "a byte is a whole number from 0 to 255, not " + imagine::text(x) + ".");
+  			all += (char)(unsigned char)x;
+  		}
+  		std::ofstream out(path(name), std::ios::binary);
+  		if (!out || !out.write(all.data(), (std::streamsize)all.size()))
+  			imagine::fail(line, "I couldn't write the file \"" + name + "\".");
+  	}
   }
 
 python:
@@ -113,6 +137,21 @@ python:
           return float(os.path.getsize(name))
       except OSError:
           raise RunError(0, 'there is no file called "' + name + '".')
+  def bytes_of(name):
+      try:
+          with open(name, "rb") as f:
+              return [float(b) for b in f.read()]
+      except OSError:
+          raise RunError(0, 'there is no file called "' + name + '".')
+  def fill(name, numbers):
+      for x in numbers:
+          if x < 0 or x > 255 or x != int(x):
+              raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
+      try:
+          with open(name, "wb") as f:
+              f.write(bytes(int(x) for x in numbers))
+      except OSError:
+          raise RunError(0, "I couldn't write the file \"" + name + "\".")
 
 to files in the folder, given folder (text), giving back a list of text = imagine_folders::inside({folder}, false, {line})
   runs: inside({folder}, False)
@@ -132,3 +171,7 @@ to copy the file, given from (text) and to (text) = imagine_folders::copy({from}
   runs: copy({from}, {to})
 to bytes in the file, given name (text), giving back a number = imagine_folders::bytes({name}, {line})
   runs: size({name})
+to the bytes of the file, given name (text), giving back a list of numbers = imagine_folders::bytes_of({name}, {line})
+  runs: bytes_of({name})
+to fill the file, given name (text) and numbers (a list of numbers) = imagine_folders::fill({name}, {numbers}, {line})
+  runs: fill({name}, {numbers})
