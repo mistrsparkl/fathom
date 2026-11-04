@@ -275,6 +275,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | Words | Means |
 |---|---|
 | `open a window with "Title", 800, 600` | Open a window this wide and high. |
+| `set the text size to 32` | Words drawn after this are 32 dots high (16 at first). |
 | `consume the window with "black"` | Fill the whole window with one colour. |
 | `draw a box with x, y, width, height, "red"` | A filled box, from its top left corner. |
 | `draw a circle with x, y, radius, "blue"` | A filled circle around a middle point. |

@@ -208,6 +208,9 @@ def program_checks():
                           "a ball (birth: 5 horizontal 5 vertical, existence: 5 horizontal 5 vertical, speed: 0)\n"
                           "4 horizontal 4 vertical\n"), repr(out.stdout)
 
+    out = both('genesis:\n  set the text size to 20\n  set the text size to 600\n' + END)
+    assert out.stderr == "Line 3: text can be from 1 to 500 dots high, not 600.\n", repr(out.stderr)
+
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'
                '  scrawl existence is within 5 of coin, " ", existence is within 4.9 of coin, " ", 7 is within 2 of 5, " ",'

@@ -20,6 +20,7 @@ code:
   	inline HWND window = nullptr;
   	inline HDC canvas = nullptr;
   	inline HFONT font = nullptr;
+  	inline int text_size = 16;
   	inline bool open_now = false;
   	inline bool opened = false;
   	inline bool keys[256] = {};
@@ -130,7 +131,7 @@ code:
   		canvas = CreateCompatibleDC(dc);
   		SelectObject(canvas, CreateCompatibleBitmap(dc, width, height));
   		ReleaseDC(window, dc);
-  		font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+  		font = CreateFontW(-text_size, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
   		SelectObject(canvas, font);
   		SetBkMode(canvas, TRANSPARENT);
   		RECT all{0, 0, width, height};
@@ -188,6 +189,20 @@ code:
   		SetTextColor(canvas, colour(c, line));
   		std::wstring w = wide(words);
   		TextOutW(canvas, (int)std::lround(x), (int)std::lround(y), w.c_str(), (int)w.size());
+  	}
+
+  	inline void set_text_size(double size, int line)
+  	{
+  		if (!(size >= 1 && size <= 500))
+  			imagine::fail(line, "text can be from 1 to 500 dots high, not " + imagine::text(size) + ".");
+  		text_size = (int)std::lround(size);
+  		if (canvas)
+  		{
+  			HFONT bigger = CreateFontW(-text_size, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+  			SelectObject(canvas, bigger);
+  			DeleteObject(font);
+  			font = bigger;
+  		}
   	}
 
   	inline void show(int line)
@@ -260,7 +275,7 @@ python:
              "grey": "#808080", "gray": "#808080"}
   KEYS = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"}
   TK_KEYS = {"return": "enter", "shift_l": "shift", "shift_r": "shift", "control_l": "control", "control_r": "control"}
-  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0}
+  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0, "text size": 16}
 
   def need_window():
       if not win["opened"]:
@@ -351,7 +366,13 @@ python:
 
   def write(words, x, y, c):
       col = colour(c)
-      draw(lambda cv: cv.create_text(round(x), round(y), text=words, fill=col, anchor="nw", font=("Segoe UI", -16)))
+      size = win["text size"]
+      draw(lambda cv: cv.create_text(round(x), round(y), text=words, fill=col, anchor="nw", font=("Segoe UI", -size)))
+
+  def set_text_size(size):
+      if not 1 <= size <= 500:
+          raise RunError(0, f"text can be from 1 to 500 dots high, not {text(size)}.")
+      win["text size"] = int(math.floor(size + 0.5))
 
   def show():
       need_window()
@@ -402,6 +423,8 @@ to draw a line, given x (a number) and y (a number) and to x (a number) and to y
   runs: line_between({x}, {y}, {to x}, {to y}, {colour})
 to draw words, given words (text) and x (a number) and y (a number) and colour (text) = imagine_window::write({words}, {x}, {y}, {colour}, {line})
   runs: write({words}, {x}, {y}, {colour})
+to set the text size to, given size (a number) = imagine_window::set_text_size({size}, {line})
+  runs: set_text_size({size})
 to show the frame = imagine_window::show({line})
   runs: show()
 to draw the picture, given file (text) and x (a number) and y (a number) = imagine_window::draw_picture({file}, {x}, {y}, {line})
