@@ -270,6 +270,11 @@ def program_checks():
     assert perr('genesis:\n  invoke 5\n' + END)[1] == "'invoke' needs a command, like 'invoke the command double with 4', not a number."
     assert perr('genesis:\n  set f to the command nothing\n' + END)[1] == "'the command' needs the name of a command after it, like 'the command double'."
 
+    # meanwhile: commands going alongside the rest, each with its own copy of the names; a problem in one stops everything.
+    out = both('to count up, given name (text) and delay (a number):\n  wait delay\n  inscribe name plus " done" into file name plus ".txt"\nand the universe said i love you\n\nto fail later:\n  wait 0.2 seconds\n  shatter with "the helper broke"\nand the universe said i love you\n\ngenesis:\n  set started to seconds since start\n  set names to a list of ("a", "b", "c")\n  for each who in names: meanwhile count up with who, 0.5\n  set names to a list of text\n  wait for the others\n  scrawl contents of file "a.txt", " ", contents of file "b.txt", " ", contents of file "c.txt"\n  scrawl seconds since start minus started falls below 1.4\n  meanwhile count up with "d", 0.3\n  scrawl "main goes on"\n  meanwhile fail later\n  wait 1 seconds\n  scrawl "never"\nand the universe said i love you\n')
+    assert (out.stdout, out.stderr) == ('a done b done c done\nyes\nmain goes on\n', 'Line 8: the helper broke\n'), repr((out.stdout, out.stderr))
+    assert perr('genesis:\n  meanwhile 5\n' + END)[1] == "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'."
+
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
                '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'

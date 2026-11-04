@@ -15,6 +15,8 @@
 #include <sstream>
 #include <string>
 #include <functional>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 // The same maths names Unreal has, so a script means the same thing in a program and in Unreal.
@@ -182,6 +184,42 @@ namespace imagine
 		else
 			std::cerr << files[problem.line / 100000] << " line " << problem.line % 100000;
 		std::cerr << ": " << problem.message << std::endl;
+	}
+	inline std::vector<std::thread> others;  // commands running alongside the rest ('meanwhile ...')
+	inline std::mutex others_lock;
+	template <typename F>
+	void meanwhile(F f)
+	{
+		std::lock_guard<std::mutex> hold(others_lock);
+		others.emplace_back([f]()
+		{
+			try
+			{
+				f();
+			}
+			catch (const Problem& problem)
+			{
+				report(problem);
+				std::fflush(stdout);
+				std::_Exit(1);
+			}
+		});
+	}
+	inline void wait_for_others()
+	{
+		for (;;)
+		{
+			std::thread other;
+			{
+				std::lock_guard<std::mutex> hold(others_lock);
+				auto it = std::find_if(others.begin(), others.end(), [](const std::thread& t) { return t.get_id() != std::this_thread::get_id(); });
+				if (it == others.end())
+					return;
+				other = std::move(*it);
+				others.erase(it);
+			}
+			other.join();
+		}
 	}
 
 	template <typename T>

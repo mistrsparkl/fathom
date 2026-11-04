@@ -90,6 +90,8 @@ and the universe said i love you
 
 The kind says what the command takes and gives back: `a command` (nothing either way), `a command given text`, `a command given a number and text giving back yes or no`. Library words work too (`the command round`). Commands for a kind of thing can't be kept this way, and commands can't be compared or saved.
 
+**At the same time.** `meanwhile download with ("https://example.com/a.png", "a.png")` starts a command going on its own, and the next line carries on straight away. `wait for the others` waits until every command started with `meanwhile` has finished (a program also waits for them before it ends). Each one gets its own copy of every name as it was when it started, so they can't spoil each other's values; they can share files and the screen. A problem in any of them stops the whole program. `meanwhile invoke f` works too.
+
 ## Your own kinds of things
 
 Describe what a kind of thing has, one part per line, then use it as a kind anywhere:
@@ -259,7 +261,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, begins, ends, invoke, shatter, trimmed, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, begins, ends, invoke, meanwhile, shatter, trimmed, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 

@@ -59,7 +59,7 @@ ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -287,6 +287,42 @@ def py_zero(kind, things):
     if is_command(kind):
         return no_command
     return None
+
+
+OTHERS = []  # commands running alongside the rest ('meanwhile ...'), as threads
+OTHERS_LOCK = threading.Lock()
+
+
+def meanwhile(run, env):
+    """Starts run going on its own, with a copy of every name as it is now (as the C++ copies them)."""
+    snapshot = {k: dup(v) for k, v in env.items()}
+
+    def go():
+        try:
+            run(snapshot)
+        except RunError as err:
+            sys.stdout.flush()
+            print(f"{run_where(err.line)}: {err.message}", file=sys.stderr)
+            sys.stderr.flush()
+            os._exit(1)
+        except Flow:
+            pass
+    worker = threading.Thread(target=go)
+    with OTHERS_LOCK:
+        OTHERS.append(worker)
+    worker.start()
+
+
+def wait_for_others():
+    """Waits until every command started with 'meanwhile' (except the one waiting) has finished."""
+    me = threading.current_thread()
+    while True:
+        with OTHERS_LOCK:
+            other = next((t for t in OTHERS if t is not me), None)
+            if other is None:
+                return
+            OTHERS.remove(other)
+        other.join()
 
 
 def no_command(*args):
@@ -1866,7 +1902,7 @@ def read_one(path, auto):
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
-        functions.append(f"int main(int count, char** given)\n{{\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t}}\n"
+        functions.append(f"int main(int count, char** given)\n{{\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\timagine::wait_for_others();\n\t}}\n"
                          f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
@@ -2248,6 +2284,29 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             raise Stop()
         return [f"{tab}return;"], run, None
+    if tokens == ["wait", "for", "the", "others"]:
+        return [f"{tab}imagine::wait_for_others();"], lambda env: wait_for_others(), None
+    if tokens[0] == "meanwhile":  # 'meanwhile download with ...': the command goes on alongside the lines after this one
+        rest = tokens[1 + (tokens[1:2] == [","]):]
+        key, size = match_command(names, rest)
+        if rest[:1] == ["invoke"]:
+            e = Expr(rest, names, n)
+            e.allow_nothing = True
+            v = e.single()
+            if e.i != len(e.t):
+                raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
+            cpp, run = strip_parens(v.cpp), v.run
+        elif key:
+            if names.commands[key].versions is not None:
+                raise ScriptError(n, f"'{' '.join(key)}' changes the thing it is given, so it can't run alongside the rest.")
+            start = size + (rest[size:size + 1] == ["with"])
+            more = rest[start:]
+            if more[:1] == ["("] and more[-1:] == [")"] and closing_bracket(more, 0) == len(more) - 1 and "," in more:
+                more = more[1:-1]
+            cpp, run = call(key, expr_list(more, 0, names, n), names, n)
+        else:
+            raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'.")
+        return [f"{tab}imagine::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
     if tokens[0] == "invoke":
         e = Expr(tokens, names, n)
         e.allow_nothing = True
@@ -2688,6 +2747,7 @@ def run_program(script):
     def go():
         try:
             program.start()
+            wait_for_others()
         except RunError as err:
             sys.stdout.flush()
             print(f"{run_where(err.line)}: {err.message}", file=sys.stderr)
