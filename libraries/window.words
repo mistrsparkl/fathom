@@ -21,6 +21,7 @@ code:
   	inline HDC canvas = nullptr;
   	inline HFONT font = nullptr;
   	inline int text_size = 16;
+  	inline double frame_time = 1.0 / 60;  // seconds the last frame took
   	inline bool open_now = false;
   	inline bool opened = false;
   	inline bool keys[256] = {};
@@ -227,7 +228,9 @@ code:
   		double spent = double(now.QuadPart - last_frame.QuadPart) / double(freq.QuadPart);
   		if (spent < 1.0 / 60)
   			Sleep((DWORD)((1.0 / 60 - spent) * 1000));
+  		LARGE_INTEGER before = last_frame;
   		QueryPerformanceCounter(&last_frame);
+  		frame_time = double(last_frame.QuadPart - before.QuadPart) / double(freq.QuadPart);
   	}
 
   	inline Gdiplus::Image* picture(const std::string& file, int line)
@@ -291,7 +294,7 @@ python:
              "grey": "#808080", "gray": "#808080"}
   KEYS = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"}
   TK_KEYS = {"return": "enter", "shift_l": "shift", "shift_r": "shift", "control_l": "control", "control_r": "control"}
-  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0, "text size": 16}
+  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0, "text size": 16, "frame time": 1.0 / 60}
 
   def need_window():
       if not win["opened"]:
@@ -398,7 +401,8 @@ python:
       wait = 1.0 / 60 - (time.monotonic() - win["last"])
       if wait > 0:
           time.sleep(wait)
-      win["last"] = time.monotonic()
+      now = time.monotonic()
+      win["frame time"], win["last"] = now - win["last"], now
 
   pictures = {}
 
@@ -490,5 +494,7 @@ to key pressed, given key (text), giving back yes or no = (imagine_window::press
   runs: key_name({key}) in win["pressed"]
 mouse clicked = imagine_window::clicked, yes or no, read only
   runs: win["clicked"]
+frame time = imagine_window::frame_time, number, read only
+  runs: win["frame time"]
 mouse held = imagine_window::mouse_down, yes or no, read only
   runs: win["down"]

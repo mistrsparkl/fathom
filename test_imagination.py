@@ -210,6 +210,9 @@ def program_checks():
 
     out = both('genesis:\n  set the text size to 20\n  set the text size to 600\n' + END)
     assert perr("genesis:\n  draw a circle with 1, 1, 1, \"red\"\n" + END)[1].startswith("'draw' is now 'etch'")
+    out = both('genesis:\n  open a window with "x", 50, 50\n  show the frame\n  show the frame\n'
+               '  scrawl frame time is more than 0.01 and frame time is less than 0.5\n  close the window\n' + END)
+    assert out.stdout == "yes\n", repr(out.stdout)
     assert out.stderr == "Line 3: text can be from 1 to 500 dots high, not 600.\n", repr(out.stderr)
 
     # within: close enough to touch.
