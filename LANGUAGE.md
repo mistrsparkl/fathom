@@ -1,18 +1,18 @@
-# Anything
+# Imagination
 
-Anything is a programming language written in plain English words. Scripts end in `.any`. `anything.py` turns each one into Unreal C++ (`<name>.any.cpp`, which you never edit):
+Imagination is a programming language written in plain English words. Scripts end in `.imagine`. `imagination.py` turns each one into Unreal C++ (`<name>.imagine.cpp`, which you never edit):
 
 ```
-py -3 anything.py <scripts folder> <output folder>
+py -3 imagination.py <scripts folder> <output folder>
 ```
 
 It A mistake stops the build with a plain message, such as:
 
 ```
-follow.any line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
+follow.imagine line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-`examples/follow.any` is a working example: it is how a deer follows the player.
+`examples/follow.imagine` is a working example: it is how a deer follows the player.
 
 ## A script, top to bottom
 
@@ -85,4 +85,4 @@ Names can be several words (`turn needed`, `braking speed`). They can't use the 
 
 A script can only use words its thing knows. New words (another part of the deer's state, a new ability) are added to the `.words` file; a new physical ability (jumping, a gallop) needs C++ underneath first, then it gets a word.
 
-Checking the translator itself: `py -3 test_anything.py`.
+Checking the translator itself: `py -3 test_imagination.py`.

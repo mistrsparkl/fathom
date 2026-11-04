@@ -1,10 +1,10 @@
-"""Self-check for anything.py. Run: py -3 test_anything.py"""
+"""Self-check for imagination.py. Run: py -3 test_imagination.py"""
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import anything as translate
+import imagination as translate
 translate.LOGIC = Path(__file__).resolve().parent / "examples"
 
 
@@ -13,7 +13,7 @@ END = "and the universe said i love you\n"
 
 def run(body):
     with tempfile.TemporaryDirectory() as d:
-        p = Path(d) / "probe.any"
+        p = Path(d) / "probe.imagine"
         p.write_text("this is part of: creature body\n\n" + body, encoding="utf-8")
         return translate.translate(p)
 
@@ -27,14 +27,14 @@ def error(body):
 
 
 def main():
-    for path in sorted(translate.LOGIC.glob("*.any")):
+    for path in sorted(translate.LOGIC.glob("*.imagine")):
         translate.translate(path)
 
     cpp = run("settings:\n  limit: 30 degrees\n\nto check, given goal (a place):\n  set gap to flat (goal minus centre of mass)\n"
               "  if size of gap is more than limit: stop\n  move turn rate toward 10 by at most 2 times frame time\n" + END)
     assert "constexpr double limit = 30.0;" in cpp, cpp
     assert "void ATerranovaCreatureBody::Check(const FVector& goal)" in cpp, cpp
-    assert "if ((gap).Size() > Any_probe::limit)" in cpp, cpp
+    assert "if ((gap).Size() > Imagine_probe::limit)" in cpp, cpp
     assert "TurnRateDegS = FMath::Clamp(10.0, TurnRateDegS - " in cpp, cpp
 
     assert error("to check:\n  set turn rate to walk sped\n" + END) == (4, "I don't know 'walk sped'. Did you mean 'walk speed'?")
@@ -47,7 +47,7 @@ def main():
     assert error(END)[1].startswith("'and the universe said i love you' closes a command")
     assert error("to check:\n  stop\n")[1].startswith("The command 'to check' must end with the line 'and the universe said i love you'")
     assert error("to check:\n  stop\nto other:\n  stop\n" + END)[0] == 5
-    print("anything.py self-check passed")
+    print("imagination.py self-check passed")
 
 
 if __name__ == "__main__":

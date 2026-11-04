@@ -1,6 +1,6 @@
-"""Anything: turns English-like scripts (*.any) into Unreal C++ (*.any.cpp).
+"""Imagination: turns English-like scripts (*.imagine) into Unreal C++ (*.imagine.cpp).
 
-Run: py -3 anything.py <scripts folder> <output folder>
+Run: py -3 imagination.py <scripts folder> <output folder>
 The language itself is described in LANGUAGE.md.
 """
 import difflib
@@ -281,7 +281,7 @@ def is_closing(line):
 
 
 def translate(path):
-    """Returns the C++ text for one .any file, or raises ScriptError."""
+    """Returns the C++ text for one .imagine file, or raises ScriptError."""
     lines = path.read_text(encoding="utf-8").splitlines()
     names, info, settings, out = None, {}, [], []
     functions = []
@@ -315,7 +315,7 @@ def translate(path):
                 if not m:
                     raise ScriptError(i, "A setting looks like 'name: number', e.g. 'look limit: 30 degrees'.")
                 words = m.group(1).split()
-                cpp = f"Any_{snake(path.stem.split())}::{snake(words)}"
+                cpp = f"Imagine_{snake(path.stem.split())}::{snake(words)}"
                 names.add(words, cpp, NUMBER, read_only=True)
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
                 settings.append(f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
@@ -336,9 +336,9 @@ def translate(path):
         raise ScriptError(n, f"I don't know what to do with '{text}'. Top-level lines are notes, 'settings:' or 'to ...:'.")
     if names is None:
         raise ScriptError(1, "The script is empty.")
-    head = [f"// Generated from {path.name} by anything.py. Edit the .any file, not this one.",
+    head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
             f'#include "{info["header"]}"', ""]
-    ns = [f"namespace Any_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
+    ns = [f"namespace Imagine_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
     return "\n".join(head + ns + out + [""] + functions) + "\n"
 
 
@@ -454,7 +454,7 @@ def statement(n, text, inner, names, declared, depth):
         step = e.need(e.sum(), NUMBER, "move")
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
-        s = f"any_step_{depth}_{n}"
+        s = f"imagine_step_{depth}_{n}"
         return [f"{tab}const double {s} = {strip_parens(step.cpp)};",
                 f"{tab}{cpp} = FMath::Clamp({strip_parens(goal.cpp)}, {cpp} - {s}, {cpp} + {s});"]
     raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, if, otherwise, stop or note.")
@@ -483,14 +483,14 @@ def strip_parens(cpp):
 def main(argv):
     global LOGIC, OUT
     if len(argv) != 3:
-        print("Use: py -3 anything.py <scripts folder> <output folder>")
+        print("Use: py -3 imagination.py <scripts folder> <output folder>")
         return 2
     LOGIC, OUT = Path(argv[1]), Path(argv[2])
     OUT.mkdir(parents=True, exist_ok=True)
     failed = False
     wanted = set()
-    for path in sorted(LOGIC.glob("*.any")):
-        target = OUT / f"{path.stem}.any.cpp"
+    for path in sorted(LOGIC.glob("*.imagine")):
+        target = OUT / f"{path.stem}.imagine.cpp"
         wanted.add(target.name)
         try:
             text = translate(path)
@@ -500,7 +500,7 @@ def main(argv):
             continue
         if not target.exists() or target.read_text(encoding="utf-8") != text:
             target.write_text(text, encoding="utf-8")
-    for old in OUT.glob("*.any.cpp"):
+    for old in OUT.glob("*.imagine.cpp"):
         if old.name not in wanted:
             old.unlink()
     return 1 if failed else 0
