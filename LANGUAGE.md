@@ -21,7 +21,7 @@ A mistake stops with a plain message, such as:
 follow.imagine line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Working examples: `examples/guess.imagine` (a guessing game, a program) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
+Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
 
 ## A program, top to bottom
 
@@ -35,6 +35,39 @@ to greet, given who (text):
   say "Hello, " plus who plus "!"
 and the universe said i love you
 ```
+
+## Commands that give back an answer
+
+Add `giving back <kind>` to the first line, and leave with `give back ...`:
+
+```
+to total age of, given pets (a list of pets), giving back a number:
+  set total to 0
+  for each pet in pets: set total to total plus age of pet
+  give back total
+and the universe said i love you
+```
+
+Then use it like any value: `say "Ages added up: ", total age of shelter`. A command with one input takes it right after its name (`with` is optional). With two or more inputs, put them in brackets: `pet called with ("Rex", 3)`.
+
+## Your own kinds of things
+
+Describe what a kind of thing has, one part per line, then use it as a kind anywhere:
+
+```
+a pet has:
+  name (text)
+  age (a number)
+  tricks (a list of text)
+and the universe said i love you
+```
+
+| Write | Means |
+|---|---|
+| `set rex to a new pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
+| `name of rex` | One of its parts. `set name of rex to "Rex"` changes it. |
+| `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
+| `say rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
 ## A part of something else, top to bottom
 
@@ -68,6 +101,8 @@ and the universe said i love you
 | a place | `centre of mass`, `goal` (a point in the world) |
 | a flat place | `flat (goal minus centre of mass)` (a place with its height dropped) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
+| a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
+| your own kind | `a new pet` (see above) |
 
 Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a number, not yes or no."
 
@@ -85,7 +120,15 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `repeat 10 times:` | Do the indented lines below 10 times. |
 | `while guess is not secret:` | Keep doing the indented lines below while it is yes. |
 | `greet with name, 3` | Do your own command `greet`, giving it its inputs in order. A command without inputs is just its name: `greet`. |
-| `stop` | Leave the command now. |
+| `for each score in scores:` | Do the indented lines once for every item of a list, with `score` being that item. |
+| `for each n from 1 to 10:` | The same for each whole number from 1 to 10. |
+| `add 5 to scores` | Put an item at the end of a list. |
+| `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
+| `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
+| `give back total` | Leave the command, giving back an answer. |
+| `write "hello" to file "notes.txt"` | Make or replace a file with this text. |
+| `add "a line" to file "log.txt"` | Add a line to the end of a file (making it if needed). |
+| `stop` | Leave the command now (only in commands that don't give back anything). |
 | `note: ...` | A note for people. |
 
 ## Working things out
@@ -99,6 +142,15 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `square root of x` | the square root |
 | `size of x` | a number without its sign, the length of a (flat) place, or how many letters text has |
 | `random number from 1 to 100` | a random whole number, both ends included |
+| `item 2 of scores` | one item of a list (counted from 1) |
+| `size of scores` | how many items a list has |
+| `scores contains 5`, `name contains "ell"` | yes or no: is it in the list / in the text |
+| `contents of file "notes.txt"` | everything in a file, as text |
+| `lines of file "notes.txt"` | the file's lines, as a list of text |
+| `file "notes.txt" exists` | yes or no |
+| `lines of text`, `words of text` | text split into lines or words, as a list of text |
+| `answer as a number` | text turned into a number (`"42"` gives 42) |
+| `score as text` | a number or yes or no written out as text |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
@@ -106,16 +158,20 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `a is more than b`, `is less than`, `is at least`, `is at most`, `is`, `is not` | yes or no |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
-`of` takes everything after it until a word like `is`, `and`, `between` or `by`. Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
+`of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, say, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as.
 
 ## Adding words
 
 A script can only use words its thing knows. New words (another part of the deer's state, a new ability) are added to the `.words` file; a new physical ability (jumping, a gallop) needs C++ underneath first, then it gets a word.
 
-Commands can only call each other inside programs for now.
+Commands can only call each other, and new kinds of things can only be described, inside programs for now.
+
+## When something goes wrong while running
+
+The program stops with the line and a plain reason, such as `Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.`
 
 Checking the translator itself: `py -3 test_imagination.py`.
