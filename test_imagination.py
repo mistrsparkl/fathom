@@ -90,7 +90,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, patterns, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, patterns, server, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -274,6 +274,10 @@ def program_checks():
     out = both('to count up, given name (text) and delay (a number):\n  wait delay\n  inscribe name plus " done" into file name plus ".txt"\nand the universe said i love you\n\nto fail later:\n  wait 0.2 seconds\n  shatter with "the helper broke"\nand the universe said i love you\n\ngenesis:\n  set started to seconds since start\n  set names to a list of ("a", "b", "c")\n  for each who in names: meanwhile count up with who, 0.5\n  set names to a list of text\n  wait for the others\n  scrawl contents of file "a.txt", " ", contents of file "b.txt", " ", contents of file "c.txt"\n  scrawl seconds since start minus started falls below 1.4\n  meanwhile count up with "d", 0.3\n  scrawl "main goes on"\n  meanwhile fail later\n  wait 1 seconds\n  scrawl "never"\nand the universe said i love you\n')
     assert (out.stdout, out.stderr) == ('a done b done c done\nyes\nmain goes on\n', 'Line 8: the helper broke\n'), repr((out.stdout, out.stderr))
     assert perr('genesis:\n  meanwhile 5\n' + END)[1] == "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'."
+
+    # The server library: a web server whose pages come from a command (with the computer and web libraries in the same program).
+    out = both('to answer, given address (text), giving back text:\n  if address is "/hello": give back "Hello from Imagination!"\n  give back "You asked for " plus address\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8765, the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8765/hello"\n  scrawl web page "http://127.0.0.1:8765/scores?top=3"\n  end the program with 0\nand the universe said i love you\n'.replace('genesis:\n', 'genesis:\n  scrawl size of user name exceeds 0\n'))
+    assert out.stdout == 'yes\nHello from Imagination!\nYou asked for /scores?top=3\n', repr(out.stdout)
 
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'

@@ -2305,7 +2305,7 @@ def statement(n, text_, inner, names, declared, depth):
                 more = more[1:-1]
             cpp, run = call(key, expr_list(more, 0, names, n), names, n)
         else:
-            raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'.")
+            raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'." + library_hint(rest))
         return [f"{tab}imagine::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
     if tokens[0] == "invoke":
         e = Expr(tokens, names, n)

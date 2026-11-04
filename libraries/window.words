@@ -5,6 +5,7 @@ note: Built programs draw with Windows' own drawing (GDI); programs run directly
 
 code:
   #define NOMINMAX
+include: <winsock2.h>
 include: <windows.h>
 link: user32
 link: gdi32

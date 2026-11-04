@@ -2,6 +2,7 @@ note: Words for the internet. Use them in a program with:  use: web
 
 code:
   #define NOMINMAX
+include: <winsock2.h>
 include: <windows.h>
 include: <urlmon.h>
 include: <wininet.h>

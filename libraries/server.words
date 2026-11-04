@@ -1,0 +1,80 @@
+note: Words for being a web server: other programs (and web browsers) on this computer can ask it for pages.
+note: Use them in a program with:  use: server
+note: The command it is given gets the address asked for (like "/hello" or "/scores?top=3") and gives back the page, as text.
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <ws2tcpip.h>
+include: <windows.h>
+link: ws2_32
+
+code:
+  namespace imagine_server
+  {
+  	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line)
+  	{
+  		WSADATA data;
+  		WSAStartup(MAKEWORD(2, 2), &data);
+  		SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  		sockaddr_in where{};
+  		where.sin_family = AF_INET;
+  		where.sin_port = htons((u_short)port);
+  		where.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // this computer only, so Windows doesn't ask about its firewall
+  		if (listener == INVALID_SOCKET || bind(listener, (sockaddr*)&where, sizeof where) != 0 || listen(listener, 16) != 0)
+  			imagine::fail(line, "I couldn't serve the web on port " + imagine::text(port) + " (is something else using it?).");
+  		for (;;)
+  		{
+  			SOCKET client = accept(listener, nullptr, nullptr);
+  			if (client == INVALID_SOCKET)
+  				continue;
+  			std::string asked;
+  			char chunk[4096];
+  			while (asked.find("\r\n\r\n") == std::string::npos)
+  			{
+  				int got = recv(client, chunk, sizeof chunk, 0);
+  				if (got <= 0)
+  					break;
+  				asked.append(chunk, got);
+  			}
+  			size_t a = asked.find(' '), b = a == std::string::npos ? a : asked.find(' ', a + 1);
+  			std::string path = b == std::string::npos ? "/" : asked.substr(a + 1, b - a - 1);
+  			std::string page = imagine::invoke(answer, line, path);
+  			std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " +
+  				std::to_string(page.size()) + "\r\nConnection: close\r\n\r\n" + page;
+  			for (size_t sent = 0; sent < reply.size();)
+  			{
+  				int put = send(client, reply.data() + sent, (int)(reply.size() - sent), 0);
+  				if (put <= 0)
+  					break;
+  				sent += put;
+  			}
+  			shutdown(client, SD_SEND);
+  			closesocket(client);
+  		}
+  	}
+  }
+
+python:
+  import http.server
+  def serve(port, answer):
+      class Handler(http.server.BaseHTTPRequestHandler):
+          def do_GET(self):
+              page = answer(self.path).encode("utf-8")
+              self.send_response(200)
+              self.send_header("Content-Type", "text/html; charset=utf-8")
+              self.send_header("Content-Length", str(len(page)))
+              self.send_header("Connection", "close")
+              self.end_headers()
+              self.wfile.write(page)
+          do_POST = do_GET
+          def log_message(self, *args):
+              pass
+      try:
+          server = http.server.HTTPServer(("127.0.0.1", int(port)), Handler)
+      except OSError:
+          raise RunError(0, "I couldn't serve the web on port " + text(port) + " (is something else using it?).")
+      server.serve_forever()
+
+to serve the web, given port (a number) and answer (a command given text giving back text) = imagine_server::serve({port}, {answer}, {line})
+  runs: serve({port}, {answer})

@@ -4,6 +4,7 @@ note: Sounds play on top of each other, so a game can have many at once.
 
 code:
   #define NOMINMAX
+include: <winsock2.h>
 include: <windows.h>
 include: <mmsystem.h>
 link: winmm
