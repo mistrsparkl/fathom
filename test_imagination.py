@@ -119,6 +119,16 @@ def program_checks():
     assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
     assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
 
+    # Places in programs.
+    out = both('to start:\n  set p to a place at (3, 4, 12)\n  set q to a place at (1, 1, 1)\n'
+               '  say p, " ", size of p, " ", p plus q, " ", p minus q times 2, " ", -q, " ", p divided by 2\n'
+               '  set f to flat p\n  say f, " ", size of f, " ", direction of a flat place at (0, 5), " ", x of p plus z of p\n'
+               '  set y of p to 100\n  say p, " ", a place at (1, 2, 0) divided by 0\n  set route to a list of (p, q)\n'
+               '  say route\n' + END)
+    assert out.stdout == ("(3, 4, 12) 13 (4, 5, 13) (1, 2, 10) (-1, -1, -1) (1.5, 2, 6)\n(3, 4) 5 90 15\n"
+                          "(3, 100, 12) (infinity, infinity, not a number)\n(3, 100, 12), (1, 1, 1)\n"), repr(out.stdout)
+    assert perr("to start:\n  say a place at (1, 2)\n" + END)[1] == "A place has 3 numbers, like a place at (1, 2, 3)."
+
     # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
     out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
                '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'

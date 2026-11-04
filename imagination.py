@@ -66,6 +66,15 @@ UNITS = set("degrees degree cm centimetres seconds second per squared percent me
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
+def reset_fields():
+    """Forget the last script's kinds of things; places always have x, y (and z) parts."""
+    FIELDS.clear()
+    for letter_ in "xyz":
+        FIELDS[(letter_,)] = {PLACE: (letter_.upper(), NUMBER)}
+        if letter_ != "z":
+            FIELDS[(letter_,)][FLAT] = (letter_.upper(), NUMBER)
+
+
 def is_list(kind):
     return kind.startswith("list of ")
 
@@ -164,6 +173,38 @@ class Thing:
         return new
 
 
+class Place:
+    """A place (x, y, z) or a flat place (x, y) while a program runs. Its parts are in .fields, like a Thing's."""
+    __slots__ = ("fields",)
+
+    def __init__(self, *parts):
+        self.fields = dict(zip("XYZ", (float(x) for x in parts)))
+
+    def parts(self):
+        return [self.fields[k] for k in "XYZ"[:len(self.fields)]]
+
+    def __eq__(self, other):
+        return isinstance(other, Place) and self.fields == other.fields
+
+    def __add__(self, other):
+        return Place(*[a + b for a, b in zip(self.parts(), other.parts())])
+
+    def __sub__(self, other):
+        return Place(*[a - b for a, b in zip(self.parts(), other.parts())])
+
+    def __mul__(self, number):
+        return Place(*[a * number for a in self.parts()])
+
+    def __truediv__(self, number):
+        return Place(*[div(a, number) for a in self.parts()])
+
+    def __neg__(self):
+        return Place(*[-a for a in self.parts()])
+
+    def size(self):
+        return math.sqrt(sum(a * a for a in self.parts()))
+
+
 def py_zero(kind, things):
     if kind == NUMBER:
         return 0.0
@@ -171,6 +212,10 @@ def py_zero(kind, things):
         return False
     if kind == TEXT:
         return ""
+    if kind == PLACE:
+        return Place(0, 0, 0)
+    if kind == FLAT:
+        return Place(0, 0)
     if is_list(kind):
         return []
     if is_table(kind):
@@ -182,13 +227,17 @@ def py_zero(kind, things):
 
 def dup(v):
     """Lists and things are copied when they are stored, as they are in the C++."""
-    return copy.deepcopy(v) if isinstance(v, (list, dict, Thing)) else v
+    return copy.deepcopy(v) if isinstance(v, (list, dict, Thing, Place)) else v
 
 
 def text(v):
     if isinstance(v, bool):
         return "yes" if v else "no"
     if isinstance(v, (int, float)):
+        if math.isnan(v):
+            return "not a number"
+        if math.isinf(v):
+            return "infinity" if v > 0 else "-infinity"
         if math.isfinite(v) and math.floor(v) == v and abs(v) < 1e21:
             return "%.0f" % v if v else "0"
         return "%.15g" % v
@@ -198,9 +247,15 @@ def text(v):
         return ", ".join(text(x) for x in v) if v else "(nothing)"
     if isinstance(v, dict):
         return ", ".join(f"{k}: {text(v[k])}" for k in sorted(v)) if v else "(nothing)"
+    if isinstance(v, Place):
+        return "(" + ", ".join(text(x) for x in v.parts()) + ")"
     if isinstance(v, Thing):
         return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
     raise RunError(0, "this can't be shown as text when running directly.")
+
+
+def divide(a, b):
+    return a / b if isinstance(a, Place) else div(a, b)
 
 
 def div(a, b):
@@ -591,7 +646,7 @@ class Expr:
             if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
             f = operator.add if op == "+" else operator.sub
-            run = (lambda env, a=a, b=b, f=f: f(a(env), b(env))) if v.kind == NUMBER else not_here(self.line, "Adding places")
+            run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
 
@@ -604,8 +659,8 @@ class Expr:
             if r.kind != NUMBER or v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can only multiply or divide a number or a place by a number, not {kind_name(v.kind)} by {kind_name(r.kind)}.")
             a, b = v.run, r.run
-            f = div if op == "/" else operator.mul
-            run = (lambda env, a=a, b=b, f=f: f(a(env), b(env))) if v.kind == NUMBER else not_here(self.line, "Multiplying places")
+            f = divide if op == "/" else operator.mul
+            run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
 
@@ -616,7 +671,7 @@ class Expr:
             if v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
             a = v.run
-            return Value(f"(-{v.cpp})", v.kind, (lambda env: -a(env)) if v.kind == NUMBER else not_here(self.line, "Negative places"))
+            return Value(f"(-{v.cpp})", v.kind, lambda env: -a(env))
         v = self.primary()
         if self.at("as", "a", "number") or self.at("as", "number"):
             self.i += 3 if self.at("as", "a") else 2
@@ -886,7 +941,7 @@ class Expr:
             if v.kind == NUMBER:
                 return Value(f"FMath::Abs({v.cpp})", NUMBER, lambda env: abs(a(env)))
             if v.kind in (PLACE, FLAT):
-                return Value(f"({v.cpp}).Size()", NUMBER, not_here(line, "The size of a place"))
+                return Value(f"({v.cpp}).Size()", NUMBER, lambda env: a(env).size())
             if v.kind == TEXT:
                 return Value(f"imagine::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
             if is_list(v.kind) or is_table(v.kind):
@@ -895,11 +950,14 @@ class Expr:
         if self.at("flat"):
             self.i += 1
             v = self.need(self.unary(), PLACE, "flat")
-            return Value(f"FVector2D({v.cpp})", FLAT, not_here(line, "'flat'"))
+            a = v.run
+            return Value(f"FVector2D({v.cpp})", FLAT, lambda env: Place(*a(env).parts()[:2]))
         if self.at("direction", "of"):
             self.i += 2
             v = self.need(self.sum(), FLAT, "direction of")
-            return Value(f"FMath::RadiansToDegrees(FMath::Atan2(({v.cpp}).Y, ({v.cpp}).X))", NUMBER, not_here(line, "'direction of'"))
+            a = v.run
+            return Value(f"FMath::RadiansToDegrees(FMath::Atan2(({v.cpp}).Y, ({v.cpp}).X))", NUMBER,
+                         lambda env: (lambda q: math.atan2(q.fields["Y"], q.fields["X"]) * 180.0 / 3.14159265358979323846)(a(env)))
         if self.at("angle", "from"):
             self.i += 2
             a = self.need(self.sum(), NUMBER, "angle from")
@@ -925,6 +983,22 @@ class Expr:
                         return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
+        for lead, kind in ((("a", "place", "at"), PLACE), (("a", "flat", "place", "at"), FLAT)):
+            if self.at(*lead):
+                self.i += len(lead)
+                self.take("(")
+                parts = [self.need(self.full(), NUMBER, "a place at")]
+                while self.at(","):
+                    self.i += 1
+                    parts.append(self.need(self.full(), NUMBER, "a place at"))
+                self.take(")")
+                need = 3 if kind == PLACE else 2
+                if len(parts) != need:
+                    raise ScriptError(self.line, f"{kind_name(kind).capitalize()} has {need} numbers, like {'a place at (1, 2, 3)' if need == 3 else 'a flat place at (1, 2)'}.")
+                runs = [x.run for x in parts]
+                cpp = "FVector" if kind == PLACE else "FVector2D"
+                return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", kind,
+                             lambda env: Place(*[f(env) for f in runs]))
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
             if self.at(*lead):
                 self.i += len(lead)
@@ -1166,7 +1240,7 @@ def read_script(path):
     things = []  # (name, line, [(line, field text)])
     libs, used = [], set()  # C++ that 'use:' libraries need, and their names
     THINGS = {}
-    FIELDS.clear()
+    reset_fields()
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
         names, info = Names(), None  # a program of its own
@@ -1989,7 +2063,7 @@ def try_it(read=input, show=print):
     global LOGIC, THINGS
     LOGIC = Path.cwd()
     THINGS = {}
-    FIELDS.clear()
+    reset_fields()
     FILES[:] = ["(typed)"]
     names, declared, env = Names(), {}, {}
     names.loops = 0

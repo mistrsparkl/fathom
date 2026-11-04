@@ -32,6 +32,40 @@ namespace FMath
 	}
 }
 
+// Places, with the same names Unreal uses, so a script means the same thing in a program and in Unreal.
+struct FVector
+{
+	double X = 0, Y = 0, Z = 0;
+	FVector() = default;
+	FVector(double x, double y, double z) : X(x), Y(y), Z(z) {}
+	static const FVector ZeroVector;
+	double Size() const { return std::sqrt(X * X + Y * Y + Z * Z); }
+	FVector operator+(const FVector& o) const { return {X + o.X, Y + o.Y, Z + o.Z}; }
+	FVector operator-(const FVector& o) const { return {X - o.X, Y - o.Y, Z - o.Z}; }
+	FVector operator*(double k) const { return {X * k, Y * k, Z * k}; }
+	FVector operator/(double k) const { return {X / k, Y / k, Z / k}; }
+	FVector operator-() const { return {-X, -Y, -Z}; }
+	bool operator==(const FVector&) const = default;
+};
+inline const FVector FVector::ZeroVector{};
+
+struct FVector2D
+{
+	double X = 0, Y = 0;
+	FVector2D() = default;
+	FVector2D(double x, double y) : X(x), Y(y) {}
+	explicit FVector2D(const FVector& v) : X(v.X), Y(v.Y) {}
+	static const FVector2D ZeroVector;
+	double Size() const { return std::sqrt(X * X + Y * Y); }
+	FVector2D operator+(const FVector2D& o) const { return {X + o.X, Y + o.Y}; }
+	FVector2D operator-(const FVector2D& o) const { return {X - o.X, Y - o.Y}; }
+	FVector2D operator*(double k) const { return {X * k, Y * k}; }
+	FVector2D operator/(double k) const { return {X / k, Y / k}; }
+	FVector2D operator-() const { return {-X, -Y}; }
+	bool operator==(const FVector2D&) const = default;
+};
+inline const FVector2D FVector2D::ZeroVector{};
+
 extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
 extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
 
@@ -48,9 +82,16 @@ namespace imagine
 	}
 
 	inline std::string text(const std::string& s) { return s; }
+	inline std::string text(double d);
+	inline std::string text(const FVector& v) { return "(" + text(v.X) + ", " + text(v.Y) + ", " + text(v.Z) + ")"; }
+	inline std::string text(const FVector2D& v) { return "(" + text(v.X) + ", " + text(v.Y) + ")"; }
 	inline std::string text(bool b) { return b ? "yes" : "no"; }
 	inline std::string text(double d)
 	{
+		if (std::isnan(d))
+			return "not a number";
+		if (std::isinf(d))
+			return d > 0 ? "infinity" : "-infinity";
 		// Whole numbers show as "5", not "5.0" or "5e+00".
 		if (std::floor(d) == d && std::fabs(d) < 1e21)
 		{
