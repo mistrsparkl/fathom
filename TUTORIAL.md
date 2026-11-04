@@ -208,18 +208,23 @@ Programs can open a window and draw in it. This is a whole game: a ball you move
 genesis:
   open a window with "Ball", 600, 400
   set birth to (300, 200)
+  set existence to birth
   while the window is open:
-    if key held "left": set birth of x to birth of x minus 5
-    if key held "right": set birth of x to birth of x plus 5
-    if key held "up": set birth of y to birth of y minus 5
-    if key held "down": set birth of y to birth of y plus 5
+    if key held "left": set existence of x to existence of x minus 5
+    if key held "right": set existence of x to existence of x plus 5
+    if key held "up": set existence of y to existence of y minus 5
+    if key held "down": set existence of y to existence of y plus 5
+    if key pressed "space": set existence to birth
     consume the window with "black"
-    draw a circle with birth of x, birth of y, 20, "orange"
+    draw a circle with birth of x, birth of y, 4, "white"
+    draw a circle with existence of x, existence of y, 20, "orange"
     show the frame
 and the universe said i love you
 ```
 
-`(300, 200)` is a place on the screen: 300 across, 200 down. `birth of x` is its across part and `birth of y` its down part. `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+`(300, 200)` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of x` is its across part and `existence of y` its down part. Space sends it back to its birth (a small white dot). `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+
+`birth` and `existence` are names you choose: any words that aren't the language's own will do.
 
 The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
 

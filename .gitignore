@@ -1,3 +1,5 @@
 generated/
 __pycache__/
 *.exe
+mygame.imagine
+*.json
