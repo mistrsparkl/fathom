@@ -8,6 +8,11 @@ code:
 include: <windows.h>
 link: user32
 link: gdi32
+code:
+  #include <objidl.h>
+  namespace Gdiplus { using std::min; using std::max; }
+include: <gdiplus.h>
+link: gdiplus
 
 code:
   namespace imagine_window
@@ -201,6 +206,34 @@ code:
   		QueryPerformanceCounter(&last_frame);
   	}
 
+  	inline Gdiplus::Image* picture(const std::string& file, int line)
+  	{
+  		static ULONG_PTR started = 0;
+  		static std::map<std::string, std::unique_ptr<Gdiplus::Image>> loaded;
+  		if (!started)
+  		{
+  			Gdiplus::GdiplusStartupInput in;
+  			Gdiplus::GdiplusStartup(&started, &in, nullptr);
+  		}
+  		auto found = loaded.find(file);
+  		if (found != loaded.end())
+  			return found->second.get();
+  		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
+  			imagine::fail(line, "there is no picture called \"" + file + "\".");
+  		auto image = std::make_unique<Gdiplus::Image>(wide(file).c_str());
+  		if (image->GetLastStatus() != Gdiplus::Ok || image->GetWidth() == 0)
+  			imagine::fail(line, "I couldn't read the picture \"" + file + "\" (use .png or .gif).");
+  		return (loaded[file] = std::move(image)).get();
+  	}
+
+  	inline void draw_picture(const std::string& file, double x, double y, int line)
+  	{
+  		need_window(line);
+  		Gdiplus::Image* image = picture(file, line);
+  		Gdiplus::Graphics g(canvas);
+  		g.DrawImage(image, (int)std::lround(x), (int)std::lround(y), (int)image->GetWidth(), (int)image->GetHeight());
+  	}
+
   	inline void close()
   	{
   		if (window)
@@ -240,6 +273,7 @@ python:
 
   def closed():
       win["open"] = False
+      pictures.clear()
       if win["root"] is not None:
           win["root"].destroy()
       win["root"] = None
@@ -256,7 +290,8 @@ python:
           raise RunError(0, "a window is already open.")
       if w < 1 or h < 1 or w > 10000 or h > 10000:
           raise RunError(0, "a window must be from 1 to 10000 dots wide and high.")
-      root = tkinter.Tk()
+      root = tkinter._default_root or tkinter.Tk()  # a hidden one may exist already, for picture sizes
+      root.deiconify()
       root.title(title)
       root.resizable(False, False)
       canvas = tkinter.Canvas(root, width=int(w), height=int(h), highlightthickness=0, bd=0, bg="#000000")
@@ -311,6 +346,29 @@ python:
           time.sleep(wait)
       win["last"] = time.monotonic()
 
+  pictures = {}
+
+  def picture(file):
+      if file not in pictures:
+          if not os.path.isfile(file):
+              raise RunError(0, f'there is no picture called "{file}".')
+          try:
+              pictures[file] = tkinter.PhotoImage(file=file)
+          except tkinter.TclError:
+              raise RunError(0, f'I couldn\'t read the picture "{file}" (use .png or .gif).')
+      return pictures[file]
+
+  def size_of_picture(file, which):
+      if not tkinter._default_root:
+          tkinter.Tk().withdraw()  # PhotoImage needs Tk running, even before a window is open
+      image = picture(file)
+      return float(image.width() if which == 0 else image.height())
+
+  def draw_picture(file, x, y):
+      need_window()
+      image = picture(file)
+      draw(lambda cv: cv.create_image(round(x), round(y), image=image, anchor="nw"))
+
   def close():
       if win["root"] is not None:
           closed()
@@ -329,6 +387,12 @@ to draw words, given words (text) and x (a number) and y (a number) and colour (
   runs: write({words}, {x}, {y}, {colour})
 to show the frame = imagine_window::show({line})
   runs: show()
+to draw the picture, given file (text) and x (a number) and y (a number) = imagine_window::draw_picture({file}, {x}, {y}, {line})
+  runs: draw_picture({file}, {x}, {y})
+to width of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetWidth()
+  runs: size_of_picture({file}, 0)
+to height of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetHeight()
+  runs: size_of_picture({file}, 1)
 to close the window = imagine_window::close()
   runs: close()
 to key held, given key (text), giving back yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])

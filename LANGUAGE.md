@@ -257,6 +257,8 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `draw a circle with x, y, radius, "blue"` | A filled circle around a middle point. |
 | `draw a line with x, y, to x, to y, "white"` | A line from one place to another. |
 | `draw words with "Score: " plus score, x, y, "yellow"` | Words, from their top left corner. |
+| `draw the picture with "ship.png", x, y` | A picture (.png or .gif), at its own size, from its top left corner. |
+| `width of picture "ship.png"`, `height of picture "ship.png"` | A picture's size in dots. |
 | `show the frame` | Show what was drawn, then wait so the window shows 60 frames a second. |
 | `the window is open` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |

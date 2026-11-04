@@ -155,6 +155,23 @@ def program_checks():
     assert out.stderr == 'Line 16: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
     assert both('use: window\nto start:\n  show the frame\n' + END).stderr.startswith("Line 3: there is no window yet.")
 
+    # Pictures: a tiny .png made here is read and drawn the same both ways.
+    import struct
+    import zlib
+
+    def png(width, height):
+        def chunk(kind, data):
+            return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+        rows = b"".join(b"\0" + b"\xff\x00\x00" * width for _ in range(height))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+    out = both('use: window\nto start:\n  say width of picture "red.png", " ", height of picture "red.png"\n'
+               '  open a window with "Pictures", 100, 100\n  draw the picture with "red.png", 10, 10\n  show the frame\n'
+               '  close the window\n  say width of picture "red.png"\n  say width of picture "none.png"\n' + END,
+               others={"red.png": png(7, 3)})
+    assert out.stdout == "7 3\n7\n", repr(out.stdout)
+    assert out.stderr == 'Line 9: there is no picture called "none.png".\n', repr(out.stderr)
+
     # The web library, without needing the internet: a page that can't be reached fails the same both ways.
     out = both('use: web\nto start:\n  say web page "http://localhost:1/"\n' + END)
     assert out.stderr == 'Line 3: I couldn\'t get the web page "http://localhost:1/".\n', repr(out.stderr)
