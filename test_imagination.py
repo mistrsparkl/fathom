@@ -208,12 +208,13 @@ def program_checks():
     # A window: opens, draws, shows frames and closes the same both ways (it flashes up for a moment).
     out = both('use: window\nto start:\n  open a window with "Test ✓", 200, 100\n'
                '  say the window is open, " ", mouse held, " ", key held "space"\n  repeat 3 times:\n'
+               '    say key pressed "space", " ", mouse clicked\n'
                '    clear the window with "black"\n    draw a box with 10, 10, 50, 20, "#ff8800"\n'
                '    draw a circle with 100, 50, 20, "blue"\n    draw a line with 0, 0, 200, 100, "white"\n'
                '    draw words with "héllo", 120, 10, "yellow"\n    show the frame\n  close the window\n'
                '  say the window is open\n  draw a circle with 1, 1, 1, "red"\n  say "ok"\n  draw a circle with 1, 1, 1, "reddish"\n' + END)
-    assert out.stdout == "yes no no\nno\nok\n", repr(out.stdout)
-    assert out.stderr == 'Line 16: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
+    assert out.stdout == "yes no no\nno no\nno no\nno no\nno\nok\n", repr(out.stdout)
+    assert out.stderr == 'Line 17: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
     assert both('use: window\nto start:\n  show the frame\n' + END).stderr.startswith("Line 3: there is no window yet.")
 
     # Pictures: a tiny .png made here is read and drawn the same both ways.

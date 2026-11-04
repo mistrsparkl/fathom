@@ -23,6 +23,8 @@ code:
   	inline bool open_now = false;
   	inline bool opened = false;
   	inline bool keys[256] = {};
+  	inline bool fresh[256] = {}, pressed[256] = {};
+  	inline bool click_fresh = false, clicked = false;
   	inline bool mouse_down = false;
   	inline double mouse_x_now = 0, mouse_y_now = 0;
   	inline int width = 0, height = 0;
@@ -78,11 +80,11 @@ code:
   		switch (msg)
   		{
   		case WM_CLOSE: open_now = false; DestroyWindow(hwnd); window = nullptr; return 0;
-  		case WM_KEYDOWN: case WM_SYSKEYDOWN: keys[wp & 255] = true; return 0;
+  		case WM_KEYDOWN: case WM_SYSKEYDOWN: if (!(lp & (1 << 30))) fresh[wp & 255] = true; keys[wp & 255] = true; return 0;
   		case WM_KEYUP: case WM_SYSKEYUP: keys[wp & 255] = false; return 0;
   		case WM_KILLFOCUS: for (bool& k : keys) k = false; mouse_down = false; return 0;
   		case WM_MOUSEMOVE: mouse_x_now = (short)LOWORD(lp); mouse_y_now = (short)HIWORD(lp); return 0;
-  		case WM_LBUTTONDOWN: mouse_down = true; SetCapture(hwnd); return 0;
+  		case WM_LBUTTONDOWN: mouse_down = click_fresh = true; SetCapture(hwnd); return 0;
   		case WM_LBUTTONUP: mouse_down = false; ReleaseCapture(); return 0;
   		case WM_PAINT:
   		{
@@ -197,6 +199,13 @@ code:
   			UpdateWindow(window);
   		}
   		pump();
+  		for (int k = 0; k < 256; ++k)
+  		{
+  			pressed[k] = fresh[k];
+  			fresh[k] = false;
+  		}
+  		clicked = click_fresh;
+  		click_fresh = false;
   		LARGE_INTEGER now, freq;
   		QueryPerformanceFrequency(&freq);
   		QueryPerformanceCounter(&now);
@@ -251,7 +260,7 @@ python:
              "grey": "#808080", "gray": "#808080"}
   KEYS = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"}
   TK_KEYS = {"return": "enter", "shift_l": "shift", "shift_r": "shift", "control_l": "control", "control_r": "control"}
-  win = {"root": None, "open": False, "opened": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0}
+  win = {"root": None, "open": False, "opened": False, "pressed": set(), "clicked": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0}
 
   def need_window():
       if not win["opened"]:
@@ -299,14 +308,20 @@ python:
       held = win["held"]
       held.clear()
       root.protocol("WM_DELETE_WINDOW", closed)
-      root.bind("<KeyPress>", lambda e: held.add(TK_KEYS.get(e.keysym.lower(), e.keysym.lower())))
+      def down(e):
+          k = TK_KEYS.get(e.keysym.lower(), e.keysym.lower())
+          if k not in held:  # not the repeats a held key sends
+              win["fresh"].add(k)
+          held.add(k)
+      root.bind("<KeyPress>", down)
       root.bind("<KeyRelease>", lambda e: held.discard(TK_KEYS.get(e.keysym.lower(), e.keysym.lower())))
       root.bind("<FocusOut>", lambda e: (held.clear(), win.update(down=False)))
       canvas.bind("<Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
       canvas.bind("<B1-Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
-      canvas.bind("<ButtonPress-1>", lambda e: win.update(down=True))
+      canvas.bind("<ButtonPress-1>", lambda e: win.update(down=True, click_fresh=True))
       canvas.bind("<ButtonRelease-1>", lambda e: win.update(down=False))
-      win.update(root=root, canvas=canvas, open=True, opened=True, size=(int(w), int(h)), last=time.monotonic())
+      win.update(root=root, canvas=canvas, open=True, opened=True, size=(int(w), int(h)), last=time.monotonic(),
+                 fresh=set(), pressed=set(), click_fresh=False, clicked=False)
       root.focus_force()
       pump()
 
@@ -341,6 +356,8 @@ python:
   def show():
       need_window()
       pump()
+      win["pressed"], win["fresh"] = win["fresh"], set()
+      win["clicked"], win["click_fresh"] = win["click_fresh"], False
       wait = 1.0 / 60 - (time.monotonic() - win["last"])
       if wait > 0:
           time.sleep(wait)
@@ -404,5 +421,9 @@ mouse x = imagine_window::mouse_x_now, number, read only
   runs: win["mouse"][0]
 mouse y = imagine_window::mouse_y_now, number, read only
   runs: win["mouse"][1]
+to key pressed, given key (text), giving back yes or no = (imagine_window::pressed[imagine_window::key_code({key}, {line})])
+  runs: key_name({key}) in win["pressed"]
+mouse clicked = imagine_window::clicked, yes or no, read only
+  runs: win["clicked"]
 mouse held = imagine_window::mouse_down, yes or no, read only
   runs: win["down"]

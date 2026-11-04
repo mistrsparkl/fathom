@@ -268,6 +268,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `the window is open` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
 | `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
+| `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
 | `close the window` | Close it yourself. |
 
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
