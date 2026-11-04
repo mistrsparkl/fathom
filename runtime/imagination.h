@@ -990,9 +990,16 @@ namespace imagine
 	template <typename T>
 	const T& random_item(const std::vector<T>& items, int line);
 
-	inline double random(double lo, double hi, int line)
+	inline std::mt19937_64& random_engine()
 	{
 		static std::mt19937_64 engine{std::random_device{}()};
+		return engine;
+	}
+	inline double random_fraction() { return std::uniform_real_distribution<double>(0.0, 1.0)(random_engine()); }
+
+	inline double random(double lo, double hi, int line)
+	{
+		auto& engine = random_engine();
 		double a = std::ceil(std::min(lo, hi)), b = std::floor(std::max(lo, hi));
 		if (a > b)
 			fail(line, "there is no whole number from " + text(lo) + " to " + text(hi) + ".");

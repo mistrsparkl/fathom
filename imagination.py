@@ -1146,6 +1146,9 @@ class Expr:
                     raise RunError(line, "the list is empty, so I can't pick a random item.")
                 return pyrandom.choice(items)
             return Value(f"imagine::random_item({v.cpp}, {line})", element(v.kind), pick)
+        if self.at("random", "fraction"):  # 'random fraction': a number from 0 up to (not quite) 1
+            self.i += 2
+            return Value("imagine::random_fraction()", NUMBER, lambda env: pyrandom.random())
         if self.at("random", "number", "from"):
             self.i += 3
             lo = self.need(self.sum(), NUMBER, "random number")

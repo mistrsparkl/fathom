@@ -293,6 +293,12 @@ def program_checks():
     out = both('genesis:\n  fill the file with ("data.bin", a list of (0, 255, 10, 13, 65))\n  scrawl the bytes of the file "data.bin", " / ", bytes in the file "data.bin"\n  set all to the bytes of the file "data.bin"\n  gather 66 into all\n  fill the file with ("data.bin", all)\n  scrawl contents of file "data.bin" ends with "AB"\n  try:\n    fill the file with ("bad.bin", a list of (1, 256))\n  if that went wrong:\n    scrawl the wound\n  scrawl file "bad.bin" exists\nand the universe said i love you\n')
     assert out.stdout == '0, 255, 10, 13, 65 / 5\nyes\na byte is a whole number from 0 to 255, not 256.\nno\n', repr(out.stdout)
 
+    # random fraction: from 0 up to (not quite) 1.
+    out = both('genesis:\n  set lowest to 1\n  set highest to 0\n  echo 1000 times:\n    set r to random fraction\n'
+               '    set lowest to smaller of lowest and r\n    set highest to larger of highest and r\n'
+               '  scrawl lowest is at least 0 and lowest falls below 0.05 and highest falls below 1 and highest exceeds 0.95\n' + END)
+    assert out.stdout == "yes\n", repr(out.stdout)
+
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
                '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'

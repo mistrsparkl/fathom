@@ -220,6 +220,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `square root of x` | the square root |
 | `size of x` | a number without its sign, the distance of a place from 0 horizontal 0 vertical 0 depth, the length of a (flat) place, or how many letters text has |
 | `random number from 1 to 100` | a random whole number, both ends included |
+| `random fraction` | a random number from 0 up to (but never quite) 1, like 0.7302 |
 | `item 2 of scores` | one item of a list (counted from 1) |
 | `a random item of scores` | one item of a list, picked at random |
 | `size of scores` | how many items a list has |
