@@ -19,6 +19,10 @@
 #include <thread>
 #include <vector>
 
+#ifdef IMAGINE_IN_UNREAL
+#include "CoreMinimal.h"  // Unreal's own FVector, FVector2D and FMath
+#pragma warning(disable: 4702)  // Unreal treats warnings as mistakes; a command's last 'return' can be one nobody reaches
+#else
 // The same maths names Unreal has, so a script means the same thing in a program and in Unreal.
 namespace FMath
 {
@@ -74,6 +78,7 @@ inline const FVector2D FVector2D::ZeroVector{};
 
 extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
 extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
+#endif
 
 namespace imagine
 {
@@ -81,13 +86,17 @@ namespace imagine
 
 	// Called first by every program: text is UTF-8, so the console should show it as UTF-8.
 	inline std::vector<std::string> arguments;  // the words typed after the program's name
+	// Where scrawl's lines and problems go when there is no console (in Unreal): text, and whether it is a problem.
+	inline std::function<void(const std::string&, bool)> show_hook;
 	inline void begin(std::initializer_list<std::string> scripts, int count = 0, char** given = nullptr)
 	{
 		files = scripts;
 		for (int k = 1; k < count; ++k)
 			arguments.push_back(given[k]);
+#ifndef IMAGINE_IN_UNREAL
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
+#endif
 	}
 
 	inline std::string text(const std::string& s) { return s; }
@@ -195,6 +204,13 @@ namespace imagine
 
 	inline void report(const Problem& problem)
 	{
+		if (show_hook)
+		{
+			std::string where = problem.line < 100000 || problem.line / 100000 >= static_cast<int>(files.size())
+				? "Line " + std::to_string(problem.line) : files[problem.line / 100000] + " line " + std::to_string(problem.line % 100000);
+			show_hook(where + ": " + problem.message, true);
+			return;
+		}
 		std::cout << std::flush;
 		if (problem.line < 100000 || problem.line / 100000 >= static_cast<int>(files.size()))
 			std::cerr << "Line " << problem.line;
@@ -961,6 +977,14 @@ namespace imagine
 
 	inline void say(std::initializer_list<std::string> parts)
 	{
+		if (show_hook)
+		{
+			std::string all;
+			for (const std::string& p : parts)
+				all += p;
+			show_hook(all, false);
+			return;
+		}
 		for (const std::string& p : parts)
 			std::cout << p;
 		std::cout << std::endl;
@@ -968,6 +992,8 @@ namespace imagine
 
 	inline std::string ask_text(const std::string& question)
 	{
+		if (show_hook)
+			throw Problem{0, "'ask' doesn't work in Unreal yet (there is nowhere to type)."};
 		std::cout << question << std::flush;
 		std::string line;
 		if (!std::getline(std::cin, line))

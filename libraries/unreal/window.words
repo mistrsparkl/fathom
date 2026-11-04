@@ -1,0 +1,241 @@
+note: The window library's words, for programs running inside Unreal (imagine unreal game.imagine).
+note: The program runs on its own thread; 'reveal the frame' hands the frame to Unreal and waits until Unreal has shown it.
+note: 3D shapes become real Unreal meshes in a lit world; flat drawing goes on top of the picture.
+
+include: "ImagineBridge.h"
+include: <chrono>
+
+code:
+  namespace imagine_window
+  {
+  	using imagine_unreal::bridge;
+  	inline double eye[5] = {0, 1.5, -6, 0, 0};  // across, up, away, turn, tilt
+  	inline int text_size = 16;
+  	inline double frame_time_now = 1.0 / 60;
+  	inline auto last_frame = std::chrono::steady_clock::now();
+  	inline const double pi3 = 3.14159265358979323846;
+
+  	inline void need_window(int line)
+  	{
+  		if (!bridge().opened)
+  			imagine::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
+  	}
+  	inline FLinearColor colour(const std::string& name, int line)
+  	{
+  		static const std::pair<const char*, FColor> named[] = {
+  			{"black", FColor(0, 0, 0)}, {"white", FColor(255, 255, 255)}, {"red", FColor(220, 40, 40)}, {"green", FColor(40, 180, 70)},
+  			{"blue", FColor(50, 90, 230)}, {"yellow", FColor(245, 210, 40)}, {"orange", FColor(245, 140, 30)},
+  			{"purple", FColor(140, 60, 200)}, {"pink", FColor(240, 120, 180)}, {"brown", FColor(130, 80, 40)},
+  			{"grey", FColor(128, 128, 128)}, {"gray", FColor(128, 128, 128)}};
+  		std::string low = imagine::lower(name);
+  		for (const auto& [key, value] : named)
+  			if (low == key)
+  				return FLinearColor::FromSRGBColor(value);
+  		if (low.size() == 7 && low[0] == '#' && low.find_first_not_of("0123456789abcdef", 1) == std::string::npos)
+  		{
+  			unsigned long v = std::stoul(low.substr(1), nullptr, 16);
+  			return FLinearColor::FromSRGBColor(FColor((v >> 16) & 255, (v >> 8) & 255, v & 255));
+  		}
+  		imagine::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
+  	}
+  	inline std::string key_name(const std::string& name, int line)
+  	{
+  		std::string k = imagine::lower(name);
+  		static const char* special[] = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"};
+  		if (k.size() == 1 && ((k[0] >= 'a' && k[0] <= 'z') || (k[0] >= '0' && k[0] <= '9')))
+  			return k;
+  		for (const char* s : special)
+  			if (k == s)
+  				return k;
+  		imagine::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
+  	}
+  	inline void open(const std::string& title, double w, double h, int line)
+  	{
+  		auto& b = bridge();
+  		std::lock_guard<std::mutex> hold(b.lock);
+  		if (b.opened)
+  			imagine::fail(line, "a window is already open.");
+  		if (w < 1 || h < 1 || w > 10000 || h > 10000)
+  			imagine::fail(line, "a window must be from 1 to 10000 dots wide and high.");
+  		b.title = title;
+  		b.width = (int)std::lround(w);
+  		b.height = (int)std::lround(h);
+  		b.width_now = b.width;
+  		b.height_now = b.height;
+  		b.opened = true;
+  		b.open_asked = true;
+  	}
+  	inline void flat(imagine_unreal::Flat f, int line)
+  	{
+  		need_window(line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		bridge().building.flats.push_back(std::move(f));
+  	}
+  	inline void clear(const std::string& c, int line)
+  	{
+  		need_window(line);
+  		FLinearColor col = colour(c, line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		bridge().building.flats.clear();
+  		bridge().building.sky = col;
+  	}
+  	inline void box(double x, double y, double w, double h, const std::string& c, int line)
+  	{
+  		flat({0, (float)x, (float)y, (float)w, (float)h, colour(c, line), ""}, line);
+  	}
+  	inline void circle(double x, double y, double r, const std::string& c, int line)
+  	{
+  		flat({1, (float)x, (float)y, (float)r, (float)r, colour(c, line), ""}, line);
+  	}
+  	inline void line_between(double x1, double y1, double x2, double y2, const std::string& c, int line)
+  	{
+  		flat({2, (float)x1, (float)y1, (float)x2, (float)y2, colour(c, line), ""}, line);
+  	}
+  	inline void write(const std::string& words, double x, double y, const std::string& c, int line)
+  	{
+  		flat({3, (float)x, (float)y, (float)text_size, 0, colour(c, line), words}, line);
+  	}
+  	inline void set_text_size(double size, int line)
+  	{
+  		if (!(size >= 1 && size <= 500))
+  			imagine::fail(line, "text can be from 1 to 500 dots high, not " + imagine::text(size) + ".");
+  		text_size = (int)std::lround(size);
+  	}
+  	inline void no_pictures(int line)
+  	{
+  		imagine::fail(line, "pictures don't work in Unreal yet.");
+  	}
+  	inline void show(int line)
+  	{
+  		need_window(line);
+  		auto& b = bridge();
+  		std::unique_lock<std::mutex> hold(b.lock);
+  		if (!b.lives)
+  			return;
+  		for (int k = 0; k < 5; ++k)
+  			b.building.eye[k] = eye[k];
+  		b.ready = std::move(b.building);
+  		b.building = imagine_unreal::Frame{};
+  		b.building.sky = b.ready.sky;
+  		b.fresh = true;
+  		b.changed.notify_all();
+  		b.changed.wait(hold, [&b] { return !b.fresh || !b.lives; });  // until Unreal has taken it
+  		b.pressed = b.pressed_fresh;
+  		b.pressed_fresh.clear();
+  		b.clicked_now = b.click_fresh ? 1 : 0;
+  		b.click_fresh = false;
+  		auto now = std::chrono::steady_clock::now();
+  		frame_time_now = std::chrono::duration<double>(now - last_frame).count();
+  		last_frame = now;
+  	}
+  	inline void close()
+  	{
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		bridge().end_asked = true;
+  	}
+  	inline bool held(const std::string& key, int line)
+  	{
+  		std::string k = key_name(key, line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		return bridge().held.count(k) > 0;
+  	}
+  	inline bool pressed(const std::string& key, int line)
+  	{
+  		std::string k = key_name(key, line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		return bridge().pressed.count(k) > 0;
+  	}
+  	inline bool lives()
+  	{
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		return bridge().opened && bridge().lives;
+  	}
+  	inline double read(double imagine_unreal::Bridge::*part)
+  	{
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		return bridge().*part;
+  	}
+
+  	// ---- 3D: across is horizontal, up is vertical, away is depth (1 = one metre in Unreal)
+  	inline void shape(int kind, const FVector& at, const FVector& size, const std::string& c, int line)
+  	{
+  		need_window(line);
+  		FLinearColor col = colour(c, line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		bridge().building.shapes.push_back({kind, at, size, col});
+  	}
+  	inline void place_eye(const FVector& p) { eye[0] = p.X; eye[1] = p.Y; eye[2] = p.Z; }
+  	inline void aim_eye(double turn, double tilt)
+  	{
+  		eye[3] = turn;
+  		eye[4] = std::max(-89.0, std::min(89.0, tilt));
+  	}
+  	inline FVector2D screen_place(const FVector& p, int line)
+  	{
+  		need_window(line);
+  		double t = eye[3] * pi3 / 180.0, a = eye[4] * pi3 / 180.0;
+  		double dx = p.X - eye[0], dy = p.Y - eye[1], dz = p.Z - eye[2];
+  		double x1 = dx * std::cos(t) - dz * std::sin(t), z1 = dx * std::sin(t) + dz * std::cos(t);
+  		double y2 = dy * std::cos(a) - z1 * std::sin(a), z2 = dy * std::sin(a) + z1 * std::cos(a);
+  		if (z2 < 0.05)
+  			return FVector2D(std::nan(""), std::nan(""));
+  		double w = read(&imagine_unreal::Bridge::width_now), h = read(&imagine_unreal::Bridge::height_now);
+  		double f = (h / 2.0) / std::tan(30.0 * pi3 / 180.0);
+  		return FVector2D(w / 2.0 + x1 * f / z2, h / 2.0 - y2 * f / z2);
+  	}
+  	inline void block(const FVector& middle, double w, double h, double d, const std::string& c, int line)
+  	{
+  		if (!(w > 0 && h > 0 && d > 0))
+  			imagine::fail(line, "a block's width, height and depth must all be more than 0.");
+  		shape(0, middle, FVector(w, h, d), c, line);
+  	}
+  	inline void cube(const FVector& middle, double size, const std::string& c, int line) { block(middle, size, size, size, c, line); }
+  	inline void ball(const FVector& middle, double radius, const std::string& c, int line)
+  	{
+  		if (!(radius > 0))
+  			imagine::fail(line, "a ball's radius must be more than 0.");
+  		shape(1, middle, FVector(radius, radius, radius), c, line);
+  	}
+  	inline void ground(const std::string& a, const std::string& b, int line)
+  	{
+  		need_window(line);
+  		FLinearColor ca = colour(a, line), cb = colour(b, line);
+  		std::lock_guard<std::mutex> hold(bridge().lock);
+  		bridge().building.ground = true;
+  		bridge().building.ground_a = ca;
+  		bridge().building.ground_b = cb;
+  	}
+  }
+
+to open a world, given title (text) and width (a number) and height (a number) = imagine_window::open({title}, {width}, {height}, {line})
+to consume the window, given colour (text) = imagine_window::clear({colour}, {line})
+to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = imagine_window::box({x}, {y}, {width}, {height}, {colour}, {line})
+to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
+to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::circle({x}, {y}, {radius}, {colour}, {line})
+to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = imagine_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
+to etch words, given words (text) and x (a number) and y (a number) and colour (text) = imagine_window::write({words}, {x}, {y}, {colour}, {line})
+to set the text size to, given size (a number) = imagine_window::set_text_size({size}, {line})
+to reveal the frame = imagine_window::show({line})
+to etch the picture, given file (text) and x (a number) and y (a number) = ((void)({file}), (void)({x}), (void)({y}), imagine_window::no_pictures({line}))
+to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = ((void)({file}), (void)({x}), (void)({y}), (void)({size}), (void)({angle}), imagine_window::no_pictures({line}))
+to width of picture, given file (text), giving back a number = ((void)({file}), imagine_window::no_pictures({line}), 0.0)
+to height of picture, given file (text), giving back a number = ((void)({file}), imagine_window::no_pictures({line}), 0.0)
+to end the world = imagine_window::close()
+to key held, given key (text), giving back yes or no = imagine_window::held({key}, {line})
+the world lives = imagine_window::lives(), yes or no, read only
+width of the world = imagine_window::read(&imagine_unreal::Bridge::width_now), number, read only
+height of the world = imagine_window::read(&imagine_unreal::Bridge::height_now), number, read only
+mouse x = imagine_window::read(&imagine_unreal::Bridge::mouse_x), number, read only
+mouse y = imagine_window::read(&imagine_unreal::Bridge::mouse_y), number, read only
+to key pressed, given key (text), giving back yes or no = imagine_window::pressed({key}, {line})
+mouse clicked = (imagine_window::read(&imagine_unreal::Bridge::clicked_now) != 0), yes or no, read only
+frame time = imagine_window::frame_time_now, number, read only
+mouse held = (imagine_window::read(&imagine_unreal::Bridge::mouse_down) != 0), yes or no, read only
+to place the eye at, given where (a place) = imagine_window::place_eye({where})
+to aim the eye, given turn (a number) and tilt (a number) = imagine_window::aim_eye({turn}, {tilt})
+to screen place of, given where (a place), giving back a flat place = imagine_window::screen_place({where}, {line})
+to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = imagine_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
+to etch a cube, given middle (a place) and size (a number) and colour (text) = imagine_window::cube({middle}, {size}, {colour}, {line})
+to etch a ball, given middle (a place) and radius (a number) and colour (text) = imagine_window::ball({middle}, {radius}, {colour}, {line})
+to etch the ground, given colour (text) and other colour (text) = imagine_window::ground({colour}, {other colour}, {line})
+the graphics card draws = true, yes or no, read only

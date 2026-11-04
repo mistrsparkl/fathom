@@ -16,6 +16,7 @@ import operator
 import os
 import random as pyrandom
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -55,6 +56,7 @@ CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D"
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT}
+UNREAL = False  # set by 'imagine unreal': libraries/unreal/ words win, and the program starts from ImagineMain()
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
@@ -1616,7 +1618,8 @@ def similar_words(tokens, names):
 
 def load_library(name, line, names):
     """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file."""
-    path = next((p for p in (LOGIC / f"{name}.words", HERE / "libraries" / f"{name}.words") if p.exists()), None)
+    places = [LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else []) + [HERE / "libraries" / f"{name}.words"]
+    path = next((p for p in places if p.exists()), None)
     if not path:
         have = sorted(p.stem for p in (HERE / "libraries").glob("*.words"))
         raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
@@ -1949,7 +1952,8 @@ def read_one(path, auto):
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
-        functions.append(f"int main(int count, char** given)\n{{\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\timagine::wait_for_others();\n\t}}\n"
+        start = "int ImagineMain()\n{\n\tint count = 0;\n\tchar** given = nullptr;" if UNREAL else "int main(int count, char** given)\n{"
+        functions.append(f"{start}\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\timagine::wait_for_others();\n\t}}\n"
                          f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
@@ -2890,6 +2894,48 @@ def build(script, exe):
     return None
 
 
+ENGINE = Path(r"C:\Program Files\Epic Games\UE_5.8")
+WORLD = Path.home() / "Documents" / "ImaginationWorld"  # the Unreal project 'imagine unreal' builds into
+
+
+def unreal(script, launch=True):
+    """Turns a program into the ImaginationWorld Unreal project, builds it, and starts it. Returns an error message, or None."""
+    global LOGIC, UNREAL
+    LOGIC, UNREAL = script.parent, True
+    try:
+        cpp_out, program = read_script(script)
+    except ScriptError as err:
+        return f"{where(err.line)}: {err.message}"
+    finally:
+        UNREAL = False
+    if program is None:
+        return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
+    editor = ENGINE / "Engine" / "Binaries" / "Win64" / "UnrealEditor.exe"
+    if not editor.exists():
+        return f"I can't find Unreal Engine at {ENGINE}."
+    shutil.copytree(HERE / "unreal", WORLD, dirs_exist_ok=True)
+    made = WORLD / "Source" / "ImaginationWorld" / "Generated"
+    made.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(HERE / "runtime" / "imagination.h", made / "imagination.h")
+    target = made / "Program.imagine.cpp"
+    if not target.exists() or target.read_text(encoding="utf-8") != cpp_out:  # unchanged files aren't compiled again
+        target.write_text(cpp_out, encoding="utf-8")
+    subprocess.run(["taskkill", "/f", "/im", "UnrealEditor.exe"], capture_output=True)
+    log = WORLD / "Saved" / "build.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    project = WORLD / "ImaginationWorld.uproject"
+    print(f"Building {project} (the first time takes a few minutes)...")
+    with open(log, "w", encoding="utf-8", errors="replace") as out:
+        result = subprocess.run([str(ENGINE / "Engine" / "Build" / "BatchFiles" / "Build.bat"), "ImaginationWorldEditor", "Win64",
+                                 "Development", f"-Project={project}", "-WaitMutex"], stdout=out, stderr=subprocess.STDOUT)
+    if result.returncode != 0:
+        lines = [l for l in log.read_text(errors="replace").splitlines() if "error" in l.lower()]
+        return "Unreal didn't accept the C++. That is a bug in Imagination (or a library), not in your script.\n" + "\n".join(lines[:20]) + f"\n(all of it: {log})"
+    if launch:
+        subprocess.Popen([str(editor), str(project), "-game", "-windowed", "-ResX=1280", "-ResY=720", "-nosplash"])
+    return None
+
+
 TRY_HELLO = """Imagination: type a line and press Enter to see what it does. For example:
   set name to "Sam"
   scrawl "Hello, " plus name
@@ -2973,6 +3019,7 @@ USAGE = """Use:
   imagine run <script.imagine>                 the same
   imagine build <script.imagine>               make it into an .exe (needs Visual Studio's C++ compiler)
   imagine check <script.imagine>               look for mistakes without running it
+  imagine unreal <script.imagine>              run it inside Unreal Engine: the 3D words become a real lit world
   imagine                                      try lines out, one at a time
   imagine <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
 (imagine is short for: py -3 imagination.py)"""
@@ -2999,6 +3046,17 @@ def main(argv):
             print(f"{where(err.line)}: {err.message}")
             return 1
         print(f"{Path(args[1]).name}: no mistakes found.")
+        return 0
+    if len(args) == 2 and args[0] == "unreal":
+        script = Path(args[1])
+        if not script.exists():
+            print(f"There is no script called {script}.")
+            return 2
+        problem = unreal(script, launch=not os.environ.get("IMAGINE_NO_LAUNCH"))
+        if problem:
+            print(problem)
+            return 1
+        print(f"Built {WORLD}" + ("" if os.environ.get("IMAGINE_NO_LAUNCH") else " and started it."))
         return 0
     if len(args) == 2 and args[0] in ("run", "build"):
         script = Path(args[1])
