@@ -251,7 +251,7 @@ and the universe said i love you
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
 | `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (gives back the page as text) |
-| `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (.wav files) |
+| `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
 
 ### The window library

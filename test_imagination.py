@@ -369,9 +369,11 @@ def program_checks():
         w.setframerate(8000)
         w.writeframes(b"\0\0" * 800)
     out = both('use: sound\ngenesis:\n  play the sound and wait with "quiet.wav"\n  play the sound with "quiet.wav"\n'
-               '  stop the sound\n  scrawl "played"\n  play the sound with "nope.wav"\n' + END, others={"quiet.wav": silent.getvalue()})
+               '  play the sound with "quiet.wav"\n  play the sound again and again with "quiet.wav"\n'
+               '  stop the sound\n  scrawl "played"\n  play the sound with "not a sound.wav"\n  play the sound with "nope.wav"\n' + END,
+               others={"quiet.wav": silent.getvalue(), "not a sound.wav": b"hello"})
     assert out.stdout == "played\n", repr(out.stdout)
-    assert out.stderr == 'Line 7: there is no sound file called "nope.wav".\n', repr(out.stderr)
+    assert out.stderr == "Line 9: I couldn't play \"not a sound.wav\" (it must be a .wav or .mp3 file).\n", repr(out.stderr)
 
     # Random items come from the list; an empty list is a plain error.
     out = both('genesis:\n  set xs to a list of (4, 4, 4)\n  scrawl a random item of xs, random item of a list of ("z")\n'

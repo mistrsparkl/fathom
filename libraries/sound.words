@@ -1,5 +1,6 @@
 note: Words for sound (Windows). Use them in a program with:  use: sound
-note: Sound files must be .wav files. Paths are from the folder the program runs in.
+note: Sound files can be .wav or .mp3 files. Paths are from the folder the program runs in.
+note: Sounds play on top of each other, so a game can have many at once.
 
 code:
   #define NOMINMAX
@@ -17,26 +18,71 @@ code:
   		return out;
   	}
 
+  	inline std::vector<std::wstring> playing;  // the players opened so far
+  	inline int made = 0;
+
+  	inline bool done(const std::wstring& alias)
+  	{
+  		wchar_t mode[64] = L"";
+  		mciSendStringW((L"status " + alias + L" mode").c_str(), mode, 64, nullptr);
+  		return std::wstring(mode) != L"playing";
+  	}
+
   	inline void play(const std::string& file, bool wait, bool loop, int line)
   	{
-  		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
+  		std::wstring path = wide(file);
+  		if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
   			imagine::fail(line, "there is no sound file called \"" + file + "\".");
-  		DWORD how = SND_FILENAME | SND_NODEFAULT | (wait ? SND_SYNC : SND_ASYNC) | (loop ? SND_LOOP : 0);
-  		if (!PlaySoundW(wide(file).c_str(), nullptr, how))
-  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav file).");
+  		for (size_t k = 0; k < playing.size();)  // close the ones that have finished
+  			if (done(playing[k]))
+  			{
+  				mciSendStringW((L"close " + playing[k]).c_str(), nullptr, 0, nullptr);
+  				playing.erase(playing.begin() + k);
+  			}
+  			else
+  				++k;
+  		wchar_t full[MAX_PATH * 4];
+  		GetFullPathNameW(path.c_str(), MAX_PATH * 4, full, nullptr);
+  		std::wstring alias = L"imagine_sound_" + std::to_wstring(++made);
+  		if (mciSendStringW((L"open \"" + std::wstring(full) + L"\" type mpegvideo alias " + alias).c_str(), nullptr, 0, nullptr) != 0)
+  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  		playing.push_back(alias);
+  		mciSendStringW((L"play " + alias + (loop ? L" repeat" : L"") + (wait ? L" wait" : L"")).c_str(), nullptr, 0, nullptr);
+  	}
+
+  	inline void stop()
+  	{
+  		for (const auto& alias : playing)
+  			mciSendStringW((L"close " + alias).c_str(), nullptr, 0, nullptr);
+  		playing.clear();
   	}
   }
 
 python:
-  import winsound
+  import ctypes
+  mci = ctypes.windll.winmm.mciSendStringW
+  playing = []
+  made = [0]
+  def done(alias):
+      mode = ctypes.create_unicode_buffer(64)
+      mci(f"status {alias} mode", mode, 64, None)
+      return mode.value != "playing"
   def play(file, wait, loop):
-      if not os.path.isfile(file):
+      if not os.path.exists(file):
           raise RunError(0, f'there is no sound file called "{file}".')
-      how = winsound.SND_FILENAME | winsound.SND_NODEFAULT | (0 if wait else winsound.SND_ASYNC) | (winsound.SND_LOOP if loop else 0)
-      try:
-          winsound.PlaySound(file, how)
-      except RuntimeError:
-          raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav file).')
+      for alias in [a for a in playing if done(a)]:  # close the ones that have finished
+          mci(f"close {alias}", None, 0, None)
+          playing.remove(alias)
+      made[0] += 1
+      alias = f"imagine_sound_{made[0]}"
+      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias {alias}', None, 0, None) != 0:
+          raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
+      playing.append(alias)
+      mci(f"play {alias}" + (" repeat" if loop else "") + (" wait" if wait else ""), None, 0, None)
+  def stop():
+      for alias in playing:
+          mci(f"close {alias}", None, 0, None)
+      playing.clear()
 
 to play the sound, given file (text) = imagine_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
@@ -44,5 +90,5 @@ to play the sound and wait, given file (text) = imagine_sound::play({file}, true
   runs: play({file}, True, False)
 to play the sound again and again, given file (text) = imagine_sound::play({file}, false, true, {line})
   runs: play({file}, False, True)
-to stop the sound = PlaySoundW(nullptr, nullptr, 0)
-  runs: winsound.PlaySound(None, 0)
+to stop the sound = imagine_sound::stop()
+  runs: stop()
