@@ -1,0 +1,41 @@
+{
+  "genesis": {
+    "prefix": "genesis",
+    "body": ["genesis:", "  $0", "and the universe said i love you"],
+    "description": "Where the program begins"
+  },
+  "command": {
+    "prefix": "to",
+    "body": ["to ${1:name}:", "  $0", "and the universe said i love you"],
+    "description": "A command of your own"
+  },
+  "command with inputs": {
+    "prefix": "to given",
+    "body": ["to ${1:name}, given ${2:input} (${3:a number}):", "  $0", "and the universe said i love you"],
+    "description": "A command that takes inputs"
+  },
+  "kind of thing": {
+    "prefix": "has",
+    "body": ["a ${1:ball} has:", "  ${2:birth} (${3:a flat place})", "and the universe said i love you"],
+    "description": "A new kind of thing and its parts"
+  },
+  "window game": {
+    "prefix": "game",
+    "body": [
+      "genesis:",
+      "  open a window with \"${1:My Game}\", 600, 400",
+      "  set birth to (300, 200)",
+      "  while the window is open:",
+      "    consume the window with \"black\"",
+      "    $0",
+      "    show the frame",
+      "and the universe said i love you"
+    ],
+    "description": "A window with a game loop"
+  },
+  "if": { "prefix": "if", "body": ["if ${1:something}:", "  $0"] },
+  "while": { "prefix": "while", "body": ["while ${1:something}:", "  $0"] },
+  "repeat": { "prefix": "repeat", "body": ["repeat ${1:3} times:", "  $0"] },
+  "for each": { "prefix": "for each", "body": ["for each ${1:item} in ${2:list}:", "  $0"] },
+  "try": { "prefix": "try", "body": ["try:", "  $1", "if that went wrong:", "  scrawl the problem"] }
+}

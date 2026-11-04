@@ -1,0 +1,28 @@
+{
+  "scopeName": "source.imagination",
+  "name": "Imagination",
+  "patterns": [
+    { "name": "comment.line.imagination", "match": "^\\s*note:.*$" },
+    { "name": "keyword.control.closing.imagination", "match": "^and the universe said i love you\\s*$" },
+    { "name": "string.quoted.double.imagination", "begin": "\"", "end": "\"" },
+    { "name": "constant.numeric.imagination", "match": "\\b\\d+(\\.\\d+)?\\b" },
+    {
+      "match": "^(genesis)(:)",
+      "captures": { "1": { "name": "keyword.control.genesis.imagination" } }
+    },
+    {
+      "match": "^(to)\\s+([a-z ]+?)(?=,|:)",
+      "captures": { "1": { "name": "keyword.control.imagination" }, "2": { "name": "entity.name.function.imagination" } }
+    },
+    {
+      "match": "^(an?)\\s+([a-z ]+?)\\s+(has)(:)",
+      "captures": { "1": { "name": "keyword.other.imagination" }, "2": { "name": "entity.name.type.imagination" }, "3": { "name": "keyword.other.imagination" } }
+    },
+    { "name": "keyword.other.use.imagination", "match": "^use:" },
+    { "name": "keyword.control.imagination", "match": "\\b(if that went wrong|if|otherwise|while|repeat|times|for each|in|from|try|stop the loop|skip to the next one|stop|give back|giving back|given)\\b" },
+    { "name": "support.function.imagination", "match": "\\b(scrawl|set|to|ask|into|add|remove|write|save|load|move|toward)\\b" },
+    { "name": "keyword.operator.imagination", "match": "\\b(plus|minus|times|divided by|is within|is more than|is less than|is at least|is at most|is not|is|not|and|or|of|contains|with)\\b" },
+    { "name": "constant.language.imagination", "match": "\\b(yes|no|birth|existence|quote mark|new line|the problem)\\b" },
+    { "name": "storage.type.imagination", "match": "\\((a number|text|yes or no|a place|a flat place|an? [a-z ]+|a list of [a-z ]+|a table of [a-z ]+)\\)" }
+  ]
+}
