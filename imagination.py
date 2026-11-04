@@ -173,7 +173,7 @@ class Thing:
 
     def __deepcopy__(self, memo):
         new = Thing.__new__(Thing)
-        new.name, new.spec, new.fields = self.name, self.spec, copy.deepcopy(self.fields, memo)
+        new.name, new.spec, new.fields = self.name, self.spec, {k: dup(x) for k, x in self.fields.items()}
         return new
 
 
@@ -182,31 +182,41 @@ class Place:
     __slots__ = ("fields",)
 
     def __init__(self, *parts):
-        self.fields = dict(zip("XYZ", (float(x) for x in parts)))
+        self.fields = {"X": float(parts[0]), "Y": float(parts[1])}
+        if len(parts) > 2:
+            self.fields["Z"] = float(parts[2])
+
+    @staticmethod
+    def made(fields):
+        new = Place.__new__(Place)
+        new.fields = fields
+        return new
 
     def parts(self):
-        return [self.fields[k] for k in "XYZ"[:len(self.fields)]]
+        return list(self.fields.values())  # always X, Y (, Z) in that order
 
     def __eq__(self, other):
         return isinstance(other, Place) and self.fields == other.fields
 
     def __add__(self, other):
-        return Place(*[a + b for a, b in zip(self.parts(), other.parts())])
+        b = other.fields
+        return Place.made({k: a + b[k] for k, a in self.fields.items()})
 
     def __sub__(self, other):
-        return Place(*[a - b for a, b in zip(self.parts(), other.parts())])
+        b = other.fields
+        return Place.made({k: a - b[k] for k, a in self.fields.items()})
 
     def __mul__(self, number):
-        return Place(*[a * number for a in self.parts()])
+        return Place.made({k: a * number for k, a in self.fields.items()})
 
     def __truediv__(self, number):
-        return Place(*[div(a, number) for a in self.parts()])
+        return Place.made({k: div(a, number) for k, a in self.fields.items()})
 
     def __neg__(self):
-        return Place(*[-a for a in self.parts()])
+        return Place.made({k: -a for k, a in self.fields.items()})
 
     def size(self):
-        return math.sqrt(sum(a * a for a in self.parts()))
+        return math.sqrt(sum(a * a for a in self.fields.values()))
 
 
 def py_zero(kind, things):
@@ -230,8 +240,29 @@ def py_zero(kind, things):
 
 
 def dup(v):
-    """Lists and things are copied when they are stored, as they are in the C++."""
-    return copy.deepcopy(v) if isinstance(v, (list, dict, Thing, Place)) else v
+    """Lists, tables, places and things are copied when they are stored, as they are in the C++.
+
+    Made by hand rather than with copy.deepcopy: it is called on every 'set', so it must be quick."""
+    t = type(v)
+    if t is float or t is str or t is bool:
+        return v
+    if t is Place:
+        new = Place.__new__(Place)
+        new.fields = v.fields.copy()
+        return new
+    if t is Thing:
+        new = Thing.__new__(Thing)
+        new.name, new.spec = v.name, v.spec
+        new.fields = {k: dup(x) for k, x in v.fields.items()}
+        return new
+    if t is list:
+        return [dup(x) for x in v] if v and type(v[0]) in DEEP else v.copy()
+    if t is dict:
+        return {k: dup(x) for k, x in v.items()} if v and type(next(iter(v.values()))) in DEEP else v.copy()
+    return v
+
+
+DEEP = (list, dict, Thing, Place)  # values that hold other values, so copying them copies inside too
 
 
 def part_text(v):
