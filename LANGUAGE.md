@@ -72,6 +72,24 @@ and the universe said i love you
 
 Call it with the ball: `bounce b`, or `bounce item 1 of balls`. More inputs come after `given`, as usual: `to move along, for a ball, given steps (a number):`, called as `move along with b, 2`. Inside, the whole ball is `ball`.
 
+**Commands as values.** `the command double` is the command itself, not its answer. Keep it in a name, a list or a part of a thing, give it to another command, or give it back from one. `invoke` does it:
+
+```
+to apply to all, given f (a command given a number giving back a number) and items (a list of numbers), giving back a list of numbers:
+  set out to a list of numbers
+  for each item in items: gather invoke f with item into out
+  give back out
+and the universe said i love you
+
+genesis:
+  scrawl apply to all with (the command double, a list of (1, 2, 3))
+  set steps to a list of (the command double, the command round)
+  invoke the command greet with "Sam"
+and the universe said i love you
+```
+
+The kind says what the command takes and gives back: `a command` (nothing either way), `a command given text`, `a command given a number and text giving back yes or no`. Library words work too (`the command round`). Commands for a kind of thing can't be kept this way, and commands can't be compared or saved.
+
 ## Your own kinds of things
 
 Describe what a kind of thing has, one part per line, then use it as a kind anywhere:
@@ -241,7 +259,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, begins, ends, invoke, shatter, trimmed, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 

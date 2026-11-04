@@ -59,7 +59,7 @@ ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -101,7 +101,39 @@ def is_thing(kind):
     return kind.startswith("thing ")
 
 
+SIGNATURES = {}  # a command kind -> (input kinds, the kind it gives back or None)
+
+
+def command_kind(inputs, gives):
+    """The kind of a command that takes these inputs and gives this back: 'command(number;text)>number'."""
+    kind = "command(" + ";".join(inputs) + ")>" + (gives or "")
+    SIGNATURES[kind] = (list(inputs), gives)
+    return kind
+
+
+def is_command(kind):
+    return kind.startswith("command(")
+
+
+def holds_command(kind):
+    """Is it a command, or a list or table with commands in it? (They can't be compared or saved.)"""
+    if is_list(kind):
+        return holds_command(element(kind))
+    if is_table(kind):
+        return holds_command(entry_kind(kind))
+    return is_command(kind)
+
+
+def command_words(kind, word="command"):
+    ins, gives = SIGNATURES[kind]
+    return word + (" given " + " and ".join(kind_name(k) for k in ins) if ins else "") + \
+        (" giving back " + kind_name(gives) if gives else "")
+
+
 def cpp_type(kind):
+    if is_command(kind):
+        ins, gives = SIGNATURES[kind]
+        return f"std::function<{cpp_type(gives) if gives else 'void'}({', '.join(cpp_type(k) for k in ins)})>"
     if is_list(kind):
         return f"std::vector<{cpp_type(element(kind))}>"
     if is_table(kind):
@@ -130,6 +162,15 @@ def parse_kind(text):
     if words[:2] in (["list", "of"], ["table", "of"], ["lists", "of"], ["tables", "of"]):
         k = parse_kind(" ".join(words[2:]))
         return k and f"{words[0].rstrip('s')} of " + k
+    if words[:1] in (["command"], ["commands"]):  # 'a command given a number and text giving back yes or no'
+        m = re.fullmatch(r"(?:given (.+?))?\s*(?:giving back (.+))?", " ".join(words[1:]))
+        if not m:
+            return None
+        ins = [parse_kind(part) for part in re.split(r"\s+and\s+", m.group(1))] if m.group(1) else []
+        gives = parse_kind(m.group(2)) if m.group(2) else None
+        if None in ins or (m.group(2) and not gives):
+            return None
+        return command_kind(ins, gives)
     for name in (phrase, phrase[:-1] if phrase.endswith("s") else None):
         if name in THINGS:
             return "thing " + name
@@ -137,10 +178,13 @@ def parse_kind(text):
 
 
 def kind_words():
-    return ", ".join(["a number", "yes or no", "text", "a place", "a list of ...", "a table of ..."] + [f"a {t}" for t in THINGS])
+    return ", ".join(["a number", "yes or no", "text", "a place", "a list of ...", "a table of ...",
+                      "a command given ... giving back ..."] + [f"a {t}" for t in THINGS])
 
 
 def kind_name(kind):
+    if is_command(kind):
+        return "a " + command_words(kind)
     if is_list(kind):
         return "a list of " + plural(element(kind))
     if is_table(kind):
@@ -151,6 +195,8 @@ def kind_name(kind):
 
 
 def plural(kind):
+    if is_command(kind):
+        return command_words(kind, "commands")
     if is_list(kind):
         return "lists of " + plural(element(kind))
     if is_table(kind):
@@ -238,7 +284,22 @@ def py_zero(kind, things):
         return {}
     if is_thing(kind):
         return Thing(kind[6:], things)
+    if is_command(kind):
+        return no_command
     return None
+
+
+def no_command(*args):
+    raise RunError(0, "there is no command in it yet: set it to one first, like 'set f to the command double'.")
+
+
+def invoke_value(f, args, line):
+    try:
+        return f(*args)
+    except RunError as err:
+        if not err.line:
+            err.line = line
+        raise
 
 
 def dup(v):
@@ -293,6 +354,8 @@ def text(v):
         return " ".join(f"{text(x)} {w}" for x, w in zip(v.parts(), ("horizontal", "vertical", "depth")))
     if isinstance(v, Thing):
         return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
+    if callable(v):
+        return "a command"
     raise RunError(0, "this can't be shown as text when running directly.")
 
 
@@ -413,6 +476,8 @@ def saved_number(x, line):
 
 def saved(v, kind, line):
     """The value written out as JSON, exactly as the C++ writes it."""
+    if is_command(kind):
+        raise RunError(line, "I can't save a command in a file.")
     if kind == NUMBER:
         return saved_number(v, line)
     if kind == YESNO:
@@ -893,7 +958,7 @@ class Expr:
             if self.at(*words):
                 self.i += len(words)
                 r = self.sum()
-                if not (op in ("==", "!=") and v.kind == r.kind and v.kind not in (PLACE, FLAT)):
+                if not (op in ("==", "!=") and v.kind == r.kind and v.kind not in (PLACE, FLAT) and not holds_command(v.kind)):
                     self.need(v, NUMBER, "Comparing")
                     self.need(r, NUMBER, "Comparing")
                 a, b, f = v.run, r.run, COMPARE_RUN[op]
@@ -1045,7 +1110,7 @@ class Expr:
                 raise ScriptError(line, "A place is written like 300 horizontal 200 vertical (and 5 depth, for a place with depth).")
             self.take(")")
             return v
-        for n in range(min(6, len(self.t) - self.i), 0, -1):
+        for n in range(min(16, len(self.t) - self.i), 0, -1):
             key = tuple(self.t[self.i:self.i + n])
             if key in FIELDS and self.peek(n) == "of" and not (
                     key in self.names.known and (self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})
@@ -1107,6 +1172,37 @@ class Expr:
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
             return Value(f"imagine::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
+        if self.at("the", "command"):  # a command kept as a value: 'set f to the command double'
+            self.i += 2
+            return command_value(self.names, self.t, self, line)
+        if self.at("invoke"):  # 'invoke f with 4': do the command a name holds
+            self.i += 1
+            f = self.unary()
+            if not is_command(f.kind):
+                raise ScriptError(line, f"'invoke' needs a command, like 'invoke the command double with 4', not {kind_name(f.kind)}.")
+            ins, gives = SIGNATURES[f.kind]
+            if self.at("with"):
+                self.i += 1
+            args = []
+            if len(ins) == 1:
+                args = [self.unary()]
+            elif len(ins) > 1:
+                if not self.at("("):
+                    raise ScriptError(line, f"This command needs {len(ins)} inputs. Put them in brackets, like: invoke f with (1, 2)")
+                self.i += 1
+                args = [self.full()]
+                while self.at(","):
+                    self.i += 1
+                    args.append(self.full())
+                self.take(")")
+            for k, (a, kind) in enumerate(zip(args, ins), 1):
+                if a.kind != kind:
+                    raise ScriptError(line, f"Input {k} of this command must be {kind_name(kind)}, not {kind_name(a.kind)}.")
+            if not gives and not getattr(self, "allow_nothing", False):
+                raise ScriptError(line, "This command doesn't give back anything, so it can't be used as a value.")
+            get, gets = f.run, [a.run for a in args]
+            return Value(f"imagine::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])})", gives,
+                         lambda env: invoke_value(get(env), [g(env) for g in gets], line))
         key, n = self.names.match(self.t, self.i)
         command_key, command_n = match_command(self.names, self.t[self.i:])
         if key and n >= command_n:  # the longer match wins: 'balls moved down' is a command even when 'balls' is a name
@@ -1235,7 +1331,7 @@ class Expr:
             if self.at("by") and is_list(v.kind) and is_thing(element(v.kind)):
                 self.i += 1
                 thing = element(v.kind)
-                for n in range(min(6, len(self.t) - self.i), 0, -1):
+                for n in range(min(16, len(self.t) - self.i), 0, -1):
                     key = tuple(self.t[self.i:self.i + n])
                     if key in FIELDS and thing in FIELDS[key]:
                         self.i += n
@@ -1321,7 +1417,7 @@ class Expr:
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
             if self.at(*lead):
                 self.i += len(lead)
-                for n in range(min(6, len(self.t) - self.i), 0, -1):
+                for n in range(min(16, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
@@ -1344,7 +1440,7 @@ class Expr:
                     runs = [v.run for v in items]
                     return Value(f"{cpp_type(kind)}{{{', '.join(strip_parens(v.cpp) for v in items)}}}", kind,
                                  lambda env: [dup(f(env)) for f in runs])
-                for n in range(min(6, len(self.t) - self.i), 0, -1):
+                for n in range(min(16, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
@@ -2152,6 +2248,14 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             raise Stop()
         return [f"{tab}return;"], run, None
+    if tokens[0] == "invoke":
+        e = Expr(tokens, names, n)
+        e.allow_nothing = True
+        v = e.single()
+        if e.i != len(e.t):
+            raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
+        get = v.run
+        return [f"{tab}{strip_parens(v.cpp)};"], lambda env: get(env) and None, None
     if tokens[0] == "shatter":  # 'shatter with "no fuel"': a problem of your own, caught by try: like any other
         v = expr_to_end(tokens, 2 if tokens[1:2] == ["with"] else 1, names, n)
         if v.kind != TEXT:
@@ -2447,6 +2551,27 @@ def call(key, args, names, n):
         cpp = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], cpp)
         return f"({cpp})", run
     return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})", run
+
+
+def command_value(names, tokens, e, line):
+    """'the command double': the command itself, to keep in a name or a list, or give to another command."""
+    key, size = match_command(names, tokens[e.i:])
+    if not key:
+        raise ScriptError(line, "'the command' needs the name of a command after it, like 'the command double'." + library_hint(list(tokens[e.i:])))
+    e.i += size
+    c = names.commands[key]
+    if c.versions is not None:
+        raise ScriptError(line, f"'{' '.join(key)}' is for a kind of thing (it changes the thing it is given), so it can't be kept as a value.")
+    kind = command_kind(c.kinds, c.gives)
+    if c.inputs is None:  # one of the script's own commands
+        cpp = f"{cpp_type(kind)}({c.cpp})"
+    else:  # a library word: its C++ goes inside a small function
+        given = {"{" + in_name + "}": f"(_{k})" for k, in_name in enumerate(c.inputs)}
+        given["{line}"] = str(line)
+        body = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], c.cpp)
+        ins = ", ".join(f"{cpp_type(k_)} _{k}" for k, k_ in enumerate(c.kinds))
+        cpp = f"{cpp_type(kind)}([&]({ins}) {{ {'return ' if c.gives else ''}{body}; }})"
+    return Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
 
 
 def writable_list(tokens, names, n, what):

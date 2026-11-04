@@ -14,6 +14,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <functional>
 #include <vector>
 
 // The same maths names Unreal has, so a script means the same thing in a program and in Unreal.
@@ -114,6 +115,7 @@ namespace imagine
 	}
 
 	template <typename T> std::string text(const std::vector<T>& items);
+	template <typename R, typename... A> std::string text(const std::function<R(A...)>&) { return "a command"; }
 	template <typename T> std::string text(const std::map<std::string, T>& table);
 	template <typename T> struct is_group : std::false_type {};
 	template <typename T> struct is_group<std::vector<T>> : std::true_type {};
@@ -162,6 +164,14 @@ namespace imagine
 	[[noreturn]] inline void fail(int line, const std::string& message)
 	{
 		throw Problem{line, message};
+	}
+
+	template <typename F, typename... A>
+	auto invoke(const F& f, int line, A&&... a)
+	{
+		if (!f)
+			fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
+		return f(std::forward<A>(a)...);
 	}
 
 	inline void report(const Problem& problem)
@@ -373,6 +383,7 @@ namespace imagine
 	}
 	inline void save(std::string& out, const FVector& v, int line) { out += "[" + saved_number(v.X, line) + ", " + saved_number(v.Y, line) + ", " + saved_number(v.Z, line) + "]"; }
 	inline void save(std::string& out, const FVector2D& v, int line) { out += "[" + saved_number(v.X, line) + ", " + saved_number(v.Y, line) + "]"; }
+	template <typename R, typename... A> void save(std::string&, const std::function<R(A...)>&, int line) { fail(line, "I can't save a command in a file."); }
 	template <typename T> void save(std::string& out, const std::vector<T>& items, int line);
 	template <typename T> void save(std::string& out, const std::map<std::string, T>& table, int line);
 	template <typename T> void save(std::string& out, const std::vector<T>& items, int line)
@@ -634,6 +645,7 @@ namespace imagine
 		}
 	};
 
+	template <typename R, typename... A> bool load(const SavedData&, std::function<R(A...)>&) { return false; }
 	inline bool load(const SavedData& d, double& x) { if (d.type != SavedData::Number) return false; x = d.number; return true; }
 	inline bool load(const SavedData& d, bool& x) { if (d.type != SavedData::YesNo) return false; x = d.yes; return true; }
 	inline bool load(const SavedData& d, std::string& x) { if (d.type != SavedData::Text) return false; x = d.words; return true; }
