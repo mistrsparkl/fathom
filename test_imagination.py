@@ -160,6 +160,36 @@ def program_checks():
                           "a pet (name: Ann, age: 9), a pet (name: Bo, age: 3), a pet (name: Rex, age: 3)\n"), repr(out.stdout)
     assert out.stderr == "Line 12: the list is empty, so it has no average.\n", repr(out.stderr)
 
+    # save ... to file / load ... from file: every kind, written exactly the same both ways.
+    out = both('a pet has:\n  name (text)\n  age (a number)\n  tricks (a list of text)\n' + END +
+               'a home has:\n  owner (a pet)\n  pets (a list of pets)\n  spot (a place)\n' + END +
+               'to start:\n  set q to quote mark\n  set h to a new home\n'
+               '  set name of owner of h to "Rex " plus q plus "the" plus q plus " dog\\" plus new line\n'
+               '  add "sit" to tricks of owner of h\n  add owner of h to pets of h\n  set spot of h to a place at (1.5, -0, 0.1)\n'
+               '  save h to file "home.json"\n  say contents of file "home.json"\n  set again to a new home\n'
+               '  load again from file "home.json"\n  say again is h\n'
+               '  set xs to a list of (0.1, 1 divided by 100000, 1 divided by 10000, 123.25, 10000000000000000, 12345678901234567,'
+               ' -1 divided by 100000, 1 divided by 3, 10000000000000000 times 1000, 7)\n'
+               '  save xs to file "xs.json"\n  say contents of file "xs.json"\n  set ys to a list of numbers\n  load ys from file "xs.json"\n'
+               '  say ys is xs\n  set t to a table of yes or no\n  set entry "b" of t to yes\n  set entry "a" of t to no\n'
+               '  save t to file "t.json"\n  say contents of file "t.json"\n'
+               '  write "{" plus q plus "name" plus q plus ": " plus q plus "Bo" plus q plus ", " plus q plus "tricks" plus q'
+               ' plus ": [" plus q plus "\\u00e9\\ud83d\\ude00" plus q plus "], " plus q plus "age" plus q plus ": 2, "'
+               ' plus q plus "age" plus q plus ": 3, " plus q plus "other" plus q plus ": null}" to file "p.json"\n'
+               '  set p to a new pet\n  load p from file "p.json"\n  say p\n'
+               '  for each bad in a list of ("[1, 2", "[1, true]", "[NaN]", "[01]", "{}", "  [ ]  x", "[1.]", "[" plus q plus "a" plus q plus "]"):\n'
+               '    write bad to file "bad.json"\n    try:\n      load ys from file "bad.json"\n'
+               '    if that went wrong:\n      say the problem\n  write "  [ 4 , 5e1, -0.5E+1 ]  " to file "ok.json"\n'
+               '  load ys from file "ok.json"\n  say ys\n  set zero to 0\n  set n to 1 divided by zero\n  save n to file "n.json"\n' + END)
+    assert out.stdout == (
+        '{"owner": {"name": "Rex \\"the\\" dog\\\\\\n", "age": 0, "tricks": ["sit"]}, "pets": [{"name": "Rex \\"the\\" dog\\\\\\n", '
+        '"age": 0, "tricks": ["sit"]}], "spot": [1.5, 0, 0.1]}\n\nyes\n'
+        '[0.1, 1e-05, 0.0001, 123.25, 1e+16, 1.2345678901234568e+16, -1e-05, 0.3333333333333333, 1e+19, 7]\n\nyes\n'
+        '{"a": false, "b": true}\n\na pet (name: Bo, age: 3, tricks: é\U0001F600)\n'
+        + 'the file "bad.json" doesn\'t hold a list of numbers.\n' * 8 + "4, 50, -5\n"), repr(out.stdout)
+    assert out.stderr == "Line 49: I can't save infinity or not a number.\n", repr(out.stderr)
+    assert perr("to start:\n  set x to 1\n  load 5 from file \"a\"\n" + END)[1] == "'5' can't be changed, so I can't load into it."
+
     # Lists of lists and tables of lists: the inner ones are shown in brackets.
     out = both('to start:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'
                '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  say grid, " / ", item 2 of item 3 of grid\n'

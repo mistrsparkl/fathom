@@ -288,6 +288,21 @@ to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::dur
 
 `{seconds}` stands for the input, and `{line}` in the C++ is the number of the line using the word (for error messages). Other lines a library can have are `include: <header>` (a C++ header), `link: name` (a system library), `code:` and `python:` (helper code, indented below), and values like `pi = 3.14159, number, read only` (with their own `runs:` line). Use each input only once in the C++ line. A word without a `runs:` line only works in built programs.
 
+## Saving and loading
+
+`save` keeps any value in a file, and `load` puts it back, so a game can remember high scores or where the player was:
+
+```
+save high scores to file "scores.json"
+...
+set high scores to a table of numbers
+load high scores from file "scores.json"
+```
+
+`load` needs a name that already holds the right kind of value (here, a table of numbers). Lists, tables, places and your own kinds of things all work, even inside each other. A thing whose file lacks one of its parts gets that part empty, so adding a part to a kind of thing doesn't spoil old saves. If the file holds something else, the problem is `the file "scores.json" doesn't hold a table of numbers.` Use `try:` to carry on instead.
+
+The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `say "She said " plus quote mark plus "hi" plus quote mark`.
+
 ## When something goes wrong while running
 
 The program stops with the line and a plain reason, such as `Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.`

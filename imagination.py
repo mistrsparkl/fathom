@@ -9,6 +9,7 @@ a small Python function that does it (what 'run' uses) and the C++ that does it 
 Both come from the same reading, so a script means the same thing either way. LANGUAGE.md describes the language.
 """
 import copy
+import json
 import difflib
 import math
 import operator
@@ -362,6 +363,73 @@ def write_file(path, s, line, mode="wb"):
             f.write(s.encode("utf-8"))
     except OSError:
         raise RunError(line, f'I couldn\'t {"write" if mode == "wb" else "add to"} the file "{path}".')
+
+
+# ---------------------------------------------------------------- saving and loading (as JSON)
+
+def saved_number(x, line):
+    if not math.isfinite(x):
+        raise RunError(line, "I can't save infinity or not a number.")
+    if x == math.floor(x) and abs(x) < 1e16:
+        return "%.0f" % (x if x else 0.0)
+    return repr(x)
+
+
+def saved(v, kind, line):
+    """The value written out as JSON, exactly as the C++ writes it."""
+    if kind == NUMBER:
+        return saved_number(v, line)
+    if kind == YESNO:
+        return "true" if v else "false"
+    if kind == TEXT:
+        return json.dumps(v, ensure_ascii=False)
+    if kind in (PLACE, FLAT):
+        return "[" + ", ".join(saved_number(x, line) for x in v.parts()) + "]"
+    if is_list(kind):
+        return "[" + ", ".join(saved(x, element(kind), line) for x in v) + "]"
+    if is_table(kind):
+        return "{" + ", ".join(f"{json.dumps(k, ensure_ascii=False)}: {saved(v[k], entry_kind(kind), line)}" for k in sorted(v)) + "}"
+    return "{" + ", ".join(f'"{" ".join(w)}": {saved(v.fields[snake(w)], k, line)}' for w, k in v.spec) + "}"
+
+
+class NotSaved(Exception):
+    pass
+
+
+def from_saved(d, kind, things):
+    """JSON data back into a value of this kind; a part a thing's file doesn't have stays empty."""
+    if kind == NUMBER and isinstance(d, float):
+        return d
+    if kind == YESNO and isinstance(d, bool):
+        return d
+    if kind == TEXT and isinstance(d, str):
+        return d
+    if kind in (PLACE, FLAT) and isinstance(d, list) and len(d) == (3 if kind == PLACE else 2) \
+            and all(isinstance(x, float) for x in d):
+        return Place(*d)
+    if is_list(kind) and isinstance(d, list):
+        return [from_saved(x, element(kind), things) for x in d]
+    if is_table(kind) and isinstance(d, dict):
+        return {k: from_saved(x, entry_kind(kind), things) for k, x in d.items()}
+    if is_thing(kind) and isinstance(d, dict):
+        t = Thing(kind[6:], things)
+        for w, k in t.spec:
+            if " ".join(w) in d:
+                t.fields[snake(w)] = from_saved(d[" ".join(w)], k, things)
+        return t
+    raise NotSaved()
+
+
+def no_constant(name):
+    raise NotSaved()
+
+
+def load_saved(path, kind, things, line):
+    data = read_file(path, line)
+    try:
+        return from_saved(json.loads(data, parse_int=float, parse_constant=no_constant), kind, things)
+    except (NotSaved, ValueError, RecursionError):
+        raise RunError(line, f'the file "{path}" doesn\'t hold {kind_name(kind)}.')
 
 
 def letters(s):
@@ -729,6 +797,10 @@ class Expr:
                 self.i += 1
             number = float(tok)
             return Value(tok if "." in tok else tok + ".0", NUMBER, lambda env: number)
+        for words, mark, cpp in ((("quote", "mark"), '"', '"\\""'), (("new", "line"), "\n", '"\\n"')):
+            if self.at(*words):  # text can't hold these between its own quote marks
+                self.i += 2
+                return Value(f"std::string({cpp})", TEXT, lambda env, mark=mark: mark)
         if tok.startswith('"'):
             self.i += 1
             s = tok[1:-1]
@@ -1435,6 +1507,15 @@ def describe_things(things):
             cpp = cpp_type("thing " + name)
             shown = ' + ", " + '.join(f'"{" ".join(w)}: " + text(v.{snake(w)})' for w, k in THINGS[name])
             out.append(f'\tinline std::string text(const {cpp}& v) {{ return std::string("a {name} (") + {shown} + ")"; }}')
+        for name, _, _ in things:
+            cpp = cpp_type("thing " + name)
+            out.append(f"\tinline void save(std::string& out, const {cpp}& v, int line);\n\tinline bool load(const SavedData& d, {cpp}& v);")
+        for name, _, _ in things:
+            cpp = cpp_type("thing " + name)
+            parts = ' out += ", ";'.join(f' out += "\\"{" ".join(w)}\\": "; save(out, v.{snake(w)}, line);' for w, k in THINGS[name])
+            out.append(f'\tinline void save(std::string& out, const {cpp}& v, int line) {{ out += "{{";{parts} out += "}}"; }}')
+            loads = "".join(f' if (auto p = d.part("{" ".join(w)}"); p && !load(*p, v.{snake(w)})) return false;' for w, k in THINGS[name])
+            out.append(f"\tinline bool load(const SavedData& d, {cpp}& v) {{ if (d.type != SavedData::Table) return false; v = {cpp}{{}};{loads} return true; }}")
         out.append("}")
         out += [f"using imagine::{cpp_type('thing ' + name)};" for name, _, _ in things]
         out.append("")
@@ -1788,6 +1869,27 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}imagine::say({{{', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)}}});"], run, None
     if tokens[0] == "ask":
         return ask(tokens, names, declared, n, tab)
+    for verb, joint in (("save", "to"), ("load", "from")):
+        if tokens[0] == verb and joint in tokens and tokens[len(tokens) - tokens[::-1].index(joint):][:1] == ["file"]:
+            cut = len(tokens) - 1 - tokens[::-1].index(joint)
+            where = expr_to_end(tokens, cut + 2, names, n)
+            if where.kind != TEXT:
+                raise ScriptError(n, f"A file is named with text, like file \"scores.txt\", but this is {kind_name(where.kind)}.")
+            if cut == 1:
+                raise ScriptError(n, f"Say what to {verb}, like '{verb} scores {joint} file \"scores.txt\"'.")
+            w = where.run
+            if verb == "save":
+                v = expr_to_end(tokens[:cut], 1, names, n)
+                get, kind = v.run, v.kind
+                return ([f"{tab}imagine::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"],
+                        lambda env: write_file(w(env), saved(get(env), kind, n) + "\n", n), None)
+            e = Expr(tokens[1:cut], names, n)
+            target = e.full()
+            if e.i != len(e.t) or not target.writable or getattr(target, "cpp_assign", None):
+                raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' can't be changed, so I can't load into it.")
+            put, kind, things = target.store, target.kind, THINGS
+            return ([f"{tab}imagine::load_file({strip_parens(target.cpp)}, {strip_parens(where.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
+                    lambda env: put(env, load_saved(w(env), kind, things, n)), None)
     key, size = match_command(names, tokens)
     if key:
         args = expr_list(tokens, size + (tokens[size:size + 1] == ["with"]), names, n)

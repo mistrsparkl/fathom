@@ -7,6 +7,8 @@
 #include <fstream>
 #include <initializer_list>
 #include <map>
+#include <cstring>
+#include <charconv>
 #include <type_traits>
 #include <iostream>
 #include <random>
@@ -304,6 +306,393 @@ namespace imagine
 		std::ofstream out(std::filesystem::u8path(path), std::ios::binary);
 		if (!(out << s))
 			fail(line, "I couldn't write the file \"" + path + "\".");
+	}
+
+	// ---- saving and loading (save ... to file / load ... from file), as JSON, written exactly as the direct way writes it.
+	inline std::string saved_number(double x, int line)
+	{
+		if (!std::isfinite(x))
+			fail(line, "I can't save infinity or not a number.");
+		char b[64];
+		if (x == std::floor(x) && std::fabs(x) < 1e16)
+		{
+			std::snprintf(b, sizeof b, "%.0f", x == 0 ? 0.0 : x);
+			return b;
+		}
+		// Shortest digits that read back the same, laid out the way Python's repr does.
+		auto r = std::to_chars(b, b + sizeof b, x, std::chars_format::scientific);
+		std::string sci(b, r.ptr);
+		size_t e = sci.find('e');
+		int exp = std::atoi(sci.c_str() + e + 1);
+		std::string sign = sci[0] == '-' ? "-" : "", digits;
+		for (size_t k = sign.size(); k < e; ++k)
+			if (sci[k] != '.')
+				digits += sci[k];
+		if (exp >= -4 && exp < 16)
+		{
+			if (exp < 0)
+				return sign + "0." + std::string(-exp - 1, '0') + digits;
+			return sign + digits.substr(0, exp + 1) + "." + digits.substr(exp + 1);
+		}
+		char tail[16];
+		std::snprintf(tail, sizeof tail, "e%c%02d", exp < 0 ? '-' : '+', std::abs(exp));
+		return sign + digits.substr(0, 1) + (digits.size() > 1 ? "." + digits.substr(1) : "") + tail;
+	}
+
+	inline void save(std::string& out, double x, int line) { out += saved_number(x, line); }
+	inline void save(std::string& out, bool x, int) { out += x ? "true" : "false"; }
+	inline void save(std::string& out, const std::string& s, int)
+	{
+		out += '"';
+		for (unsigned char c : s)
+		{
+			switch (c)
+			{
+			case '"': out += "\\\""; break;
+			case '\\': out += "\\\\"; break;
+			case '\n': out += "\\n"; break;
+			case '\r': out += "\\r"; break;
+			case '\t': out += "\\t"; break;
+			case '\b': out += "\\b"; break;
+			case '\f': out += "\\f"; break;
+			default:
+				if (c < 0x20)
+				{
+					char u[8];
+					std::snprintf(u, sizeof u, "\\u%04x", c);
+					out += u;
+				}
+				else
+					out += static_cast<char>(c);
+			}
+		}
+		out += '"';
+	}
+	inline void save(std::string& out, const FVector& v, int line) { out += "[" + saved_number(v.X, line) + ", " + saved_number(v.Y, line) + ", " + saved_number(v.Z, line) + "]"; }
+	inline void save(std::string& out, const FVector2D& v, int line) { out += "[" + saved_number(v.X, line) + ", " + saved_number(v.Y, line) + "]"; }
+	template <typename T> void save(std::string& out, const std::vector<T>& items, int line);
+	template <typename T> void save(std::string& out, const std::map<std::string, T>& table, int line);
+	template <typename T> void save(std::string& out, const std::vector<T>& items, int line)
+	{
+		out += "[";
+		for (size_t k = 0; k < items.size(); ++k)
+		{
+			if (k)
+				out += ", ";
+			save(out, items[k], line);
+		}
+		out += "]";
+	}
+	template <typename T> void save(std::string& out, const std::map<std::string, T>& table, int line)
+	{
+		out += "{";
+		bool first = true;
+		for (const auto& [key, value] : table)
+		{
+			if (!first)
+				out += ", ";
+			first = false;
+			save(out, key, line);
+			out += ": ";
+			save(out, value, line);
+		}
+		out += "}";
+	}
+
+	// JSON read back in, before it is turned into a value of the right kind.
+	struct SavedData
+	{
+		enum Type { Nothing, Number, YesNo, Text, List, Table } type = Nothing;
+		double number = 0;
+		bool yes = false;
+		std::string words;
+		std::vector<SavedData> items;
+		std::vector<std::pair<std::string, SavedData>> parts;
+		const SavedData* part(const std::string& key) const
+		{
+			for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // the last one wins, as in Python
+				if (it->first == key)
+					return &it->second;
+			return nullptr;
+		}
+	};
+
+	struct SavedReader
+	{
+		const std::string& s;
+		size_t i = 0;
+		int depth = 0;
+
+		void space()
+		{
+			while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r'))
+				++i;
+		}
+		bool word(const char* w)
+		{
+			size_t n = std::strlen(w);
+			if (s.compare(i, n, w) != 0)
+				return false;
+			i += n;
+			return true;
+		}
+		bool hex4(unsigned& u)
+		{
+			if (i + 4 > s.size())
+				return false;
+			u = 0;
+			for (int k = 0; k < 4; ++k)
+			{
+				char c = s[i++];
+				int v = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+				if (v < 0)
+					return false;
+				u = u * 16 + v;
+			}
+			return true;
+		}
+		bool text(std::string& out)
+		{
+			++i;
+			while (i < s.size() && s[i] != '"')
+			{
+				unsigned char c = s[i++];
+				if (c < 0x20)
+					return false;
+				if (c != '\\')
+				{
+					out += static_cast<char>(c);
+					continue;
+				}
+				if (i >= s.size())
+					return false;
+				char e = s[i++];
+				switch (e)
+				{
+				case '"': out += '"'; break;
+				case '\\': out += '\\'; break;
+				case '/': out += '/'; break;
+				case 'b': out += '\b'; break;
+				case 'f': out += '\f'; break;
+				case 'n': out += '\n'; break;
+				case 'r': out += '\r'; break;
+				case 't': out += '\t'; break;
+				case 'u':
+				{
+					unsigned u;
+					if (!hex4(u))
+						return false;
+					if (u >= 0xD800 && u < 0xDC00 && s.compare(i, 2, "\\u") == 0)
+					{
+						size_t back = i;
+						i += 2;
+						unsigned low;
+						if (hex4(low) && low >= 0xDC00 && low < 0xE000)
+							u = 0x10000 + ((u - 0xD800) << 10) + (low - 0xDC00);
+						else
+							i = back;
+					}
+					if (u < 0x80)
+						out += static_cast<char>(u);
+					else if (u < 0x800)
+						out += {static_cast<char>(0xC0 | (u >> 6)), static_cast<char>(0x80 | (u & 63))};
+					else if (u < 0x10000)
+						out += {static_cast<char>(0xE0 | (u >> 12)), static_cast<char>(0x80 | ((u >> 6) & 63)), static_cast<char>(0x80 | (u & 63))};
+					else
+						out += {static_cast<char>(0xF0 | (u >> 18)), static_cast<char>(0x80 | ((u >> 12) & 63)),
+								static_cast<char>(0x80 | ((u >> 6) & 63)), static_cast<char>(0x80 | (u & 63))};
+					break;
+				}
+				default: return false;
+				}
+			}
+			if (i >= s.size())
+				return false;
+			++i;
+			return true;
+		}
+		bool digits()
+		{
+			size_t from = i;
+			while (i < s.size() && s[i] >= '0' && s[i] <= '9')
+				++i;
+			return i > from;
+		}
+		bool value(SavedData& d)
+		{
+			if (++depth > 5000)
+				return false;
+			space();
+			if (i >= s.size())
+				return false;
+			char c = s[i];
+			bool ok = true;
+			if (c == '{')
+			{
+				d.type = SavedData::Table;
+				++i;
+				space();
+				if (i < s.size() && s[i] == '}')
+					++i;
+				else
+					for (;;)
+					{
+						space();
+						std::string key;
+						SavedData part;
+						if (i >= s.size() || s[i] != '"' || !text(key))
+							return false;
+						space();
+						if (i >= s.size() || s[i++] != ':' || !value(part))
+							return false;
+						d.parts.emplace_back(std::move(key), std::move(part));
+						space();
+						if (i < s.size() && s[i] == ',')
+						{
+							++i;
+							continue;
+						}
+						if (i < s.size() && s[i] == '}')
+						{
+							++i;
+							break;
+						}
+						return false;
+					}
+			}
+			else if (c == '[')
+			{
+				d.type = SavedData::List;
+				++i;
+				space();
+				if (i < s.size() && s[i] == ']')
+					++i;
+				else
+					for (;;)
+					{
+						SavedData item;
+						if (!value(item))
+							return false;
+						d.items.push_back(std::move(item));
+						space();
+						if (i < s.size() && s[i] == ',')
+						{
+							++i;
+							continue;
+						}
+						if (i < s.size() && s[i] == ']')
+						{
+							++i;
+							break;
+						}
+						return false;
+					}
+			}
+			else if (c == '"')
+			{
+				d.type = SavedData::Text;
+				ok = text(d.words);
+			}
+			else if (word("true") || word("false"))
+			{
+				d.type = SavedData::YesNo;
+				d.yes = s[i - 1] == 'e' && s[i - 2] == 'u';
+			}
+			else if (word("null"))
+				d.type = SavedData::Nothing;
+			else
+			{
+				size_t from = i;
+				if (s[i] == '-')
+					++i;
+				if (i < s.size() && s[i] == '0')
+					++i;
+				else if (!digits())
+					return false;
+				if (i < s.size() && s[i] == '.')
+				{
+					++i;
+					if (!digits())
+						return false;
+				}
+				if (i < s.size() && (s[i] == 'e' || s[i] == 'E'))
+				{
+					++i;
+					if (i < s.size() && (s[i] == '+' || s[i] == '-'))
+						++i;
+					if (!digits())
+						return false;
+				}
+				d.type = SavedData::Number;
+				d.number = std::strtod(s.substr(from, i - from).c_str(), nullptr);
+			}
+			--depth;
+			return ok;
+		}
+	};
+
+	inline bool load(const SavedData& d, double& x) { if (d.type != SavedData::Number) return false; x = d.number; return true; }
+	inline bool load(const SavedData& d, bool& x) { if (d.type != SavedData::YesNo) return false; x = d.yes; return true; }
+	inline bool load(const SavedData& d, std::string& x) { if (d.type != SavedData::Text) return false; x = d.words; return true; }
+	inline bool load(const SavedData& d, FVector& v)
+	{
+		if (d.type != SavedData::List || d.items.size() != 3)
+			return false;
+		return load(d.items[0], v.X) && load(d.items[1], v.Y) && load(d.items[2], v.Z);
+	}
+	inline bool load(const SavedData& d, FVector2D& v)
+	{
+		if (d.type != SavedData::List || d.items.size() != 2)
+			return false;
+		return load(d.items[0], v.X) && load(d.items[1], v.Y);
+	}
+	template <typename T> bool load(const SavedData& d, std::vector<T>& items);
+	template <typename T> bool load(const SavedData& d, std::map<std::string, T>& table);
+	template <typename T> bool load(const SavedData& d, std::vector<T>& items)
+	{
+		if (d.type != SavedData::List)
+			return false;
+		items.assign(d.items.size(), T{});
+		for (size_t k = 0; k < d.items.size(); ++k)
+			if (!load(d.items[k], items[k]))
+				return false;
+		return true;
+	}
+	template <typename T> bool load(const SavedData& d, std::map<std::string, T>& table)
+	{
+		if (d.type != SavedData::Table)
+			return false;
+		table.clear();
+		for (const auto& [key, part] : d.parts)
+		{
+			T value{};
+			if (!load(part, value))
+				return false;
+			table[key] = std::move(value);
+		}
+		return true;
+	}
+
+	template <typename T>
+	void save_file(const T& value, const std::string& path, int line)
+	{
+		std::string out;
+		save(out, value, line);
+		write_file(path, out + "\n", line);
+	}
+
+	template <typename T>
+	void load_file(T& into, const std::string& path, const std::string& kind, int line)
+	{
+		std::string all = read_file(path, line);
+		SavedReader reader{all};
+		SavedData d;
+		T value{};
+		bool ok = reader.value(d);
+		reader.space();
+		if (!ok || reader.i != all.size() || !load(d, value))
+			fail(line, "the file \"" + path + "\" doesn't hold " + kind + ".");
+		into = std::move(value);
 	}
 
 	inline void add_line(const std::string& path, const std::string& s, int line)
