@@ -1,4 +1,4 @@
-note: Following: the deer walks or runs toward a goal, looking at it. The game calls this every frame while a deer follows.
+whisper: Following: the deer walks or runs toward a goal, looking at it. The game calls this every frame while a deer follows.
 
 this is part of: creature body
 
@@ -16,21 +16,21 @@ settings:
   running turn limit: 8 degrees per second
   turn slew: 20 degrees per second squared
   look limit: 30 degrees
-  note: shortcut: the flying trot holds to about 188 cm/s, turning only 8 degrees per second at full speed; faster and sharper needs a gallop controller.
+  whisper: shortcut: the flying trot holds to about 188 cm/s, turning only 8 degrees per second at full speed; faster and sharper needs a gallop controller.
 
 to steer toward, given goal (a place) and running (yes or no):
   set wandering to no
-  note: Speed must not build up while down, and a turn started before the legs have taken the weight back topples it again.
-  if fallen or time since standing up is less than settle time: stop
+  whisper: Speed must not build up while down, and a turn started before the legs have taken the weight back topples it again.
+  if fallen or time since standing up falls below settle time: cease
 
   set gap to flat (goal minus centre of mass)
   set turn needed to angle from heading to direction of gap
-  note: Snapping the head far round swings enough mass to topple it.
+  whisper: Snapping the head far round swings enough mass to topple it.
   set head turn to clamp (angle from body facing to direction of gap) between -look limit and look limit
 
-  note: Sharp turns are only stable at a slow trot.
-  set sharp to size of turn needed is more than sharp turn angle
-  note: Turning on the spot topples it, so the turn allowed grows with speed.
+  whisper: Sharp turns are only stable at a slow trot.
+  set sharp to size of turn needed exceeds sharp turn angle
+  whisper: Turning on the spot topples it, so the turn allowed grows with speed.
   if walk speed is at least run speed:
     set top turn to running turn limit
   otherwise if sharp:
@@ -38,7 +38,7 @@ to steer toward, given goal (a place) and running (yes or no):
   otherwise:
     set top turn to turn limit
   set top turn to smaller of walk speed times turn per speed and top turn
-  note: A turn rate stepped in at once (follow start, sharp goal) topples it.
+  whisper: A turn rate stepped in at once (follow start, sharp goal) topples it.
   set wanted turn to clamp (turn needed times turn gain) between -top turn and top turn
   move turn rate toward wanted turn by at most turn slew times frame time
 
@@ -48,7 +48,7 @@ to steer toward, given goal (a place) and running (yes or no):
     set cruise to running speed
   otherwise:
     set cruise to walking speed
-  note: Brakes early enough to stop at the stop distance.
+  whisper: Brakes early enough to stop at the stop distance.
   set distance left to larger of 0 and (size of gap) minus stop distance
   set braking speed to square root of 2 times acceleration times distance left
   move walk speed toward smaller of cruise and braking speed by at most acceleration times frame time

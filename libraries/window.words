@@ -42,7 +42,7 @@ code:
   	inline void need_window(int line)
   	{
   		if (!opened)
-  			imagine::fail(line, "there is no window yet. Open one first, like: open a window with \"My game\", 800, 600");
+  			imagine::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
   	}
 
   	inline COLORREF colour(const std::string& name, int line)
@@ -298,7 +298,7 @@ python:
 
   def need_window():
       if not win["opened"]:
-          raise RunError(0, 'there is no window yet. Open one first, like: open a window with "My game", 800, 600')
+          raise RunError(0, 'there is no window yet. Open one first, like: open a world with "My game", 800, 600')
 
   def colour(name):
       low = name.lower()
@@ -455,7 +455,7 @@ python:
       if win["root"] is not None:
           closed()
 
-to open a window, given title (text) and width (a number) and height (a number) = imagine_window::open({title}, {width}, {height}, {line})
+to open a world, given title (text) and width (a number) and height (a number) = imagine_window::open({title}, {width}, {height}, {line})
   runs: open_window({title}, {width}, {height})
 to consume the window, given colour (text) = imagine_window::clear({colour}, {line})
   runs: clear({colour})
@@ -469,7 +469,7 @@ to etch words, given words (text) and x (a number) and y (a number) and colour (
   runs: write({words}, {x}, {y}, {colour})
 to set the text size to, given size (a number) = imagine_window::set_text_size({size}, {line})
   runs: set_text_size({size})
-to show the frame = imagine_window::show({line})
+to reveal the frame = imagine_window::show({line})
   runs: show()
 to etch the picture, given file (text) and x (a number) and y (a number) = imagine_window::draw_picture({file}, {x}, {y}, {line})
   runs: draw_picture({file}, {x}, {y})
@@ -479,12 +479,12 @@ to width of picture, given file (text), giving back a number = (double)imagine_w
   runs: size_of_picture({file}, 0)
 to height of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetHeight()
   runs: size_of_picture({file}, 1)
-to close the window = imagine_window::close()
+to end the world = imagine_window::close()
   runs: close()
 to key held, given key (text), giving back yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])
   runs: key_name({key}) in win["held"]
 
-the window is open = imagine_window::open_now, yes or no, read only
+the world lives = imagine_window::open_now, yes or no, read only
   runs: win["open"]
 mouse x = imagine_window::mouse_x_now, number, read only
   runs: win["mouse"][0]

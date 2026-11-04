@@ -86,7 +86,7 @@ and the universe said i love you
 
 | Write | Means |
 |---|---|
-| `set rex to a new pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
+| `set rex to conjure a pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
 | `name of rex` | One of its parts. `set name of rex to "Rex"` changes it. |
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
@@ -94,7 +94,7 @@ and the universe said i love you
 ## A part of something else, top to bottom
 
 ```
-note: Anything after "note:" is for people; the computer ignores it.
+whisper: Anything after "note:" is for people; the computer ignores it.
 
 this is part of: creature body
 
@@ -104,7 +104,7 @@ settings:
 
 to steer toward, given goal (a place) and running (yes or no):
   set wandering to no
-  if fallen: stop
+  if fallen: cease
   ...
 and the universe said i love you
 ```
@@ -119,7 +119,7 @@ and the universe said i love you
 | Kind | Examples |
 |---|---|
 | a number | `60`, `2.5`, `walk speed`, `30 degrees` |
-| yes or no | `yes`, `no`, `fallen`, `speed is more than 10` |
+| yes or no | `yes`, `no`, `fallen`, `speed exceeds 10` |
 | a place | `1 horizontal 2 vertical 3 depth`, `centre of mass`, `goal` (a point in space: across, down and deep) |
 | a flat place | `300 horizontal 200 vertical`, `flat (goal minus centre of mass)` (across and down only) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
@@ -140,7 +140,7 @@ and the universe said i love you
 `set birth of ball to 100 horizontal 50 vertical` puts the ball's existence there too. Then move `existence of ball`, and `(existence of ball) of horizontal` is how far across it is.
 
 Lists and tables can hold other lists and tables: `a list of lists of numbers` is a grid, and `item 2 of item 3 of grid` reaches inside it. When shown, the inner ones are in brackets: `(1, 2), (3, 4)`.
-| your own kind | `a new pet` (see above) |
+| your own kind | `conjure a pet` (see above) |
 
 Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a number, not yes or no."
 
@@ -150,30 +150,30 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 |---|---|
 | `set gap to goal minus centre of mass` | Remember a value under a name. A new name is made the first time it is set. |
 | `move turn rate toward 20 by at most 5` | Change a number toward a goal, but by no more than the step. |
-| `if fallen: stop` | Do the part after the colon only when it is yes. |
+| `if fallen: cease` | Do the part after the colon only when it is yes. |
 | `if ...:` / `otherwise if ...:` / `otherwise:` | With indented lines below, for longer choices. |
 | `scrawl "Score: ", score` | Show things on the screen, one after another, then start a new line. |
 | `ask "Your name? " into name` | Show the question and keep what the person types, as text. |
 | `ask "Your age? " into age (a number)` | The same, as a number. It asks again until a number is typed. |
 | `ask "Again? " into again (yes or no)` | The same, as yes or no (`yes`, `y`, `no` or `n`). |
-| `repeat 10 times:` | Do the indented lines below 10 times. |
-| `while guess is not secret:` | Keep doing the indented lines below while it is yes. |
+| `echo 10 times:` | Do the indented lines below 10 times. |
+| `as long as guess is not secret:` | Keep doing the indented lines below while it is yes. |
 | `greet with name, 3` | Do your own command `greet`, giving it its inputs in order. A command without inputs is just its name: `greet`. |
 | `for each score in scores:` | Do the indented lines once for every item of a list, with `score` being that item. |
 | `for each n from 1 to 10:` | The same for each whole number from 1 to 10. |
-| `add 5 to scores` | Put an item at the end of a list. |
-| `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
+| `gather 5 into scores` | Put an item at the end of a list. |
+| `banish item 2 from scores` / `banish 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
 | `set entry "Rex" of ages to 3` | Put a value in a table under a name (replacing what was there). |
-| `remove entry "Rex" from ages` | Take a name and its value out of a table. |
+| `banish entry "Rex" from ages` | Take a name and its value out of a table. |
 | `give back total` | Leave the command, giving back an answer. |
-| `stop the loop` | Leave the `repeat`, `while` or `for each` it is inside, and carry on after it. |
-| `skip to the next one` | Go straight to the next round of the loop it is inside. |
-| `write "hello" to file "notes.txt"` | Make or replace a file with this text. |
-| `add "a line" to file "log.txt"` | Add a line to the end of a file (making it if needed). |
-| `stop` | Leave the command now (only in commands that don't give back anything). |
+| `break free` | Leave the `echo`, `as long as` or `for each` it is inside, and carry on after it. |
+| `move on` | Go straight to the next round of the loop it is inside. |
+| `inscribe "hello" into file "notes.txt"` | Make or replace a file with this text. |
+| `gather "a line" into file "log.txt"` | Add a line to the end of a file (making it if needed). |
+| `cease` | Leave the command now (only in commands that don't give back anything). |
 | `beep with 440, 0.5` | A word from a library (see Libraries). |
-| `note: ...` | A note for people. |
+| `whisper: ...` | A note for people. |
 
 ## Working things out
 
@@ -216,7 +216,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `flat (place)` | the place without its height |
 | `direction of flat place` | its compass angle in degrees |
 | `angle from a to b` | the turn from angle a to angle b, -180 to 180 degrees |
-| `a is more than b`, `is less than`, `is at least`, `is at most`, `is`, `is not` | yes or no |
+| `a exceeds b`, `falls below`, `is at least`, `is at most`, `is`, `is not` | yes or no |
 | `existence is within 30 of coin` | yes or no: are two places (or numbers) 30 or less apart? Good for things touching. |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
@@ -224,7 +224,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: set, to, if, otherwise, stop, note, and, or, not, is, more, less, than, at, least, most, plus, minus, times, divided, by, clamp, between, smaller, larger, of, square, root, size, flat, direction, angle, from, yes, no, move, toward, try, scrawl, ask, into, repeat, while, with, random, for, each, in, contains, list, empty, new, remove, file, write, as. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 
@@ -271,13 +271,13 @@ and the universe said i love you
 use: window
 
 genesis:
-  open a window with "My game", 800, 600
+  open a world with "My game", 800, 600
   set x to 400
-  while the window is open:
+  as long as the world lives:
     if key held "right": set x to x plus 5
     consume the window with "black"
     etch a circle with x, 300, 20, "orange"
-    show the frame
+    reveal the frame
 and the universe said i love you
 ```
 
@@ -285,7 +285,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 
 | Words | Means |
 |---|---|
-| `open a window with "Title", 800, 600` | Open a window this wide and high. |
+| `open a world with "Title", 800, 600` | Open a window this wide and high. |
 | `etch the picture turned with "ship.png", 300, 200, 2, 45` | The picture with its middle at 300, 200, twice as big, turned 45 degrees clockwise. (Running directly, this needs Pillow: `py -3 -m pip install pillow`.) |
 | `frame time` | How many seconds the last frame took (about 0.0167 at 60 frames a second). Moving by `speed times frame time times 60` keeps things the same speed even when the computer is slow. |
 | `set the text size to 32` | Words etched after this are 32 dots high (16 at first). |
@@ -296,13 +296,13 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `etch words with "Score: " plus score, x, y, "yellow"` | Words, from their top left corner. |
 | `etch the picture with "ship.png", x, y` | A picture (.png or .gif), at its own size, from its top left corner. |
 | `width of picture "ship.png"`, `height of picture "ship.png"` | A picture's size in dots. |
-| `show the frame` | Show what was etched, then wait so the window shows 60 frames a second. |
-| `the window is open` | yes or no: becomes no when the person closes the window. |
+| `reveal the frame` | Show what was etched, then wait so the window shows 60 frames a second. |
+| `the world lives` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
 | `consume the window with "black"` | The same as `consume the window with`. |
 | `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
 | `key pressed "space"`, `mouse clicked` | yes or no: was the key pressed (or the mouse button clicked) since the frame before? Yes for one frame only, so one press does one thing. |
-| `close the window` | Close it yourself. |
+| `end the world` | Close it yourself. |
 
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
@@ -311,7 +311,7 @@ Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`,
 A library is a `.words` file, in `libraries/` or next to your program. Each word says what it means in C++ (for `build`) and, on an indented `runs:` line, in Python (for running directly). Anything C++ or Python can do can get an English word this way: windows, sound, the internet, games. Here is a word from `libraries/time.words`:
 
 ```
-to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
+to wait, given seconds (a number) = std: : this_thread: : sleep_for(std: : chrono: : duration<double>({seconds}))
   runs: time.sleep(max(0.0, {seconds}))
 ```
 
@@ -336,13 +336,13 @@ The file is JSON, which other programs can read too. To write text holding a quo
 
 The program stops with the line and a plain reason, such as `Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.`
 
-To carry on instead, put the lines that might go wrong under `try:`, and what to do instead under `if that went wrong:` (at the same indent, right after). Inside it, `the problem` is the reason, as text:
+To carry on instead, put the lines that might go wrong under `try:`, and what to do instead under `if that went wrong:` (at the same indent, right after). Inside it, `the wound` is the reason, as text:
 
 ```
 try:
   set notes to contents of file "notes.txt"
 if that went wrong:
-  scrawl "I couldn't read the notes: ", the problem
+  scrawl "I couldn't read the notes: ", the wound
   set notes to ""
 ```
 

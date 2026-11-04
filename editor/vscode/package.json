@@ -2,25 +2,47 @@
   "name": "imagination",
   "displayName": "Imagination",
   "description": "Colours, indenting and shortcuts for the Imagination language (.imagine files).",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "speda",
-  "engines": { "vscode": "^1.60.0" },
-  "categories": ["Programming Languages", "Snippets"],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
   "contributes": {
-    "languages": [{
-      "id": "imagination",
-      "aliases": ["Imagination"],
-      "extensions": [".imagine"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "imagination",
-      "scopeName": "source.imagination",
-      "path": "./syntaxes/imagination.tmLanguage.json"
-    }],
-    "snippets": [{ "language": "imagination", "path": "./snippets.json" }],
+    "languages": [
+      {
+        "id": "imagination",
+        "aliases": [
+          "Imagination"
+        ],
+        "extensions": [
+          ".imagine"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "imagination",
+        "scopeName": "source.imagination",
+        "path": "./syntaxes/imagination.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "imagination",
+        "path": "./snippets.json"
+      }
+    ],
     "configurationDefaults": {
-      "[imagination]": { "editor.tabSize": 2, "editor.insertSpaces": true, "editor.detectIndentation": false }
+      "[imagination]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false
+      }
     }
   }
 }

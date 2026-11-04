@@ -47,9 +47,9 @@ Next year Sam will be 12.
 ```imagination
 genesis:
   set temperature to 31
-  if temperature is more than 30:
+  if temperature exceeds 30:
     scrawl "It's hot."
-  otherwise if temperature is less than 10:
+  otherwise if temperature falls below 10:
     scrawl "It's cold."
   otherwise:
     scrawl "It's nice."
@@ -66,7 +66,7 @@ It's hot.
 
 ```imagination
 genesis:
-  repeat 3 times:
+  echo 3 times:
     scrawl "Hip hip hooray!"
   for each n from 1 to 5:
     scrawl n, " times 7 is ", n times 7
@@ -84,14 +84,14 @@ Hip hip hooray!
 5 times 7 is 35
 ```
 
-`repeat` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `while ...:`, which keeps going while something is yes.
+`echo` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `as long as ...:`, which keeps going while something is yes.
 
 ## 5. Lists
 
 ```imagination
 genesis:
   set shopping to a list of ("milk", "eggs")
-  add "bread" to shopping
+  gather "bread" into shopping
   scrawl "I need ", size of shopping, " things: ", shopping
   for each thing in shopping:
     scrawl "- ", thing
@@ -146,7 +146,7 @@ a pet has:
 and the universe said i love you
 
 genesis:
-  set rex to a new pet
+  set rex to conjure a pet
   set name of rex to "Rex"
   set age of rex to 3
   scrawl rex
@@ -159,7 +159,7 @@ a pet (name: Rex, age: 3)
 Rex is 3 years old.
 ```
 
-`a pet has:` describes a new kind of thing and its parts. After that, `a new pet` makes one, and `name of rex` is one of its parts.
+`a pet has:` describes a new kind of thing and its parts. After that, `conjure a pet` makes one, and `name of rex` is one of its parts.
 
 ## 8. Asking
 
@@ -190,7 +190,7 @@ genesis:
   try:
     scrawl contents of file "missing.txt"
   if that went wrong:
-    scrawl "No luck: ", the problem
+    scrawl "No luck: ", the wound
   scrawl "Still going."
 and the universe said i love you
 ```
@@ -202,13 +202,13 @@ Still going.
 
 ## 10. A game
 
-Programs can open a window and etch in it. This is a whole game: a ball you move with the arrow keys.
+Programs can open a world (a window) and etch in it. This is a whole game: a ball you move with the arrow keys.
 
 ```
 genesis:
-  open a window with "Ball", 600, 400
+  open a world with "Ball", 600, 400
   set birth to 300 horizontal 200 vertical
-  while the window is open:
+  as long as the world lives:
     if key held "left": set existence of horizontal to existence of horizontal minus 5
     if key held "right": set existence of horizontal to existence of horizontal plus 5
     if key held "up": set existence of vertical to existence of vertical minus 5
@@ -217,11 +217,11 @@ genesis:
     consume the window with "black"
     etch a circle with birth of horizontal, birth of vertical, 4, "white"
     etch a circle with existence of horizontal, existence of vertical, 20, "orange"
-    show the frame
+    reveal the frame
 and the universe said i love you
 ```
 
-`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `reveal the frame` puts the picture on the screen (60 times a second).
 
 Setting `birth` also makes `existence` start at the same place.
 

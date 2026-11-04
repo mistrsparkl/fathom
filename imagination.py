@@ -58,7 +58,7 @@ BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place":
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -549,6 +549,89 @@ def tokenize(text, line):
         if not re.fullmatch(TOKEN, t):
             raise ScriptError(line, f"I don't understand the symbol '{t}'.")
     return [t.lower() if t[0].isalpha() else t for t in tokens]
+
+
+# The language's words, and the words they replaced. A script line's words are turned into the
+# older inner words before it is read; the older words themselves are not allowed in scripts.
+OLD_WORDS = [  # (old words, how to say it now) - checked anywhere in a line, outside quote marks
+    (r"\bis more than\b", "exceeds"), (r"\bis less than\b", "falls below"),
+    (r"\bthe problem\b", "the wound"), (r"\ban? new\b", "conjure a"),
+    (r"\bopen a window\b", "open a world"), (r"\bthe window is open\b", "the world lives"),
+    (r"\bclose the window\b", "end the world"), (r"\bshow the frame\b", "reveal the frame"),
+]
+OLD_STARTS = [  # (old first words, how to say it now) - checked at the start of a line
+    (r"while\b", "as long as"), (r"repeat\b", "echo"), (r"stop the loop$", "break free"),
+    (r"skip to the next( one)?$", "move on"), (r"stop$", "cease"), (r"add\b", "gather ... into"),
+    (r"remove\b", "banish ... from"), (r"write\b", "inscribe ... into"),
+]
+NEW_WORDS = [  # (new words, the inner words they become) - anywhere outside quote marks
+    (r"\bexceeds\b", "is more than"), (r"\bfalls below\b", "is less than"), (r"\bthe wound\b", "the problem"),
+    (r"\bconjure (an?) ", "a new "),
+]
+NEW_STARTS = [  # at the start of a line
+    (r"as long as\b", "while"), (r"echo\b", "repeat"), (r"break free$", "stop the loop"),
+    (r"move on$", "skip to the next one"), (r"cease$", "stop"),
+]
+
+
+def outside_quotes(text, change):
+    """Applies change to the parts of text that are not between quote marks."""
+    parts = re.split(r'("[^"]*")', text)
+    return "".join(part if k % 2 else change(part, k == 0) for k, part in enumerate(parts))
+
+
+def surface(text, line):
+    """A script line in the language's words, turned into the inner words (old words are a mistake).
+
+    'if done: cease' is two parts; each is turned on its own."""
+    head, colon, rest = split_colon(text)
+    out = surface_part(head, line)
+    if colon:
+        out += ":" + (" " + surface(rest.strip(), line) if rest.strip() else "")
+    return out
+
+
+def surface_part(text, line):
+    def check(part, first):
+        low = part.lower()
+        for old, now in OLD_WORDS:
+            m = re.search(old, low)
+            if m:
+                raise ScriptError(line, f"'{m.group(0)}' is now '{now}'.")
+        if first:
+            head = split_colon(low)[0].strip()
+            for old, now in OLD_STARTS:
+                m = re.match(old, head)
+                if m:
+                    raise ScriptError(line, f"'{m.group(0).strip()}' is now '{now}'.")
+        return part
+    outside_quotes(text, check)
+
+    def change(part, first):
+        for new, inner in NEW_WORDS:
+            part = re.sub(new, inner, part, flags=re.IGNORECASE)
+        if first:
+            lead = len(part) - len(part.lstrip())
+            body = part[lead:]
+            for new, inner in NEW_STARTS:
+                body = re.sub("^" + new, inner, body, flags=re.IGNORECASE)
+            m = re.match(r"(gather|banish|inscribe)\b", body, re.IGNORECASE)
+            if m:  # gather x into y -> add x to y; banish x from y -> remove x from y; inscribe x into file -> write x to file
+                verb = m.group(1).lower()
+                body = {"gather": "add", "banish": "remove", "inscribe": "write"}[verb] + body[m.end():]
+                if verb != "banish":
+                    k = body.lower().rfind(" into ")
+                    if k < 0:
+                        raise ScriptError(line, f"'{verb}' looks like '{verb} {'5 into scores' if verb == 'gather' else chr(34) + 'hello' + chr(34) + ' into file ' + chr(34) + 'notes.txt' + chr(34)}'.")
+                    body = body[:k] + " to " + body[k + 6:]
+            part = part[:lead] + body
+        return part
+    # 'into' may sit after a quoted part, so turn the whole line, then put the quoted parts back unchanged
+    pieces = re.split(r'("[^"]*")', text)
+    marks = [pieces[k] for k in range(1, len(pieces), 2)]
+    joined = "".join(f"\x00{k}\x00" if i % 2 else piece for i, piece in enumerate(pieces) for k in [i // 2])
+    joined = change(joined, True)
+    return re.sub(r"\x00(\d+)\x00", lambda m: marks[int(m.group(1))], joined)
 
 
 def split_colon(text):
@@ -1396,6 +1479,10 @@ def gather(path, from_line=None, seen=None):
         raise ScriptError(k * PER_FILE + 1, f"A script can have at most {PER_FILE - 1} lines.")
     lines, numbers = [], []
     for n, raw in enumerate(own, 1):
+        if raw.strip().lower().startswith("note:"):
+            raise ScriptError(k * PER_FILE + n, "'note:' is now 'whisper:'.")
+        if raw.strip().lower().startswith("whisper:"):  # read as an inner 'note:' line
+            raw = raw[:len(raw) - len(raw.lstrip())] + "note:" + raw.strip()[8:]
         m = re.fullmatch(r"\s*use:\s*(.+\.imagine)\s*", raw, re.IGNORECASE)
         if m and not raw[:1].isspace():
             other = path.parent / m.group(1).strip()
@@ -1739,7 +1826,7 @@ def statements(body, names, declared, depth):
             continue
         if raw.strip().lower() == "if that went wrong:":
             raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
-        lines, run, branch = statement(n, raw.strip(), inner, names, declared, depth)
+        lines, run, branch = statement(n, surface(raw.strip(), n), inner, names, declared, depth)
         out += lines
         if branch:
             which, cond = branch
@@ -1848,7 +1935,7 @@ def statement(n, text_, inner, names, declared, depth):
         if tokens[0] == "while":
             v = expr_to_end(tokens, 1, names, n)
             if v.kind != YESNO:
-                raise ScriptError(n, f"'while' needs something that is yes or no, but this is {kind_name(v.kind)}.")
+                raise ScriptError(n, f"'as long as' needs something that is yes or no, but this is {kind_name(v.kind)}.")
             lines, then = body(loop=True)
             cond = v.run
 
@@ -1858,10 +1945,10 @@ def statement(n, text_, inner, names, declared, depth):
                         break
             return [f"{tab}while ({strip_parens(v.cpp)})", tab + "{"] + lines + [tab + "}"], run, None
         if tokens[-1:] != ["times"]:
-            raise ScriptError(n, "'repeat' looks like 'repeat 10 times:'.")
+            raise ScriptError(n, "'echo' looks like 'echo 10 times:'.")
         count = expr_to_end(tokens[:-1], 1, names, n)
         if count.kind != NUMBER:
-            raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
+            raise ScriptError(n, f"'echo' needs a number of times, but this is {kind_name(count.kind)}.")
         lines, then = body(loop=True)
         k = f"imagine_count_{depth}_{n}"
         times = count.run
@@ -1893,11 +1980,12 @@ def statement(n, text_, inner, names, declared, depth):
         lines, then = body()
         return [line, tab + "{"] + lines + [tab + "}"], guard(then, n), (which, test)
     if inner:
-        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'while' and 'for each' lines can have indented lines under them.")
+        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'echo', 'as long as', 'for each' and 'try' lines can have indented lines under them.")
     tokens = tokenize(text_, n)
     if tokens in (["stop", "the", "loop"], ["skip", "to", "the", "next", "one"], ["skip", "to", "the", "next"]):
         if not names.loops:
-            raise ScriptError(n, f"'{' '.join(tokens)}' only works inside 'repeat', 'while' or 'for each'.")
+            said = "break free" if tokens[0] == "stop" else "move on"
+            raise ScriptError(n, f"'{said}' only works inside 'echo', 'as long as' or 'for each'.")
         leave = tokens[0] == "stop"
 
         def run(env):
@@ -1905,7 +1993,7 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}{'break' if leave else 'continue'};"], run, None
     if tokens == ["stop"]:
         if names.gives:
-            raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, so leave it with 'give back ...' instead of 'stop'.")
+            raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, so leave it with 'give back ...' instead of 'cease'.")
 
         def run(env):
             raise Stop()
@@ -1946,7 +2034,7 @@ def statement(n, text_, inner, names, declared, depth):
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         table = expr_to_end(tokens, cut + 1, names, n)
         if not is_table(table.kind) or not table.writable:
-            raise ScriptError(n, f"'remove entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
+            raise ScriptError(n, f"'banish entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
         key = expr_to_end(tokens[:cut], 2, names, n)
         if key.kind != TEXT:
             raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
@@ -1960,7 +2048,7 @@ def statement(n, text_, inner, names, declared, depth):
         if tokens[1] == "item":
             index = expr_to_end(tokens[:cut], 2, names, n)
             if index.kind != NUMBER:
-                raise ScriptError(n, f"'remove item' needs a number, but this is {kind_name(index.kind)}.")
+                raise ScriptError(n, f"'banish item' needs a number, but this is {kind_name(index.kind)}.")
             at = index.run
 
             def run(env):
@@ -2106,7 +2194,7 @@ def statement(n, text_, inner, names, declared, depth):
     hint = library_hint(tokens)
     if hint:
         raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
-    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, add, remove, write, if, otherwise, repeat, while, for each, give back, stop, note or the name of a command.")
+    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, gather, banish, inscribe, if, otherwise, echo, as long as, for each, try, give back, cease, whisper or the name of a command.")
 
 
 def for_each(n, head, body, names, declared, depth):

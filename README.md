@@ -7,10 +7,10 @@ genesis:
   scrawl "I'm thinking of a number from 1 to 100."
   set secret to random number from 1 to 100
   set guess to 0
-  while guess is not secret:
+  as long as guess is not secret:
     ask "Your guess? " into guess (a number)
-    if guess is less than secret: scrawl "Too low."
-    if guess is more than secret: scrawl "Too high."
+    if guess falls below secret: scrawl "Too low."
+    if guess exceeds secret: scrawl "Too high."
   scrawl "You got it!"
 and the universe said i love you
 ```

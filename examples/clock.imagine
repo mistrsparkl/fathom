@@ -1,5 +1,5 @@
-note: A countdown that uses two libraries.
-note: Run it with: imagine examples/clock.imagine
+whisper: A countdown that uses two libraries.
+whisper: Run it with: imagine examples/clock.imagine
 
 use: time
 use: maths
@@ -13,6 +13,6 @@ genesis:
 and the universe said i love you
 
 to two digits, given x (a number), giving back text:
-  if x is less than 10: give back "0" plus x
+  if x falls below 10: give back "0" plus x
   give back x as text
 and the universe said i love you

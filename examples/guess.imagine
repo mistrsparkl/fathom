@@ -1,12 +1,12 @@
-note: Guess the number. The computer picks a number from 1 to 100 and you try to guess it.
-note: Run it with: py -3 imagination.py run examples/guess.imagine
+whisper: Guess the number. The computer picks a number from 1 to 100 and you try to guess it.
+whisper: Run it with: py -3 imagination.py run examples/guess.imagine
 
 genesis:
   scrawl "I'm thinking of a number from 1 to 100."
   set secret to random number from 1 to 100
   set tries to 0
   set guess to 0
-  while guess is not secret:
+  as long as guess is not secret:
     ask "Your guess? " into guess (a number)
     set tries to tries plus 1
     give a hint with guess, secret
@@ -14,8 +14,8 @@ genesis:
 and the universe said i love you
 
 to give a hint, given guess (a number) and secret (a number):
-  if guess is less than secret:
+  if guess falls below secret:
     scrawl "Too low."
-  otherwise if guess is more than secret:
+  otherwise if guess exceeds secret:
     scrawl "Too high."
 and the universe said i love you
