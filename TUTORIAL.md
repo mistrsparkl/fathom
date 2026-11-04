@@ -200,6 +200,26 @@ No luck: there is no file called "missing.txt" (or it can't be opened).
 Still going.
 ```
 
+Your own commands can go wrong on purpose with `shatter`, and `try:` catches that the same way:
+
+```imagination
+to fly, given fuel (a number):
+  if fuel falls below 10: shatter with "not enough fuel (only " plus fuel plus ")"
+  scrawl "Up we go!"
+and the universe said i love you
+
+genesis:
+  try:
+    fly with 3
+  if that went wrong:
+    scrawl "Grounded: ", the wound
+and the universe said i love you
+```
+
+```output
+Grounded: not enough fuel (only 3)
+```
+
 ## 10. A game
 
 Programs can open a world (a window) and etch in it. This is a whole game: a ball you move with the arrow keys.
@@ -228,6 +248,116 @@ Setting `birth` also makes `existence` start at the same place.
 The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
 
 `examples/dodge.imagine` is a bigger game: dodge the falling balls.
+
+## 11. Kinds of kinds
+
+A dog is a kind of pet: it has everything a pet has, and more. A command for pets works on dogs too, unless dogs have their own version:
+
+```imagination
+a pet has:
+  name (text)
+and the universe said i love you
+
+a dog is a kind of pet that has:
+  tricks (a list of text)
+and the universe said i love you
+
+to speak, for a pet:
+  scrawl name, " makes a sound."
+and the universe said i love you
+
+to speak, for a dog:
+  scrawl name, " barks and knows ", size of tricks, " tricks."
+and the universe said i love you
+
+genesis:
+  set tom to conjure a pet
+  set name of tom to "Tom"
+  set rex to conjure a dog
+  set name of rex to "Rex"
+  gather "sit" into tricks of rex
+  speak tom
+  speak rex
+and the universe said i love you
+```
+
+```output
+Tom makes a sound.
+Rex barks and knows 1 tricks.
+```
+
+## 12. Commands as values
+
+`the command double` is the command itself, not its answer. You can keep it, give it to another command, and do it later with `invoke`:
+
+```imagination
+to double, given x (a number), giving back a number:
+  give back x times 2
+and the universe said i love you
+
+to do twice, given f (a command given a number giving back a number) and x (a number), giving back a number:
+  give back invoke f with (invoke f with x)
+and the universe said i love you
+
+genesis:
+  scrawl do twice with (the command double, 5)
+  set steps to a list of (the command double, the command round)
+  for each step in steps: scrawl invoke step with 2.6
+and the universe said i love you
+```
+
+```output
+20
+5.2
+3
+```
+
+## 13. Two things at once
+
+`meanwhile` starts a command and carries straight on. `wait for the others` waits until they are all done:
+
+```imagination
+to note down, given name (text):
+  inscribe "hello from " plus name into file name plus ".txt"
+and the universe said i love you
+
+genesis:
+  meanwhile note down with "first"
+  meanwhile note down with "second"
+  wait for the others
+  scrawl contents of file "first.txt", " / ", contents of file "second.txt"
+and the universe said i love you
+```
+
+```output
+hello from first / hello from second
+```
+
+## 14. Talking to other programs
+
+Websites and other programs often speak JSON. `as saved text` writes anything as JSON, and `load ... from the text` reads it back. `patterns` find text by its shape:
+
+```imagination
+genesis:
+  set scores to a table of numbers
+  set entry "Sam" of scores to 31
+  set entry "Jo" of scores to 7
+  set words to scores as saved text
+  scrawl words
+  set again to a table of numbers
+  load again from the text words
+  scrawl entry "Sam" of again
+  scrawl matches of the pattern with ("[0-9]+", "Sam is 31, Jo is 7")
+and the universe said i love you
+```
+
+```output
+{"Jo": 7, "Sam": 31}
+31
+31, 7
+```
+
+The `web` library gets and sends pages (`web page`, `send to the web page`), `server` makes your program a web server, `folders` works with files and folders, and `computer` runs other programs (`output of the command "dir"`). LANGUAGE.md has them all.
 
 ## Where next
 
