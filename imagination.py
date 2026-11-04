@@ -1636,7 +1636,7 @@ def read_one(path, auto):
                 commands.append((text_, n, body))
             if i >= len(lines) or not is_closing(lines[i]):
                 raise ScriptError(numbers[i] if i < len(lines) else numbers[-1],
-                                  f"The command '{text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
+                                  f"The command '{'genesis' if text_ == 'to start:' else text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
             i += 1
             continue
         if text_.lower().startswith("use:"):  # a library ('use: x.imagine' lines were already replaced by gather)
