@@ -373,7 +373,7 @@ load high scores from file "scores.json"
 
 `load` needs a name that already holds the right kind of value (here, a table of numbers). Lists, tables, places and your own kinds of things all work, even inside each other. A thing whose file lacks one of its parts gets that part empty, so adding a part to a kind of thing doesn't spoil old saves. If the file holds something else, the problem is `the file "scores.json" doesn't hold a table of numbers.` Use `try:` to carry on instead.
 
-The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `scrawl "She said " plus quote mark plus "hi" plus quote mark`.
+`scores as saved text` gives the same JSON as text, without a file, and `load scores from the text reply` reads it back, so a program can talk to websites and other programs that use JSON (`load` fails with `the text doesn't hold a list of numbers.` if it doesn't fit). The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `scrawl "She said " plus quote mark plus "hi" plus quote mark`.
 
 ## When something goes wrong while running
 

@@ -561,6 +561,14 @@ def no_constant(name):
     raise NotSaved()
 
 
+def load_text(data, kind, things, line):
+    """'load scores from the text reply': JSON text (from 'as saved text', a file or the web) back into a value."""
+    try:
+        return from_saved(json.loads(data, parse_int=float, parse_constant=no_constant), kind, things)
+    except (NotSaved, ValueError, RecursionError):
+        raise RunError(line, f"the text doesn't hold {kind_name(kind)}.")
+
+
 def load_saved(path, kind, things, line):
     data = read_file(path, line)
     try:
@@ -1079,6 +1087,12 @@ class Expr:
                 raise ScriptError(self.line, f"'as a number' turns text into a number, but this is {kind_name(v.kind)}.")
             a, line = v.run, self.line
             return Value(f"imagine::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line))
+        if self.at("as", "saved", "text"):  # 'scores as saved text': written out as JSON, as 'save' writes it
+            self.i += 3
+            if holds_command(v.kind):
+                raise ScriptError(self.line, "A command can't be saved.")
+            a, kind, line = v.run, v.kind, self.line
+            return Value(f"imagine::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line))
         if self.at("as", "text"):
             self.i += 2
             a = v.run
@@ -2406,6 +2420,20 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}imagine::say({{{', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)}}});"], run, None
     if tokens[0] == "ask":
         return ask(tokens, names, declared, n, tab)
+    if tokens[0] == "load" and "from" in tokens and tokens[len(tokens) - tokens[::-1].index("from"):][:2] == ["the", "text"]:
+        cut = len(tokens) - 1 - tokens[::-1].index("from")
+        source = expr_to_end(tokens, cut + 3, names, n)
+        if source.kind != TEXT:
+            raise ScriptError(n, f"'load ... from the text' needs text, but this is {kind_name(source.kind)}.")
+        e = Expr(tokens[1:cut], names, n)
+        target = e.full() if cut > 1 else None
+        if not target or e.i != len(e.t) or not target.writable or getattr(target, "cpp_assign", None):
+            raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' can't be changed, so I can't load into it.")
+        if holds_command(target.kind):
+            raise ScriptError(n, "A command can't be loaded.")
+        put, kind, things, w = target.store, target.kind, THINGS, source.run
+        return ([f"{tab}imagine::load_text({strip_parens(target.cpp)}, {strip_parens(source.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
+                lambda env: put(env, load_text(w(env), kind, things, n)), None)
     for verb, joint in (("save", "to"), ("load", "from")):
         if tokens[0] == verb and joint in tokens and tokens[len(tokens) - tokens[::-1].index(joint):][:1] == ["file"]:
             cut = len(tokens) - 1 - tokens[::-1].index(joint)

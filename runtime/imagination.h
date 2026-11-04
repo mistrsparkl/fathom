@@ -735,6 +735,27 @@ namespace imagine
 	}
 
 	template <typename T>
+	std::string saved_text(const T& value, int line)
+	{
+		std::string out;
+		save(out, value, line);
+		return out;
+	}
+
+	template <typename T>
+	void load_text(T& into, const std::string& all, const std::string& kind, int line)
+	{
+		SavedReader reader{all};
+		SavedData d;
+		T value{};
+		bool ok = reader.value(d);
+		reader.space();
+		if (!ok || reader.i != all.size() || !load(d, value))
+			fail(line, "the text doesn't hold " + kind + ".");
+		into = std::move(value);
+	}
+
+	template <typename T>
 	void load_file(T& into, const std::string& path, const std::string& kind, int line)
 	{
 		std::string all = read_file(path, line);
