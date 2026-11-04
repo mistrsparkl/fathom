@@ -91,6 +91,19 @@ and the universe said i love you
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
+**Kinds of kinds.** A kind of thing can be a kind of another one. It has all of the other's parts, and more of its own:
+
+```
+a dog is a kind of pet that has:
+  tricks (a list of text)
+and the universe said i love you
+
+a puppy is a kind of dog:
+and the universe said i love you
+```
+
+A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. Elsewhere a dog stays a dog: an input `(a pet)` or a list of pets can't hold one.
+
 ## A part of something else, top to bottom
 
 ```

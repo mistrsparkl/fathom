@@ -241,6 +241,27 @@ def program_checks():
     assert out.stdout == "no\nyes\nyes\nno\n", repr(out.stdout)
     assert perr("genesis:\n  scrawl 3 touches 4\n" + END)[1] == "'touches' needs a thing or a place, not a number."
 
+    # Kinds of kinds: a dog has all of a pet's parts and does a pet's commands, unless it has its own version.
+    kinds = ('a pet has:\n  name (text)\n  age (a number)\n' + END + 'a dog is a kind of pet that has:\n  tricks (a list of text)\n' + END +
+             'a puppy is a kind of dog:\n' + END + 'a cat is a kind of pet that also has:\n  lives (a number)\n' + END +
+             'to speak, for a pet:\n  scrawl name, " makes a sound"\n' + END +
+             'to speak, for a dog:\n  scrawl name, " says woof and knows ", size of tricks, " tricks"\n' + END +
+             'to grow, for a pet, given years (a number), giving back a number:\n  set age to age plus years\n  give back age\n' + END)
+    out = both(kinds + 'genesis:\n  set p to conjure a pet\n  set name of p to "Blob"\n  set d to conjure a dog\n  set name of d to "Rex"\n'
+               '  gather "sit" into tricks of d\n  set u to conjure a puppy\n  set name of u to "Bit"\n  set c to conjure a cat\n'
+               '  set name of c to "Tom"\n  set lives of c to 9\n  speak p\n  speak d\n  speak u\n  speak c\n'
+               '  scrawl grow with (d, 3), " ", grow with (c, 2), " ", grow with (u, 1)\n  scrawl d\n  scrawl c\n  scrawl u\n' + END)
+    assert out.stdout == ("Blob makes a sound\nRex says woof and knows 1 tricks\nBit says woof and knows 0 tricks\nTom makes a sound\n3 2 1\n"
+                          "a dog (name: Rex, age: 3, tricks: sit)\na cat (name: Tom, age: 2, lives: 9)\na puppy (name: Bit, age: 1, tricks: (nothing))\n"), repr(out.stdout)
+    assert perr(kinds + 'to show, given p (a pet):\n  scrawl p\n' + END + 'genesis:\n  show conjure a dog\n' + END)[1] == \
+        "Input 1 of 'show' must be a pet, not a dog. A dog is a kind of pet, but only commands for a pet ('to ..., for a pet:') take it."
+    assert perr('a dog is a kind of pet:\n' + END + 'genesis:\n  cease\n' + END)[1] == \
+        "Describe what a pet has above the dog, so a dog can be a kind of pet."
+    assert perr(kinds + 'a fish is a kind of pet that has:\n  age (a number)\n' + END + 'genesis:\n  cease\n' + END)[1] == \
+        "A fish already has a part called 'age' (every pet has one)."
+    assert perr(kinds + 'to speak, for a cat, given loud (yes or no):\n  cease\n' + END + 'genesis:\n  cease\n' + END)[1] == \
+        "Every version of 'speak' must take the same inputs and give back the same kind."
+
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
                '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'

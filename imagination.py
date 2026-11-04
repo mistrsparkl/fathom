@@ -70,6 +70,7 @@ TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 # Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
 OWNERS = {}
+PARENTS = {}  # kind of thing -> the kind it is a kind of ('a dog is a kind of pet')
 
 # The parts of a place, written after it: 'existence of horizontal'.
 PLACE_PARTS = {("horizontal",): "X", ("vertical",): "Y", ("depth",): "Z"}
@@ -696,6 +697,7 @@ class Command:
         self.cpp, self.kinds, self.gives = cpp, kinds, gives
         self.inputs = inputs  # library words: the input names their C++ uses as {name}
         self.runner = runner  # called with the inputs' values when running directly
+        self.versions = None  # a command for a kind of thing: {kind: Command} for it and the kinds of it
 
 
 class Names:
@@ -1619,6 +1621,7 @@ def read_one(path, auto):
     libs, used = [], set()  # C++ that 'use:' libraries need, and their names
     THINGS = {}
     OWNERS.clear()
+    PARENTS.clear()
     reset_fields()
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
@@ -1687,7 +1690,8 @@ def read_one(path, auto):
             used.add(lib)
             libs += load_library(lib, n, names)
             continue
-        m = re.fullmatch(r"an? ([a-z][a-z ]*?) has:", text_.lower())
+        m = (re.fullmatch(r"an? ([a-z][a-z ]*?) is a kind of (?:an? )?([a-z][a-z ]*?)(?: that (?:also )?has)?:", text_.lower())
+             or re.fullmatch(r"an? ([a-z][a-z ]*?) has:()", text_.lower()))
         if m:
             fields = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
@@ -1702,6 +1706,11 @@ def read_one(path, auto):
             if name in THINGS or name in BASIC_WORDS:
                 raise ScriptError(n, f"There is already a kind of thing called '{name}'.")
             THINGS[name] = []
+            if m.group(2):
+                parent = " ".join(m.group(2).split())
+                if parent not in THINGS:
+                    raise ScriptError(n, f"Describe what a {parent} has above the {name}, so a {name} can be a kind of {parent}.")
+                PARENTS[name] = parent
             things.append((name, n, fields))
             continue
         if is_closing(text_):
@@ -1714,17 +1723,47 @@ def read_one(path, auto):
         raise ScriptError(things[0][1], "New kinds of things can only be described in programs for now.")
     structs = describe_things(things)
     heads = [command_head(text_, n) for text_, n, _ in commands]
+    made = []  # the Command for each head
     for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
-        if tuple(words) in names.commands:
-            raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
-        names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
+        command = Command(cpp, [kind for _, kind in inputs], gives)
+        have = names.commands.get(tuple(words))
+        if have is not None:
+            owner = inputs[0][1] if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else None
+            if have.versions is None or owner is None or owner in have.versions:
+                raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
+            if len(have.kinds) != len(command.kinds) or have.kinds[1:] != command.kinds[1:] or have.gives != gives:
+                raise ScriptError(n, f"Every version of '{' '.join(words)}' must take the same inputs and give back the same kind.")
+            have.versions[owner] = command
+        else:
+            names.commands[tuple(words)] = command
+            if cpp in OWNERS:
+                command.versions = {inputs[0][1]: command}
+        made.append(command)
+    # A kind of pet does a pet's command the pet's way, unless it has its own version: the command is made again for it.
+    extra, written = [], list(made)
+    for head, (text_, n, body), command in zip(heads, commands, made):
+        words, cpp, inputs, gives = head
+        if cpp not in OWNERS or not inputs or not is_thing(inputs[0][1]):
+            continue
+        versions = names.commands[tuple(words)].versions
+        own = {k: c for k, c in versions.items() if any(c is m for m in written)}  # written in the script, not made here
+        for kind_ in ["thing " + k for k in THINGS if is_kind_of("thing " + k, inputs[0][1]) and "thing " + k != inputs[0][1]]:
+            if kind_ in versions or nearest_version(own, kind_) is not command:
+                continue
+            copy = Command(cpp, [kind_] + command.kinds[1:], gives)
+            versions[kind_] = copy
+            extra.append(((words, cpp, [(inputs[0][0], kind_)] + inputs[1:], gives), (text_, n, body), copy))
+    for item in extra:
+        heads.append(item[0])
+        commands.append(item[1])
+        made.append(item[2])
     if program:
         if ("start",) not in names.commands:
             raise ScriptError(main_lines or 1, "A program needs a 'genesis:' command: that is where it begins.")
         if names.commands[("start",)].kinds or names.commands[("start",)].gives:
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
                               "'genesis:' has no inputs and gives nothing back.")
-    functions = [function(head, n, body, names, info) for head, (_, n, body) in zip(heads, commands)]
+    functions = [function(head, n, body, names, info, command) for head, (_, n, body), command in zip(heads, commands, made)]
     if program:
         protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
@@ -1748,7 +1787,11 @@ def describe_things(things):
     """Reads 'a pet has:' descriptions; returns the C++ structs."""
     described = set()
     for name, n, fields in things:
-        if not fields:
+        if name in PARENTS:
+            for words, kind in THINGS[PARENTS[name]]:
+                THINGS[name].append((words, kind))
+                FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
+        elif not fields:
             raise ScriptError(n, f"Say what a {name} has, one thing per indented line, like: name (text)")
         for fn, text_ in fields:
             m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
@@ -1762,6 +1805,8 @@ def describe_things(things):
             words = m.group(1).split()
             if any(w in KEYWORDS for w in words):
                 raise ScriptError(fn, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
+            if any(w == words for w, _ in THINGS[name]):
+                raise ScriptError(fn, f"A {name} already has a part called '{' '.join(words)}'" + (f" (every {PARENTS[name]} has one)." if name in PARENTS else "."))
             THINGS[name].append((words, kind))
             FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
         if any(w == ["birth"] for w, _ in THINGS[name]) and not any(w == ["existence"] for w, _ in THINGS[name]):
@@ -1825,13 +1870,27 @@ def command_head(header, line):
     return words, "".join(w.capitalize() for w in words), inputs, gives
 
 
+def is_kind_of(kind, other):
+    """Is a dog (or a kind of dog) a pet?"""
+    while kind != other and is_thing(kind) and kind[6:] in PARENTS:
+        kind = "thing " + PARENTS[kind[6:]]
+    return kind == other
+
+
+def nearest_version(versions, kind):
+    """The version of a command for this kind of thing, or for the closest kind it is a kind of."""
+    while kind not in versions and is_thing(kind) and kind[6:] in PARENTS:
+        kind = "thing " + PARENTS[kind[6:]]
+    return versions.get(kind)
+
+
 def params(cpp, inputs):
     """The C++ inputs of a command; the thing a command is for is passed so the command can change it."""
     return ", ".join((f"{cpp_type(k)}& " if i == 0 and cpp in OWNERS else param_type(k) + " ") + snake(w)
                      for i, (w, k) in enumerate(inputs))
 
 
-def function(head, line, body, names, info):
+def function(head, line, body, names, info, command=None):
     words, name, inputs, gives = head
     local = Names()
     local.known = dict(names.known)
@@ -1876,7 +1935,7 @@ def function(head, line, body, names, info):
             except GiveBack as g:
                 return g.value
             return py_zero(gives, things) if gives else None
-        names.commands[tuple(words)].runner = runner
+        (command or names.commands[tuple(words)]).runner = runner
     return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({params(name, inputs)})", "{"]
                      + hoisted + code + end + ["}"]) + "\n"
 
@@ -2358,12 +2417,16 @@ def for_each(n, head, body, names, declared, depth):
 def call(key, args, names, n):
     """Calling a command, after checking its inputs. Returns (C++, run)."""
     command = names.commands[key]
+    if command.versions and args and is_thing(args[0].kind):
+        command = nearest_version(command.versions, args[0].kind) or command
     kinds = command.kinds
     if len(args) != len(kinds):
         raise ScriptError(n, f"'{' '.join(key)}' needs {len(kinds)} input{'s' if len(kinds) != 1 else ''}, but this gives it {len(args)}.")
     for k, (a, kind) in enumerate(zip(args, kinds), 1):
         if a.kind != kind:
-            raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.")
+            hint = (f" {kind_name(a.kind).capitalize()} is a kind of {kind_name(kind)[2:]}, but only commands for a {kind_name(kind)[2:]}"
+                    f" ('to ..., for a {kind_name(kind)[2:]}:') take it." if is_kind_of(a.kind, kind) else "")
+            raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.{hint}")
     if command.cpp in OWNERS and not args[0].writable:
         raise ScriptError(n, f"'{' '.join(key)}' changes the {kind_name(kinds[0])[2:]} it is given, so give it a name "
                              f"that holds one, like '{' '.join(key)} {kind_name(kinds[0])[2:]}'.")
