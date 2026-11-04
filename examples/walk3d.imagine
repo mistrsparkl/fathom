@@ -50,5 +50,6 @@ genesis:
       if not taken of c: etch a ball with (birth of c, 0.5, "yellow")
     etch words with "Coins: " plus score plus " of 8", 10, 10, "white"
     if score is 8: etch words with "You found them all!", 320, 280, "white"
+    if the graphics card draws: etch words with "graphics card", 10, 30, "white"
     reveal the frame
 and the universe said i love you

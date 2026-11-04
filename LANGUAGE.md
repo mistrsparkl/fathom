@@ -361,9 +361,10 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `etch a cube with (middle, size, "red")` | A cube around a middle place. Its sides are shaded by the light. |
 | `etch a block with (middle, width, height, depth, "brown")` | A box of any size. |
 | `etch a ball with (middle, radius, "yellow")` | A ball. |
+| `the graphics card draws` | yes or no: are the 3D shapes drawn by the graphics card? |
 | `screen place of 3 horizontal 1 vertical 5 depth` | Where a place shows on the window, as a flat place (`not a number` when it is behind the eye). |
 
-3D shapes are drawn far ones first, just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.imagine` is a small 3D game.
+3D shapes are drawn just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. They are drawn by the **graphics card** (OpenGL, which every Windows has): things hide behind each other properly and balls are smoothly lit. Running directly, this also needs Pillow (`py -3 -m pip install pillow`). Without them, the same shapes are drawn far ones first instead, which looks a little plainer. `the graphics card draws` is yes or no (once a world is open), and setting the environment value `IMAGINE_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.imagine` is a small 3D game.
 
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
