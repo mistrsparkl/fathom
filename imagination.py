@@ -59,7 +59,7 @@ ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -1087,6 +1087,25 @@ class Expr:
                 raise ScriptError(self.line, f"'as a number' turns text into a number, but this is {kind_name(v.kind)}.")
             a, line = v.run, self.line
             return Value(f"imagine::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line))
+        for words in (("changed", "by"), ("kept", "by")):
+            if self.at(*words):  # 'scores changed by the command double', 'scores kept by the command is big'
+                self.i += 2
+                if not is_list(v.kind):
+                    raise ScriptError(self.line, f"'{' '.join(words)}' needs a list, but this is {kind_name(v.kind)}.")
+                f = self.unary()
+                item = element(v.kind)
+                ins, gives = SIGNATURES.get(f.kind, (None, None))
+                if ins != [item] or (words[0] == "kept" and gives != YESNO) or not gives:
+                    want = f"a command given {kind_name(item)} giving back " + ("yes or no" if words[0] == "kept" else "something")
+                    raise ScriptError(self.line, f"'{' '.join(words)}' needs {want}, not {kind_name(f.kind)}.")
+                a, g, line = v.run, f.run, self.line
+                if words[0] == "kept":
+                    v = Value(f"imagine::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
+                              lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env)))
+                else:
+                    v = Value(f"imagine::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", "list of " + gives,
+                              lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env)))
+                return v
         if self.at("as", "saved", "text"):  # 'scores as saved text': written out as JSON, as 'save' writes it
             self.i += 3
             if holds_command(v.kind):

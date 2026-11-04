@@ -175,6 +175,23 @@ namespace imagine
 			fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
 		return f(std::forward<A>(a)...);
 	}
+	template <typename R, typename T, typename F>
+	std::vector<R> changed_by(const std::vector<T>& items, const F& f, int line)
+	{
+		std::vector<R> out;
+		for (const T& x : items)
+			out.push_back(invoke(f, line, x));
+		return out;
+	}
+	template <typename T, typename F>
+	std::vector<T> kept_by(const std::vector<T>& items, const F& f, int line)
+	{
+		std::vector<T> out;
+		for (const T& x : items)
+			if (invoke(f, line, x))
+				out.push_back(x);
+		return out;
+	}
 
 	inline void report(const Problem& problem)
 	{

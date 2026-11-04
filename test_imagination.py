@@ -299,6 +299,12 @@ def program_checks():
                '  scrawl lowest is at least 0 and lowest falls below 0.05 and highest falls below 1 and highest exceeds 0.95\n' + END)
     assert out.stdout == "yes\n", repr(out.stdout)
 
+    # changed by / kept by: a command done to every item of a list, or picking items.
+    out = both('to double, given x (a number), giving back a number:\n  give back x times 2\nand the universe said i love you\n\nto big one, given x (a number), giving back yes or no:\n  give back x exceeds 3\nand the universe said i love you\n\nto shout, given word (text), giving back text:\n  give back upper case of word plus "!"\nand the universe said i love you\n\ngenesis:\n  set scores to a list of (1, 5, 2, 8)\n  scrawl scores changed by the command double\n  scrawl scores kept by the command big one\n  scrawl (scores kept by the command big one) changed by the command double\n  scrawl (words of "hi there") changed by the command shout\n  scrawl size of (a list of numbers kept by the command big one)\n  scrawl scores changed by the command round\nand the universe said i love you\n')
+    assert out.stdout == '2, 10, 4, 16\n5, 8\n10, 16\nHI!, THERE!\n0\n1, 5, 2, 8\n', repr(out.stdout)
+    assert perr('to half, given x (text), giving back text:\n  give back x\n' + END + 'genesis:\n  scrawl a list of (1, 2) changed by the command half\n' + END)[1] == \
+        "'changed by' needs a command given a number giving back something, not a command given text giving back text."
+
     # shatter: a problem of your own, caught by try: like any other.
     out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
                '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'
