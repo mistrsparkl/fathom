@@ -700,10 +700,11 @@ class Expr:
             get = table.run
             return Value(f"imagine::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
         key, n = self.names.match(self.t, self.i)
-        if key:
+        command_key, command_n = match_command(self.names, self.t[self.i:])
+        if key and n >= command_n:  # the longer match wins: 'balls moved down' is a command even when 'balls' is a name
             self.i += n
             return self.names.value(key)
-        key, n = match_command(self.names, self.t[self.i:])
+        key, n = command_key, command_n
         if key:
             self.i += n
             command = self.names.commands[key]
@@ -1669,8 +1670,9 @@ def call(key, args, names, n):
     cpp = command.cpp
     if command.inputs is not None:  # a library word: put each input into its {input name} place
         given = {"{" + in_name + "}": f"({strip_parens(a.cpp)})" for in_name, a in zip(command.inputs, args)}
-        if given:  # all at once, so an input's own text is never replaced again
-            cpp = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], cpp)
+        given["{line}"] = str(n)  # so the library's C++ can say which line went wrong
+        # all at once, so an input's own text is never replaced again
+        cpp = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], cpp)
         return f"({cpp})", run
     return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})", run
 
@@ -1853,7 +1855,11 @@ def main(argv):
             print(f"There is no script called {script}.")
             return 2
         if args[0] == "run":
-            return run_program(script)
+            code = run_program(script)
+            sys.stdout.flush()
+            sys.stderr.flush()
+            # Exit straight away: a library's leftovers (like a closed window) must not be tidied up from the wrong thread.
+            os._exit(code)
         exe = script.with_suffix(".exe")
         problem = build(script, exe)
         if problem:

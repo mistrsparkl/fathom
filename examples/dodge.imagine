@@ -1,0 +1,59 @@
+note: Dodge! Move with the left and right arrow keys and dodge the falling balls.
+note: Run it with: imagine examples/dodge.imagine      (or build it: imagine build examples/dodge.imagine)
+
+use: window
+
+a ball has:
+  x (a number)
+  y (a number)
+  speed (a number)
+and the universe said i love you
+
+to start:
+  open a window with "Dodge!", 480, 640
+  set player x to 240
+  set balls to a list of balls
+  set score to 0
+  set playing to yes
+  while the window is open:
+    if playing:
+      if key held "left": set player x to player x minus 6
+      if key held "right": set player x to player x plus 6
+      set player x to clamp player x between 30 and 450
+      if random number from 1 to 20 is 1: add a falling ball to balls
+      set balls to every ball moved down from balls
+      for each ball in balls:
+        if hits the player with (ball, player x): set playing to no
+      set score to score plus 1
+    otherwise if key held "space":
+      set balls to a list of balls
+      set score to 0
+      set playing to yes
+    clear the window with "#101828"
+    for each ball in balls: draw a circle with x of ball, y of ball, 14, "orange"
+    draw a box with player x minus 30, 600, 60, 16, "#5ad1ff"
+    draw words with "Score: " plus score, 12, 10, "white"
+    if not playing: draw words with "Ouch! Press space to play again.", 120, 300, "yellow"
+    show the frame
+and the universe said i love you
+
+to a falling ball, giving back a ball:
+  set made to a new ball
+  set x of made to random number from 20 to 460
+  set y of made to -20
+  set speed of made to random number from 3 to 8
+  give back made
+and the universe said i love you
+
+to every ball moved down from, given balls (a list of balls), giving back a list of balls:
+  set still falling to a list of balls
+  for each ball in balls:
+    set moved to ball
+    set y of moved to y of ball plus speed of ball
+    if y of moved is less than 680: add moved to still falling
+  give back still falling
+and the universe said i love you
+
+to hits the player, given ball (a ball) and player x (a number), giving back yes or no:
+  give back y of ball is more than 586 and y of ball is less than 630 and size of (x of ball minus player x) is less than 44
+and the universe said i love you

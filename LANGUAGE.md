@@ -29,7 +29,7 @@ A mistake stops with a plain message, such as:
 follow.imagine line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers), `examples/clock.imagine` (libraries) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
+Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers), `examples/clock.imagine` (libraries), `examples/dodge.imagine` (a game in a window) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
 
 ## A program, top to bottom
 
@@ -213,7 +213,42 @@ and the universe said i love you
 |---|---|
 | `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `power of (2, 10)`, `remainder of (17, 5)` |
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
+| `window` | A window to draw in, for games and pictures. See below. |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
+
+### The window library
+
+```
+use: window
+
+to start:
+  open a window with "My game", 800, 600
+  set x to 400
+  while the window is open:
+    if key held "right": set x to x plus 5
+    clear the window with "black"
+    draw a circle with x, 300, 20, "orange"
+    show the frame
+and the universe said i love you
+```
+
+Places are counted in dots (pixels) from the top left corner: `x` goes right, `y` goes down.
+
+| Words | Means |
+|---|---|
+| `open a window with "Title", 800, 600` | Open a window this wide and high. |
+| `clear the window with "black"` | Fill the whole window with one colour. |
+| `draw a box with x, y, width, height, "red"` | A filled box, from its top left corner. |
+| `draw a circle with x, y, radius, "blue"` | A filled circle around a middle point. |
+| `draw a line with x, y, to x, to y, "white"` | A line from one place to another. |
+| `draw words with "Score: " plus score, x, y, "yellow"` | Words, from their top left corner. |
+| `show the frame` | Show what was drawn, then wait so the window shows 60 frames a second. |
+| `the window is open` | yes or no: becomes no when the person closes the window. |
+| `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
+| `mouse x`, `mouse y`, `mouse held` | Where the mouse is, and whether its left button is held down. |
+| `close the window` | Close it yourself. |
+
+Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
 ### Making a library
 
@@ -224,7 +259,7 @@ to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::dur
   runs: time.sleep(max(0.0, {seconds}))
 ```
 
-`{seconds}` stands for the input. Other lines a library can have are `include: <header>` (a C++ header), `link: name` (a system library), `code:` and `python:` (helper code, indented below), and values like `pi = 3.14159, number, read only` (with their own `runs:` line). Use each input only once in the C++ line. A word without a `runs:` line only works in built programs.
+`{seconds}` stands for the input, and `{line}` in the C++ is the number of the line using the word (for error messages). Other lines a library can have are `include: <header>` (a C++ header), `link: name` (a system library), `code:` and `python:` (helper code, indented below), and values like `pi = 3.14159, number, read only` (with their own `runs:` line). Use each input only once in the C++ line. A word without a `runs:` line only works in built programs.
 
 ## When something goes wrong while running
 

@@ -1,0 +1,344 @@
+note: A window to draw in, for games and pictures. Use it in a program with:  use: window
+note: Places in the window are counted in dots (pixels) from its top left corner: x goes right, y goes down.
+note: Colours are names (black, white, red, green, blue, yellow, orange, purple, pink, brown, grey) or "#rrggbb".
+note: Built programs draw with Windows' own drawing (GDI); programs run directly draw with Tkinter.
+
+code:
+  #define NOMINMAX
+include: <windows.h>
+link: user32
+link: gdi32
+
+code:
+  namespace imagine_window
+  {
+  	inline HWND window = nullptr;
+  	inline HDC canvas = nullptr;
+  	inline HFONT font = nullptr;
+  	inline bool open_now = false;
+  	inline bool opened = false;
+  	inline bool keys[256] = {};
+  	inline bool mouse_down = false;
+  	inline double mouse_x_now = 0, mouse_y_now = 0;
+  	inline int width = 0, height = 0;
+  	inline LARGE_INTEGER last_frame{};
+
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size());
+  		return out;
+  	}
+
+  	inline void need_window(int line)
+  	{
+  		if (!opened)
+  			imagine::fail(line, "there is no window yet. Open one first, like: open a window with \"My game\", 800, 600");
+  	}
+
+  	inline COLORREF colour(const std::string& name, int line)
+  	{
+  		static const std::pair<const char*, COLORREF> named[] = {
+  			{"black", RGB(0, 0, 0)}, {"white", RGB(255, 255, 255)}, {"red", RGB(220, 40, 40)}, {"green", RGB(40, 180, 70)},
+  			{"blue", RGB(50, 90, 230)}, {"yellow", RGB(245, 210, 40)}, {"orange", RGB(245, 140, 30)},
+  			{"purple", RGB(140, 60, 200)}, {"pink", RGB(240, 120, 180)}, {"brown", RGB(130, 80, 40)},
+  			{"grey", RGB(128, 128, 128)}, {"gray", RGB(128, 128, 128)}};
+  		std::string low = imagine::lower(name);
+  		for (const auto& [key, value] : named)
+  			if (low == key) return value;
+  		if (low.size() == 7 && low[0] == '#' && low.find_first_not_of("0123456789abcdef", 1) == std::string::npos)
+  		{
+  			unsigned long v = std::stoul(low.substr(1), nullptr, 16);
+  			return RGB((v >> 16) & 255, (v >> 8) & 255, v & 255);
+  		}
+  		imagine::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
+  	}
+
+  	inline int key_code(const std::string& name, int line)
+  	{
+  		std::string k = imagine::lower(name);
+  		if (k.size() == 1 && ((k[0] >= 'a' && k[0] <= 'z') || (k[0] >= '0' && k[0] <= '9')))
+  			return std::toupper((unsigned char)k[0]);
+  		static const std::pair<const char*, int> named[] = {
+  			{"left", VK_LEFT}, {"right", VK_RIGHT}, {"up", VK_UP}, {"down", VK_DOWN}, {"space", VK_SPACE},
+  			{"enter", VK_RETURN}, {"escape", VK_ESCAPE}, {"shift", VK_SHIFT}, {"control", VK_CONTROL},
+  			{"tab", VK_TAB}, {"backspace", VK_BACK}};
+  		for (const auto& [key, value] : named)
+  			if (k == key) return value;
+  		imagine::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
+  	}
+
+  	inline LRESULT CALLBACK on_message(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+  	{
+  		switch (msg)
+  		{
+  		case WM_CLOSE: open_now = false; DestroyWindow(hwnd); window = nullptr; return 0;
+  		case WM_KEYDOWN: case WM_SYSKEYDOWN: keys[wp & 255] = true; return 0;
+  		case WM_KEYUP: case WM_SYSKEYUP: keys[wp & 255] = false; return 0;
+  		case WM_KILLFOCUS: for (bool& k : keys) k = false; mouse_down = false; return 0;
+  		case WM_MOUSEMOVE: mouse_x_now = (short)LOWORD(lp); mouse_y_now = (short)HIWORD(lp); return 0;
+  		case WM_LBUTTONDOWN: mouse_down = true; SetCapture(hwnd); return 0;
+  		case WM_LBUTTONUP: mouse_down = false; ReleaseCapture(); return 0;
+  		case WM_PAINT:
+  		{
+  			PAINTSTRUCT ps;
+  			HDC dc = BeginPaint(hwnd, &ps);
+  			BitBlt(dc, 0, 0, width, height, canvas, 0, 0, SRCCOPY);
+  			EndPaint(hwnd, &ps);
+  			return 0;
+  		}
+  		}
+  		return DefWindowProcW(hwnd, msg, wp, lp);
+  	}
+
+  	inline void pump()
+  	{
+  		MSG m;
+  		while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE))
+  		{
+  			TranslateMessage(&m);
+  			DispatchMessageW(&m);
+  		}
+  	}
+
+  	inline void open(const std::string& title, double w, double h, int line)
+  	{
+  		if (window)
+  			imagine::fail(line, "a window is already open.");
+  		if (w < 1 || h < 1 || w > 10000 || h > 10000)
+  			imagine::fail(line, "a window must be from 1 to 10000 dots wide and high.");
+  		width = (int)w; height = (int)h;
+  		WNDCLASSW wc{};
+  		wc.lpfnWndProc = on_message;
+  		wc.hInstance = GetModuleHandleW(nullptr);
+  		wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  		wc.lpszClassName = L"ImaginationWindow";
+  		RegisterClassW(&wc);
+  		DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+  		RECT r{0, 0, width, height};
+  		AdjustWindowRect(&r, style, FALSE);
+  		window = CreateWindowW(L"ImaginationWindow", wide(title).c_str(), style, CW_USEDEFAULT, CW_USEDEFAULT,
+  			r.right - r.left, r.bottom - r.top, nullptr, nullptr, wc.hInstance, nullptr);
+  		HDC dc = GetDC(window);
+  		canvas = CreateCompatibleDC(dc);
+  		SelectObject(canvas, CreateCompatibleBitmap(dc, width, height));
+  		ReleaseDC(window, dc);
+  		font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+  		SelectObject(canvas, font);
+  		SetBkMode(canvas, TRANSPARENT);
+  		RECT all{0, 0, width, height};
+  		FillRect(canvas, &all, (HBRUSH)GetStockObject(BLACK_BRUSH));
+  		open_now = opened = true;
+  		ShowWindow(window, SW_SHOW);
+  		pump();
+  		QueryPerformanceCounter(&last_frame);
+  	}
+
+  	inline void clear(const std::string& c, int line)
+  	{
+  		need_window(line);
+  		HBRUSH b = CreateSolidBrush(colour(c, line));
+  		RECT all{0, 0, width, height};
+  		FillRect(canvas, &all, b);
+  		DeleteObject(b);
+  	}
+
+  	inline void box(double x, double y, double w, double h, const std::string& c, int line)
+  	{
+  		need_window(line);
+  		HBRUSH b = CreateSolidBrush(colour(c, line));
+  		RECT r{(int)std::lround(x), (int)std::lround(y), (int)std::lround(x + w), (int)std::lround(y + h)};
+  		FillRect(canvas, &r, b);
+  		DeleteObject(b);
+  	}
+
+  	inline void circle(double x, double y, double radius, const std::string& c, int line)
+  	{
+  		need_window(line);
+  		COLORREF col = colour(c, line);
+  		HBRUSH b = CreateSolidBrush(col);
+  		HPEN p = CreatePen(PS_SOLID, 1, col);
+  		HGDIOBJ ob = SelectObject(canvas, b), op = SelectObject(canvas, p);
+  		Ellipse(canvas, (int)std::lround(x - radius), (int)std::lround(y - radius), (int)std::lround(x + radius) + 1, (int)std::lround(y + radius) + 1);
+  		SelectObject(canvas, ob); SelectObject(canvas, op);
+  		DeleteObject(b); DeleteObject(p);
+  	}
+
+  	inline void line_between(double x1, double y1, double x2, double y2, const std::string& c, int line)
+  	{
+  		need_window(line);
+  		HPEN p = CreatePen(PS_SOLID, 2, colour(c, line));
+  		HGDIOBJ op = SelectObject(canvas, p);
+  		MoveToEx(canvas, (int)std::lround(x1), (int)std::lround(y1), nullptr);
+  		LineTo(canvas, (int)std::lround(x2), (int)std::lround(y2));
+  		SelectObject(canvas, op);
+  		DeleteObject(p);
+  	}
+
+  	inline void write(const std::string& words, double x, double y, const std::string& c, int line)
+  	{
+  		need_window(line);
+  		SetTextColor(canvas, colour(c, line));
+  		std::wstring w = wide(words);
+  		TextOutW(canvas, (int)std::lround(x), (int)std::lround(y), w.c_str(), (int)w.size());
+  	}
+
+  	inline void show(int line)
+  	{
+  		need_window(line);
+  		if (window)
+  		{
+  			InvalidateRect(window, nullptr, FALSE);
+  			UpdateWindow(window);
+  		}
+  		pump();
+  		LARGE_INTEGER now, freq;
+  		QueryPerformanceFrequency(&freq);
+  		QueryPerformanceCounter(&now);
+  		double spent = double(now.QuadPart - last_frame.QuadPart) / double(freq.QuadPart);
+  		if (spent < 1.0 / 60)
+  			Sleep((DWORD)((1.0 / 60 - spent) * 1000));
+  		QueryPerformanceCounter(&last_frame);
+  	}
+
+  	inline void close()
+  	{
+  		if (window)
+  			DestroyWindow(window);
+  		window = nullptr;
+  		open_now = false;
+  		pump();
+  	}
+  }
+
+python:
+  import tkinter
+  COLOURS = {"black": "#000000", "white": "#ffffff", "red": "#dc2828", "green": "#28b446", "blue": "#325ae6",
+             "yellow": "#f5d228", "orange": "#f58c1e", "purple": "#8c3cc8", "pink": "#f078b4", "brown": "#825028",
+             "grey": "#808080", "gray": "#808080"}
+  KEYS = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"}
+  TK_KEYS = {"return": "enter", "shift_l": "shift", "shift_r": "shift", "control_l": "control", "control_r": "control"}
+  win = {"root": None, "open": False, "opened": False, "held": set(), "mouse": (0.0, 0.0), "down": False, "last": 0.0}
+
+  def need_window():
+      if not win["opened"]:
+          raise RunError(0, 'there is no window yet. Open one first, like: open a window with "My game", 800, 600')
+
+  def colour(name):
+      low = name.lower()
+      if low in COLOURS:
+          return COLOURS[low]
+      if len(low) == 7 and low[0] == "#" and all(c in "0123456789abcdef" for c in low[1:]):
+          return low
+      raise RunError(0, f'I don\'t know the colour "{name}". Use a name like "red" or a code like "#ff8800".')
+
+  def key_name(name):
+      k = name.lower()
+      if (len(k) == 1 and (("a" <= k <= "z") or ("0" <= k <= "9"))) or k in KEYS:
+          return k
+      raise RunError(0, f'I don\'t know the key "{name}". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.')
+
+  def closed():
+      win["open"] = False
+      if win["root"] is not None:
+          win["root"].destroy()
+      win["root"] = None
+
+  def pump():
+      if win["root"] is not None:
+          try:
+              win["root"].update()
+          except tkinter.TclError:
+              win["root"], win["open"] = None, False
+
+  def open_window(title, w, h):
+      if win["root"] is not None:
+          raise RunError(0, "a window is already open.")
+      if w < 1 or h < 1 or w > 10000 or h > 10000:
+          raise RunError(0, "a window must be from 1 to 10000 dots wide and high.")
+      root = tkinter.Tk()
+      root.title(title)
+      root.resizable(False, False)
+      canvas = tkinter.Canvas(root, width=int(w), height=int(h), highlightthickness=0, bd=0, bg="#000000")
+      canvas.pack()
+      held = win["held"]
+      held.clear()
+      root.protocol("WM_DELETE_WINDOW", closed)
+      root.bind("<KeyPress>", lambda e: held.add(TK_KEYS.get(e.keysym.lower(), e.keysym.lower())))
+      root.bind("<KeyRelease>", lambda e: held.discard(TK_KEYS.get(e.keysym.lower(), e.keysym.lower())))
+      root.bind("<FocusOut>", lambda e: (held.clear(), win.update(down=False)))
+      canvas.bind("<Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
+      canvas.bind("<B1-Motion>", lambda e: win.update(mouse=(float(e.x), float(e.y))))
+      canvas.bind("<ButtonPress-1>", lambda e: win.update(down=True))
+      canvas.bind("<ButtonRelease-1>", lambda e: win.update(down=False))
+      win.update(root=root, canvas=canvas, open=True, opened=True, size=(int(w), int(h)), last=time.monotonic())
+      root.focus_force()
+      pump()
+
+  def draw(make):
+      need_window()
+      if win["root"] is not None:
+          make(win["canvas"])
+
+  def clear(c):
+      col = colour(c)
+      def make(cv):
+          cv.delete("all")
+          cv.create_rectangle(0, 0, win["size"][0], win["size"][1], fill=col, outline="")
+      draw(make)
+
+  def box(x, y, w, h, c):
+      col = colour(c)
+      draw(lambda cv: cv.create_rectangle(round(x), round(y), round(x + w), round(y + h), fill=col, outline=""))
+
+  def circle(x, y, r, c):
+      col = colour(c)
+      draw(lambda cv: cv.create_oval(round(x - r), round(y - r), round(x + r), round(y + r), fill=col, outline=col))
+
+  def line_between(x1, y1, x2, y2, c):
+      col = colour(c)
+      draw(lambda cv: cv.create_line(round(x1), round(y1), round(x2), round(y2), fill=col, width=2))
+
+  def write(words, x, y, c):
+      col = colour(c)
+      draw(lambda cv: cv.create_text(round(x), round(y), text=words, fill=col, anchor="nw", font=("Segoe UI", -16)))
+
+  def show():
+      need_window()
+      pump()
+      wait = 1.0 / 60 - (time.monotonic() - win["last"])
+      if wait > 0:
+          time.sleep(wait)
+      win["last"] = time.monotonic()
+
+  def close():
+      if win["root"] is not None:
+          closed()
+
+to open a window, given title (text) and width (a number) and height (a number) = imagine_window::open({title}, {width}, {height}, {line})
+  runs: open_window({title}, {width}, {height})
+to clear the window, given colour (text) = imagine_window::clear({colour}, {line})
+  runs: clear({colour})
+to draw a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = imagine_window::box({x}, {y}, {width}, {height}, {colour}, {line})
+  runs: box({x}, {y}, {width}, {height}, {colour})
+to draw a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::circle({x}, {y}, {radius}, {colour}, {line})
+  runs: circle({x}, {y}, {radius}, {colour})
+to draw a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = imagine_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
+  runs: line_between({x}, {y}, {to x}, {to y}, {colour})
+to draw words, given words (text) and x (a number) and y (a number) and colour (text) = imagine_window::write({words}, {x}, {y}, {colour}, {line})
+  runs: write({words}, {x}, {y}, {colour})
+to show the frame = imagine_window::show({line})
+  runs: show()
+to close the window = imagine_window::close()
+  runs: close()
+to key held, given key (text), giving back yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])
+  runs: key_name({key}) in win["held"]
+
+the window is open = imagine_window::open_now, yes or no, read only
+  runs: win["open"]
+mouse x = imagine_window::mouse_x_now, number, read only
+  runs: win["mouse"][0]
+mouse y = imagine_window::mouse_y_now, number, read only
+  runs: win["mouse"][1]
+mouse held = imagine_window::mouse_down, yes or no, read only
+  runs: win["down"]
