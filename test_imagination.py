@@ -193,6 +193,7 @@ def program_checks():
     out = both('genesis:\n  scrawl "Hello ", 1 plus 1\n' + END)
     assert out.stdout == "Hello 2\n", repr(out.stdout)
     assert perr("genesis:\n  scrawl\n" + END)[1] == "'scrawl' needs something to show, like: scrawl \"hello\"."
+    assert perr("genesis:\n  say 1\n" + END)[1] == "'say' is now 'scrawl', like: scrawl \"hello\"."
 
     # Setting birth makes existence start there too.
     out = both('genesis:\n  set birth to (300, 200)\n  set existence of x to existence of x plus 5\n  scrawl birth, " ", existence\n'
