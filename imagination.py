@@ -1,24 +1,52 @@
-"""Imagination: turns English-like scripts (*.imagine) into C++.
+"""Imagination: a programming language written in plain English words.
 
-A script that starts with 'this is part of: <thing>' becomes part of that C++ class (e.g. Unreal code).
-Any other script is a program of its own, which starts at its 'to start:' command.
+Run a program:         py -3 imagination.py run <script.imagine>      (or: imagine <script.imagine>)
+Build it as an .exe:   py -3 imagination.py build <script.imagine>    (needs Visual Studio's C++ compiler)
+Unreal parts:          py -3 imagination.py <scripts folder> <output folder>
 
-Run a program:          py -3 imagination.py run <script.imagine>
-Translate a folder:     py -3 imagination.py <scripts folder> <output folder>
-The language itself is described in LANGUAGE.md.
+How it works: this file reads a script once, checks it, and turns every piece into two things at the same time:
+a small Python function that does it (what 'run' uses) and the C++ that does it (what 'build' and Unreal use).
+Both come from the same reading, so a script means the same thing either way. LANGUAGE.md describes the language.
 """
+import copy
 import difflib
+import math
+import operator
 import os
+import random as pyrandom
 import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 
-LOGIC = Path("examples")  # set from the command line by main()
+LOGIC = Path("examples")  # where 'this is part of:' and 'use:' look first; set by main()
 OUT = Path("generated")
 HERE = Path(__file__).resolve().parent
+
+
+class ScriptError(Exception):
+    """A mistake in a script, found before it runs."""
+
+    def __init__(self, line, message):
+        super().__init__(message)
+        self.line = line
+        self.message = message
+
+
+class RunError(Exception):
+    """Something that went wrong while a program ran."""
+
+    def __init__(self, line, message):
+        super().__init__(message)
+        self.line = line
+        self.message = message
+
+
+# ---------------------------------------------------------------- kinds of things
 
 NUMBER, YESNO, PLACE, FLAT, TEXT = "number", "yes or no", "place", "flat", "text"
 # Kinds are strings: the five above, "list of <kind>", or "thing <name>" for a kind the script describes itself.
@@ -26,11 +54,16 @@ CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D"
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT}
-THINGS = {}  # name -> [(field words, kind)], for the script being translated
+THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
+FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
 KEYWORDS = set("""set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 say ask into repeat while with random for each in contains list empty new remove file write as""".split())
+ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
+                  "between", "+", "-", "*", "/", "contains"}
+UNITS = set("degrees degree cm centimetres seconds second per squared percent metres metre m s".split())
+TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
 def is_list(kind):
@@ -80,18 +113,181 @@ def parse_kind(text):
 
 def kind_words():
     return ", ".join(["a number", "yes or no", "text", "a place", "a list of ..."] + [f"a {t}" for t in THINGS])
-ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
-                  "between", "+", "-", "*", "/", "contains"}
-UNITS = set("degrees degree cm centimetres seconds second per squared percent metres metre m s".split())
-TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
-class ScriptError(Exception):
-    def __init__(self, line, message):
-        super().__init__(message)
-        self.line = line
-        self.message = message
+def kind_name(kind):
+    if is_list(kind):
+        return "a list of " + plural(element(kind))
+    if is_thing(kind):
+        return "a " + kind[6:]
+    return {NUMBER: "a number", YESNO: "yes or no", PLACE: "a place", FLAT: "a flat place", TEXT: "text"}[kind]
 
+
+def plural(kind):
+    if is_list(kind):
+        return "lists of " + plural(element(kind))
+    if is_thing(kind):
+        return kind[6:] + "s"
+    return {NUMBER: "numbers", YESNO: "yes or no", PLACE: "places", FLAT: "flat places", TEXT: "text"}[kind]
+
+
+# ---------------------------------------------------------------- what running a program uses
+
+class Thing:
+    """One of a script's own kinds of things, while a program runs."""
+    __slots__ = ("name", "spec", "fields")
+
+    def __init__(self, name, things):
+        self.name, self.spec = name, things[name]
+        self.fields = {snake(w): py_zero(k, things) for w, k in self.spec}
+
+    def __eq__(self, other):
+        return isinstance(other, Thing) and self.name == other.name and self.fields == other.fields
+
+    def __deepcopy__(self, memo):
+        new = Thing.__new__(Thing)
+        new.name, new.spec, new.fields = self.name, self.spec, copy.deepcopy(self.fields, memo)
+        return new
+
+
+def py_zero(kind, things):
+    if kind == NUMBER:
+        return 0.0
+    if kind == YESNO:
+        return False
+    if kind == TEXT:
+        return ""
+    if is_list(kind):
+        return []
+    if is_thing(kind):
+        return Thing(kind[6:], things)
+    return None
+
+
+def dup(v):
+    """Lists and things are copied when they are stored, as they are in the C++."""
+    return copy.deepcopy(v) if isinstance(v, (list, Thing)) else v
+
+
+def text(v):
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    if isinstance(v, (int, float)):
+        if math.isfinite(v) and math.floor(v) == v and abs(v) < 1e15:
+            return str(int(v))
+        return "%.15g" % v
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        return ", ".join(text(x) for x in v) if v else "(nothing)"
+    if isinstance(v, Thing):
+        return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
+    raise RunError(0, "this can't be shown as text when running directly.")
+
+
+def div(a, b):
+    if b == 0:
+        if a == 0 or a != a:
+            return math.nan
+        return math.copysign(math.inf, a) * math.copysign(1.0, b)
+    return a / b
+
+
+def unwind(a):
+    a = math.fmod(a, 360.0)
+    if a > 180.0:
+        a -= 360.0
+    if a < -180.0:
+        a += 360.0
+    return a
+
+
+NUMBER_TEXT = re.compile(r"\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*")
+
+
+def to_number(s, line):
+    if NUMBER_TEXT.fullmatch(s):
+        return float(s)
+    raise RunError(line, f'"{s}" is not a number.')
+
+
+def index_of(items, number, line):
+    if math.floor(number) != number or number < 1 or number > len(items):
+        raise RunError(line, f"there is no item {text(number)} in a list of {len(items)} item{'' if len(items) == 1 else 's'}."
+                             " Items are counted from 1.")
+    return int(number) - 1
+
+
+def lines_of(s):
+    if not s:
+        return []
+    parts = s.split("\n")
+    if s.endswith("\n"):
+        parts.pop()
+    return [p[:-1] if p.endswith("\r") else p for p in parts]
+
+
+def random_number(lo, hi, line):
+    a, b = math.ceil(min(lo, hi)), math.floor(max(lo, hi))
+    if a > b:
+        raise RunError(line, f"there is no whole number from {text(lo)} to {text(hi)}.")
+    return float(pyrandom.randint(a, b))
+
+
+def ask_text(question):
+    sys.stdout.write(question)
+    sys.stdout.flush()
+    line = sys.stdin.readline()
+    if not line:
+        raise SystemExit(0)  # nobody is left to answer (input closed)
+    return line.rstrip("\n").rstrip("\r")
+
+
+def ask_number(question):
+    while True:
+        answer = ask_text(question)
+        if NUMBER_TEXT.fullmatch(answer):
+            return float(answer)
+        print("Please type a number.")
+
+
+def read_file(path, line):
+    try:
+        with open(path, "rb") as f:
+            return f.read().decode("utf-8", errors="replace")
+    except OSError:
+        raise RunError(line, f'there is no file called "{path}" (or it can\'t be opened).')
+
+
+def write_file(path, s, line, mode="wb"):
+    try:
+        with open(path, mode) as f:
+            f.write(s.encode("utf-8"))
+    except OSError:
+        raise RunError(line, f'I couldn\'t {"write" if mode == "wb" else "add to"} the file "{path}".')
+
+
+def letters(s):
+    return float(len(s))
+
+
+class Stop(Exception):
+    pass
+
+
+class GiveBack(Exception):
+    def __init__(self, value):
+        self.value = value
+
+
+def not_here(line, what):
+    """For words that only mean something in C++ (Unreal, or a library word without a 'runs:' line)."""
+    def run(env):
+        raise RunError(line, f"{what} only works when the script is built into C++, not when it runs directly.")
+    return run
+
+
+# ---------------------------------------------------------------- reading
 
 def tokenize(text, line):
     tokens = re.findall(TOKEN + r"|\S", text)
@@ -114,20 +310,37 @@ def split_colon(text):
 
 
 class Value:
-    def __init__(self, cpp, kind, writable=False):
-        self.cpp, self.kind, self.writable = cpp, kind, writable
+    """A piece of an expression: its C++, its kind, and run(env) which works it out.
+
+    store(env, x) changes it, for values that can be changed (a name, a part of a thing, an item of a list)."""
+
+    def __init__(self, cpp, kind, run, store=None):
+        self.cpp, self.kind, self.run, self.store = cpp, kind, run, store
+
+    @property
+    def writable(self):
+        return self.store is not None
+
+
+class Command:
+    """A command a program can call: one of the script's own, or a word from a library."""
+
+    def __init__(self, cpp, kinds, gives, inputs=None, runner=None):
+        self.cpp, self.kinds, self.gives = cpp, kinds, gives
+        self.inputs = inputs  # library words: the input names their C++ uses as {name}
+        self.runner = runner  # called with the inputs' values when running directly
 
 
 class Names:
     """Every name a script can use: the class's words, settings, inputs and the script's own names."""
 
     def __init__(self):
-        self.known = {}  # words tuple -> (cpp, kind, read_only)
-        self.commands = {}  # words tuple -> (cpp name, [input kinds], kind given back or None); only programs call commands
-        self.gives = None  # what the command being translated gives back
+        self.known = {}  # words tuple -> (cpp, kind, read_only, run or None for a name kept in env)
+        self.commands = {}  # words tuple -> Command
+        self.gives = None  # what the command being read gives back
 
-    def add(self, words, cpp, kind, read_only=False):
-        self.known[tuple(words)] = (cpp, kind, read_only)
+    def add(self, words, cpp, kind, read_only=False, run=None):
+        self.known[tuple(words)] = (cpp, kind, read_only, run)
 
     def match(self, tokens, i):
         for n in range(min(8, len(tokens) - i), 0, -1):
@@ -138,7 +351,7 @@ class Names:
 
     def unknown(self, tokens, i):
         """The best guess at what an unknown name at tokens[i] was meant to be, as an error message."""
-        known = [" ".join(k) for k in self.known]
+        known = [" ".join(k) for k in self.known] + [" ".join(k) for k in self.commands]
         best = (0.0, tokens[i], None)
         for n in range(1, min(5, len(tokens) - i) + 1):
             if not all(t[0].isalpha() for t in tokens[i:i + n]):
@@ -150,6 +363,16 @@ class Names:
                     best = (score, phrase, name)
         return f"I don't know '{best[1]}'." + (f" Did you mean '{best[2]}'?" if best[2] else "")
 
+    def value(self, key):
+        cpp, kind, read_only, run = self.known[key]
+        if run is not None:  # a setting, an Unreal word or a library word
+            return Value(cpp, kind, run, None if read_only else (lambda env, x: run(env)))
+        get = lambda env: env[cpp]
+
+        def put(env, x):
+            env[cpp] = dup(x)
+        return Value(cpp, kind, get, None if read_only else put)
+
 
 CPP_RESERVED = set("""auto bool break case catch char check class const continue default delete do double else enum
 explicit false float for friend goto if inline int long new operator private protected public return short signed
@@ -159,6 +382,14 @@ sizeof static struct switch template this throw true try typedef union unsigned 
 def snake(words):
     name = "_".join(re.sub(r"[^a-z0-9]", "", w) for w in words)
     return name + "_" if name in CPP_RESERVED else name
+
+
+def cpp_text(token):
+    """A quoted text token as a C++ string."""
+    return "std::string(" + token.replace("\\", "\\\\") + ")"
+
+
+COMPARE_RUN = {">": operator.gt, "<": operator.lt, ">=": operator.ge, "<=": operator.le, "!=": operator.ne, "==": operator.eq}
 
 
 class Expr:
@@ -192,7 +423,8 @@ class Expr:
         while self.at("or"):
             self.i += 1
             r = self.logic_and()
-            v = Value(f"({self.need(v, YESNO, 'or').cpp} || {self.need(r, YESNO, 'or').cpp})", YESNO)
+            a, b = self.need(v, YESNO, "or").run, self.need(r, YESNO, "or").run
+            v = Value(f"({v.cpp} || {r.cpp})", YESNO, lambda env, a=a, b=b: a(env) or b(env))
         return v
 
     def logic_and(self):
@@ -200,17 +432,258 @@ class Expr:
         while self.at("and"):
             self.i += 1
             r = self.logic_not()
-            v = Value(f"({self.need(v, YESNO, 'and').cpp} && {self.need(r, YESNO, 'and').cpp})", YESNO)
+            a, b = self.need(v, YESNO, "and").run, self.need(r, YESNO, "and").run
+            v = Value(f"({v.cpp} && {r.cpp})", YESNO, lambda env, a=a, b=b: a(env) and b(env))
         return v
 
     def logic_not(self):
         if self.at("not"):
             self.i += 1
-            return Value(f"!{self.need(self.logic_not(), YESNO, 'not').cpp}", YESNO)
+            v = self.need(self.logic_not(), YESNO, "not")
+            a = v.run
+            return Value(f"!{v.cpp}", YESNO, lambda env: not a(env))
         return self.compare()
 
     COMPARE = [(("is", "more", "than"), ">"), (("is", "less", "than"), "<"), (("is", "at", "least"), ">="),
                (("is", "at", "most"), "<="), (("is", "not"), "!="), (("is",), "==")]
+
+    def compare(self):
+        v = self.sum()
+        if self.at("contains"):
+            self.i += 1
+            r = self.sum()
+            if not (v.kind == r.kind == TEXT or (is_list(v.kind) and element(v.kind) == r.kind)):
+                raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
+            a, b = v.run, r.run
+            return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+        for words, op in self.COMPARE:
+            if self.at(*words):
+                self.i += len(words)
+                r = self.sum()
+                if not (op in ("==", "!=") and v.kind == r.kind and v.kind not in (PLACE, FLAT)):
+                    self.need(v, NUMBER, "Comparing")
+                    self.need(r, NUMBER, "Comparing")
+                a, b, f = v.run, r.run, COMPARE_RUN[op]
+                return Value(f"({v.cpp} {op} {r.cpp})", YESNO, lambda env: f(a(env), b(env)))
+        return v
+
+    def sum(self):
+        v = self.product()
+        while self.peek() in ("plus", "+", "minus", "-"):
+            op = "+" if self.peek() in ("plus", "+") else "-"
+            self.i += 1
+            r = self.product()
+            a, b = v.run, r.run
+            if v.kind == TEXT and op == "+":
+                v = Value(f"(imagine::text({v.cpp}) + imagine::text({r.cpp}))", TEXT,
+                          lambda env, a=a, b=b: text(a(env)) + text(b(env)))
+                continue
+            if v.kind != r.kind or v.kind in (YESNO, TEXT) or is_list(v.kind) or is_thing(v.kind):
+                raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
+            f = operator.add if op == "+" else operator.sub
+            run = (lambda env, a=a, b=b, f=f: f(a(env), b(env))) if v.kind == NUMBER else not_here(self.line, "Adding places")
+            v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
+        return v
+
+    def product(self):
+        v = self.unary()
+        while self.peek() in ("times", "*", "/") or self.at("divided", "by"):
+            op = "/" if self.peek() in ("/", "divided") else "*"
+            self.i += 2 if self.at("divided", "by") else 1
+            r = self.unary()
+            if r.kind != NUMBER or v.kind not in (NUMBER, PLACE, FLAT):
+                raise ScriptError(self.line, f"I can only multiply or divide a number or a place by a number, not {kind_name(v.kind)} by {kind_name(r.kind)}.")
+            a, b = v.run, r.run
+            f = div if op == "/" else operator.mul
+            run = (lambda env, a=a, b=b, f=f: f(a(env), b(env))) if v.kind == NUMBER else not_here(self.line, "Multiplying places")
+            v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
+        return v
+
+    def unary(self):
+        if self.peek() in ("-", "minus"):
+            self.i += 1
+            v = self.unary()
+            if v.kind not in (NUMBER, PLACE, FLAT):
+                raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
+            a = v.run
+            return Value(f"(-{v.cpp})", v.kind, (lambda env: -a(env)) if v.kind == NUMBER else not_here(self.line, "Negative places"))
+        v = self.primary()
+        if self.at("as", "a", "number") or self.at("as", "number"):
+            self.i += 3 if self.at("as", "a") else 2
+            if v.kind != TEXT:
+                raise ScriptError(self.line, f"'as a number' turns text into a number, but this is {kind_name(v.kind)}.")
+            a, line = v.run, self.line
+            return Value(f"imagine::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line))
+        if self.at("as", "text"):
+            self.i += 2
+            a = v.run
+            return Value(f"imagine::text({v.cpp})", TEXT, lambda env: text(a(env)))
+        return v
+
+    def primary(self):
+        tok, line = self.peek(), self.line
+        if tok is None:
+            raise ScriptError(line, "This line ends too early: something is missing.")
+        if re.fullmatch(r"\d+(?:\.\d+)?", tok):
+            self.i += 1
+            while self.peek() in UNITS:
+                self.i += 1
+            number = float(tok)
+            return Value(tok if "." in tok else tok + ".0", NUMBER, lambda env: number)
+        if tok.startswith('"'):
+            self.i += 1
+            s = tok[1:-1]
+            return Value(cpp_text(tok), TEXT, lambda env: s)
+        if self.at("random", "number", "from"):
+            self.i += 3
+            lo = self.need(self.sum(), NUMBER, "random number")
+            self.take("to")
+            hi = self.need(self.sum(), NUMBER, "random number")
+            a, b = lo.run, hi.run
+            return Value(f"imagine::random({lo.cpp}, {hi.cpp}, {line})", NUMBER, lambda env: random_number(a(env), b(env), line))
+        if tok == "(":
+            self.i += 1
+            v = self.full()
+            self.take(")")
+            return v
+        for n in range(min(6, len(self.t) - self.i), 0, -1):
+            key = tuple(self.t[self.i:self.i + n])
+            if key in FIELDS and self.peek(n) == "of":
+                self.i += n + 1
+                owner = self.unary()
+                if owner.kind not in FIELDS[key]:
+                    raise ScriptError(line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
+                member, kind = FIELDS[key][owner.kind]
+                get = owner.run
+
+                def put(env, x, get=get, member=member):
+                    get(env).fields[member] = dup(x)
+                return Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+        if tok == "item" and self.peek(1) not in ITEM_NOT_INDEX:
+            self.i += 1
+            index = self.need(self.sum(), NUMBER, "item")
+            self.take("of")
+            seq = self.unary()
+            if not is_list(seq.kind):
+                raise ScriptError(line, f"'item ... of' needs a list, but this is {kind_name(seq.kind)}.")
+            get, at = seq.run, index.run
+
+            def item(env):
+                items = get(env)
+                return items[index_of(items, at(env), line)]
+
+            def put(env, x):
+                items = get(env)
+                items[index_of(items, at(env), line)] = dup(x)
+            return Value(f"imagine::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
+                         put if seq.writable else None)
+        made = self.made()  # before names, so a name like 'a' doesn't hide 'a list of'
+        if made:
+            return made
+        key, n = self.names.match(self.t, self.i)
+        if key:
+            self.i += n
+            return self.names.value(key)
+        key, n = match_command(self.names, self.t[self.i:])
+        if key:
+            self.i += n
+            command = self.names.commands[key]
+            needs = len(command.kinds)
+            if self.at("with"):
+                self.i += 1
+            args = []
+            if needs == 1:
+                args = [self.unary()]
+            elif needs > 1:
+                if not self.at("("):
+                    raise ScriptError(line, f"'{' '.join(key)}' needs {needs} inputs. Put them in brackets here, like: {' '.join(key)} with (1, 2)")
+                self.i += 1
+                args = [self.full()]
+                while self.at(","):
+                    self.i += 1
+                    args.append(self.full())
+                self.take(")")
+            if not command.gives:
+                raise ScriptError(line, f"'{' '.join(key)}' doesn't give back anything, so it can't be used as a value.")
+            cpp, run = call(key, args, self.names, line)
+            return Value(cpp, command.gives, run)
+        if tok in ("yes", "no"):
+            self.i += 1
+            b = tok == "yes"
+            return Value("true" if b else "false", YESNO, lambda env: b)
+        if self.at("clamp"):
+            self.i += 1
+            v = self.need(self.sum(), NUMBER, "clamp")
+            self.take("between")
+            lo = self.need(self.sum(), NUMBER, "clamp")
+            self.take("and")
+            hi = self.need(self.sum(), NUMBER, "clamp")
+            x, a, b = v.run, lo.run, hi.run
+            return Value(f"FMath::Clamp({v.cpp}, {lo.cpp}, {hi.cpp})", NUMBER, lambda env: min(max(x(env), a(env)), b(env)))
+        for word, fn, f in (("smaller", "Min", min), ("larger", "Max", max)):
+            if self.at(word, "of"):
+                self.i += 2
+                a = self.need(self.sum(), NUMBER, f"{word} of")
+                self.take("and")
+                b = self.need(self.sum(), NUMBER, f"{word} of")
+                x, y = a.run, b.run
+                return Value(f"FMath::{fn}({a.cpp}, {b.cpp})", NUMBER, lambda env, f=f: f(x(env), y(env)))
+        if self.at("contents", "of", "file") or self.at("lines", "of", "file"):
+            whole = self.at("contents")
+            self.i += 3
+            where = self.need(self.unary(), TEXT, "file")
+            w = where.run
+            if whole:
+                return Value(f"imagine::read_file({where.cpp}, {line})", TEXT, lambda env: read_file(w(env), line))
+            return Value(f"imagine::read_lines({where.cpp}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)))
+        if self.at("file"):
+            self.i += 1
+            where = self.need(self.unary(), TEXT, "file")
+            self.take("exists")
+            w = where.run
+            return Value(f"imagine::file_exists({where.cpp})", YESNO, lambda env: os.path.isfile(w(env)))
+        for words, fn, f in ((("lines", "of"), "lines_of", lines_of), (("words", "of"), "words_of", str.split)):
+            if self.at(*words):
+                self.i += 2
+                v = self.need(self.unary(), TEXT, " ".join(words))
+                a = v.run
+                return Value(f"imagine::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
+        if self.at("square", "root", "of"):
+            self.i += 3
+            v = self.need(self.sum(), NUMBER, "square root")
+            a = v.run
+            return Value(f"FMath::Sqrt({v.cpp})", NUMBER, lambda env: math.sqrt(x) if (x := a(env)) >= 0 else math.nan)
+        if self.at("size", "of"):
+            self.i += 2
+            v = self.sum()
+            a = v.run
+            if v.kind == NUMBER:
+                return Value(f"FMath::Abs({v.cpp})", NUMBER, lambda env: abs(a(env)))
+            if v.kind in (PLACE, FLAT):
+                return Value(f"({v.cpp}).Size()", NUMBER, not_here(line, "The size of a place"))
+            if v.kind == TEXT:
+                return Value(f"imagine::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
+            if is_list(v.kind):
+                return Value(f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
+            raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
+        if self.at("flat"):
+            self.i += 1
+            v = self.need(self.unary(), PLACE, "flat")
+            return Value(f"FVector2D({v.cpp})", FLAT, not_here(line, "'flat'"))
+        if self.at("direction", "of"):
+            self.i += 2
+            v = self.need(self.sum(), FLAT, "direction of")
+            return Value(f"FMath::RadiansToDegrees(FMath::Atan2(({v.cpp}).Y, ({v.cpp}).X))", NUMBER, not_here(line, "'direction of'"))
+        if self.at("angle", "from"):
+            self.i += 2
+            a = self.need(self.sum(), NUMBER, "angle from")
+            self.take("to")
+            b = self.need(self.sum(), NUMBER, "angle from")
+            x, y = a.run, b.run
+            return Value(f"FMath::UnwindDegrees({b.cpp} - {a.cpp})", NUMBER, lambda env: unwind(y(env) - x(env)))
+        if tok in KEYWORDS:
+            raise ScriptError(line, f"'{tok}' can't go here.")
+        raise ScriptError(line, self.names.unknown(self.t, self.i))
 
     def made(self):
         """A new value: 'a list of numbers', 'an empty list of text', 'a list of (1, 2, 3)', 'a new pet'."""
@@ -222,7 +695,8 @@ class Expr:
                     name = " ".join(self.t[self.i:self.i + n])
                     if name in THINGS:
                         self.i += n
-                        return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name)
+                        things = THINGS
+                        return Value(f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
         for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of")):
@@ -239,224 +713,20 @@ class Expr:
                         if v.kind != items[0].kind:
                             raise ScriptError(self.line, f"A list holds one kind of thing, but this mixes {kind_name(items[0].kind)} and {kind_name(v.kind)}.")
                     kind = "list of " + items[0].kind
-                    return Value(f"{cpp_type(kind)}{{{', '.join(strip_parens(v.cpp) for v in items)}}}", kind)
+                    runs = [v.run for v in items]
+                    return Value(f"{cpp_type(kind)}{{{', '.join(strip_parens(v.cpp) for v in items)}}}", kind,
+                                 lambda env: [dup(f(env)) for f in runs])
                 for n in range(min(6, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return Value(f"{cpp_type('list of ' + k)}()", "list of " + k)
+                        return Value(f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: [])
                 raise ScriptError(self.line, f"Say what the list holds, like 'a list of numbers'. Kinds are: {kind_words()}.")
         self.i = start
         return None
 
-    def compare(self):
-        v = self.sum()
-        if self.at("contains"):
-            self.i += 1
-            r = self.sum()
-            if not (v.kind == r.kind == TEXT or (is_list(v.kind) and element(v.kind) == r.kind)):
-                raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
-            return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO)
-        for words, op in self.COMPARE:
-            if self.at(*words):
-                self.i += len(words)
-                r = self.sum()
-                if op in ("==", "!=") and v.kind == r.kind and v.kind not in (PLACE, FLAT):
-                    return Value(f"({v.cpp} {op} {r.cpp})", YESNO)
-                return Value(f"({self.need(v, NUMBER, 'Comparing').cpp} {op} {self.need(r, NUMBER, 'Comparing').cpp})", YESNO)
-        return v
 
-    def sum(self):
-        v = self.product()
-        while self.peek() in ("plus", "+", "minus", "-"):
-            op = "+" if self.peek() in ("plus", "+") else "-"
-            self.i += 1
-            r = self.product()
-            if v.kind == TEXT and op == "+":
-                v = Value(f"(imagine::text({v.cpp}) + imagine::text({r.cpp}))", TEXT)
-                continue
-            if v.kind != r.kind or v.kind in (YESNO, TEXT):
-                raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
-            v = Value(f"({v.cpp} {op} {r.cpp})", v.kind)
-        return v
-
-    def product(self):
-        v = self.unary()
-        while self.peek() in ("times", "*", "/") or self.at("divided", "by"):
-            op = "/" if self.peek() in ("/", "divided") else "*"
-            self.i += 2 if self.at("divided", "by") else 1
-            r = self.unary()
-            if r.kind != NUMBER or v.kind in (YESNO, TEXT):
-                raise ScriptError(self.line, f"I can only multiply or divide by a number, not {kind_name(r.kind)}.")
-            v = Value(f"({v.cpp} {op} {r.cpp})", v.kind)
-        return v
-
-    def unary(self):
-        if self.peek() in ("-", "minus"):
-            self.i += 1
-            v = self.unary()
-            if v.kind in (YESNO, TEXT):
-                raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
-            return Value(f"(-{v.cpp})", v.kind)
-        v = self.primary()
-        if self.at("as", "a", "number") or self.at("as", "number"):
-            self.i += 3 if self.at("as", "a") else 2
-            if v.kind != TEXT:
-                raise ScriptError(self.line, f"'as a number' turns text into a number, but this is {kind_name(v.kind)}.")
-            return Value(f"imagine::to_number({v.cpp}, {self.line})", NUMBER)
-        if self.at("as", "text"):
-            self.i += 2
-            return Value(f"imagine::text({v.cpp})", TEXT)
-        return v
-
-    def primary(self):
-        tok = self.peek()
-        if tok is None:
-            raise ScriptError(self.line, "This line ends too early: something is missing.")
-        if re.fullmatch(r"\d+(?:\.\d+)?", tok):
-            self.i += 1
-            while self.peek() in UNITS:
-                self.i += 1
-            return Value(tok if "." in tok else tok + ".0", NUMBER)
-        if tok.startswith('"'):
-            self.i += 1
-            return Value(cpp_text(tok), TEXT)
-        if self.at("random", "number", "from"):
-            self.i += 3
-            lo = self.need(self.sum(), NUMBER, "random number")
-            self.take("to")
-            hi = self.need(self.sum(), NUMBER, "random number")
-            return Value(f"imagine::random({lo.cpp}, {hi.cpp})", NUMBER)
-        if tok == "(":
-            self.i += 1
-            v = self.full()
-            self.take(")")
-            return v
-        for n in range(min(6, len(self.t) - self.i), 0, -1):
-            key = tuple(self.t[self.i:self.i + n])
-            if key in FIELDS and self.peek(n) == "of":
-                self.i += n + 1
-                owner = self.unary()
-                if owner.kind not in FIELDS[key]:
-                    raise ScriptError(self.line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
-                member, kind = FIELDS[key][owner.kind]
-                return Value(f"({owner.cpp}).{member}", kind, owner.writable)
-        if tok == "item" and self.peek(1) not in ITEM_NOT_INDEX:
-            self.i += 1
-            index = self.need(self.sum(), NUMBER, "item")
-            self.take("of")
-            seq = self.unary()
-            if not is_list(seq.kind):
-                raise ScriptError(self.line, f"'item ... of' needs a list, but this is {kind_name(seq.kind)}.")
-            return Value(f"imagine::at({seq.cpp}, {strip_parens(index.cpp)}, {self.line})", element(seq.kind), seq.writable)
-        key, n = self.names.match(self.t, self.i)
-        if key:
-            self.i += n
-            cpp, kind, read_only = self.names.known[key]
-            return Value(cpp, kind, not read_only)
-        key, n = match_command(self.names, self.t[self.i:])
-        if key:
-            self.i += n
-            needs = len(self.names.commands[key][1])
-            if self.at("with"):
-                self.i += 1
-            args = []
-            if needs == 1:
-                args = [self.unary()]
-            elif needs > 1:
-                if not self.at("("):
-                    raise ScriptError(self.line, f"'{' '.join(key)}' needs {needs} inputs. Put them in brackets here, like: {' '.join(key)} with (1, 2)")
-                self.i += 1
-                args = [self.full()]
-                while self.at(","):
-                    self.i += 1
-                    args.append(self.full())
-                self.take(")")
-            gives = self.names.commands[key][2]
-            if not gives:
-                raise ScriptError(self.line, f"'{' '.join(key)}' doesn't give back anything, so it can't be used as a value.")
-            return Value(call(key, args, self.names, self.line), gives)
-        made = self.made()
-        if made:
-            return made
-        if tok in ("yes", "no"):
-            self.i += 1
-            return Value("true" if tok == "yes" else "false", YESNO)
-        if self.at("clamp"):
-            self.i += 1
-            v = self.need(self.sum(), NUMBER, "clamp")
-            self.take("between")
-            lo = self.need(self.sum(), NUMBER, "clamp")
-            self.take("and")
-            hi = self.need(self.sum(), NUMBER, "clamp")
-            return Value(f"FMath::Clamp({v.cpp}, {lo.cpp}, {hi.cpp})", NUMBER)
-        for word, fn in (("smaller", "Min"), ("larger", "Max")):
-            if self.at(word, "of"):
-                self.i += 2
-                a = self.need(self.sum(), NUMBER, f"{word} of")
-                self.take("and")
-                b = self.need(self.sum(), NUMBER, f"{word} of")
-                return Value(f"FMath::{fn}({a.cpp}, {b.cpp})", NUMBER)
-        for words, fn, kind, what in ((("contents", "of", "file"), "read_file", TEXT, "text"),
-                                      (("lines", "of", "file"), "read_lines", "list of text", "lines"),
-                                      (("file",), "file_exists", YESNO, "exists")):
-            if self.at(*words):
-                self.i += len(words)
-                where = self.need(self.unary(), TEXT, "file")
-                if fn == "file_exists":
-                    self.take("exists")
-                    return Value(f"imagine::file_exists({where.cpp})", YESNO)
-                return Value(f"imagine::{fn}({where.cpp}, {self.line})", kind)
-        for words, fn in ((("lines", "of"), "lines_of"), (("words", "of"), "words_of")):
-            if self.at(*words):
-                self.i += 2
-                return Value(f"imagine::{fn}({self.need(self.unary(), TEXT, ' '.join(words)).cpp})", "list of text")
-        if self.at("square", "root", "of"):
-            self.i += 3
-            return Value(f"FMath::Sqrt({self.need(self.sum(), NUMBER, 'square root').cpp})", NUMBER)
-        if self.at("size", "of"):
-            self.i += 2
-            v = self.sum()
-            if v.kind == NUMBER:
-                return Value(f"FMath::Abs({v.cpp})", NUMBER)
-            if v.kind in (PLACE, FLAT):
-                return Value(f"({v.cpp}).Size()", NUMBER)
-            if v.kind == TEXT or is_list(v.kind):
-                return Value(f"double(({v.cpp}).size())", NUMBER)
-            raise ScriptError(self.line, "yes or no has no size.")
-        if self.at("flat"):
-            self.i += 1
-            return Value(f"FVector2D({self.need(self.unary(), PLACE, 'flat').cpp})", FLAT)
-        if self.at("direction", "of"):
-            self.i += 2
-            v = self.need(self.sum(), FLAT, "direction of")
-            return Value(f"FMath::RadiansToDegrees(FMath::Atan2(({v.cpp}).Y, ({v.cpp}).X))", NUMBER)
-        if self.at("angle", "from"):
-            self.i += 2
-            a = self.need(self.sum(), NUMBER, "angle from")
-            self.take("to")
-            b = self.need(self.sum(), NUMBER, "angle from")
-            return Value(f"FMath::UnwindDegrees({b.cpp} - {a.cpp})", NUMBER)
-        if tok in KEYWORDS:
-            raise ScriptError(self.line, f"'{tok}' can't go here.")
-        raise ScriptError(self.line, self.names.unknown(self.t, self.i))
-
-
-def kind_name(kind):
-    if is_list(kind):
-        return "a list of " + plural(element(kind))
-    if is_thing(kind):
-        return "a " + kind[6:]
-    return {NUMBER: "a number", YESNO: "yes or no", PLACE: "a place", FLAT: "a flat place", TEXT: "text"}[kind]
-
-
-def plural(kind):
-    if is_list(kind):
-        return "lists of " + plural(element(kind))
-    if is_thing(kind):
-        return kind[6:] + "s"
-    return {NUMBER: "numbers", YESNO: "yes or no", PLACE: "places", FLAT: "flat places", TEXT: "text"}[kind]
-
+# ---------------------------------------------------------------- words files and libraries
 
 def load_words(name, line):
     path = LOGIC / f"{name}.words"
@@ -464,14 +734,14 @@ def load_words(name, line):
         raise ScriptError(line, f"There is no '{name}' to be part of (no {name}.words next to the script).")
     names, info = Names(), {}
     for n, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        text = raw.strip()
-        if not text or text.startswith("note:"):
+        text_ = raw.strip()
+        if not text_ or text_.startswith("note:"):
             continue
-        if text.startswith("class:") or text.startswith("header:"):
-            key, value = text.split(":", 1)
+        if text_.startswith("class:") or text_.startswith("header:"):
+            key, value = text_.split(":", 1)
             info[key] = value.strip()
             continue
-        english, _, rest = text.partition("=")
+        english, _, rest = text_.partition("=")
         parts = [p.strip() for p in rest.rsplit(",", 2)]
         read_only = parts[-1] == "read only"
         if read_only:
@@ -479,9 +749,110 @@ def load_words(name, line):
         cpp, kind = ", ".join(parts[:-1]), parts[-1]
         if kind not in CPP_TYPE:
             raise ScriptError(n, f"{path.name}: unknown type '{kind}'.")
-        names.add(english.strip().lower().split(), cpp, kind, read_only)
+        names.add(english.strip().lower().split(), cpp, kind, read_only, not_here(line, f"'{english.strip()}'"))
     return names, info
 
+
+LIBRARY_HELP = """A library is <name>.words, next to the script or in Imagination's libraries folder. Its lines:
+  include: <cmath>                    a C++ header to include
+  link: shell32                       a system library to link with
+  code:                               C++ lines (indented below) the words can use
+  python:                             Python lines (indented below) the 'runs:' lines can use
+  pi = 3.14159, number, read only     a word for a value
+  to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
+                                      a word for a command; {input name} stands for each input
+    runs: time.sleep({seconds})       (indented under a word) what it does when the program runs directly"""
+
+
+def load_library(name, line, names):
+    """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file."""
+    path = next((p for p in (LOGIC / f"{name}.words", HERE / "libraries" / f"{name}.words") if p.exists()), None)
+    if not path:
+        have = sorted(p.stem for p in (HERE / "libraries").glob("*.words"))
+        raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
+    out = [f"// From the library '{name}'"]
+    space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
+             "text": text, "RunError": RunError}
+    rows = path.read_text(encoding="utf-8").splitlines()
+    pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
+    k = 0
+    while k < len(rows):
+        raw = rows[k]
+        stripped = raw.strip()
+        n = k + 1
+        k += 1
+        where = f"In the library '{name}' ({path.name} line {n}): "
+        if not stripped or stripped.startswith("note:"):
+            continue
+        if raw[:1].isspace() and stripped.startswith("runs:"):
+            if not pending:
+                raise ScriptError(line, where + "'runs:' goes indented under the word it is for.")
+            src, (word_where, inputs, set_run) = stripped[5:].strip(), pending
+            for idx, in_name in enumerate(inputs):
+                src = src.replace("{" + in_name + "}", f"_{idx}")
+            try:
+                fn = eval(f"lambda {', '.join(f'_{idx}' for idx in range(len(inputs)))}: ({src})", space)
+            except SyntaxError as err:
+                raise ScriptError(line, where + f"the 'runs:' line isn't valid Python: {err.msg}.")
+            set_run(fn)
+            pending = None
+            continue
+        pending = None
+        if stripped.startswith("include:"):
+            out.append(f"#include {stripped[8:].strip()}")
+        elif stripped.startswith("link:"):
+            out.append(f'#pragma comment(lib, "{stripped[5:].strip()}")')
+        elif stripped in ("code:", "python:"):
+            block = []
+            while k < len(rows) and (not rows[k].strip() or rows[k][:1].isspace()):
+                block.append(rows[k][2:] if rows[k].startswith("  ") else rows[k].lstrip())
+                k += 1
+            if stripped == "code:":
+                out += block
+            else:
+                exec("\n".join(block), space)
+        elif stripped.startswith("to ") and " = " in stripped:
+            head, _, cpp = stripped.partition(" = ")
+            try:
+                words, _, inputs, gives = command_head(head + ":", line)
+            except ScriptError as err:
+                raise ScriptError(line, where + err.message)
+            in_names = [" ".join(w) for w, _ in inputs]
+            for in_name in in_names:
+                if "{" + in_name + "}" not in cpp:
+                    raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
+            command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
+            word = " ".join(words)
+
+            def missing(*args, word=word):
+                raise RunError(0, f"'{word}' (from the library '{name}') only works when the program is built into C++.")
+            command.runner = missing
+            names.commands[tuple(words)] = command
+            pending = (where, in_names, lambda fn, command=command: setattr(command, "runner", fn))
+        elif "=" in stripped:
+            english, _, rest = stripped.partition("=")
+            parts = [p.strip() for p in rest.rsplit(",", 2)]
+            read_only = parts[-1] == "read only"
+            if read_only:
+                parts = parts[:-1]
+            kind = parse_kind(parts[-1])
+            if not kind or len(parts) < 2:
+                raise ScriptError(line, where + f"a word looks like 'pi = 3.14159, number, read only'. Kinds are: {kind_words()}.")
+            words = english.strip().lower().split()
+            holder = {"run": not_here(line, f"'{english.strip()}' (from the library '{name}')")}
+            names.add(words, ", ".join(parts[:-1]), kind, True, lambda env, holder=holder: holder["run"](env))
+            if not read_only:
+                raise ScriptError(line, where + "library words for values must be 'read only' for now.")
+
+            def set_value(fn, holder=holder):
+                holder["run"] = lambda env: fn()
+            pending = (where, [], set_value)
+        else:
+            raise ScriptError(line, where + f"I don't understand '{stripped}'.\n{LIBRARY_HELP}")
+    return out + [""]
+
+
+# ---------------------------------------------------------------- a whole script
 
 CLOSING = "and the universe said i love you"
 
@@ -491,13 +862,30 @@ def is_closing(line):
     return line.strip().lower().rstrip(".") == CLOSING
 
 
+class Program:
+    """A script read for running directly: start() runs it."""
+
+    def __init__(self, commands):
+        self.commands = commands
+
+    def start(self):
+        self.commands[("start",)].runner()
+
+
 def translate(path):
     """Returns the C++ text for one .imagine file, or raises ScriptError."""
+    return read_script(path)[0]
+
+
+def read_script(path):
+    """Reads one .imagine file. Returns (C++ text, Program or None), or raises ScriptError."""
+    global THINGS
     lines = path.read_text(encoding="utf-8").splitlines()
     names, info, settings, out = None, {}, [], []
     commands = []  # (header text, line, body)
     things = []  # (name, line, [(line, field text)])
-    THINGS.clear()
+    libs, used = [], set()  # C++ that 'use:' libraries need, and their names
+    THINGS = {}
     FIELDS.clear()
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
@@ -505,21 +893,21 @@ def translate(path):
     i = 0
     while i < len(lines):
         raw = lines[i]
-        text = raw.strip()
+        text_ = raw.strip()
         n = i + 1
         i += 1
-        if not text:
+        if not text_:
             continue
-        if text.startswith("note:"):
+        if text_.startswith("note:"):
             if not raw[0].isspace():
-                out.append(f"// {text[5:].strip()}")
+                out.append(f"// {text_[5:].strip()}")
             continue
-        if text.startswith("this is part of:"):
-            if text != first or (names and names.known):
+        if text_.startswith("this is part of:"):
+            if text_ != first or (names and names.known):
                 raise ScriptError(n, "'this is part of:' must be the first line of the script (after notes).")
-            names, info = load_words(text.split(":", 1)[1].strip().lower(), n)
+            names, info = load_words(text_.split(":", 1)[1].strip().lower(), n)
             continue
-        if text == "settings:":
+        if text_ == "settings:":
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
                 s = lines[i].strip()
                 i += 1
@@ -533,22 +921,30 @@ def translate(path):
                     raise ScriptError(i, "A setting looks like 'name: number', e.g. 'look limit: 30 degrees'.")
                 words = m.group(1).split()
                 cpp = f"Imagine_{snake(path.stem.split())}::{snake(words)}"
-                names.add(words, cpp, NUMBER, read_only=True)
+                number = float(m.group(2))
+                names.add(words, cpp, NUMBER, True, lambda env, number=number: number)
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
                 settings.append(f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
             continue
-        if text.startswith("to ") and text.endswith(":"):
+        if text_.startswith("to ") and text_.endswith(":"):
             body = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
                 body.append((i + 1, lines[i]))
                 i += 1
-            commands.append((text, n, body))
+            commands.append((text_, n, body))
             if i >= len(lines) or not is_closing(lines[i]):
                 raise ScriptError(i + 1 if i < len(lines) else len(lines),
-                                  f"The command '{text[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
+                                  f"The command '{text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
             i += 1
             continue
-        m = re.fullmatch(r"an? ([a-z][a-z ]*?) has:", text.lower())
+        if text_.lower().startswith("use:"):
+            lib = " ".join(text_[4:].split()).lower()
+            if lib in used:
+                raise ScriptError(n, f"The library '{lib}' is already used above.")
+            used.add(lib)
+            libs += load_library(lib, n, names)
+            continue
+        m = re.fullmatch(r"an? ([a-z][a-z ]*?) has:", text_.lower())
         if m:
             fields = []
             while i < len(lines) and (not lines[i].strip() or lines[i][:1].isspace()):
@@ -565,58 +961,61 @@ def translate(path):
             THINGS[name] = []
             things.append((name, n, fields))
             continue
-        if is_closing(text):
+        if is_closing(text_):
             raise ScriptError(n, f"'{CLOSING}' closes a command, so it goes right after the command's last indented line.")
-        raise ScriptError(n, f"I don't know what to do with '{text}'. Top-level lines are notes, 'settings:', 'a ... has:' or 'to ...:'.")
+        raise ScriptError(n, f"I don't know what to do with '{text_}'. Top-level lines are notes, 'use:', 'settings:', 'a ... has:' or 'to ...:'.")
     if names is None:
         raise ScriptError(1, "The script is empty.")
     program = info is None
     if things and not program:
         raise ScriptError(things[0][1], "New kinds of things can only be described in programs for now.")
     structs = describe_things(things)
-    heads = [command_head(text, n) for text, n, _ in commands]
+    heads = [command_head(text_, n) for text_, n, _ in commands]
     if program:
-        for words, cpp, inputs, gives in heads:
+        for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
             if tuple(words) in names.commands:
-                raise ScriptError(next(n for t, n, _ in commands if command_head(t, n)[0] == words),
-                                  f"There are two commands called '{' '.join(words)}'.")
-            names.commands[tuple(words)] = (cpp, [kind for _, kind in inputs], gives)
+                raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
+            names.commands[tuple(words)] = Command(cpp, [kind for _, kind in inputs], gives)
         if ("start",) not in names.commands:
             raise ScriptError(len(lines) or 1, "A program needs a 'to start:' command: that is where it begins.")
+        if names.commands[("start",)].kinds or names.commands[("start",)].gives:
+            raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
+                              "'to start:' has no inputs and gives nothing back.")
     functions = [function(head, n, body, names, info) for head, (_, n, body) in zip(heads, commands)]
     if program:
         protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({', '.join(param_type(k) + ' ' + snake(w) for w, k in inputs)});"
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
-                '#include "imagination.h"', ""] + structs + protos + [""]
+                '#include "imagination.h"', ""] + libs + structs + protos + [""]
         functions.append("int main()\n{\n\tStart();\n\treturn 0;\n}\n")
     else:
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
-                f'#include "{info["header"]}"', ""]
+                f'#include "{info["header"]}"', ""] + libs
     ns = [f"namespace Imagine_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
-    return "\n".join(head + ns + out + [""] + functions) + "\n"
-
-
-FIELDS = {}  # field words tuple -> {thing kind: (cpp member, kind)}
+    return "\n".join(head + ns + out + [""] + functions) + "\n", Program(names.commands) if program else None
 
 
 def describe_things(things):
     """Reads 'a pet has:' descriptions; returns the C++ structs."""
+    described = set()
     for name, n, fields in things:
         if not fields:
             raise ScriptError(n, f"Say what a {name} has, one thing per indented line, like: name (text)")
-        for fn, text in fields:
-            m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text.lower())
+        for fn, text_ in fields:
+            m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
             kind = m and parse_kind(m.group(2))
             if not kind:
                 raise ScriptError(fn, f"Each thing a {name} has looks like 'name (text)'. Kinds are: {kind_words()}.")
             if kind == "thing " + name:
                 raise ScriptError(fn, f"A {name} can't hold a whole {name} inside itself, but it can hold a list of {name}s.")
+            if is_thing(kind) and kind[6:] not in described:
+                raise ScriptError(fn, f"Describe what a {kind[6:]} has above the {name}, or hold a list of {kind[6:]}s.")
             words = m.group(1).split()
             if any(w in KEYWORDS for w in words):
                 raise ScriptError(fn, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
             THINGS[name].append((words, kind))
             FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
+        described.add(name)
     out = []
     if things:
         out.append("namespace imagine\n{")
@@ -671,21 +1070,37 @@ def function(head, line, body, names, info):
         params.append(f"{param_type(kind)} {snake(in_words)}")
         local.add(in_words, snake(in_words), kind, read_only=True)
     declared = {}
-    code = statements(body, local, declared, 1)
+    code, run = statements(body, local, declared, 1)
     hoisted = [f"\t{cpp_type(k)} {c} = {zero(k)};" for c, k in declared.values()]
     owner = f"{info['class']}::" if info else ""
     end = [f"\treturn {zero(gives)};"] if gives else []
+    if not info:
+        param_names = [snake(w) for w, _ in inputs]
+        things = THINGS
+
+        def runner(*args):
+            env = {c: py_zero(k, things) for c, k in declared.values()}
+            env.update(zip(param_names, args))
+            try:
+                run(env)
+            except Stop:
+                return None
+            except GiveBack as g:
+                return g.value
+            return py_zero(gives, things) if gives else None
+        names.commands[tuple(words)].runner = runner
     return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({', '.join(params)})", "{"]
                      + hoisted + code + end + ["}"]) + "\n"
 
 
+# ---------------------------------------------------------------- lines inside a command
+
 def statements(body, names, declared, depth):
-    """Translates an indented block. body: list of (line number, raw text)."""
-    out = []
+    """Reads an indented block. body: list of (line number, raw text). Returns (C++ lines, run)."""
+    out, runs = [], []
     rows = [(n, r) for n, r in body if r.strip()]
-    if not rows:
-        return out
-    indent = len(rows[0][1].expandtabs(4)) - len(rows[0][1].expandtabs(4).lstrip())
+    indent = len(rows[0][1].expandtabs(4)) - len(rows[0][1].expandtabs(4).lstrip()) if rows else 0
+    chain = None  # the if / otherwise if / otherwise choices being collected
     k = 0
     while k < len(rows):
         n, raw = rows[k]
@@ -697,73 +1112,146 @@ def statements(body, names, declared, depth):
         while k < len(rows) and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) > indent:
             inner.append(rows[k])
             k += 1
-        out += statement(n, raw.strip(), inner, names, declared, depth)
-    return out
+        lines, run, branch = statement(n, raw.strip(), inner, names, declared, depth)
+        out += lines
+        if branch:
+            which, cond = branch
+            if which == "if":
+                chain = [(cond, run)]
+                runs.append(choose(chain))
+            elif chain is None:
+                raise ScriptError(n, f"'{raw.strip().split(':')[0]}' needs an 'if' line just above it, at the same indent.")
+            else:
+                chain.append((cond, run))
+            if which == "otherwise":
+                chain = None
+            continue
+        if run is not None:
+            chain = None
+            runs.append(guard(run, n))
+    return out, block(runs)
 
 
-def statement(n, text, inner, names, declared, depth):
+def choose(chain):
+    def run(env):
+        for cond, then in chain:
+            if cond is None or cond(env):
+                then(env)
+                return
+    return run
+
+
+def block(runs):
+    runs = tuple(runs)
+
+    def run(env):
+        for f in runs:
+            f(env)
+    return run
+
+
+def guard(run, n):
+    """Turns a surprise inside Imagination into a plain message with the line it happened on."""
+    def guarded(env):
+        try:
+            run(env)
+        except (RunError, Stop, GiveBack, SystemExit, KeyboardInterrupt):
+            raise
+        except RecursionError:
+            raise RunError(n, "commands called each other too many times in a row (they may never stop).")
+        except Exception as err:
+            raise RunError(n, f"something went wrong inside Imagination: {err}")
+    return guarded
+
+
+def statement(n, text_, inner, names, declared, depth):
+    """One line (with its indented lines). Returns (C++ lines, run, branch); branch is set for if/otherwise lines."""
     tab = "\t" * depth
-    if text.startswith("note:"):
-        return [f"{tab}// {text[5:].strip()}"]
-    head, colon, rest = split_colon(text)
-    if colon and re.match(r"for each ", text.lower()):
-        return for_each(n, head, rest, inner, names, declared, depth)
-    if colon and re.match(r"(repeat |while )", text.lower()):
+    if text_.startswith("note:"):
+        return [f"{tab}// {text_[5:].strip()}"], None, None
+    head, colon, rest = split_colon(text_)
+
+    def body():
+        if rest.strip():
+            lines, run, branch = statement(n, rest.strip(), [], names, declared, depth + 1)
+            if branch:
+                raise ScriptError(n, "Put 'if' and 'otherwise' on their own lines when they are inside another line.")
+            return lines, run or (lambda env: None)
+        lines, run = statements(inner, names, declared, depth + 1)
+        if not lines:
+            raise ScriptError(n, "Say what to do after the ':' (on the same line or indented below).")
+        return lines, run
+
+    if colon and re.match(r"for each ", text_.lower()):
+        return for_each(n, head, body, names, declared, depth)
+    if colon and re.match(r"(repeat |while )", text_.lower()):
         tokens = tokenize(head, n)
         if tokens[0] == "while":
             v = expr_to_end(tokens, 1, names, n)
             if v.kind != YESNO:
                 raise ScriptError(n, f"'while' needs something that is yes or no, but this is {kind_name(v.kind)}.")
-            line = [f"{tab}while ({strip_parens(v.cpp)})"]
-        else:
-            if tokens[-1:] != ["times"]:
-                raise ScriptError(n, "'repeat' looks like 'repeat 10 times:'.")
-            count = expr_to_end(tokens[:-1], 1, names, n)
-            if count.kind != NUMBER:
-                raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
-            k = f"imagine_count_{depth}_{n}"
-            line = [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})"]
-        block = statement(n, rest.strip(), [], names, declared, depth + 1) if rest.strip() else statements(inner, names, declared, depth + 1)
-        if not block:
-            raise ScriptError(n, "Say what to repeat after the ':' (on the same line or indented below).")
-        return line + [tab + "{"] + block + [tab + "}"]
-    if colon and re.match(r"(if |otherwise\b)", text):
+            lines, then = body()
+            cond = v.run
+
+            def run(env):
+                while cond(env):
+                    then(env)
+            return [f"{tab}while ({strip_parens(v.cpp)})", tab + "{"] + lines + [tab + "}"], run, None
+        if tokens[-1:] != ["times"]:
+            raise ScriptError(n, "'repeat' looks like 'repeat 10 times:'.")
+        count = expr_to_end(tokens[:-1], 1, names, n)
+        if count.kind != NUMBER:
+            raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
+        lines, then = body()
+        k = f"imagine_count_{depth}_{n}"
+        times = count.run
+
+        def run(env):
+            c = times(env)
+            for _ in range(int(c) if math.isfinite(c) else 0):
+                then(env)
+        return [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})", tab + "{"] + lines + [tab + "}"], run, None
+    if colon and re.match(r"(if |otherwise\b)", text_):
         tokens = tokenize(head, n)
         if tokens[:2] == ["otherwise", "if"]:
-            cond, prefix = tokens[2:], "else if"
+            cond, prefix, which = tokens[2:], "else if", "otherwise if"
         elif tokens == ["otherwise"]:
-            cond, prefix = None, "else"
+            cond, prefix, which = None, "else", "otherwise"
         elif tokens[0] == "if":
-            cond, prefix = tokens[1:], "if"
+            cond, prefix, which = tokens[1:], "if", "if"
         else:
             raise ScriptError(n, "Use 'if ...:', 'otherwise if ...:' or 'otherwise:'.")
         line = f"{tab}{prefix}"
+        test = None
         if cond is not None:
-            e = Expr(cond, names, n)
-            v = e.full()
-            if e.i != len(cond):
-                raise ScriptError(n, f"I don't understand '{' '.join(cond[e.i:])}' here.")
+            v = expr_to_end(cond, 0, names, n)
             if v.kind != YESNO:
                 raise ScriptError(n, f"'if' needs something that is yes or no, but this is {kind_name(v.kind)}.")
             line += f" ({strip_parens(v.cpp)})"
-        block = statement(n, rest.strip(), [], names, declared, depth + 1) if rest.strip() else statements(inner, names, declared, depth + 1)
-        if not block:
-            raise ScriptError(n, "Say what to do after the ':' (on the same line or indented below).")
-        return [line, tab + "{"] + block + [tab + "}"]
+            test = v.run
+        lines, then = body()
+        return [line, tab + "{"] + lines + [tab + "}"], guard(then, n), (which, test)
     if inner:
-        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat' and 'while' lines can have indented lines under them.")
-    tokens = tokenize(text, n)
+        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'while' and 'for each' lines can have indented lines under them.")
+    tokens = tokenize(text_, n)
     if tokens == ["stop"]:
         if names.gives:
             raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, so leave it with 'give back ...' instead of 'stop'.")
-        return [f"{tab}return;"]
+
+        def run(env):
+            raise Stop()
+        return [f"{tab}return;"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
             raise ScriptError(n, "'give back' only works in a command that says what it gives back, like 'to double, given x (a number), giving back a number:'.")
         v = expr_to_end(tokens, 2, names, n)
         if v.kind != names.gives:
             raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, not {kind_name(v.kind)}.")
-        return [f"{tab}return {strip_parens(v.cpp)};"]
+        get = v.run
+
+        def run(env):
+            raise GiveBack(get(env))
+        return [f"{tab}return {strip_parens(v.cpp)};"], run, None
     if tokens[0] in ("add", "write") and "to" in tokens and tokens[len(tokens) - tokens[::-1].index("to"):][:1] == ["file"]:
         cut = len(tokens) - 1 - tokens[::-1].index("to")
         where = expr_to_end(tokens, cut + 2, names, n)
@@ -771,37 +1259,60 @@ def statement(n, text, inner, names, declared, depth):
         if where.kind != TEXT:
             raise ScriptError(n, f"A file is named with text, like file \"notes.txt\", but this is {kind_name(where.kind)}.")
         fn = "add_line" if tokens[0] == "add" else "write_file"
-        return [f"{tab}imagine::{fn}({strip_parens(where.cpp)}, imagine::text({strip_parens(v.cpp)}), {n});"]
+        w, get, adding = where.run, v.run, tokens[0] == "add"
+
+        def run(env):
+            s = text(get(env))
+            write_file(w(env), s + "\n" if adding else s, n, "ab" if adding else "wb")
+        return [f"{tab}imagine::{fn}({strip_parens(where.cpp)}, imagine::text({strip_parens(v.cpp)}), {n});"], run, None
     if tokens[0] == "add" and "to" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("to")
         target = writable_list(tokens[cut + 1:], names, n, "add to")
         v = expr_to_end(tokens[:cut], 1, names, n)
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
-        return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"]
+        seq, get = target.run, v.run
+        return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], lambda env: seq(env).append(dup(get(env))), None
     if tokens[0] == "remove" and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         target = writable_list(tokens[cut + 1:], names, n, "remove from")
+        seq = target.run
         if tokens[1] == "item":
             index = expr_to_end(tokens[:cut], 2, names, n)
             if index.kind != NUMBER:
                 raise ScriptError(n, f"'remove item' needs a number, but this is {kind_name(index.kind)}.")
-            return [f"{tab}imagine::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"]
+            at = index.run
+
+            def run(env):
+                items = seq(env)
+                items.pop(index_of(items, at(env), n))
+            return [f"{tab}imagine::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"], run, None
         v = expr_to_end(tokens[:cut], 1, names, n)
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so it has no {kind_name(v.kind)} to remove.")
-        return [f"{tab}imagine::remove_value({target.cpp}, {strip_parens(v.cpp)});"]
+        get = v.run
+
+        def run(env):
+            items, x = seq(env), get(env)
+            if x in items:
+                items.remove(x)
+        return [f"{tab}imagine::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
     if tokens[0] == "say":
         parts = expr_list(tokens, 1, names, n)
         if not parts:
             raise ScriptError(n, "'say' needs something to say, like: say \"hello\".")
-        return [f"{tab}imagine::say({{{', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)}}});"]
+        gets = [p.run for p in parts]
+
+        def run(env):
+            print("".join(text(g(env)) for g in gets))
+        return [f"{tab}imagine::say({{{', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)}}});"], run, None
     if tokens[0] == "ask":
         return ask(tokens, names, declared, n, tab)
     key, size = match_command(names, tokens)
     if key:
         args = expr_list(tokens, size + (tokens[size:size + 1] == ["with"]), names, n)
-        return [f"{tab}{call(key, args, names, n)};"]
+        cpp, run = call(key, args, names, n)
+        return [f"{tab}{cpp};"], run, None
     if tokens[0] == "set" and "to" in tokens and ("of" in tokens[1:tokens.index("to")] or tokens[1:2] == ["item"]):
         cut = tokens.index("to")
         e = Expr(tokens[1:cut], names, n)
@@ -811,17 +1322,19 @@ def statement(n, text, inner, names, declared, depth):
         v = expr_to_end(tokens, cut + 1, names, n)
         if v.kind != target.kind:
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' holds {kind_name(target.kind)}, not {kind_name(v.kind)}.")
-        return [f"{tab}{strip_parens(target.cpp)} = {strip_parens(v.cpp)};"]
+        put, get = target.store, v.run
+        return [f"{tab}{strip_parens(target.cpp)} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:
-            cpp, kind, read_only = names.known[key]
+            cpp, kind, read_only, _ = names.known[key]
             if read_only:
                 raise ScriptError(n, f"'{' '.join(key)}' can't be changed by a script.")
             v = expr_to_end(tokens, 2 + size, names, n)
             if v.kind != kind:
                 raise ScriptError(n, f"'{' '.join(key)}' holds {kind_name(kind)}, not {kind_name(v.kind)}.")
-            return [f"{tab}{cpp} = {strip_parens(v.cpp)};"]
+            put, get = names.value(key).store, v.run
+            return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
         if "to" not in tokens:
             raise ScriptError(n, "'set' looks like 'set speed to 5'.")
         words = tokens[1:tokens.index("to")]
@@ -833,12 +1346,16 @@ def statement(n, text, inner, names, declared, depth):
             raise ScriptError(n, f"'{' '.join(words)}' already holds {kind_name(declared[tuple(words)][1])}, so it can't hold {kind_name(v.kind)}.")
         declared[tuple(words)] = (cpp, v.kind)
         names.add(words, cpp, v.kind)
-        return [f"{tab}{cpp} = {strip_parens(v.cpp)};"]
+        get = v.run
+
+        def run(env):
+            env[cpp] = dup(get(env))
+        return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], run, None
     if tokens[0] == "move":
         key, size = names.match(tokens, 1)
         if not key or tokens[1 + size:2 + size] != ["toward"]:
             raise ScriptError(n, "'move' looks like 'move turn rate toward 20 by at most 5'.")
-        cpp, kind, read_only = names.known[key]
+        cpp, kind, read_only, _ = names.known[key]
         if read_only or kind != NUMBER:
             raise ScriptError(n, f"'{' '.join(key)}' can't be moved: it must be a number a script may change.")
         e = Expr(tokens[2 + size:], names, n)
@@ -848,12 +1365,18 @@ def statement(n, text, inner, names, declared, depth):
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         s = f"imagine_step_{depth}_{n}"
+        target = names.value(key)
+        now, put, g, st = target.run, target.store, goal.run, step.run
+
+        def run(env):
+            x, by = now(env), st(env)
+            put(env, min(max(g(env), x - by), x + by))
         return [f"{tab}const double {s} = {strip_parens(step.cpp)};",
-                f"{tab}{cpp} = FMath::Clamp({strip_parens(goal.cpp)}, {cpp} - {s}, {cpp} + {s});"]
-    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, say, ask, if, otherwise, repeat, while, stop, note or the name of a command.")
+                f"{tab}{cpp} = FMath::Clamp({strip_parens(goal.cpp)}, {cpp} - {s}, {cpp} + {s});"], run, None
+    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, say, ask, add, remove, write, if, otherwise, repeat, while, for each, give back, stop, note or the name of a command.")
 
 
-def for_each(n, head, rest, inner, names, declared, depth):
+def for_each(n, head, body, names, declared, depth):
     """for each score in scores:  /  for each n from 1 to 10:"""
     tab = "\t" * depth
     tokens = tokenize(head, n)
@@ -870,6 +1393,11 @@ def for_each(n, head, rest, inner, names, declared, depth):
             raise ScriptError(n, f"'for each ... in' needs a list, but this is {kind_name(seq.kind)}.")
         kind = element(seq.kind)
         line = f"{tab}for (const {cpp_type(kind)} {cpp} : imagine::copy({strip_parens(seq.cpp)}))"
+        get = seq.run
+        simple = kind in (NUMBER, YESNO, TEXT)
+
+        def items(env):
+            return list(get(env)) if simple else copy.deepcopy(get(env))
     else:
         e = Expr(tokens[cut + 1:], names, n)
         lo = e.need(e.sum(), NUMBER, "for each ... from")
@@ -880,30 +1408,53 @@ def for_each(n, head, rest, inner, names, declared, depth):
         kind = NUMBER
         end = f"imagine_end_{n}"
         line = f"{tab}for (double {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
+        a, b = lo.run, hi.run
+
+        def items(env):
+            x, last = a(env), b(env)
+            while x <= last:
+                yield x
+                x += 1
     names.add(words, cpp, kind, read_only=True)
-    block = statement(n, rest.strip(), [], names, declared, depth + 1) if rest.strip() else statements(inner, names, declared, depth + 1)
+    lines, then = body()
     del names.known[tuple(words)]
-    if not block:
-        raise ScriptError(n, "Say what to do for each one after the ':' (on the same line or indented below).")
-    return [line, tab + "{"] + block + [tab + "}"]
+
+    def run(env):
+        for x in items(env):
+            env[cpp] = x
+            then(env)
+    return [line, tab + "{"] + lines + [tab + "}"], run, None
 
 
 def call(key, args, names, n):
-    """C++ for calling a command, after checking its inputs."""
-    cpp, kinds, _ = names.commands[key]
+    """Calling a command, after checking its inputs. Returns (C++, run)."""
+    command = names.commands[key]
+    kinds = command.kinds
     if len(args) != len(kinds):
         raise ScriptError(n, f"'{' '.join(key)}' needs {len(kinds)} input{'s' if len(kinds) != 1 else ''}, but this gives it {len(args)}.")
     for k, (a, kind) in enumerate(zip(args, kinds), 1):
         if a.kind != kind:
             raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.")
-    return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})"
+    gets = [a.run for a in args]
+
+    def run(env):
+        try:
+            return command.runner(*[g(env) for g in gets])
+        except RunError as err:
+            if not err.line:  # from a library word: point at the line that used it
+                err.line = n
+            raise
+    cpp = command.cpp
+    if command.inputs is not None:  # a library word: put each input into its {input name} place
+        given = {"{" + in_name + "}": f"({strip_parens(a.cpp)})" for in_name, a in zip(command.inputs, args)}
+        if given:  # all at once, so an input's own text is never replaced again
+            cpp = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], cpp)
+        return f"({cpp})", run
+    return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})", run
 
 
 def writable_list(tokens, names, n, what):
-    e = Expr(tokens, names, n)
-    v = e.full()
-    if e.i != len(e.t):
-        raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
+    v = expr_to_end(tokens, 0, names, n)
     if not is_list(v.kind):
         raise ScriptError(n, f"'{what}' needs a list, but this is {kind_name(v.kind)}.")
     if not v.writable:
@@ -920,8 +1471,7 @@ def match_command(names, tokens):
 
 def ask(tokens, names, declared, n, tab):
     """ask "question" into name (kind) -- shows the question and keeps what the person types."""
-    m = len(tokens) >= 4 and tokens[1].startswith('"') and tokens[2] == "into"
-    if not m:
+    if not (len(tokens) >= 4 and tokens[1].startswith('"') and tokens[2] == "into"):
         raise ScriptError(n, "'ask' looks like: ask \"What's your name? \" into name (text)")
     rest = tokens[3:]
     kind = TEXT
@@ -933,7 +1483,7 @@ def ask(tokens, names, declared, n, tab):
         rest = rest[:cut]
     key, size = names.match(rest, 0)
     if key and size == len(rest):
-        cpp, have, read_only = names.known[key]
+        cpp, have, read_only, _ = names.known[key]
         if read_only or have not in (TEXT, NUMBER):
             raise ScriptError(n, f"'{' '.join(key)}' can't hold an answer.")
         if "(" in tokens and have != kind:
@@ -945,13 +1495,13 @@ def ask(tokens, names, declared, n, tab):
         cpp = snake(rest)
         declared[tuple(rest)] = (cpp, kind)
         names.add(rest, cpp, kind)
-    reader = "imagine::ask_number" if kind == NUMBER else "imagine::ask_text"
-    return [f"{tab}{cpp} = {reader}({cpp_text(tokens[1])});"]
+    question = tokens[1][1:-1]
+    reader = ask_number if kind == NUMBER else ask_text
 
-
-def cpp_text(token):
-    """A quoted text token as a C++ string."""
-    return "std::string(" + token.replace("\\", "\\\\") + ")"
+    def run(env):
+        env[cpp] = reader(question)
+    cpp_reader = "imagine::ask_number" if kind == NUMBER else "imagine::ask_text"
+    return [f"{tab}{cpp} = {cpp_reader}({cpp_text(tokens[1])});"], run, None
 
 
 def expr_list(tokens, start, names, n):
@@ -985,6 +1535,43 @@ def strip_parens(cpp):
     return cpp
 
 
+# ---------------------------------------------------------------- running and building
+
+def run_program(script):
+    """Runs a program directly. Returns the exit code (0 when it finished, 1 when it stopped with an error)."""
+    global LOGIC
+    LOGIC = script.parent
+    try:
+        _, program = read_script(script)
+    except ScriptError as err:
+        print(f"{script.name} line {err.line}: {err.message}")
+        return 1
+    if program is None:
+        print(f"{script.name} is part of something else ('this is part of:'), so it can't run on its own.")
+        return 1
+    result = {"code": 0}
+
+    def go():
+        try:
+            program.start()
+        except RunError as err:
+            sys.stdout.flush()
+            print(f"Line {err.line}: {err.message}", file=sys.stderr)
+            result["code"] = 1
+        except SystemExit as done:
+            result["code"] = done.code or 0
+        except KeyboardInterrupt:
+            result["code"] = 130
+        sys.stdout.flush()
+    # Deep chains of commands need a deeper stack than Python's default.
+    sys.setrecursionlimit(100000)
+    threading.stack_size(255 * 1024 * 1024)  # the most Windows allows here
+    worker = threading.Thread(target=go)
+    worker.start()
+    worker.join()
+    return result["code"]
+
+
 def find_vcvars():
     """The Visual Studio script that sets up the C++ compiler, or None."""
     vswhere = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
@@ -997,49 +1584,62 @@ def find_vcvars():
 
 
 def build(script, exe):
-    """Translates a program script and compiles it into exe. Returns an error message, or None."""
+    """Reads a program script and compiles it into exe. Returns an error message, or None."""
     global LOGIC
     LOGIC = script.parent
     try:
-        cpp_text_out = translate(script)
+        cpp_out, program = read_script(script)
     except ScriptError as err:
         return f"{script.name} line {err.line}: {err.message}"
-    if "int main()" not in cpp_text_out:
+    if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
     vcvars = find_vcvars()
     if not vcvars:
         return "I can't find the C++ compiler. Install Visual Studio with 'Desktop development with C++'."
     work = Path(tempfile.mkdtemp(prefix="imagine_"))
     cpp = work / f"{script.stem}.imagine.cpp"
-    cpp.write_text(cpp_text_out, encoding="utf-8")
+    cpp.write_text(cpp_out, encoding="utf-8")
     bat = work / "build.bat"
     bat.write_text(f'@call "{vcvars}" >nul 2>&1\r\n@cl /nologo /utf-8 /EHsc /std:c++20 /O2 /W0 /I"{HERE / "runtime"}" '
                    f'"{cpp}" /Fe"{exe}" /Fo"{work}\\\\" >"{work / "compile.log"}" 2>&1\r\n', encoding="utf-8")
     result = subprocess.run(["cmd", "/c", str(bat)])
     if result.returncode != 0:
         log = (work / "compile.log").read_text(errors="replace")
-        return f"Imagination wrote C++ the compiler didn't accept. That is a bug in Imagination, not in your script.\n{log}"
+        return f"Imagination wrote C++ the compiler didn't accept. That is a bug in Imagination (or a library), not in your script.\n{log}"
     return None
+
+
+USAGE = """Use:
+  imagine <script.imagine>                     run a program
+  imagine run <script.imagine>                 the same
+  imagine build <script.imagine>               make it into an .exe (needs Visual Studio's C++ compiler)
+  imagine <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
+(imagine is short for: py -3 imagination.py)"""
 
 
 def main(argv):
     global LOGIC, OUT
-    if len(argv) == 3 and argv[1] == "run":
-        script = Path(argv[2])
+    args = argv[1:]
+    if len(args) == 1 and args[0].lower().endswith(".imagine"):
+        args = ["run", args[0]]
+    if len(args) == 2 and args[0] in ("run", "build"):
+        script = Path(args[1])
         if not script.exists():
             print(f"There is no script called {script}.")
             return 2
+        if args[0] == "run":
+            return run_program(script)
         exe = script.with_suffix(".exe")
         problem = build(script, exe)
         if problem:
             print(problem)
             return 1
-        return subprocess.run([str(exe.resolve())]).returncode
-    if len(argv) != 3:
-        print("Use: py -3 imagination.py run <script.imagine>")
-        print("  or py -3 imagination.py <scripts folder> <output folder>")
+        print(f"Built {exe}")
+        return 0
+    if len(args) != 2:
+        print(USAGE)
         return 2
-    LOGIC, OUT = Path(argv[1]), Path(argv[2])
+    LOGIC, OUT = Path(args[0]), Path(args[1])
     OUT.mkdir(parents=True, exist_ok=True)
     failed = False
     wanted = set()
@@ -1047,13 +1647,13 @@ def main(argv):
         target = OUT / f"{path.stem}.imagine.cpp"
         wanted.add(target.name)
         try:
-            text = translate(path)
+            cpp_out = translate(path)
         except ScriptError as err:
             print(f"{path.name} line {err.line}: {err.message}")
             failed = True
             continue
-        if not target.exists() or target.read_text(encoding="utf-8") != text:
-            target.write_text(text, encoding="utf-8")
+        if not target.exists() or target.read_text(encoding="utf-8") != cpp_out:
+            target.write_text(cpp_out, encoding="utf-8")
     for old in OUT.glob("*.imagine.cpp"):
         if old.name not in wanted:
             old.unlink()

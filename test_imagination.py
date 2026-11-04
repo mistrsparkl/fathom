@@ -3,7 +3,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 import imagination as translate
 translate.LOGIC = Path(__file__).resolve().parent / "examples"
 
@@ -60,24 +61,63 @@ def program_checks():
     assert perr("a pet has:\n  name (text)\n\nto start:\n  stop\n" + END)[1].startswith("The description of 'pet' must end with")
     assert perr("to start:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
-    # Build and run a real program, if this computer has the C++ compiler.
-    if not translate.find_vcvars():
-        print("(skipped running a program: no C++ compiler found)")
-        return
-    import subprocess
-    with tempfile.TemporaryDirectory() as d:
-        script = Path(d) / "hello.imagine"
-        script.write_text('to start:\n  ask "Name? " into name\n  ask "Age? " into age (a number)\n'
-                          '  repeat 2 times: say "Hello, " plus name plus "!"\n'
-                          '  say "Next year you are ", age plus 1, ". Grown up: ", age is at least 18\n' + END, encoding="utf-8")
-        exe = Path(d) / "hello.exe"
-        problem = translate.build(script, exe)
-        assert problem is None, problem
-        out = subprocess.run([str(exe)], input="Sam\nlots\n20.5\n", capture_output=True, text=True).stdout
-        assert out == "Name? Age? Please type a number.\nAge? Hello, Sam!\nHello, Sam!\nNext year you are 21.5. Grown up: yes\n", repr(out)
+    assert perr("to start:\n  otherwise: stop\n" + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
+    assert perr("use: nothing here\nto start:\n  stop\n" + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, maths, time")
 
-        # Lists, kinds of things, giving back, files, and a plain error while running.
-        script.write_text('a pet has:\n  name (text)\n  ages (a list of numbers)\n' + END +
+    # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
+    # Both must print exactly the same, so the two halves of every piece of the language agree.
+    import subprocess
+    compiler = translate.find_vcvars()
+    if not compiler:
+        print("(only running directly: no C++ compiler found)")
+
+    def both(source, typed=""):
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "probe.imagine"
+            script.write_text(source, encoding="utf-8")
+            direct = subprocess.run([sys.executable, str(HERE / "imagination.py"), "run", str(script)],
+                                    input=typed, capture_output=True, text=True, cwd=d)
+            if compiler:
+                exe = Path(d) / "probe.exe"
+                problem = translate.build(script, exe)
+                assert problem is None, problem
+                built = subprocess.run([str(exe)], input=typed, capture_output=True, text=True, cwd=d)
+                assert (built.stdout, built.stderr, built.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
+                    f"built: {built.stdout!r} {built.stderr!r} {built.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}"
+            return direct
+
+    out = both('to start:\n  ask "Name? " into name\n  ask "Age? " into age (a number)\n'
+               '  repeat 2 times: say "Hello, " plus name plus "!"\n'
+               '  say "Next year you are ", age plus 1, ". Grown up: ", age is at least 18\n' + END, "Sam\nlots\n20.5\n").stdout
+    assert out == "Name? Age? Please type a number.\nAge? Hello, Sam!\nHello, Sam!\nNext year you are 21.5. Grown up: yes\n", repr(out)
+
+    # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
+    out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
+               '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'
+               '  for each n from 1 to 4:\n    if n is 1: say "one"\n    otherwise if n is 2:\n      say "two"\n    otherwise: say "many"\n'
+               '  say first big in a list of (1, 5, 9, 2)\n  count down with 3\n' + END +
+               'to first big in, given xs (a list of numbers), giving back a number:\n'
+               '  for each x in xs:\n    if x is more than 4: give back x\n  give back 0\n' + END +
+               'to count down, given from (a number):\n  set left to from\n  while yes:\n    say left\n'
+               '    set left to left minus 1\n    if left is 0: stop\n' + END).stdout
+    assert out == ("0.333333333333333 2.5 0.2 1000000000000 0\n5 a1yes yes no\none\ntwo\nmany\nmany\n5\n3\n2\n1\n"), repr(out)
+
+    # Lists of things are copied when stored, the same both ways.
+    out = both('a box has:\n  items (a list of numbers)\n' + END +
+               'to start:\n  set a to a new box\n  add 1 to items of a\n  set b to a\n  add 2 to items of b\n'
+               '  set boxes to a list of (a, b)\n  add 3 to items of item 1 of boxes\n  say a, " ", b, " ", boxes\n'
+               '  say a is item 1 of boxes, " ", b is item 2 of boxes\n' + END).stdout
+    assert out == ("a box (items: 1) a box (items: 1, 2) a box (items: 1, 3), a box (items: 1, 2)\nno yes\n"), repr(out)
+
+    # Libraries.
+    out = both('use: maths\nuse: time\nto start:\n  say round (sine of 30 times 1000), " ", power of (2, 10), " ", remainder of (17, 5)\n'
+               '  say round 2.5, " ", round down -2.5, " ", round up 2.1, " ", round (pi times 100)\n'
+               '  wait 0.01 seconds\n  say seconds since start is more than 0, " ", year now is more than 2000\n' + END).stdout
+    assert out == "500 1024 2\n3 -3 3 314\nyes yes\n", repr(out)
+
+    # Lists, kinds of things, giving back, files, and a plain error while running.
+    if True:
+        ran = both('a pet has:\n  name (text)\n  ages (a list of numbers)\n' + END +
                           'to start:\n  set p to a new pet\n  set name of p to "Rex"\n  add 3 to ages of p\n  add 4 to ages of p\n'
                           '  say p\n  say total of ages of p, " ", item 2 of ages of p, " ", size of ages of p\n'
                           '  for each n from 1 to 3: add n times 10 to ages of p\n  remove item 1 from ages of p\n  say ages of p\n'
@@ -87,9 +127,7 @@ def program_checks():
                           '  say (item 2 of words of item 2 of got) as a number plus 1\n'
                           '  say item 9 of ages of p\n' + END +
                           'to total of, given xs (a list of numbers), giving back a number:\n  set sum to 0\n'
-                          '  for each x in xs: set sum to sum plus x\n  give back sum\n' + END, encoding="utf-8")
-        assert translate.build(script, exe) is None
-        ran = subprocess.run([str(exe)], capture_output=True, text=True, cwd=d)
+                          '  for each x in xs: set sum to sum plus x\n  give back sum\n' + END)
         assert ran.stdout == ("a pet (name: Rex, ages: 3, 4)\n7 4 2\n4, 10, 20, 30\nyes yes\n"
                               "one, two 2 | 2 | two, 2 | yes no\n3\n"), repr(ran.stdout)
         assert ran.stderr == "Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.\n", repr(ran.stderr)

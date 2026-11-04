@@ -191,11 +191,21 @@ namespace imagine
 		}
 	}
 
-	inline double random(double lo, double hi)
+	inline double random(double lo, double hi, int line)
 	{
 		static std::mt19937_64 engine{std::random_device{}()};
-		long long a = static_cast<long long>(std::ceil(std::min(lo, hi)));
-		long long b = static_cast<long long>(std::floor(std::max(lo, hi)));
-		return static_cast<double>(std::uniform_int_distribution<long long>(a, b)(engine));
+		double a = std::ceil(std::min(lo, hi)), b = std::floor(std::max(lo, hi));
+		if (a > b)
+			fail(line, "there is no whole number from " + text(lo) + " to " + text(hi) + ".");
+		return static_cast<double>(std::uniform_int_distribution<long long>(static_cast<long long>(a), static_cast<long long>(b))(engine));
+	}
+
+	// How many letters text has (not bytes: "é" is one letter).
+	inline double letters(const std::string& s)
+	{
+		double count = 0;
+		for (unsigned char c : s)
+			count += (c & 0xC0) != 0x80;
+		return count;
 	}
 }

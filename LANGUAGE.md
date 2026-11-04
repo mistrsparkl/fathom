@@ -5,10 +5,18 @@ Imagination is a programming language written in plain English words. Scripts en
 - **A program** stands on its own and begins at its `to start:` command. Run it with:
 
   ```
-  py -3 imagination.py run examples/guess.imagine
+  imagine examples/guess.imagine
   ```
 
-  Imagination turns it into C++, builds it with the Visual Studio C++ compiler, and runs it.
+  Imagination reads the script and does what it says, line by line. Nothing is translated and no compiler is needed. (`imagine` is `imagine.bat` in this folder, short for `py -3 imagination.py`.)
+
+  To make a program into an `.exe` that runs fast and on its own, build it. This turns it into C++ and needs Visual Studio's C++ compiler:
+
+  ```
+  imagine build examples/guess.imagine
+  ```
+
+  A program does exactly the same thing either way. The self-check runs its test programs both ways and compares what they print.
 - **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a folder of these into C++ (`<name>.imagine.cpp`, which you never edit) with:
 
   ```
@@ -21,7 +29,7 @@ A mistake stops with a plain message, such as:
 follow.imagine line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
+Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers), `examples/clock.imagine` (libraries) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
 
 ## A program, top to bottom
 
@@ -129,6 +137,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `write "hello" to file "notes.txt"` | Make or replace a file with this text. |
 | `add "a line" to file "log.txt"` | Add a line to the end of a file (making it if needed). |
 | `stop` | Leave the command now (only in commands that don't give back anything). |
+| `beep with 440, 0.5` | A word from a library (see Libraries). |
 | `note: ...` | A note for people. |
 
 ## Working things out
@@ -169,6 +178,37 @@ Names can be several words (`turn needed`, `braking speed`). They can't use the 
 A script can only use words its thing knows. New words (another part of the deer's state, a new ability) are added to the `.words` file; a new physical ability (jumping, a gallop) needs C++ underneath first, then it gets a word.
 
 Commands can only call each other, and new kinds of things can only be described, inside programs for now.
+
+## Libraries
+
+A library gives a program more words. Put `use: <library>` near the top of the program:
+
+```
+use: time
+use: maths
+
+to start:
+  wait 2 seconds
+  say "Sine of 30 is ", sine of 30
+and the universe said i love you
+```
+
+| Library | Words |
+|---|---|
+| `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `power of (2, 10)`, `remainder of (17, 5)` |
+| `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
+
+### Making a library
+
+A library is a `.words` file, in `libraries/` or next to your program. Each word says what it means in C++ (for `build`) and, on an indented `runs:` line, in Python (for running directly). Anything C++ or Python can do can get an English word this way: windows, sound, the internet, games. Here is a word from `libraries/time.words`:
+
+```
+to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
+  runs: time.sleep(max(0.0, {seconds}))
+```
+
+`{seconds}` stands for the input. Other lines a library can have are `include: <header>` (a C++ header), `link: name` (a system library), `code:` and `python:` (helper code, indented below), and values like `pi = 3.14159, number, read only` (with their own `runs:` line). Use each input only once in the C++ line. A word without a `runs:` line only works in built programs.
 
 ## When something goes wrong while running
 

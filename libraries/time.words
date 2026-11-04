@@ -1,0 +1,44 @@
+note: Words for time. Use them in a program with:  use: time
+
+include: <chrono>
+include: <ctime>
+include: <thread>
+
+code:
+  namespace imagine_time
+  {
+  	inline const auto started = std::chrono::steady_clock::now();
+  	inline double since_start() { return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(); }
+  	inline double part_of_today(int which)
+  	{
+  		std::time_t now = std::time(nullptr);
+  		std::tm parts{};
+  		localtime_s(&parts, &now);
+  		int values[] = {parts.tm_hour, parts.tm_min, parts.tm_sec, parts.tm_mday, parts.tm_mon + 1, parts.tm_year + 1900};
+  		return values[which];
+  	}
+  }
+
+python:
+  started = time.monotonic()
+  def part_of_today(which):
+      t = time.localtime()
+      return float((t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year)[which])
+
+to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
+  runs: time.sleep(max(0.0, {seconds}))
+
+seconds since start = imagine_time::since_start(), number, read only
+  runs: time.monotonic() - started
+hour now = imagine_time::part_of_today(0), number, read only
+  runs: part_of_today(0)
+minute now = imagine_time::part_of_today(1), number, read only
+  runs: part_of_today(1)
+second now = imagine_time::part_of_today(2), number, read only
+  runs: part_of_today(2)
+day of the month = imagine_time::part_of_today(3), number, read only
+  runs: part_of_today(3)
+month now = imagine_time::part_of_today(4), number, read only
+  runs: part_of_today(4)
+year now = imagine_time::part_of_today(5), number, read only
+  runs: part_of_today(5)

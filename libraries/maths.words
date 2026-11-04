@@ -1,0 +1,33 @@
+note: Words for maths. Use them in a program with:  use: maths
+note: Angles are in degrees.
+
+include: <cmath>
+
+pi = 3.14159265358979323846, number, read only
+  runs: math.pi
+
+to sine of, given angle (a number), giving back a number = std::sin({angle} * 3.14159265358979323846 / 180.0)
+  runs: math.sin({angle} * 3.14159265358979323846 / 180.0)
+to cosine of, given angle (a number), giving back a number = std::cos({angle} * 3.14159265358979323846 / 180.0)
+  runs: math.cos({angle} * 3.14159265358979323846 / 180.0)
+to tangent of, given angle (a number), giving back a number = std::tan({angle} * 3.14159265358979323846 / 180.0)
+  runs: math.tan({angle} * 3.14159265358979323846 / 180.0)
+
+to round, given x (a number), giving back a number = std::round({x})
+  runs: float(math.floor(abs({x}) + 0.5) * (1 if {x} >= 0 else -1))
+to round down, given x (a number), giving back a number = std::floor({x})
+  runs: float(math.floor({x}))
+to round up, given x (a number), giving back a number = std::ceil({x})
+  runs: float(math.ceil({x}))
+
+to power of, given x (a number) and power (a number), giving back a number = std::pow({x}, {power})
+  runs: power_of({x}, {power})
+to remainder of, given x (a number) and divided by (a number), giving back a number = std::fmod({x}, {divided by})
+  runs: math.fmod({x}, {divided by}) if {divided by} != 0 else math.nan
+
+python:
+  def power_of(x, p):
+      try:
+          return float(math.pow(x, p))
+      except (OverflowError, ValueError):
+          return math.inf if x > 1 or x < -1 else math.nan

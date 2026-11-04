@@ -1,0 +1,18 @@
+note: A countdown that uses two libraries.
+note: Run it with: imagine examples/clock.imagine
+
+use: time
+use: maths
+
+to start:
+  say "Hello, it is ", hour now, ":", two digits with minute now, "."
+  for each n from 1 to 3:
+    say 4 minus n, "..."
+    wait 1 second
+  say "Done! That took about ", round (seconds since start), " seconds."
+and the universe said i love you
+
+to two digits, given x (a number), giving back text:
+  if x is less than 10: give back "0" plus x
+  give back x as text
+and the universe said i love you

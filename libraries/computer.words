@@ -1,0 +1,41 @@
+note: Words for the computer itself (Windows). Use them in a program with:  use: computer
+
+code:
+  #define NOMINMAX
+include: <windows.h>
+include: <shellapi.h>
+include: <cstdlib>
+link: shell32
+
+code:
+  namespace imagine_computer
+  {
+  	inline std::string user_name()
+  	{
+  		char* found = nullptr;
+  		size_t size = 0;
+  		std::string name = _dupenv_s(&found, &size, "USERNAME") == 0 && found ? found : "";
+  		std::free(found);
+  		return name;
+  	}
+  }
+
+python:
+  import ctypes
+  def beep(pitch, seconds):
+      ctypes.windll.kernel32.Beep(int(pitch), int(seconds * 1000))
+  def run_command(command):
+      sys.stdout.flush()
+      return float(subprocess.call(command, shell=True))
+  def open_thing(thing):
+      os.startfile(thing)
+
+to beep, given pitch (a number) and seconds (a number) = Beep((DWORD)({pitch}), (DWORD)(1000 * {seconds}))
+  runs: beep({pitch}, {seconds})
+to run the command, given command (text), giving back a number = (double)std::system({command}.c_str())
+  runs: run_command({command})
+to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
+  runs: open_thing({thing})
+
+user name = imagine_computer::user_name(), text, read only
+  runs: os.environ.get("USERNAME", "")
