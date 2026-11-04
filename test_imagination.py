@@ -190,6 +190,12 @@ def program_checks():
     assert out.stderr == "Line 49: I can't save infinity or not a number.\n", repr(out.stderr)
     assert perr("to start:\n  set x to 1\n  load 5 from file \"a\"\n" + END)[1] == "'5' can't be changed, so I can't load into it."
 
+    # Forgetting 'use:' says which library a word comes from.
+    assert perr("to start:\n  open a window with \"x\", 10, 10\n" + END)[1] == (
+        "I don't know how to start a line with 'open'. 'open a window' is a word from the window library: "
+        "put the line 'use: window' at the top of the script.")
+    assert perr("to start:\n  say sine of 30\n" + END)[1].endswith("put the line 'use: maths' at the top of the script.")
+
     # Lists of lists and tables of lists: the inner ones are shown in brackets.
     out = both('to start:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'
                '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  say grid, " / ", item 2 of item 3 of grid\n'

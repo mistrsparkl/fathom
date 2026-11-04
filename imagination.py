@@ -611,6 +611,9 @@ class Names:
                 score = difflib.SequenceMatcher(None, phrase, name).ratio()
                 if score > best[0]:
                     best = (score, phrase, name)
+        hint = library_hint(tokens[i:])
+        if hint:
+            return f"I don't know '{best[1]}'." + hint
         return f"I don't know '{best[1]}'." + (f" Did you mean '{best[2]}'?" if best[2] else "")
 
     def value(self, key):
@@ -1188,6 +1191,19 @@ LIBRARY_HELP = """A library is <name>.words, next to the script or in Imaginatio
   to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
                                       a word for a command; {input name} stands for each input
     runs: time.sleep({seconds})       (indented under a word) what it does when the program runs directly"""
+
+
+def library_hint(tokens):
+    """If the words at the start of tokens belong to a library the script doesn't use, says which one."""
+    best = None  # the longest matching word wins: 'open a window' over 'open'
+    for path in sorted((HERE / "libraries").glob("*.words")):
+        for row in path.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"(?:to )?([a-z][a-z ]*?)\s*(?:,|=)", row)
+            if m and tokens[:len(m.group(1).split())] == m.group(1).split() and (not best or len(m.group(1)) > len(best[0])):
+                best = (m.group(1), path.stem)
+    if not best:
+        return ""
+    return f" '{best[0]}' is a word from the {best[1]} library: put the line 'use: {best[1]}' at the top of the script."
 
 
 def load_library(name, line, names):
@@ -1956,6 +1972,9 @@ def statement(n, text_, inner, names, declared, depth):
             put(env, min(max(g(env), x - by), x + by))
         return [f"{tab}const double {s} = {strip_parens(step.cpp)};",
                 f"{tab}{cpp} = FMath::Clamp({strip_parens(goal.cpp)}, {cpp} - {s}, {cpp} + {s});"], run, None
+    hint = library_hint(tokens)
+    if hint:
+        raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
     raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, say, ask, add, remove, write, if, otherwise, repeat, while, for each, give back, stop, note or the name of a command.")
 
 
