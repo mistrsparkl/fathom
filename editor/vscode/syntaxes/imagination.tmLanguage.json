@@ -39,7 +39,7 @@
       }
     },
     {
-      "match": "^(an?)\\s+([a-z ]+?)\\s+(has)(:)",
+      "match": "^(an?)\\s+([a-z ]+?)\\s+(has|is a kind of [a-z ]+?(?: that (?:also )?has)?)(:)",
       "captures": {
         "1": {
           "name": "keyword.other.imagination"
@@ -58,15 +58,15 @@
     },
     {
       "name": "keyword.control.imagination",
-      "match": "\\b(if that went wrong|if|otherwise|as long as|echo|times|for each|in|from|try|break free|move on|cease|give back|giving back|given)\\b"
+      "match": "\\b(if that went wrong|if|otherwise|as long as|echo|times|for each|in|from|try|break free|move on|cease|give back|giving back|given|shatter|meanwhile|wait for the others|for a)\\b"
     },
     {
       "name": "support.function.imagination",
-      "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|gather|banish|inscribe|save|load|move|toward|conjure)\\b"
+      "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|gather|banish|inscribe|save|load|move|toward|conjure|invoke|the command)\\b"
     },
     {
       "name": "keyword.operator.imagination",
-      "match": "\\b(plus|minus|times|divided by|is within|exceeds|falls below|is at least|is at most|is not|is|not|and|or|of|contains|with)\\b"
+      "match": "\\b(plus|minus|times|divided by|is within|exceeds|falls below|is at least|is at most|is not|is|not|and|or|of|contains|with|touches|begins with|ends with|trimmed|as saved text|as text)\\b"
     },
     {
       "name": "constant.language.imagination",
