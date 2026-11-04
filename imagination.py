@@ -1968,6 +1968,12 @@ def describe_things(things):
             cpp = cpp_type("thing " + name)
             out.append(f"\tstruct {cpp}\n\t{{")
             out += [f"\t\t{cpp_type(k)} {snake(w)} = {zero(k)};" for w, k in THINGS[name]]
+            parent = PARENTS.get(name)
+            while parent:
+                pc = cpp_type("thing " + parent)
+                copies = " ".join(f"p.{snake(w)} = {snake(w)};" for w, _ in THINGS[parent])
+                out.append(f"\t\toperator {pc}() const {{ {pc} p; {copies} return p; }}")
+                parent = PARENTS.get(parent)
             out.append(f"\t\tbool operator==(const {cpp}&) const = default;\n\t}};")
         for name, _, _ in things:
             cpp = cpp_type("thing " + name)
@@ -2021,6 +2027,23 @@ def is_kind_of(kind, other):
     while kind != other and is_thing(kind) and kind[6:] in PARENTS:
         kind = "thing " + PARENTS[kind[6:]]
     return kind == other
+
+
+def fit(v, kind):
+    """v as the kind wanted: itself, or a dog made into a pet (a copy with just a pet's parts). None if it can't be."""
+    if v.kind == kind:
+        return v
+    if is_thing(v.kind) and is_thing(kind) and is_kind_of(v.kind, kind):
+        get, name, things = v.run, kind[6:], THINGS
+        return Value(f"{cpp_type(kind)}({strip_parens(v.cpp)})", kind, lambda env: as_kind(get(env), name, things))
+    return None
+
+
+def as_kind(thing, name, things):
+    new = Thing.__new__(Thing)
+    new.name, new.spec = name, things[name]
+    new.fields = {snake(w): dup(thing.fields[snake(w)]) for w, _ in new.spec}
+    return new
 
 
 def nearest_version(versions, kind):
@@ -2342,6 +2365,7 @@ def statement(n, text_, inner, names, declared, depth):
         if not names.gives:
             raise ScriptError(n, "'give back' only works in a command that says what it gives back, like 'to double, given x (a number), giving back a number:'.")
         v = expr_to_end(tokens, 2, names, n)
+        v = fit(v, names.gives) or v
         if v.kind != names.gives:
             raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, not {kind_name(v.kind)}.")
         get = v.run
@@ -2366,6 +2390,7 @@ def statement(n, text_, inner, names, declared, depth):
         cut = len(tokens) - 1 - tokens[::-1].index("to")
         target = writable_list(tokens[cut + 1:], names, n, "add to")
         v = expr_to_end(tokens[:cut], 1, names, n)
+        v = fit(v, element(target.kind)) or v
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
@@ -2471,6 +2496,7 @@ def statement(n, text_, inner, names, declared, depth):
         if e.i != len(e.t) or not target.writable:
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' can't be changed.")
         v = expr_to_end(tokens, cut + 1, names, n)
+        v = fit(v, target.kind) or v
         if v.kind != target.kind:
             raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' holds {kind_name(target.kind)}, not {kind_name(v.kind)}.")
         put, get = target.store, v.run
@@ -2483,6 +2509,7 @@ def statement(n, text_, inner, names, declared, depth):
             if read_only:
                 raise ScriptError(n, f"'{' '.join(key)}' can't be changed by a script.")
             v = expr_to_end(tokens, 2 + size, names, n)
+            v = fit(v, kind) or v
             if v.kind != kind:
                 raise ScriptError(n, f"'{' '.join(key)}' holds {kind_name(kind)}, not {kind_name(v.kind)}.")
             put, get = names.value(key).store, v.run
@@ -2613,11 +2640,10 @@ def call(key, args, names, n):
     kinds = command.kinds
     if len(args) != len(kinds):
         raise ScriptError(n, f"'{' '.join(key)}' needs {len(kinds)} input{'s' if len(kinds) != 1 else ''}, but this gives it {len(args)}.")
+    args = [fit(a, kind) or a for a, kind in zip(args, kinds)] if len(args) == len(kinds) else args
     for k, (a, kind) in enumerate(zip(args, kinds), 1):
         if a.kind != kind:
-            hint = (f" {kind_name(a.kind).capitalize()} is a kind of {kind_name(kind)[2:]}, but only commands for a {kind_name(kind)[2:]}"
-                    f" ('to ..., for a {kind_name(kind)[2:]}:') take it." if is_kind_of(a.kind, kind) else "")
-            raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.{hint}")
+            raise ScriptError(n, f"Input {k} of '{' '.join(key)}' must be {kind_name(kind)}, not {kind_name(a.kind)}.")
     if command.cpp in OWNERS and not args[0].writable:
         raise ScriptError(n, f"'{' '.join(key)}' changes the {kind_name(kinds[0])[2:]} it is given, so give it a name "
                              f"that holds one, like '{' '.join(key)} {kind_name(kinds[0])[2:]}'.")

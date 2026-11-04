@@ -122,7 +122,7 @@ a puppy is a kind of dog:
 and the universe said i love you
 ```
 
-A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. Elsewhere a dog stays a dog: an input `(a pet)` or a list of pets can't hold one.
+A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. A dog can also go anywhere a pet is wanted: an input `(a pet)`, a list of pets, a name holding a pet, or `give back` in a command giving back a pet. It goes there as a pet: a copy with just a pet's parts (its tricks stay behind). A pet can't go where a dog is wanted.
 
 ## A part of something else, top to bottom
 
