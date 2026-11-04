@@ -23,6 +23,8 @@ Imagination is a programming language written in plain English words. Scripts en
   py -3 imagination.py <scripts folder> <output folder>
   ```
 
+- **Trying things out:** type just `imagine` for a prompt. Each line you type is done straight away, and names are kept from line to line. Type a value on its own (`5 plus 3`) to see it. A line ending in `:` takes the indented lines after it, finished with an empty line. `bye` finishes.
+
 A mistake stops with a plain message, such as:
 
 ```

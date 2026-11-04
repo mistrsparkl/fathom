@@ -1900,6 +1900,74 @@ def build(script, exe):
     return None
 
 
+TRY_HELLO = """Imagination: type a line and press Enter to see what it does. For example:
+  set name to "Sam"
+  say "Hello, " plus name
+  5 plus 3 times 2
+A line ending in ':' (like 'repeat 3 times:') takes the indented lines after it; finish them with an empty line.
+'use: maths' brings in a library. Type 'bye' to finish."""
+
+
+def try_it(read=input, show=print):
+    """Lines typed one at a time, each done straight away (names are kept from line to line)."""
+    global LOGIC, THINGS
+    LOGIC = Path.cwd()
+    THINGS = {}
+    FIELDS.clear()
+    FILES[:] = ["(typed)"]
+    names, declared, env = Names(), {}, {}
+    names.loops = 0
+    show(TRY_HELLO)
+    n = 0
+    while True:
+        try:
+            line = read("> ")
+        except (EOFError, KeyboardInterrupt):
+            return 0
+        n += 1
+        if line.strip().lower() in ("bye", "quit", "exit"):
+            return 0
+        if not line.strip():
+            continue
+        rows = [(n, "  " + line)]
+        if split_colon(line)[1] and not split_colon(line)[2].strip():
+            while True:  # the indented lines of a block, until an empty line
+                try:
+                    more = read("... ")
+                except (EOFError, KeyboardInterrupt):
+                    more = ""
+                n += 1
+                if not more.strip():
+                    break
+                rows.append((n, "  " + (more if more[:1].isspace() else "  " + more)))
+        try:
+            if line.strip().lower().startswith("use:"):
+                load_library(" ".join(line.strip()[4:].split()).lower(), n, names)
+                show(f"(the words of '{line.strip()[4:].strip()}' can be used now)")
+                continue
+            v = None
+            if len(rows) == 1:
+                try:  # a value on its own (like '5 plus 3' or 'round 2.6') is shown
+                    v = expr_to_end(tokenize(line.strip(), n), 0, names, n)
+                except ScriptError:
+                    v = None
+            if v is not None:
+                run = lambda env, get=v.run: show(text(get(env)))
+            else:
+                _, run = statements(rows, names, declared, 1)
+            for cpp, kind in declared.values():
+                env.setdefault(cpp, py_zero(kind, THINGS))
+            run(env)
+        except ScriptError as err:
+            show(err.message)
+        except RunError as err:
+            show(err.message[:1].upper() + err.message[1:])
+        except (Stop, GiveBack):
+            pass
+        except Flow:
+            show("That only works inside a loop.")
+
+
 USAGE = """Use:
   imagine <script.imagine>                     run a program
   imagine run <script.imagine>                 the same
@@ -1911,6 +1979,8 @@ USAGE = """Use:
 def main(argv):
     global LOGIC, OUT
     args = argv[1:]
+    if not args:
+        return try_it()
     if len(args) == 1 and args[0].lower().endswith(".imagine"):
         args = ["run", args[0]]
     if len(args) == 2 and args[0] in ("run", "build"):

@@ -252,6 +252,20 @@ def main():
                  "to calm down, given by (a number):\n  set walk speed to walk speed minus by\n" + END)
     assert "TurnRateDegS = HalfOf(10.0);" in called and "\tCalmDown(2.0);" in called, called
     assert "//   double HalfOf(double x);" in called, called
+    # Try-it mode: each typed line is done straight away; names are kept; blocks end with an empty line.
+    typed = iter(['set name to "Sam"', 'say "Hi " plus name', "5 plus 3 times 2", "repeat 2 times:", "say name", "",
+                  "say nme", "say item 3 of a list of (1)", "use: maths", "round 2.6", "stop the loop", "bye"])
+    import contextlib
+    import io
+    screen = io.StringIO()
+    with contextlib.redirect_stdout(screen):
+        translate.try_it(read=lambda prompt: next(typed))
+    shown = screen.getvalue().rstrip("\n").split("\n")[6:]
+    assert shown == ["Hi Sam", "11", "Sam", "Sam", "I don't know 'nme'. Did you mean 'name'?",
+                         "There is no item 3 in a list of 1 item. Items are counted from 1.",
+                         "(the words of 'maths' can be used now)", "3",
+                         "'stop the loop' only works inside 'repeat', 'while' or 'for each'."], shown
+    translate.THINGS = {}
     program_checks()
     print("imagination.py self-check passed")
 
