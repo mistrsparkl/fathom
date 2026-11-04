@@ -20,7 +20,7 @@
     },
     { "name": "keyword.other.use.imagination", "match": "^use:" },
     { "name": "keyword.control.imagination", "match": "\\b(if that went wrong|if|otherwise|while|repeat|times|for each|in|from|try|stop the loop|skip to the next one|stop|give back|giving back|given)\\b" },
-    { "name": "support.function.imagination", "match": "\\b(scrawl|set|to|ask|into|add|remove|write|save|load|move|toward)\\b" },
+    { "name": "support.function.imagination", "match": "\\b(scrawl|etch|consume|set|to|ask|into|add|remove|write|save|load|move|toward)\\b" },
     { "name": "keyword.operator.imagination", "match": "\\b(plus|minus|times|divided by|is within|is more than|is less than|is at least|is at most|is not|is|not|and|or|of|contains|with)\\b" },
     { "name": "constant.language.imagination", "match": "\\b(yes|no|birth|existence|horizontal|vertical|depth|quote mark|new line|the problem)\\b" },
     { "name": "storage.type.imagination", "match": "\\((a number|text|yes or no|a place|a flat place|an? [a-z ]+|a list of [a-z ]+|a table of [a-z ]+)\\)" }

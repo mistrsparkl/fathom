@@ -37,11 +37,11 @@ genesis:
       set score to 0
       set playing to yes
     consume the window with "#101828"
-    for each ball in balls: draw a circle with existence of ball of horizontal, existence of ball of vertical, 14, "orange"
-    draw a box with player x minus 30, 600, 60, 16, "#5ad1ff"
-    draw words with "Score: " plus score, 12, 10, "white"
-    draw words with "Best: " plus best, 380, 10, "white"
-    if not playing: draw words with "Ouch! Press space to play again.", 120, 300, "yellow"
+    for each ball in balls: etch a circle with existence of ball of horizontal, existence of ball of vertical, 14, "orange"
+    etch a box with player x minus 30, 600, 60, 16, "#5ad1ff"
+    etch words with "Score: " plus score, 12, 10, "white"
+    etch words with "Best: " plus best, 380, 10, "white"
+    if not playing: etch words with "Ouch! Press space to play again.", 120, 300, "yellow"
     show the frame
 and the universe said i love you
 

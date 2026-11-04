@@ -1945,6 +1945,8 @@ def statement(n, text_, inner, names, declared, depth):
             if x in items:
                 items.remove(x)
         return [f"{tab}imagine::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
+    if tokens[0] == "draw":
+        raise ScriptError(n, "'draw' is now 'etch', like: etch a circle with 100, 100, 20, \"orange\".")
     if tokens[0] == "say":
         raise ScriptError(n, "'say' is now 'scrawl', like: scrawl \"hello\".")
     if tokens[0] == "scrawl":
@@ -2015,6 +2017,9 @@ def statement(n, text_, inner, names, declared, depth):
                     there(env, dup(x))
                 return [f"{tab}{cpp} = {strip_parens(v.cpp)};", f"{tab}existence = {cpp};"], run, None
             return [f"{tab}{cpp} = {strip_parens(v.cpp)};"], lambda env: put(env, get(env)), None
+        hint = library_hint(tokens)
+        if hint:
+            raise ScriptError(n, f"I don't know '{' '.join(tokens[:tokens.index('to') + 1] if 'to' in tokens else tokens)}'." + hint)
         if "to" not in tokens:
             raise ScriptError(n, "'set' looks like 'set speed to 5'.")
         words = tokens[1:tokens.index("to")]

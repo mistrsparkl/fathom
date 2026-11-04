@@ -202,7 +202,7 @@ Still going.
 
 ## 10. A game
 
-Programs can open a window and draw in it. This is a whole game: a ball you move with the arrow keys.
+Programs can open a window and etch in it. This is a whole game: a ball you move with the arrow keys.
 
 ```
 genesis:
@@ -215,13 +215,13 @@ genesis:
     if key held "down": set existence of vertical to existence of vertical plus 5
     if key pressed "space": set existence to birth
     consume the window with "black"
-    draw a circle with birth of horizontal, birth of vertical, 4, "white"
-    draw a circle with existence of horizontal, existence of vertical, 20, "orange"
+    etch a circle with birth of horizontal, birth of vertical, 4, "white"
+    etch a circle with existence of horizontal, existence of vertical, 20, "orange"
     show the frame
 and the universe said i love you
 ```
 
-`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything drawn before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
+`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `show the frame` puts the picture on the screen (60 times a second).
 
 Setting `birth` also makes `existence` start at the same place.
 

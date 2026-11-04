@@ -209,6 +209,7 @@ def program_checks():
                           "4 horizontal 4 vertical\n"), repr(out.stdout)
 
     out = both('genesis:\n  set the text size to 20\n  set the text size to 600\n' + END)
+    assert perr("genesis:\n  draw a circle with 1, 1, 1, \"red\"\n" + END)[1].startswith("'draw' is now 'etch'")
     assert out.stderr == "Line 3: text can be from 1 to 500 dots high, not 600.\n", repr(out.stderr)
 
     # within: close enough to touch.
@@ -304,10 +305,10 @@ def program_checks():
     out = both('use: window\ngenesis:\n  open a window with "Test ✓", 200, 100\n'
                '  scrawl the window is open, " ", mouse held, " ", key held "space"\n  repeat 3 times:\n'
                '    scrawl key pressed "space", " ", mouse clicked\n'
-               '    consume the window with "black"\n    draw a box with 10, 10, 50, 20, "#ff8800"\n'
-               '    draw a circle with 100, 50, 20, "blue"\n    draw a line with 0, 0, 200, 100, "white"\n'
-               '    draw words with "héllo", 120, 10, "yellow"\n    show the frame\n  close the window\n'
-               '  scrawl the window is open\n  draw a circle with 1, 1, 1, "red"\n  scrawl "ok"\n  draw a circle with 1, 1, 1, "reddish"\n' + END)
+               '    consume the window with "black"\n    etch a box with 10, 10, 50, 20, "#ff8800"\n'
+               '    etch a circle with 100, 50, 20, "blue"\n    etch a line with 0, 0, 200, 100, "white"\n'
+               '    etch words with "héllo", 120, 10, "yellow"\n    show the frame\n  close the window\n'
+               '  scrawl the window is open\n  etch a circle with 1, 1, 1, "red"\n  scrawl "ok"\n  etch a circle with 1, 1, 1, "reddish"\n' + END)
     assert out.stdout == "yes no no\nno no\nno no\nno no\nno\nok\n", repr(out.stdout)
     assert out.stderr == 'Line 17: I don\'t know the colour "reddish". Use a name like "red" or a code like "#ff8800".\n', repr(out.stderr)
     assert both('use: window\ngenesis:\n  show the frame\n' + END).stderr.startswith("Line 3: there is no window yet.")
@@ -323,7 +324,7 @@ def program_checks():
         return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
     out = both('use: window\ngenesis:\n  scrawl width of picture "red.png", " ", height of picture "red.png"\n'
-               '  open a window with "Pictures", 100, 100\n  draw the picture with "red.png", 10, 10\n  show the frame\n'
+               '  open a window with "Pictures", 100, 100\n  etch the picture with "red.png", 10, 10\n  show the frame\n'
                '  close the window\n  scrawl width of picture "red.png"\n  scrawl width of picture "none.png"\n' + END,
                others={"red.png": png(7, 3)})
     assert out.stdout == "7 3\n7\n", repr(out.stdout)

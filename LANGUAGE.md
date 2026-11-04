@@ -249,7 +249,7 @@ and the universe said i love you
 |---|---|
 | `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `power of (2, 10)`, `remainder of (17, 5)` |
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
-| `window` | A window to draw in, for games and pictures. See below. |
+| `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (gives back the page as text) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (.wav files) |
 | `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
@@ -265,7 +265,7 @@ genesis:
   while the window is open:
     if key held "right": set x to x plus 5
     consume the window with "black"
-    draw a circle with x, 300, 20, "orange"
+    etch a circle with x, 300, 20, "orange"
     show the frame
 and the universe said i love you
 ```
@@ -275,15 +275,15 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | Words | Means |
 |---|---|
 | `open a window with "Title", 800, 600` | Open a window this wide and high. |
-| `set the text size to 32` | Words drawn after this are 32 dots high (16 at first). |
+| `set the text size to 32` | Words etched after this are 32 dots high (16 at first). |
 | `consume the window with "black"` | Fill the whole window with one colour. |
-| `draw a box with x, y, width, height, "red"` | A filled box, from its top left corner. |
-| `draw a circle with x, y, radius, "blue"` | A filled circle around a middle point. |
-| `draw a line with x, y, to x, to y, "white"` | A line from one place to another. |
-| `draw words with "Score: " plus score, x, y, "yellow"` | Words, from their top left corner. |
-| `draw the picture with "ship.png", x, y` | A picture (.png or .gif), at its own size, from its top left corner. |
+| `etch a box with x, y, width, height, "red"` | A filled box, from its top left corner. |
+| `etch a circle with x, y, radius, "blue"` | A filled circle around a middle point. |
+| `etch a line with x, y, to x, to y, "white"` | A line from one place to another. |
+| `etch words with "Score: " plus score, x, y, "yellow"` | Words, from their top left corner. |
+| `etch the picture with "ship.png", x, y` | A picture (.png or .gif), at its own size, from its top left corner. |
 | `width of picture "ship.png"`, `height of picture "ship.png"` | A picture's size in dots. |
-| `show the frame` | Show what was drawn, then wait so the window shows 60 frames a second. |
+| `show the frame` | Show what was etched, then wait so the window shows 60 frames a second. |
 | `the window is open` | yes or no: becomes no when the person closes the window. |
 | `key held "left"` | yes or no: is that key held down? Keys: letters, digits, `left`, `right`, `up`, `down`, `space`, `enter`, `escape`, `shift`, `control`, `tab`, `backspace`. |
 | `consume the window with "black"` | The same as `consume the window with`. |
