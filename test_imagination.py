@@ -114,6 +114,11 @@ def program_checks():
     assert perr("to start:\n  try:\n    stop\n  say 1\n" + END)[1].startswith("'try:' needs an 'if that went wrong:' line")
     assert perr("to start:\n  if that went wrong:\n    stop\n" + END)[1].startswith("'if that went wrong:' goes right after")
 
+    out = both('to start:\n  say (2 divided by 3) rounded to 2 places, " ", 2.675 rounded to 2 places, " ", 1234.5 rounded to 0 places,'
+               ' " ", -1.25 rounded to 1 place\n  say 1 rounded to 1.5 places\n' + END)
+    assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
+    assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
+
     # Numbers and text shown the same way both ways; if / otherwise chains; stop and give back inside loops.
     out = both('to start:\n  say 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
                '  say size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'

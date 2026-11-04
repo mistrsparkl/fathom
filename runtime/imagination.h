@@ -183,6 +183,16 @@ namespace imagine
 	template <typename T>
 	std::vector<T> copy(const std::vector<T>& items) { return items; }
 
+	inline double rounded(double x, double places, int line)
+	{
+		if (std::floor(places) != places || places < 0 || places > 15)
+			fail(line, "I can round to 0 to 15 places, not " + text(places) + ".");
+		if (!std::isfinite(x))
+			return x;
+		double scale = std::pow(10.0, places);  // halves go away from zero, as taught at school
+		return std::copysign(std::floor(std::fabs(x) * scale + 0.5) / scale, x);
+	}
+
 	inline double to_number(const std::string& s, int line)
 	{
 		std::istringstream in(s);

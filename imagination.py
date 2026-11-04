@@ -223,6 +223,15 @@ def unwind(a):
 NUMBER_TEXT = re.compile(r"\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*")
 
 
+def rounded(x, places, line):
+    if math.floor(places) != places or not 0 <= places <= 15:
+        raise RunError(line, f"I can round to 0 to 15 places, not {text(places)}.")
+    if not math.isfinite(x):
+        return x
+    scale = 10.0 ** int(places)  # halves go away from zero, as taught at school (same steps as the C++)
+    return math.copysign(math.floor(abs(x) * scale + 0.5) / scale, x)
+
+
 def to_number(s, line):
     if NUMBER_TEXT.fullmatch(s):
         return float(s)
@@ -619,6 +628,16 @@ class Expr:
             self.i += 2
             a = v.run
             return Value(f"imagine::text({v.cpp})", TEXT, lambda env: text(a(env)))
+        if self.at("rounded", "to"):
+            self.i += 2
+            self.need(v, NUMBER, "rounded to")
+            places = self.need(self.primary(), NUMBER, "rounded to")
+            if self.peek() in ("places", "place", "decimal"):
+                self.i += 1
+                if self.at("places") or self.at("place"):
+                    self.i += 1
+            a, b, line = v.run, places.run, self.line
+            return Value(f"imagine::rounded({v.cpp}, {places.cpp}, {line})", NUMBER, lambda env: rounded(a(env), b(env), line))
         if self.at("split", "by"):
             self.i += 2
             self.need(v, TEXT, "split by")
