@@ -225,6 +225,12 @@ def program_checks():
                 'genesis:\n  bounce conjure a ball\n' + END)[1].startswith("'bounce' changes the ball it is given")
     assert perr('to bounce, for a rock:\n  cease\n' + END + 'genesis:\n  cease\n' + END)[1] == "There is no kind of thing called 'rock'."
 
+    # A ball bounces off the world's edges, using radius.
+    out = both('genesis:\n  open a world with "Bounce", 600, 400\n  set radius to 30\n  set birth to 300 horizontal 200 vertical\n  set speed to 7 horizontal 5 vertical\n  set side bounces to 0\n  set floor bounces to 0\n  echo 300 times:\n    set existence to existence plus speed\n    if existence touches a side:\n      set speed of horizontal to speed of horizontal times -1\n      set side bounces to side bounces plus 1\n    if existence touches the top or bottom:\n      set speed of vertical to speed of vertical times -1\n      set floor bounces to floor bounces plus 1\n    consume the window with "black"\n    etch a circle with existence of horizontal, existence of vertical, radius, "purple"\n    reveal the frame\n  scrawl width of the world, " ", height of the world, " ", side bounces, " ", floor bounces\nand the universe said i love you\n')
+    assert out.stdout == "600 400 4 4\n", repr(out.stdout)
+    assert perr("genesis:\n  set birth to 1 horizontal 1 vertical\n  scrawl existence touches a side\n" + END)[1] == \
+        "'touches a side' needs to know how big the thing is: set radius first, like 'set radius to 20'."
+
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'
                '  scrawl existence is within 5 of coin, " ", existence is within 4.9 of coin, " ", 7 is within 2 of 5, " ",'

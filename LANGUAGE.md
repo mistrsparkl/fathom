@@ -288,6 +288,8 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `open a world with "Title", 800, 600` | Open a window this wide and high. |
 | `etch the picture turned with "ship.png", 300, 200, 2, 45` | The picture with its middle at 300, 200, twice as big, turned 45 degrees clockwise. (Running directly, this needs Pillow: `py -3 -m pip install pillow`.) |
 | `frame time` | How many seconds the last frame took (about 0.0167 at 60 frames a second). Moving by `speed times frame time times 60` keeps things the same speed even when the computer is slow. |
+| `width of the world`, `height of the world` | How big the window is, in dots. |
+| `existence touches a side`, `existence touches the top or bottom` | yes or no: is a thing this place is the middle of touching (or past) the window's left or right edge, or its top or bottom? It uses `radius` for how far the thing reaches from its middle, so `set radius to 20` first, and etch the circle with `radius` too. |
 | `set the text size to 32` | Words etched after this are 32 dots high (16 at first). |
 | `consume the window with "black"` | Fill the whole window with one colour. |
 | `etch a box with x, y, width, height, "red"` | A filled box, from its top left corner. |

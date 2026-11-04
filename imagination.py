@@ -58,7 +58,7 @@ BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place":
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -798,6 +798,23 @@ class Expr:
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
             return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+        for words, part, size in ((("touches", "a", "side"), "horizontal", "width"),
+                                  (("touches", "the", "top", "or", "bottom"), "vertical", "height")):
+            if self.at(*words):  # 'existence touches a side': within radius of the world's edge (or past it)
+                self.i += len(words)
+                if v.kind not in (PLACE, FLAT):
+                    raise ScriptError(self.line, f"'{' '.join(words)}' needs a place, like 'existence {' '.join(words)}', not {kind_name(v.kind)}.")
+                if ("radius",) not in self.names.known or self.names.known[("radius",)][1] != NUMBER:
+                    raise ScriptError(self.line, f"'{' '.join(words)}' needs to know how big the thing is: set radius first, like 'set radius to 20'.")
+                edge = (size, "of", "the", "world")
+                if edge not in self.names.known:
+                    raise ScriptError(self.line, f"I don't know '{' '.join(words)}'." + library_hint(list(edge)))
+                at = part_of(v, (part,))
+                r = self.names.value(("radius",))
+                far = self.names.value(edge)
+                a, b, c = at.run, r.run, far.run
+                return Value(f"({at.cpp} <= {r.cpp} || {at.cpp} >= {far.cpp} - {r.cpp})", YESNO,
+                             lambda env: a(env) <= b(env) or a(env) >= c(env) - b(env))
         if self.at("is", "within"):  # 'existence is within 30 of coin': close enough to touch
             self.i += 2
             reach = self.need(self.sum(), NUMBER, "within")

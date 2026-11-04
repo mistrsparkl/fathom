@@ -486,6 +486,10 @@ to key held, given key (text), giving back yes or no = (imagine_window::keys[ima
 
 the world lives = imagine_window::open_now, yes or no, read only
   runs: win["open"]
+width of the world = (double)imagine_window::width, number, read only
+  runs: float(win.get("size", (0, 0))[0])
+height of the world = (double)imagine_window::height, number, read only
+  runs: float(win.get("size", (0, 0))[1])
 mouse x = imagine_window::mouse_x_now, number, read only
   runs: win["mouse"][0]
 mouse y = imagine_window::mouse_y_now, number, read only
