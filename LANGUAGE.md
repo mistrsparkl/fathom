@@ -167,6 +167,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `set entry "Rex" of ages to 3` | Put a value in a table under a name (replacing what was there). |
 | `banish entry "Rex" from ages` | Take a name and its value out of a table. |
 | `give back total` | Leave the command, giving back an answer. |
+| `shatter with "the tank is empty"` | Stop with a problem of your own. `try:` catches it like any other, and `the wound` is its text. |
 | `break free` | Leave the `echo`, `as long as` or `for each` it is inside, and carry on after it. |
 | `move on` | Go straight to the next round of the loop it is inside. |
 | `inscribe "hello" into file "notes.txt"` | Make or replace a file with this text. |
@@ -199,6 +200,8 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `(price times 1.2) rounded to 2 places` | a number rounded to that many decimal places (halves go up, away from zero) |
 | `letter 2 of name`, `letters 2 to 4 of name` | one letter, or some letters, of text (counted from 1) |
 | `upper case of name`, `lower case of name` | text in CAPITALS / small letters (A to Z only) |
+| `trimmed line` | text without the spaces, tabs and line breaks at its start and end |
+| `name begins with "Dr"`, `name ends with ".txt"` | yes or no |
 | `position of "lo" in name` | where it first appears, counted from 1 (0 if it isn't there) |
 | `replace "a" with "b" in name` | text with every "a" changed to "b" |
 | `line split by ", "` | text cut into a list of text at every ", " |
@@ -218,6 +221,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `angle from a to b` | the turn from angle a to angle b, -180 to 180 degrees |
 | `a exceeds b`, `falls below`, `is at least`, `is at most`, `is`, `is not` | yes or no |
 | `existence is within 30 of coin` | yes or no: are two places (or numbers) 30 or less apart? Good for things touching. |
+| `ball touches coin` | yes or no: do two things' circles overlap? Each needs a `birth` (giving it an `existence`) and a `radius`. A place on its own counts as a dot (or uses `radius`, inside a thing's command). |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
 `of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
@@ -258,12 +262,13 @@ and the universe said i love you
 
 | Library | Words |
 |---|---|
-| `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `power of (2, 10)`, `remainder of (17, 5)` |
+| `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `whole part of`, `power of (2, 10)`, `remainder of (17, 5)`, `e`, `logarithm of` (base 10), `natural logarithm of`, `arc sine of`, `arc cosine of`, `arc tangent of` (degrees) |
 | `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now` |
 | `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (gives back the page as text) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
-| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name` |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `imagine game.imagine easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
+| `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"` |
 
 ### The window library
 

@@ -64,7 +64,7 @@ def program_checks():
     assert "void Greet(const std::string& who, double times);" in cpp, cpp
     assert 'name = imagine::ask_text(std::string("Name? "));' in cpp, cpp
     assert "Greet(name, 2.0);" in cpp, cpp
-    assert "int main()" in cpp, cpp
+    assert "int main(int count, char** given)" in cpp, cpp
     pass
     assert perr("genesis:\n  greet with 1\n" + END)[1].startswith("I don't know how to start a line with 'greet'")
     assert perr("genesis:\n  hi with 1\n" + END + 'to hi, given who (text):\n  cease\n' + END) == (2, "Input 1 of 'hi' must be text, not a number.")
@@ -90,7 +90,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, maths, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, maths, sound, time, web, window")
 
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -240,6 +240,38 @@ def program_checks():
                '  scrawl 0 horizontal 0 vertical touches b\n' + END)
     assert out.stdout == "no\nyes\nyes\nno\n", repr(out.stdout)
     assert perr("genesis:\n  scrawl 3 touches 4\n" + END)[1] == "'touches' needs a thing or a place, not a number."
+
+    # shatter: a problem of your own, caught by try: like any other.
+    out = both('to check fuel, given fuel (a number):\n  if fuel falls below 1: shatter with "the tank is empty (" plus fuel plus ")"\n'
+               '  scrawl "fuel ok"\n' + END + 'genesis:\n  check fuel with 5\n  try:\n    check fuel with 0\n  if that went wrong:\n'
+               '    scrawl "caught: ", the wound\n  shatter "for real"\n' + END)
+    assert (out.stdout, out.stderr) == ("fuel ok\ncaught: the tank is empty (0)\n", "Line 11: for real\n"), repr((out.stdout, out.stderr))
+    assert perr("genesis:\n  shatter 5\n" + END)[1] == "'shatter' needs text saying what went wrong, not a number."
+
+    # Text: trimmed, begins with, ends with.
+    out = both('genesis:\n  scrawl "[" plus trimmed "  hi there  " plus "]", " [", trimmed "   ", "]"\n'
+               '  scrawl "Dr Who" begins with "Dr", " ", "Dr Who" begins with "Who", " ", "Dr Who" ends with "Who", " ", "a" ends with "abc", " ", "x" begins with ""\n' + END)
+    assert out.stdout == "[hi there] []\nyes no yes no yes\n", repr(out.stdout)
+
+    # The computer library: commands' output, the environment, ending with an exit number; maths words.
+    out = both('genesis:\n  scrawl size of the words given\n  scrawl output of the command "echo hello there"\n'
+               '  scrawl environment value of "OS"\n  scrawl size of current folder exceeds 2\n  end the program with 3\n  scrawl "never"\n' + END)
+    assert (out.stdout, out.returncode) == ("0\nhello there\n\nWindows_NT\nyes\n", 3), repr((out.stdout, out.returncode))
+    out = both('genesis:\n  scrawl logarithm of 1000, " ", natural logarithm of e, " ", logarithm of -1\n'
+               '  scrawl arc sine of 0.5 rounded to 6 places, " ", arc cosine of 0, " ", arc tangent of 1, " ", arc sine of 2\n'
+               '  scrawl whole part of -3.7, " ", whole part of 3.7\n' + END)
+    assert out.stdout == "3 1 not a number\n30 90 45 not a number\n-3 3\n", repr(out.stdout)
+
+    # The folders library.
+    out = both('genesis:\n  make the folder "box/inner"\n  inscribe "hello" into file "box/a.txt"\n'
+               '  copy the file with "box/a.txt", "box/b.txt"\n  move the file with "box/b.txt", "box/c.txt"\n'
+               '  scrawl files in the folder "box", " / ", folders in the folder "box"\n'
+               '  scrawl bytes in the file "box/c.txt", " ", there is a folder "box/inner", " ", there is a folder "nope"\n'
+               '  erase the file "box/a.txt"\n  scrawl files in the folder "box"\n  try:\n    erase the file "box/a.txt"\n'
+               '  if that went wrong:\n    scrawl the wound\n  erase the folder "box"\n  scrawl there is a folder "box"\n'
+               '  scrawl files in the folder "nope"\n' + END)
+    assert (out.stdout, out.stderr) == ('a.txt, c.txt / inner\n5 yes no\nc.txt\nI couldn\'t erase the file "box/a.txt".\nno\n',
+                                        'Line 16: there is no folder called "nope".\n'), repr((out.stdout, out.stderr))
 
     out = both('genesis:\n  open a world with "x", 40, 40\n  etch a square with 20, 20, 5, "purple"\n  reveal the frame\n'
                '  end the world\n  scrawl "ok"\n' + END)

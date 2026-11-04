@@ -1,0 +1,134 @@
+note: Words for folders and files on the disk. Use them in a program with:  use: folders
+note: Names of files and folders are text, like "saves/slot 1.json". A name without a folder is in the current folder.
+
+include: <filesystem>
+include: <algorithm>
+
+code:
+  namespace imagine_folders
+  {
+  	namespace fs = std::filesystem;
+  	inline fs::path path(const std::string& name) { return fs::path(std::u8string(name.begin(), name.end())); }
+  	inline std::string name_of(const fs::path& p) { auto s = p.u8string(); return std::string(s.begin(), s.end()); }
+  	inline std::vector<std::string> inside(const std::string& folder, bool folders, int line)
+  	{
+  		std::error_code problem;
+  		if (!fs::is_directory(path(folder), problem))
+  			imagine::fail(line, "there is no folder called \"" + folder + "\".");
+  		std::vector<std::string> found;
+  		for (const auto& entry : fs::directory_iterator(path(folder), problem))
+  			if (entry.is_directory() == folders)
+  				found.push_back(name_of(entry.path().filename()));
+  		std::sort(found.begin(), found.end());
+  		return found;
+  	}
+  	inline void make(const std::string& folder, int line)
+  	{
+  		std::error_code problem;
+  		fs::create_directories(path(folder), problem);
+  		if (problem)
+  			imagine::fail(line, "I couldn't make the folder \"" + folder + "\".");
+  	}
+  	inline void erase(const std::string& name, int line)
+  	{
+  		std::error_code problem;
+  		if (!fs::is_regular_file(path(name), problem) || !fs::remove(path(name), problem))
+  			imagine::fail(line, "I couldn't erase the file \"" + name + "\".");
+  	}
+  	inline void erase_folder(const std::string& name, int line)
+  	{
+  		std::error_code problem;
+  		if (!fs::is_directory(path(name), problem))
+  			imagine::fail(line, "I couldn't erase the folder \"" + name + "\".");
+  		fs::remove_all(path(name), problem);
+  		if (problem)
+  			imagine::fail(line, "I couldn't erase the folder \"" + name + "\".");
+  	}
+  	inline void move(const std::string& from, const std::string& to, int line)
+  	{
+  		std::error_code problem;
+  		if (!fs::exists(path(from), problem) || fs::exists(path(to), problem))
+  			imagine::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
+  		fs::rename(path(from), path(to), problem);
+  		if (problem)
+  			imagine::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
+  	}
+  	inline void copy(const std::string& from, const std::string& to, int line)
+  	{
+  		std::error_code problem;
+  		if (!fs::is_regular_file(path(from), problem) || !fs::copy_file(path(from), path(to), fs::copy_options::overwrite_existing, problem))
+  			imagine::fail(line, "I couldn't copy \"" + from + "\" to \"" + to + "\".");
+  	}
+  	inline double bytes(const std::string& name, int line)
+  	{
+  		std::error_code problem;
+  		auto size = fs::file_size(path(name), problem);
+  		if (problem)
+  			imagine::fail(line, "there is no file called \"" + name + "\".");
+  		return (double)size;
+  	}
+  }
+
+python:
+  import shutil
+  def inside(folder, folders):
+      if not os.path.isdir(folder):
+          raise RunError(0, 'there is no folder called "' + folder + '".')
+      return sorted(n for n in os.listdir(folder) if os.path.isdir(os.path.join(folder, n)) == folders)
+  def make(folder):
+      try:
+          os.makedirs(folder, exist_ok=True)
+      except OSError:
+          raise RunError(0, "I couldn't make the folder \"" + folder + "\".")
+  def erase(name):
+      try:
+          if not os.path.isfile(name):
+              raise OSError
+          os.remove(name)
+      except OSError:
+          raise RunError(0, "I couldn't erase the file \"" + name + "\".")
+  def erase_folder(name):
+      try:
+          if not os.path.isdir(name):
+              raise OSError
+          shutil.rmtree(name)
+      except OSError:
+          raise RunError(0, "I couldn't erase the folder \"" + name + "\".")
+  def move(a, b):
+      try:
+          if not os.path.exists(a) or os.path.exists(b):
+              raise OSError
+          os.rename(a, b)
+      except OSError:
+          raise RunError(0, "I couldn't move \"" + a + "\" to \"" + b + "\".")
+  def copy(a, b):
+      try:
+          if not os.path.isfile(a):
+              raise OSError
+          shutil.copyfile(a, b)
+      except OSError:
+          raise RunError(0, "I couldn't copy \"" + a + "\" to \"" + b + "\".")
+  def size(name):
+      try:
+          return float(os.path.getsize(name))
+      except OSError:
+          raise RunError(0, 'there is no file called "' + name + '".')
+
+to files in the folder, given folder (text), giving back a list of text = imagine_folders::inside({folder}, false, {line})
+  runs: inside({folder}, False)
+to folders in the folder, given folder (text), giving back a list of text = imagine_folders::inside({folder}, true, {line})
+  runs: inside({folder}, True)
+to there is a folder, given folder (text), giving back yes or no = std::filesystem::is_directory(imagine_folders::path({folder}))
+  runs: os.path.isdir({folder})
+to make the folder, given folder (text) = imagine_folders::make({folder}, {line})
+  runs: make({folder})
+to erase the file, given name (text) = imagine_folders::erase({name}, {line})
+  runs: erase({name})
+to erase the folder, given name (text) = imagine_folders::erase_folder({name}, {line})
+  runs: erase_folder({name})
+to move the file, given from (text) and to (text) = imagine_folders::move({from}, {to}, {line})
+  runs: move({from}, {to})
+to copy the file, given from (text) and to (text) = imagine_folders::copy({from}, {to}, {line})
+  runs: copy({from}, {to})
+to bytes in the file, given name (text), giving back a number = imagine_folders::bytes({name}, {line})
+  runs: size({name})

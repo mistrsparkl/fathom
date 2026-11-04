@@ -55,10 +55,11 @@ CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D"
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT}
+ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -845,6 +846,13 @@ class Expr:
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
             return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+        for words, fn, test in ((("begins", "with"), "begins_with", str.startswith), (("ends", "with"), "ends_with", str.endswith)):
+            if self.at(*words):  # 'name begins with "Dr"'
+                self.i += 2
+                r = self.need(self.sum(), TEXT, " ".join(words))
+                self.need(v, TEXT, " ".join(words))
+                a, b = v.run, r.run
+                return Value(f"imagine::{fn}({v.cpp}, {r.cpp})", YESNO, lambda env, test=test: test(a(env), b(env)))
         for words, part, size in ((("touches", "a", "side"), "horizontal", "width"),
                                   (("touches", "the", "top", "or", "bottom"), "vertical", "height")):
             if self.at(*words):  # 'existence touches a side': within radius of the world's edge (or past it)
@@ -1181,6 +1189,11 @@ class Expr:
             b = last_.run
             return Value(f"imagine::letters_from({v.cpp}, {strip_parens(first.cpp)}, {strip_parens(last_.cpp)}, {line})", TEXT,
                          lambda env: letters_from(a(env), f(env), b(env), line))
+        if self.at("trimmed"):  # 'trimmed line': without spaces, tabs and line breaks at either end
+            self.i += 1
+            v = self.need(self.unary(), TEXT, "trimmed")
+            a = v.run
+            return Value(f"imagine::trimmed({v.cpp})", TEXT, lambda env: a(env).strip(" \t\r\n"))
         for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
             if self.at(*words):
                 self.i += 3
@@ -1428,7 +1441,7 @@ def load_library(name, line, names):
         raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
     out = [f"// From the library '{name}'"]
     space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
-             "text": text, "RunError": RunError}
+             "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS}
     rows = path.read_text(encoding="utf-8").splitlines()
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
     k = 0
@@ -1718,7 +1731,7 @@ def read_one(path, auto):
         head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
                 '#include "imagination.h"', ""] + libs + structs + protos + [""]
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
-        functions.append(f"int main()\n{{\n\timagine::begin({{{files}}});\n\ttry\n\t{{\n\t\tStart();\n\t}}\n"
+        functions.append(f"int main(int count, char** given)\n{{\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t}}\n"
                          f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
@@ -2080,6 +2093,15 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             raise Stop()
         return [f"{tab}return;"], run, None
+    if tokens[0] == "shatter":  # 'shatter with "no fuel"': a problem of your own, caught by try: like any other
+        v = expr_to_end(tokens, 2 if tokens[1:2] == ["with"] else 1, names, n)
+        if v.kind != TEXT:
+            raise ScriptError(n, f"'shatter' needs text saying what went wrong, not {kind_name(v.kind)}.")
+        get = v.run
+
+        def run(env):
+            raise RunError(n, get(env))
+        return [f"{tab}imagine::fail({n}, {strip_parens(v.cpp)});"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
             raise ScriptError(n, "'give back' only works in a command that says what it gives back, like 'to double, given x (a number), giving back a number:'.")
@@ -2616,8 +2638,11 @@ def main(argv):
     args = argv[1:]
     if not args:
         return try_it()
-    if len(args) == 1 and args[0].lower().endswith(".imagine"):
-        args = ["run", args[0]]
+    if args[0].lower().endswith(".imagine"):
+        args = ["run"] + args
+    if len(args) > 2 and args[0] == "run":  # the words after the script are for the program: 'the words given'
+        ARGUMENTS[:] = args[2:]
+        args = args[:2]
     if len(args) == 2 and args[0] == "check":
         LOGIC = Path(args[1]).parent
         try:

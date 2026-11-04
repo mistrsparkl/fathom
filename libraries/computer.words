@@ -39,3 +39,63 @@ to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nu
 
 user name = imagine_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME", "")
+
+include: <cstdio>
+include: <filesystem>
+
+code:
+  namespace imagine_computer
+  {
+  	inline std::string output_of(const std::string& command, int line)
+  	{
+  		std::fflush(stdout);
+  		FILE* pipe = _popen(command.c_str(), "rb");
+  		if (!pipe)
+  			imagine::fail(line, "I couldn't run the command \"" + command + "\".");
+  		std::string all;
+  		char chunk[4096];
+  		for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, pipe)) > 0;)
+  			all.append(chunk, got);
+  		_pclose(pipe);
+  		std::string tidy;
+  		for (char c : all)
+  			if (c != '\r')
+  				tidy += c;
+  		return tidy;
+  	}
+  	inline std::string environment(const std::string& name)
+  	{
+  		char* found = nullptr;
+  		size_t size = 0;
+  		std::string value = _dupenv_s(&found, &size, name.c_str()) == 0 && found ? found : "";
+  		std::free(found);
+  		return value;
+  	}
+  	[[noreturn]] inline void end_program(double code)
+  	{
+  		std::fflush(stdout);
+  		std::fflush(stderr);
+  		std::_Exit((int)code);
+  	}
+  }
+
+python:
+  def output_of(command):
+      sys.stdout.flush()
+      done = subprocess.run(command, shell=True, capture_output=True)
+      return done.stdout.decode("utf-8", errors="replace").replace("\r", "")
+  def end_program(code):
+      sys.stdout.flush()
+      sys.stderr.flush()
+      os._exit(int(code))
+
+the words given = imagine::arguments, a list of text, read only
+  runs: list(ARGUMENTS)
+current folder = std::filesystem::current_path().string(), text, read only
+  runs: os.getcwd()
+to output of the command, given command (text), giving back text = imagine_computer::output_of({command}, {line})
+  runs: output_of({command})
+to environment value of, given name (text), giving back text = imagine_computer::environment({name})
+  runs: os.environ.get({name}, "")
+to end the program, given code (a number) = imagine_computer::end_program({code})
+  runs: end_program({code})

@@ -77,9 +77,12 @@ namespace imagine
 	inline std::vector<std::string> files;  // the program's script, then each script it uses
 
 	// Called first by every program: text is UTF-8, so the console should show it as UTF-8.
-	inline void begin(std::initializer_list<std::string> scripts)
+	inline std::vector<std::string> arguments;  // the words typed after the program's name
+	inline void begin(std::initializer_list<std::string> scripts, int count = 0, char** given = nullptr)
 	{
 		files = scripts;
+		for (int k = 1; k < count; ++k)
+			arguments.push_back(given[k]);
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
 	}
@@ -717,6 +720,13 @@ namespace imagine
 		return out;
 	}
 
+	inline std::string trimmed(const std::string& s)
+	{
+		size_t from = s.find_first_not_of(" \t\r\n");
+		return from == std::string::npos ? "" : s.substr(from, s.find_last_not_of(" \t\r\n") - from + 1);
+	}
+	inline bool begins_with(const std::string& s, const std::string& part) { return s.compare(0, part.size(), part) == 0 && s.size() >= part.size(); }
+	inline bool ends_with(const std::string& s, const std::string& part) { return s.size() >= part.size() && s.compare(s.size() - part.size(), part.size(), part) == 0; }
 	inline std::string upper(std::string s)
 	{
 		for (char& c : s)
