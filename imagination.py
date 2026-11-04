@@ -230,6 +230,11 @@ def dup(v):
     return copy.deepcopy(v) if isinstance(v, (list, dict, Thing, Place)) else v
 
 
+def part_text(v):
+    """A list or table inside another one is shown in brackets, so its items stay together."""
+    return f"({text(v)})" if isinstance(v, (list, dict)) and v else text(v)
+
+
 def text(v):
     if isinstance(v, bool):
         return "yes" if v else "no"
@@ -244,9 +249,9 @@ def text(v):
     if isinstance(v, str):
         return v
     if isinstance(v, list):
-        return ", ".join(text(x) for x in v) if v else "(nothing)"
+        return ", ".join(part_text(x) for x in v) if v else "(nothing)"
     if isinstance(v, dict):
-        return ", ".join(f"{k}: {text(v[k])}" for k in sorted(v)) if v else "(nothing)"
+        return ", ".join(f"{k}: {part_text(v[k])}" for k in sorted(v)) if v else "(nothing)"
     if isinstance(v, Place):
         return "(" + ", ".join(text(x) for x in v.parts()) + ")"
     if isinstance(v, Thing):

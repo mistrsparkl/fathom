@@ -7,6 +7,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <map>
+#include <type_traits>
 #include <iostream>
 #include <random>
 #include <sstream>
@@ -107,6 +108,22 @@ namespace imagine
 		return out.str();
 	}
 
+	template <typename T> std::string text(const std::vector<T>& items);
+	template <typename T> std::string text(const std::map<std::string, T>& table);
+	template <typename T> struct is_group : std::false_type {};
+	template <typename T> struct is_group<std::vector<T>> : std::true_type {};
+	template <typename T> struct is_group<std::map<std::string, T>> : std::true_type {};
+
+	// A list or table inside another one is shown in brackets, so its items stay together.
+	template <typename T>
+	std::string part_text(const T& x)
+	{
+		if constexpr (is_group<T>::value)
+			return x.empty() ? text(x) : "(" + text(x) + ")";
+		else
+			return text(x);
+	}
+
 	template <typename T>
 	std::string text(const std::vector<T>& items)
 	{
@@ -114,7 +131,7 @@ namespace imagine
 			return "(nothing)";
 		std::string out;
 		for (size_t k = 0; k < items.size(); ++k)
-			out += (k ? ", " : "") + text(items[k]);
+			out += (k ? ", " : "") + part_text(items[k]);
 		return out;
 	}
 
@@ -125,7 +142,7 @@ namespace imagine
 			return "(nothing)";
 		std::string out;
 		for (const auto& [key, value] : table)
-			out += (out.empty() ? "" : ", ") + key + ": " + text(value);
+			out += (out.empty() ? "" : ", ") + key + ": " + part_text(value);
 		return out;
 	}
 

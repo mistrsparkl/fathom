@@ -160,6 +160,12 @@ def program_checks():
                           "a pet (name: Ann, age: 9), a pet (name: Bo, age: 3), a pet (name: Rex, age: 3)\n"), repr(out.stdout)
     assert out.stderr == "Line 12: the list is empty, so it has no average.\n", repr(out.stderr)
 
+    # Lists of lists and tables of lists: the inner ones are shown in brackets.
+    out = both('to start:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'
+               '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  say grid, " / ", item 2 of item 3 of grid\n'
+               '  set teams to a table of lists of text\n  set entry "red" of teams to a list of ("Ann", "Bo")\n  say teams\n' + END)
+    assert out.stdout == "(9, 2), (nothing), (3, 4) / 4\nred: (Ann, Bo)\n", repr(out.stdout)
+
     # Places in programs.
     out = both('to start:\n  set p to a place at (3, 4, 12)\n  set q to a place at (1, 1, 1)\n'
                '  say p, " ", size of p, " ", p plus q, " ", p minus q times 2, " ", -q, " ", p divided by 2\n'
@@ -209,7 +215,7 @@ def program_checks():
                '  set pets to a table of lists of text\n  set entry "Rex" of pets to a list of text\n'
                '  add "sit" to entry "Rex" of pets\n  say pets\n  for each name in keys of pets: say name\n'
                '  say entry "Bob" of ages\n' + END)
-    assert out.stdout == "Ann: 40, Rex: 4 | 2 | Ann, Rex\nyes no\nRex: 4\nRex: sit\nRex\n", repr(out.stdout)
+    assert out.stdout == "Ann: 40, Rex: 4 | 2 | Ann, Rex\nyes no\nRex: 4\nRex: (sit)\nRex\n", repr(out.stdout)
     assert out.stderr == 'Line 15: there is no entry "Bob" in the table.\n', repr(out.stderr)
 
     # Libraries.
