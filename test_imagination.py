@@ -27,6 +27,34 @@ def error(body, part_of="this is part of: creature body\n\n"):
     raise AssertionError("expected a script error")
 
 
+def tutorial_checks():
+    """Every program in TUTORIAL.md has no mistakes, and the ones with an output block print exactly that."""
+    import re
+    import subprocess
+    doc = (HERE / "TUTORIAL.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```(\w*)\n(.*?)```", doc, re.S)
+    ran = 0
+    for k, (fence, body) in enumerate(blocks):
+        if CLOSING_LINE not in body:
+            continue
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "tutorial.imagine"
+            script.write_text(body, encoding="utf-8")
+            translate.LOGIC = Path(d)
+            translate.read_script(script)  # raises on any mistake
+            if fence == "imagination":
+                assert blocks[k + 1][0] == "output", f"a program in TUTORIAL.md has no output block after it:\n{body}"
+                out = subprocess.run([sys.executable, str(HERE / "imagination.py"), "run", str(script)],
+                                     capture_output=True, text=True, encoding="utf-8", cwd=d)
+                assert out.stdout == blocks[k + 1][1] and not out.stderr, f"TUTORIAL.md:\n{body}\nprinted:\n{out.stdout}{out.stderr}"
+                ran += 1
+    assert ran >= 8, ran
+    translate.LOGIC = HERE / "examples"
+
+
+CLOSING_LINE = "and the universe said i love you"
+
+
 def program_checks():
     """Programs of their own: text, say, ask, loops, calling commands."""
     prog = lambda body: run(body, "")
@@ -316,6 +344,7 @@ def main():
                          "(the words of 'maths' can be used now)", "3",
                          "'stop the loop' only works inside 'repeat', 'while' or 'for each'."], shown
     translate.THINGS = {}
+    tutorial_checks()
     program_checks()
     print("imagination.py self-check passed")
 
