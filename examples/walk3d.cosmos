@@ -12,14 +12,14 @@ to make coins, returning a list of coins:
   set coins to a list of coins
   for each k from 1 to 8:
     set c to conjure a coin
-    set birth of c to (random number from -20 to 20) horizontal 1 vertical (random number from -20 to 20) depth
+    set the birth of c to (random number from -20 to 20) horizontal 1 vertical (random number from -20 to 20) depth
     add c to coins
   return coins
 and the universe said i love you
 
 to blocked, given at (a place), returning yes or no:
   for each k from -2 to 2:
-    if size of (flat (at minus ((k times 8) horizontal 1 vertical 6 depth))) falls below 2: return yes
+    if the size of (flat (at minus ((k times 8) horizontal 1 vertical 6 depth))) falls below 2: return yes
   return no
 and the universe said i love you
 
@@ -37,9 +37,9 @@ genesis:
     if key held "down": set step to -0.25
     set ahead to (sine of turn times step) horizontal 0 vertical (cosine of turn times step) depth
     if not (blocked with (existence plus ahead)): set existence to existence plus ahead
-    for each k from 1 to size of coins:
-      if not taken of (item k of coins) and size of (existence minus birth of (item k of coins)) falls below 1.5:
-        set taken of (item k of coins) to yes
+    for each k from 1 to the size of coins:
+      if not the taken of (item k of coins) and the size of (existence minus the birth of (item k of coins)) falls below 1.5:
+        set the taken of (item k of coins) to yes
         set score to score plus 1
     place the eye at existence
     aim the eye with (turn, 0)
@@ -47,7 +47,7 @@ genesis:
     etch the ground with ("#3c8c3c", "#327832")
     for each k from -2 to 2: etch a block with ((k times 8) horizontal 1 vertical 6 depth, 2, 2, 2, "brown")
     for each c in coins:
-      if not taken of c: etch a ball with (birth of c, 0.5, "yellow")
+      if not the taken of c: etch a ball with (the birth of c, 0.5, "yellow")
     etch words with "Coins: " plus score plus " of 8", 10, 10, "white"
     if score is 8: etch words with "You found them all!", 320, 280, "white"
     if the graphics card draws: etch words with "graphics card", 10, 30, "white"

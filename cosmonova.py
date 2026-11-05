@@ -72,6 +72,18 @@ FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound return returning raise whether horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
+# Words that shape a line, so no name may hold them. A name of two or more words may hold the other keywords.
+STRUCTURE = set("""to and or is of in with as by from into plus minus times divided than not if otherwise set at between contains
+toward exceeds falls each for""".split())
+
+
+def bad_name(words):
+    """True if these words can't be a name."""
+    if len(words) == 1:
+        return words[0] in KEYWORDS
+    return any(w in STRUCTURE for w in words)
+
+
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
                   "between", "+", "-", "*", "/", "contains", "in", "from", "with"}
 UNITS = set("degrees degree cm centimetres seconds second per squared percent metres metre m s".split())
@@ -758,6 +770,95 @@ def tokenize(text, line):
     return [t.lower() if t[0].isalpha() else t for t in tokens]
 
 
+# Grammar is for people: 'the', 'a' and 'an' are checked where English needs them, then left out before the
+# line is read, so 'if the size of kept notifications falls below 60' is read as 'if size of kept notifications ...'.
+ARTICLES = ("the", "a", "an")
+KEPT_PHRASES = [  # inner words that hold an article of their own
+    ("stop", "the", "loop"), ("skip", "to", "the", "next"), ("wait", "for", "the", "others"), ("from", "the", "text"),
+    ("touches", "a", "side"), ("touches", "the", "top"), ("of", "the", "world"), ("the", "command"), ("as", "a", "number"),
+]
+NOT_A_NAME_AFTER = {None, "to", "is", "of", "in", "and", "or", "plus", "minus", "times", "divided", "exceeds", "falls"}
+
+
+def read_words(text, line, names):
+    """A line's words, with its grammar checked and then left out (see ARTICLES)."""
+    return drop_articles(tokenize(text, line), names, line)
+
+
+def kept_span(tokens, i, names):
+    """How many words from tokens[i] belong to a phrase, name or command that holds an article itself (0 if none)."""
+    for phrase in KEPT_PHRASES:
+        if tuple(tokens[i:i + len(phrase)]) == phrase:
+            return len(phrase)
+    best = 0
+    for key in list(names.known) + library_phrases():
+        if len(key) > best and tuple(tokens[i:i + len(key)]) == key and any(w in ARTICLES for w in key):
+            best = len(key)
+    for key in names.commands:  # a command's own name is kept whole: 'total age of shelter' is the command 'total age of'
+        if len(key) > best and tuple(tokens[i:i + len(key)]) == key:
+            best = len(key)
+    return best
+
+
+LIBRARY_PHRASES = []
+
+
+def library_phrases():
+    """Every library word that holds an article ('open a world'), so it is kept even before its library is used."""
+    if not LIBRARY_PHRASES:
+        for path in sorted((HERE / "libraries").glob("**/*.words")):
+            for row in path.read_text(encoding="utf-8").splitlines():
+                m = re.match(r"(?:to )?([a-z][a-z ]*?)\s*(?:,|=)", row)
+                if m and any(w in ARTICLES for w in m.group(1).split()):
+                    LIBRARY_PHRASES.append(tuple(m.group(1).split()))
+        LIBRARY_PHRASES.append(("the", "problem"))  # so the list is never empty again
+    return LIBRARY_PHRASES
+
+
+def needs_the(tokens, i, names):
+    """The part of something that must have 'the' before it here ('the size of x', 'the name of rex'), or None."""
+    if tokens[i:i + 2] == ["size", "of"] and not names.match(tokens, i)[0] and not match_command(names, tokens[i:])[0]:
+        return "size of"
+    for n in range(min(6, len(tokens) - i - 1), 0, -1):
+        key = tuple(tokens[i:i + n])
+        if key in FIELDS and tokens[i + n] == "of" and key not in names.known:
+            return " ".join(key) + " of"
+    return None
+
+
+def drop_articles(tokens, names, line):
+    out, i = [], 0
+    while i < len(tokens):
+        span = kept_span(tokens, i, names)
+        if span and tokens[i] in ARTICLES and (needs_the(tokens, i + 1, names) or any(
+                tuple(tokens[i + 1:i + 1 + n]) in FIELDS and tokens[i + 1 + n:i + 2 + n] == ["of"] for n in range(1, 7))):
+            span = 0  # 'the element of win' is the part 'element', not the library word 'the element ...'
+        if span:  # the longest known words win, as before: 'the page' is the library word even if 'page' is a name
+            out += tokens[i:i + span]
+            i += span
+            continue
+        t = tokens[i]
+        if t in ARTICLES:
+            after = tokens[i + 1] if i + 1 < len(tokens) else None
+            if t != "the" and (after in NOT_A_NAME_AFTER or not after[0].isalpha()):
+                raise ScriptError(line, f"'{t}' is grammar, which the computer skips, so it can't be a name. Pick another name.")
+            if after and after[0].isalpha():
+                if t == "a" and after[0] in "aei":
+                    raise ScriptError(line, f"Write 'an {after}', not 'a {after}'.")
+                if t == "an" and after[0] not in "aeiouh":
+                    raise ScriptError(line, f"Write 'a {after}', not 'an {after}'.")
+            i += 1
+            continue
+        part = needs_the(tokens, i, names)
+        if part and (i == 0 or tokens[i - 1] != "the"):
+            raise ScriptError(line, f"Write 'the {part}', not '{part}': grammar is needed here for people reading it "
+                                    f"(the computer skips it).")
+        size = len(part.split()) - 1 if part else 1  # the whole part's name ('before x'), so 'x of' inside it isn't checked again
+        out += tokens[i:i + size]
+        i += size
+    return out
+
+
 # The language's words, and the words they replaced. A script line's words are turned into the
 # older inner words before it is read; the older words themselves are not allowed in scripts.
 OLD_WORDS = [  # (old words, how to say it now) - checked anywhere in a line, outside quote marks
@@ -776,7 +877,7 @@ OLD_STARTS = [  # (old first words, how to say it now) - checked at the start of
 ]
 NEW_WORDS = [  # (new words, the inner words they become) - anywhere outside quote marks
     (r"\bexceeds\b", "is more than"), (r"\bfalls below\b", "is less than"), (r"\bthe wound\b", "the problem"),
-    (r"\bconjure (an?) ", "a new "), (r"\bwhether\s+", ""), (r"\ba quotation mark\b", "quote mark"),
+    (r"\bconjure (an?)\s+", "a new "), (r"\bwhether\s+", ""), (r"\ba quotation mark\b", "quote mark"),
     (r"\bthe item at\b(.+?)\bin\b", r"item\1of"), (r"\brounded to\b(.+?)\bdecimal places?\b", r"rounded to\1places"),
 ]
 NEW_STARTS = [  # at the start of a line
@@ -811,6 +912,16 @@ def surface_part(text, line):
             m = re.search(old, low)
             if m:
                 raise ScriptError(line, f"'{m.group(0)}' is now '{now}'.")
+        m = re.search(r"\bconjure\s+(?!an?\b)(\S+)", low)
+        if m:
+            raise ScriptError(line, f"Write 'conjure a {m.group(1)}' (or 'an'): grammar is needed here for people reading it (the computer skips it).")
+        m = re.search(r"\bconjure\s+(an?)\s+([a-z])", low)
+        if m and (m.group(1) == "a") == (m.group(2) in "aei"):  # 'conjure an notice' is read before the other a/an checks
+            word = re.search(r"\bconjure\s+an?\s+(\w+)", low).group(1)
+            if not (m.group(1) == "an" and m.group(2) in "ouh"):
+                raise ScriptError(line, f"Write '{'an' if m.group(1) == 'a' else 'a'} {word}', not '{m.group(1)} {word}'.")
+        if re.search(r"(?<!\ba )(?<!\ban )\blist containing\b", low):
+            raise ScriptError(line, "Write 'a list containing ...': grammar is needed here for people reading it (the computer skips it).")
         if first:
             head = split_colon(low)[0].strip()
             for old, now in OLD_STARTS:
@@ -912,7 +1023,10 @@ class Names:
         hint = library_hint(tokens[i:])
         if hint:
             return f"I don't know '{best[1]}'." + hint
-        return f"I don't know '{best[1]}'." + (f" Did you mean '{best[2]}'?" if best[2] else "")
+        if best[2]:
+            return f"I don't know '{best[1]}'. Did you mean '{best[2]}'?"
+        return (f"I don't know '{best[1]}'. If it is a name, set it before this line (like 'set {best[1]} to 0') "
+                f"or list it as an input of the command.")
 
     def value(self, key):
         cpp, kind, read_only, run = self.known[key]
@@ -1610,7 +1724,7 @@ class Expr:
         """A new value: 'a list of numbers', 'an empty list of text', 'a list of (1, 2, 3)', 'a new pet'."""
         start = self.i
         for lead in (("a", "new"), ("an", "new"), ("new",)):
-            if self.at(*lead):
+            if self.at(*lead) and not self.names.match(self.t, self.i)[0]:  # a name like 'new notification' wins
                 self.i += len(lead)
                 for n in range(min(5, len(self.t) - self.i), 0, -1):
                     name = " ".join(self.t[self.i:self.i + n])
@@ -1629,16 +1743,21 @@ class Expr:
                         self.i += n
                         return Value(zero("table of " + k) if JS else f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {})
                 raise ScriptError(self.line, f"Say what the table holds, like 'a table of numbers'. Kinds are: {kind_words()}.")
-        for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of")):
+        for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of"), ("list", "containing")):
             if self.at(*lead):
                 self.i += len(lead)
-                if "empty" not in lead and self.at("("):
-                    self.i += 1
-                    items = [self.full()]
-                    while self.at(","):
+                close = closing_bracket(self.t, self.i) if self.at("(") else -1
+                bracket = close > 0 and "," in self.t[self.i:close]
+                if "empty" not in lead and (self.at("(") if "of" in lead else True):
+                    if bracket or "of" in lead:  # 'a list of (1, 2, 3)', 'a list containing (1, 2, 3)'
                         self.i += 1
-                        items.append(self.full())
-                    self.take(")")
+                        items = [self.full()]
+                        while self.at(","):
+                            self.i += 1
+                            items.append(self.full())
+                        self.take(")")
+                    else:  # 'a list containing new notification': a list with that one item
+                        items = [self.full()]
                     for v in items:
                         if v.kind != items[0].kind:
                             raise ScriptError(self.line, f"A list holds one kind of thing, but this mixes {kind_name(items[0].kind)} and {kind_name(v.kind)}.")
@@ -2103,6 +2222,7 @@ def read_one(path, auto):
     if remembered and not program:
         raise ScriptError(remembered[0][0], "'the world remembers:' is for programs of their own (with 'genesis:').")
     structs += remember(remembered, names)
+    commands = [listed_inputs(text_, n, body) for text_, n, body in commands]
     heads = [command_head(text_, n) for text_, n, _ in commands]
     made = []  # the Command for each head
     for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
@@ -2191,7 +2311,7 @@ def remember(rows, names):
         if not kind:
             raise ScriptError(n, f"Each name the world remembers looks like 'score (a number)'. Kinds are: {kind_words()}.")
         words = m.group(1).split()
-        if any(w in KEYWORDS for w in words):
+        if bad_name(words):
             raise ScriptError(n, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
         if tuple(words) in names.known:
             raise ScriptError(n, f"'{' '.join(words)}' already means something, so the world can't remember it as a name.")
@@ -2231,7 +2351,7 @@ def describe_things(things):
             if is_thing(kind) and kind[6:] not in described:
                 raise ScriptError(fn, f"Describe what a {kind[6:]} has above the {name}, or hold a list of {kind[6:]}s.")
             words = m.group(1).split()
-            if any(w in KEYWORDS for w in words):
+            if bad_name(words):
                 raise ScriptError(fn, f"'{' '.join(words)}' can't be a name: it uses the language's own words.")
             if any(w == words for w, _ in THINGS[name]):
                 raise ScriptError(fn, f"A {name} already has a part called '{' '.join(words)}'" + (f" (every {PARENTS[name]} has one)." if name in PARENTS else "."))
@@ -2282,6 +2402,45 @@ def describe_things(things):
         out += [f"using cosmonova::{cpp_type('thing ' + name)};" for name, _, _ in things]
         out.append("")
     return out
+
+
+INPUT_LINE = re.compile(r"((?:[a-z][a-z' ]*?))\s*\(([a-z ]+)\)")
+
+
+def listed_inputs(header, line, body):
+    """'to tell, use:' with the inputs on the indented lines under it -> the same command as 'to tell, given ...:'.
+
+    The inputs are the first lines, each 'name (kind)'; the first line that isn't one starts the instructions."""
+    m = re.fullmatch(r"(to .+?),\s*(?:use|using|utilize):", header.strip().lower())
+    if not m:
+        return header, line, body
+    if ", given " in m.group(1):
+        raise ScriptError(line, "Give the inputs either after 'given' or on the lines under 'use:', not both.")
+    inputs, k = [], 0
+    rows = [(n, raw) for n, raw in body]
+    while k < len(rows):
+        n, raw = rows[k]
+        s = " ".join(w for w in raw.strip().lower().split() if w not in ARTICLES)
+        if not s or s.startswith("note:") or raw.strip().lower().startswith("whisper:"):
+            k += 1
+            continue
+        im = INPUT_LINE.fullmatch(s)
+        if not im:
+            break
+        if not parse_kind(im.group(2)):
+            raise ScriptError(n, f"'{im.group(2)}' isn't a kind, so '{raw.strip()}' can't be an input. Kinds are: {kind_words()}.")
+        inputs.append(f"{im.group(1).strip()} ({im.group(2).strip()})")
+        k += 1
+    if not inputs:
+        raise ScriptError(line, "Under 'use:', list each input on its own indented line, like 'title (text)', before the instructions.")
+    for n, raw in rows[k:]:
+        s = " ".join(w for w in raw.strip().lower().split() if w not in ARTICLES)
+        im = INPUT_LINE.fullmatch(s)
+        if im and parse_kind(im.group(2)):
+            raise ScriptError(n, f"'{raw.strip()}' looks like an input, but it is among the instructions. "
+                                 "Inputs go together right under 'use:', before the first instruction.")
+    head, back, gives = m.group(1).partition(", returning ")  # 'given' goes before 'returning'
+    return f"{head}, given {' and '.join(inputs)}{back}{gives}:", line, rows[k:]
 
 
 def command_head(header, line):
@@ -2556,7 +2715,7 @@ def statement(n, text_, inner, names, declared, depth):
     if colon and re.match(r"for each ", text_.lower()):
         return for_each(n, head, body, names, declared, depth)
     if colon and re.match(r"(repeat |while )", text_.lower()):
-        tokens = tokenize(head, n)
+        tokens = read_words(head, n, names)
         if tokens[0] == "while":
             v = expr_to_end(tokens, 1, names, n)
             if v.kind != YESNO:
@@ -2588,7 +2747,7 @@ def statement(n, text_, inner, names, declared, depth):
             return [head, tab + "{"] + lines + [tab + "}"], run, None
         return [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})", tab + "{"] + lines + [tab + "}"], run, None
     if colon and re.match(r"(if |otherwise\b)", text_):
-        tokens = tokenize(head, n)
+        tokens = read_words(head, n, names)
         if tokens[:2] == ["otherwise", "if"]:
             cond, prefix, which = tokens[2:], "else if", "otherwise if"
         elif tokens == ["otherwise"]:
@@ -2609,7 +2768,7 @@ def statement(n, text_, inner, names, declared, depth):
         return [line, tab + "{"] + lines + [tab + "}"], guard(then, n), (which, test)
     if inner:
         raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'as long as', 'for each' and 'try' lines can have indented lines under them.")
-    tokens = tokenize(text_, n)
+    tokens = read_words(text_, n, names)
     if tokens in (["stop", "the", "loop"], ["skip", "to", "the", "next", "one"], ["skip", "to", "the", "next"]):
         if not names.loops:
             said = "break free" if tokens[0] == "stop" else "move on"
@@ -2695,6 +2854,19 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}cosmonova::{fn}({strip_parens(where.cpp)}, cosmonova::text({strip_parens(v.cpp)}), {n});"], run, None
     if tokens[0] == "add" and "to" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("to")
+        target = expr_to_end(tokens[cut + 1:], 0, names, n)
+        if target.kind == NUMBER:  # 'add 1 to count': the number goes up
+            if not target.writable:
+                raise ScriptError(n, f"'{' '.join(tokens[cut + 1:])}' can't be changed.")
+            v = expr_to_end(tokens[:cut], 1, names, n)
+            if v.kind != NUMBER:
+                raise ScriptError(n, f"'{' '.join(tokens[cut + 1:])}' is a number, so I can only add a number to it, not {kind_name(v.kind)}.")
+            put, now, get = target.store, target.run, v.run
+            assign = js_set(target) if JS else getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
+            return ([f"{tab}{assign}{target.cpp} + {v.cpp}{getattr(target, 'cpp_close', '')};"],
+                     lambda env: put(env, now(env) + get(env)), None)
+        if not is_list(target.kind):
+            raise ScriptError(n, f"'add ... to' needs a list or a number, but this is {kind_name(target.kind)}.")
         target = writable_list(tokens[cut + 1:], names, n, "add to")
         v = expr_to_end(tokens[:cut], 1, names, n)
         v = fit(v, element(target.kind)) or v
@@ -2848,7 +3020,7 @@ def statement(n, text_, inner, names, declared, depth):
         if "to" not in tokens:
             raise ScriptError(n, "'set' looks like 'set speed to 5'.")
         words = tokens[1:tokens.index("to")]
-        if not words or any(w in KEYWORDS or not w[0].isalpha() for w in words):
+        if not words or bad_name(words) or any(not w[0].isalpha() for w in words):
             raise ScriptError(n, f"'{' '.join(words)}' can't be a name: names can't use the words {', '.join(sorted(set(words) & KEYWORDS)) or 'symbols'}.")
         v = expr_to_end(tokens, tokens.index("to") + 1, names, n)
         cpp = snake(words)
@@ -2897,17 +3069,17 @@ def statement(n, text_, inner, names, declared, depth):
         raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
     near = similar_words(tokens, names)
     if near:
-        raise ScriptError(n, f"I don't know '{' '.join(tokens[:4])}'." + near)
+        raise ScriptError(n, f"I don't know '{' '.join(tokenize(text_, n)[:4])}'." + near)  # as written, with its grammar
     raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, add, remove, inscribe, if, otherwise, repeat, as long as, for each, try, return, raise an error with, cease, whisper or the name of a command.")
 
 
 def for_each(n, head, body, names, declared, depth):
     """for each score in scores:  /  for each n from 1 to 10:"""
     tab = "\t" * depth
-    tokens = tokenize(head, n)
+    tokens = read_words(head, n, names)
     cut = next((k for k, t in enumerate(tokens) if t in ("in", "from")), None)
     words = tokens[2:cut] if cut else []
-    if not words or any(w in KEYWORDS or not w[0].isalpha() for w in words):
+    if not words or bad_name(words) or any(not w[0].isalpha() for w in words):
         raise ScriptError(n, "'for each' looks like 'for each score in scores:' or 'for each n from 1 to 10:'.")
     if tuple(words) in names.known:
         raise ScriptError(n, f"'{' '.join(words)}' already means something here, so pick another name for each item.")
@@ -3061,7 +3233,7 @@ def ask(tokens, names, declared, n, tab):
             raise ScriptError(n, f"'{' '.join(key)}' already holds {kind_name(have)}, so it can't hold {kind_name(kind)}.")
         kind = have
     else:
-        if not rest or any(w in KEYWORDS or not w[0].isalpha() for w in rest):
+        if not rest or bad_name(rest) or any(not w[0].isalpha() for w in rest):
             raise ScriptError(n, f"'{' '.join(rest)}' can't be a name.")
         cpp = snake(rest)
         declared[tuple(rest)] = (cpp, kind)
@@ -3309,7 +3481,7 @@ def try_it(read=input, show=print):
                     v = None
                     if len(rows) == 1:
                         try:  # a value on its own (like '5 plus 3' or 'round 2.6') is shown
-                            v = expr_to_end(tokenize(surface(line.strip(), n), n), 0, names, n)
+                            v = expr_to_end(read_words(surface(line.strip(), n), n, names), 0, names, n)
                         except ScriptError as err:
                             if "put the line 'use: " in err.message:
                                 raise

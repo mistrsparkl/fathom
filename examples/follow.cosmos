@@ -29,7 +29,7 @@ to steer toward, given goal (a place) and running (yes or no):
   set head turn to clamp (angle from body facing to direction of gap) between -look limit and look limit
 
   whisper: Sharp turns are only stable at a slow trot.
-  set sharp to size of turn needed exceeds sharp turn angle
+  set sharp to the size of turn needed exceeds sharp turn angle
   whisper: Turning on the spot topples it, so the turn allowed grows with speed.
   if walk speed is at least run speed:
     set top turn to running turn limit
@@ -49,7 +49,7 @@ to steer toward, given goal (a place) and running (yes or no):
   otherwise:
     set cruise to walking speed
   whisper: Brakes early enough to stop at the stop distance.
-  set distance left to larger of 0 and (size of gap) minus stop distance
+  set distance left to larger of 0 and (the size of gap) minus stop distance
   set braking speed to square root of 2 times acceleration times distance left
   move walk speed toward smaller of cruise and braking speed by at most acceleration times frame time
 and the universe said i love you

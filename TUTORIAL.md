@@ -92,7 +92,7 @@ Hip hip hooray!
 genesis:
   set shopping to a list of ("milk", "eggs")
   add "bread" to shopping
-  scrawl "I need ", size of shopping, " things: ", shopping
+  scrawl "I need ", the size of shopping, " things: ", shopping
   for each thing in shopping:
     scrawl "- ", thing
   if shopping contains "eggs": scrawl "Don't drop the eggs!"
@@ -147,10 +147,10 @@ and the universe said i love you
 
 genesis:
   set rex to conjure a pet
-  set name of rex to "Rex"
-  set age of rex to 3
+  set the name of rex to "Rex"
+  set the age of rex to 3
   scrawl rex
-  scrawl name of rex, " is ", age of rex, " years old."
+  scrawl the name of rex, " is ", the age of rex, " years old."
 and the universe said i love you
 ```
 
@@ -159,7 +159,7 @@ a pet (name: Rex, age: 3)
 Rex is 3 years old.
 ```
 
-`a pet has:` describes a new kind of thing and its parts. After that, `conjure a pet` makes one, and `name of rex` is one of its parts.
+`a pet has:` describes a new kind of thing and its parts. After that, `conjure a pet` makes one, and `the name of rex` is one of its parts.
 
 ## 8. Asking
 
@@ -229,19 +229,19 @@ genesis:
   open a world with "Ball", 600, 400
   set birth to 300 horizontal 200 vertical
   as long as the world lives:
-    if key held "left": set existence of horizontal to existence of horizontal minus 5
-    if key held "right": set existence of horizontal to existence of horizontal plus 5
-    if key held "up": set existence of vertical to existence of vertical minus 5
-    if key held "down": set existence of vertical to existence of vertical plus 5
+    if key held "left": set the existence of horizontal to the existence of horizontal minus 5
+    if key held "right": set the existence of horizontal to the existence of horizontal plus 5
+    if key held "up": set the existence of vertical to the existence of vertical minus 5
+    if key held "down": set the existence of vertical to the existence of vertical plus 5
     if key pressed "space": set existence to birth
     consume the window with "black"
-    etch a circle with birth of horizontal, birth of vertical, 4, "white"
-    etch a circle with existence of horizontal, existence of vertical, 20, "orange"
+    etch a circle with the birth of horizontal, the birth of vertical, 4, "white"
+    etch a circle with the existence of horizontal, the existence of vertical, 20, "orange"
     reveal the frame
 and the universe said i love you
 ```
 
-`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `existence of horizontal` is how far across it is, and `existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `reveal the frame` puts the picture on the screen (60 times a second).
+`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `the existence of horizontal` is how far across it is, and `the existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `reveal the frame` puts the picture on the screen (60 times a second).
 
 Setting `birth` also makes `existence` start at the same place.
 
@@ -267,15 +267,15 @@ to speak, for a pet:
 and the universe said i love you
 
 to speak, for a dog:
-  scrawl name, " barks and knows ", size of tricks, " tricks."
+  scrawl name, " barks and knows ", the size of tricks, " tricks."
 and the universe said i love you
 
 genesis:
   set tom to conjure a pet
-  set name of tom to "Tom"
+  set the name of tom to "Tom"
   set rex to conjure a dog
-  set name of rex to "Rex"
-  add "sit" to tricks of rex
+  set the name of rex to "Rex"
+  add "sit" to the tricks of rex
   speak tom
   speak rex
 and the universe said i love you
@@ -357,7 +357,49 @@ and the universe said i love you
 31, 7
 ```
 
-The `web` library gets and sends pages (`web page`, `send to the web page`), `server` makes your program a web server, `folders` works with files and folders, and `computer` runs other programs (`output of the command "dir"`). LANGUAGE.md has them all.
+The `web` library gets and sends pages (`web page`, `send to the web page`), `server` makes your program a web server, `folders` works with files and folders, and `computer` runs other programs (`the output of the command "dir"`). LANGUAGE.md has them all.
+
+## 15. Grammar for people
+
+Cosmonova is written for people to read, so it asks for grammar in a few places: `the` before a part
+(`the size of`, `the title of`), and `a` or `an` after `conjure` and before `list containing`.
+The computer checks it is there, then skips it: `the`, `a` and `an` change nothing.
+A command's inputs can also go on their own lines, under `use:`:
+
+```cosmonova
+a notice has:
+  title (text)
+and the universe said i love you
+
+the world remembers:
+  total (a number)
+and the universe said i love you
+
+to tell, use:
+  title (text)
+  count (a number)
+
+  conjure a notice as new notification
+  set the title of new notification to title
+  set kept notices to a list containing new notification
+  add count to the total
+  scrawl the size of kept notices, " ", the title of new notification
+and the universe said i love you
+
+genesis:
+  tell with "hello", 2
+  tell with "again", 3
+  scrawl the total
+and the universe said i love you
+```
+
+```output
+1 hello
+1 again
+5
+```
+
+Leave out `the` in `scrawl size of kept notices` and Cosmonova says: Write 'the size of', not 'size of'.
 
 ## Where next
 

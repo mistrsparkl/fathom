@@ -18,7 +18,7 @@ Cosmonova is a programming language written in plain English words. Scripts end 
 
   A program does exactly the same thing either way. The self-check runs its test programs both ways and compares what they print.
 - **A program for a web page** is made into JavaScript instead: `cosmonova web examples/pets.cosmos site` writes `site/pets.js` and Cosmonova's runtime `site/cosmonova.js`. Load both in a page (`<script src="cosmonova.js"></script><script src="pets.js"></script>`), or run the program with `node pets.js`. It does the same as the other two ways (the self-check runs its programs with node too). See *Programs for web pages* below.
-- **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a folder of these into C++ (`<name>.cosmos.cpp`, which you never edit) with:
+- **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a the folder of these into C++ (`<name>.cosmos.cpp`, which you never edit) with:
 
   ```
   py -3 cosmonova.py <scripts folder> <output folder>
@@ -55,7 +55,7 @@ Add `returning <kind>` to the first line, and leave with `return ...`:
 ```
 to total age of, given pets (a list of pets), returning a number:
   set total to 0
-  for each pet in pets: set total to total plus age of pet
+  for each pet in pets: set total to total plus the age of pet
   return total
 and the universe said i love you
 ```
@@ -109,7 +109,7 @@ and the universe said i love you
 |---|---|
 | `set rex to conjure a pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
 | `conjure a pet as rex` | The same, said the other way round. |
-| `name of rex` | One of its parts. `set name of rex to "Rex"` changes it. |
+| `the name of rex` | One of its parts. `set the name of rex to "Rex"` changes it. |
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
@@ -172,7 +172,7 @@ a ball has:
 and the universe said i love you
 ```
 
-`set birth of ball to 100 horizontal 50 vertical` puts the ball's existence there too. Then move `existence of ball`, and `(existence of ball) of horizontal` is how far across it is.
+`set the birth of ball to 100 horizontal 50 vertical` puts the ball's existence there too. Then move `the existence of ball`, and `(the existence of ball) of horizontal` is how far across it is.
 
 Lists and tables can hold other lists and tables: `a list of lists of numbers` is a grid, and `item 2 of item 3 of grid` reaches inside it. When shown, the inner ones are in brackets: `(1, 2), (3, 4)`.
 | your own kind | `conjure a pet` (see above) |
@@ -220,17 +220,17 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `smaller of a and b`, `larger of a and b` | the smaller or larger number |
 | `clamp x between low and high` | x, kept inside the range |
 | `square root of x` | the square root |
-| `size of x` | a number without its sign, the distance of a place from 0 horizontal 0 vertical 0 depth, the length of a (flat) place, or how many letters text has |
+| `the size of x` | a number without its sign, the distance of a place from 0 horizontal 0 vertical 0 depth, the length of a (flat) place, or how many letters text has |
 | `random number from 1 to 100` | a random whole number, both ends included |
 | `random fraction` | a random number from 0 up to (but never quite) 1, like 0.7302 |
 | `item 2 of scores` | one item of a list (counted from 1) |
 | `a random item of scores` | one item of a list, picked at random |
-| `size of scores` | how many items a list has |
+| `the size of scores` | how many items a list has |
 | `scores contains 5`, `name contains "ell"` | yes or no: is it in the list / in the text |
 | `contents of file "notes.txt"` | everything in a file, as text |
 | `lines of file "notes.txt"` | the file's lines, as a list of text |
 | `file "notes.txt" exists` | yes or no |
-| `lines of text`, `words of text` | text split into lines or words, as a list of text |
+| `lines of text`, `the words of text` | text split into lines or words, as a list of text |
 | `answer as a number` | text turned into a number (`"42"` gives 42) |
 | `score as text` | a number or yes or no written out as text |
 | `(price times 1.2) rounded to 2 decimal places` | a number rounded to that many decimal places (halves go up, away from zero) |
@@ -250,7 +250,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `sorted pets by age` | a copy of a list of things, smallest part first (things with the same part keep their order) |
 | `entry "Rex" of ages` | the value a table keeps under that name |
 | `keys of ages` | a table's names, as a list of text in alphabetical order |
-| `ages contains "Rex"`, `size of ages` | yes or no: does the table have that name / how many names it has |
+| `ages contains "Rex"`, `the size of ages` | yes or no: does the table have that name / how many names it has |
 | `"Hi " plus name` | text joined together (numbers and yes or no are written out, e.g. `"Score: " plus 5`) |
 | `p of horizontal`, `p of vertical`, `p of depth` | one part of a place: across, down (on a screen, down is more), deep. `set p of horizontal to 5` changes it. |
 | `p plus q`, `p minus q`, `p times 2`, `p divided by 2`, `-p` | places added, taken away, made bigger or smaller |
@@ -262,7 +262,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `ball touches coin` | yes or no: do two things' circles overlap? Each needs a `birth` (giving it an `existence`) and a `radius`. A place on its own counts as a dot (or uses `radius`, inside a thing's command). |
 | `x and y`, `x or y`, `not x` | combining yes or no |
 
-`of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`age of rex plus 1` is `(age of rex) plus 1`). Words that change a whole value (`as text`, `as a number`, `as saved text`, `rounded to`, `changed by`, `kept by`) belong to everything before them: `item 2 of scores as text` is `(item 2 of scores) as text`, and `round x as text` is `(round x) as text`. Use brackets to say exactly what belongs together: `(size of gap) minus stop distance`.
+`of` takes everything after it until a word like `is`, `and`, `between` or `by`, except for parts and items (`the age of rex plus 1` is `(the age of rex) plus 1`). Words that change a whole value (`as text`, `as a number`, `as saved text`, `rounded to`, `changed by`, `kept by`) belong to everything before them: `item 2 of scores as text` is `(item 2 of scores) as text`, and `round x as text` is `(round x) as text`. Use brackets to say exactly what belongs together: `(the size of gap) minus stop distance`.
 
 ## Names
 
@@ -318,7 +318,7 @@ and the universe said i love you
 | `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (returns the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, returns the answer) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
-| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `cosmonova game.cosmos easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `the output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `cosmonova game.cosmos easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"`, `the bytes of the file "cat.png"` (the file as a list of numbers from 0 to 255, for files that aren't text), `fill the file with ("out.bin", numbers)` (the other way) |
 | `letters` | `code of the letter "A"` (65: the number behind a letter), `the letter with code 233` ("é") |
 | `patterns` | Finding text by its shape (`"[0-9]+"` is one or more digits, `"."` any letter, `"(...)"` a piece to keep): `the pattern fits with ("[0-9]+", line)` (yes or no), `matches of the pattern with ("[0-9]+", line)` (every match, as a list of text), `pieces of the pattern with ("([a-z]+)=([0-9]+)", line)` (the bracketed pieces of the first match), `replace the pattern with ("[0-9]+", line, "#")` |
@@ -422,7 +422,7 @@ genesis:
 and the universe said i love you
 ```
 
-Every element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `listen for an event` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
+Every the element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `listen for an event` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
 
 | Words (library `page`) | Means |
 |---|---|
@@ -477,7 +477,32 @@ Checking the translator itself: `py -3 test_cosmonova.py`.
 
 - `genesis:` just above a definition (`to ...:`, `a ... has:`, `the world remembers:`) only marks where it begins;
   the program still starts at the one `genesis:` whose lines are commands.
-- `the` may go before a name or a part: `the theme of prefs`, `the size of parts`, `the remainder of (7, 2)`.
+- Grammar is for people, and the computer skips it: `the`, `a` and `an` are left out before a line is read,
+  so `if the size of kept notifications falls below 60:` is read as `if size of kept notifications falls below 60:`.
+  Words inside quote marks, notes and names that hold an article themselves (`the page`, `open a world`) are kept.
+- Grammar is **needed** in these places, and a line without it is a mistake:
+  - `the` before a part of something: `the size of xs`, `the name of rex`, `the id of new notification`.
+  - `a` or `an` after `conjure`: `conjure a notice as new notification`.
+  - `a` before `list containing`: `set kept to a list containing new notification` (several items: `a list containing (1, 2, 3)`).
+  - `a` before a consonant and `an` before a, e or i: `an apple`, not `a apple` (`an hour`, `a unit` and `an orange` are fine).
+- Anywhere else `the`, `a` and `an` are up to you: `set the notices to kept notifications` and `set notices to kept notifications` are the same line.
+- So `a`, `an` and `the` can't be names on their own.
+- `add 1 to count` makes a number bigger; `add item to collection` puts an item at the end of a list.
+- A command's inputs can be listed under it, after `use:` or `using:` (or `utilize:`), one per line, before its instructions:
+
+  ```
+  to tell, use:
+    app name (text)
+    title (text)
+    quiet delivery (yes or no)
+
+    conjure a notice as new notification
+    set the title of new notification to title
+  and the universe said i love you
+  ```
+
+  The first line that isn't `name (kind)` starts the instructions; an input-looking line among the instructions is a mistake.
+  It is the same command as `to tell, given app name (text) and title (text) and quiet delivery (yes or no):`.
 - `return x` leaves a command with x; a command that returns says so in its first line: `to double, given x (a number), returning a number:`.
 - `raise an error with "no fuel"` is a problem of your own, caught by `try:` like any other.
 - `return whether x is 3`: `whether` just reads well; it changes nothing.

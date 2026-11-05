@@ -12,13 +12,13 @@ genesis:
   add pet called with ("Rex", 3) to shelter
   add pet called with ("Mittens", 12) to shelter
   add pet called with ("Bubbles", 1) to shelter
-  add "sit" to tricks of item 1 of shelter
-  add "roll over" to tricks of item 1 of shelter
+  add "sit" to the tricks of item 1 of shelter
+  add "roll over" to the tricks of item 1 of shelter
 
   for each pet in shelter:
-    scrawl name of pet, " is ", age of pet, " and knows: ", tricks of pet
+    scrawl the name of pet, " is ", the age of pet, " and knows: ", the tricks of pet
 
-  scrawl "Oldest: ", name of oldest in shelter
+  scrawl "Oldest: ", the name of oldest in shelter
   scrawl "Ages added up: ", total age of shelter
   set item 3 of shelter to pet called with ("Goldie", 2)
   remove item 2 from shelter
@@ -28,26 +28,26 @@ and the universe said i love you
 
 to pet called, given name (text) and age (a number), returning a pet:
   set made to conjure a pet
-  set name of made to name
-  set age of made to age
+  set the name of made to name
+  set the age of made to age
   return made
 and the universe said i love you
 
 to oldest in, given pets (a list of pets), returning a pet:
   set best to item 1 of pets
   for each pet in pets:
-    if age of pet exceeds age of best: set best to pet
+    if the age of pet exceeds the age of best: set best to pet
   return best
 and the universe said i love you
 
 to total age of, given pets (a list of pets), returning a number:
   set total to 0
-  for each pet in pets: set total to total plus age of pet
+  for each pet in pets: set total to total plus the age of pet
   return total
 and the universe said i love you
 
 to names in, given pets (a list of pets), returning a list of text:
   set found to a list of text
-  for each pet in pets: add name of pet to found
+  for each pet in pets: add the name of pet to found
   return found
 and the universe said i love you

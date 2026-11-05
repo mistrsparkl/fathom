@@ -37,7 +37,7 @@ genesis:
       set score to 0
       set playing to yes
     consume the window with "#101828"
-    for each ball in balls: etch a circle with existence of ball of horizontal, existence of ball of vertical, 14, "orange"
+    for each ball in balls: etch a circle with the existence of ball of horizontal, the existence of ball of vertical, 14, "orange"
     etch a box with player x minus 30, 600, 60, 16, "#5ad1ff"
     etch words with "Score: " plus score, 12, 10, "white"
     etch words with "Best: " plus best, 380, 10, "white"
@@ -47,8 +47,8 @@ and the universe said i love you
 
 to a falling ball, returning a ball:
   set made to conjure a ball
-  set birth of made to (random number from 20 to 460) horizontal -20 vertical
-  set speed of made to random number from 3 to 8
+  set the birth of made to (random number from 20 to 460) horizontal -20 vertical
+  set the speed of made to random number from 3 to 8
   return made
 and the universe said i love you
 
@@ -56,12 +56,12 @@ to every ball moved down from, given balls (a list of balls), returning a list o
   set still falling to a list of balls
   for each ball in balls:
     set moved to ball
-    set existence of moved to existence of ball plus 0 horizontal (speed of ball) vertical
-    if existence of moved of vertical falls below 680: add moved to still falling
+    set the existence of moved to the existence of ball plus 0 horizontal (the speed of ball) vertical
+    if the existence of moved of vertical falls below 680: add moved to still falling
   return still falling
 and the universe said i love you
 
 to hits the player, given ball (a ball) and player x (a number), returning yes or no:
-  set where to existence of ball
+  set where to the existence of ball
   return where of vertical exceeds 586 and where of vertical falls below 630 and where of horizontal is within 44 of player x
 and the universe said i love you
