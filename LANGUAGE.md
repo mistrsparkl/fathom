@@ -33,7 +33,7 @@ A mistake stops with a plain message, such as:
 follow.imagine line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that give back answers), `examples/clock.imagine` (libraries), `examples/dodge.imagine` (a game in a window) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
+Working examples: `examples/guess.imagine` (a guessing game), `examples/pets.imagine` (lists, kinds of things, commands that return answers), `examples/clock.imagine` (libraries), `examples/dodge.imagine` (a game in a window) and `examples/follow.imagine` (how a deer follows the player, part of a creature).
 
 ## A program, top to bottom
 
@@ -48,15 +48,15 @@ to greet, given who (text):
 and the universe said i love you
 ```
 
-## Commands that give back an answer
+## Commands that return an answer
 
-Add `giving back <kind>` to the first line, and leave with `give back ...`:
+Add `returning <kind>` to the first line, and leave with `return ...`:
 
 ```
-to total age of, given pets (a list of pets), giving back a number:
+to total age of, given pets (a list of pets), returning a number:
   set total to 0
   for each pet in pets: set total to total plus age of pet
-  give back total
+  return total
 and the universe said i love you
 ```
 
@@ -76,10 +76,10 @@ Call it with the ball: `bounce b`, or `bounce item 1 of balls`. More inputs come
 **Commands as values.** `the command double` is the command itself, not its answer. Keep it in a name, a list or a part of a thing, give it to another command, or give it back from one. `invoke` does it:
 
 ```
-to apply to all, given f (a command given a number giving back a number) and items (a list of numbers), giving back a list of numbers:
+to apply to all, given f (a command given a number returning a number) and items (a list of numbers), returning a list of numbers:
   set out to a list of numbers
-  for each item in items: gather invoke f with item into out
-  give back out
+  for each item in items: add invoke f with item to out
+  return out
 and the universe said i love you
 
 genesis:
@@ -89,7 +89,7 @@ genesis:
 and the universe said i love you
 ```
 
-The kind says what the command takes and gives back: `a command` (nothing either way), `a command given text`, `a command given a number and text giving back yes or no`. Library words work too (`the command round`). Commands for a kind of thing can't be kept this way, and commands can't be compared or saved.
+The kind says what the command takes and returns: `a command` (nothing either way), `a command given text`, `a command given a number and text returning yes or no`. Library words work too (`the command round`). Commands for a kind of thing can't be kept this way, and commands can't be compared or saved.
 
 **At the same time.** `meanwhile download with ("https://example.com/a.png", "a.png")` starts a command going on its own, and the next line carries on straight away. `wait for the others` waits until every command started with `meanwhile` has finished (a program also waits for them before it ends). Each one gets its own copy of every name as it was when it started, so they can't spoil each other's values; they can share files and the screen. A problem in any of them stops the whole program. `meanwhile invoke f` works too.
 
@@ -108,6 +108,7 @@ and the universe said i love you
 | Write | Means |
 |---|---|
 | `set rex to conjure a pet` | A new pet: its numbers are 0, its text is empty, its lists are empty. |
+| `conjure a pet as rex` | The same, said the other way round. |
 | `name of rex` | One of its parts. `set name of rex to "Rex"` changes it. |
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
@@ -123,7 +124,7 @@ a puppy is a kind of dog:
 and the universe said i love you
 ```
 
-A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. A dog can also go anywhere a pet is wanted: an input `(a pet)`, a list of pets, a name holding a pet, or `give back` in a command giving back a pet. It goes there as a pet: a copy with just a pet's parts (its tricks stay behind). A pet can't go where a dog is wanted.
+A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. A dog can also go anywhere a pet is wanted: an input `(a pet)`, a list of pets, a name holding a pet, or `return` in a command returning a pet. It goes there as a pet: a copy with just a pet's parts (its tricks stay behind). A pet can't go where a dog is wanted.
 
 ## A part of something else, top to bottom
 
@@ -190,23 +191,23 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `ask "Your name? " into name` | Show the question and keep what the person types, as text. |
 | `ask "Your age? " into age (a number)` | The same, as a number. It asks again until a number is typed. |
 | `ask "Again? " into again (yes or no)` | The same, as yes or no (`yes`, `y`, `no` or `n`). |
-| `echo 10 times:` | Do the indented lines below 10 times. |
+| `repeat 10 times:` | Do the indented lines below 10 times. |
 | `as long as guess is not secret:` | Keep doing the indented lines below while it is yes. |
 | `greet with name, 3` | Do your own command `greet`, giving it its inputs in order. A command without inputs is just its name: `greet`. |
 | `for each score in scores:` | Do the indented lines once for every item of a list, with `score` being that item. |
 | `for each n from 1 to 10:` | The same for each whole number from 1 to 10. |
-| `gather 5 into scores` | Put an item at the end of a list. |
-| `banish item 2 from scores` / `banish 5 from scores` | Take out the second item / the first 5. |
+| `add 5 to scores` | Put an item at the end of a list. |
+| `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
 | `set entry "Rex" of ages to 3` | Put a value in a table under a name (replacing what was there). |
-| `banish entry "Rex" from ages` | Take a name and its value out of a table. |
-| `give back total` | Leave the command, giving back an answer. |
-| `shatter with "the tank is empty"` | Stop with a problem of your own. `try:` catches it like any other, and `the wound` is its text. |
-| `break free` | Leave the `echo`, `as long as` or `for each` it is inside, and carry on after it. |
+| `remove entry "Rex" from ages` | Take a name and its value out of a table. |
+| `return total` | Leave the command, returning an answer. |
+| `raise an error with "the tank is empty"` | Stop with a problem of your own. `try:` catches it like any other, and `the wound` is its text. |
+| `break free` | Leave the `repeat`, `as long as` or `for each` it is inside, and carry on after it. |
 | `move on` | Go straight to the next round of the loop it is inside. |
 | `inscribe "hello" into file "notes.txt"` | Make or replace a file with this text. |
-| `gather "a line" into file "log.txt"` | Add a line to the end of a file (making it if needed). |
-| `cease` | Leave the command now (only in commands that don't give back anything). |
+| `add "a line" to file "log.txt"` | Add a line to the end of a file (making it if needed). |
+| `cease` | Leave the command now (only in commands that don't return anything). |
 | `beep with 440, 0.5` | A word from a library (see Libraries). |
 | `whisper: ...` | A note for people. |
 
@@ -232,7 +233,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `lines of text`, `words of text` | text split into lines or words, as a list of text |
 | `answer as a number` | text turned into a number (`"42"` gives 42) |
 | `score as text` | a number or yes or no written out as text |
-| `(price times 1.2) rounded to 2 places` | a number rounded to that many decimal places (halves go up, away from zero) |
+| `(price times 1.2) rounded to 2 decimal places` | a number rounded to that many decimal places (halves go up, away from zero) |
 | `letter 2 of name`, `letters 2 to 4 of name` | one letter, or some letters, of text (counted from 1) |
 | `upper case of name`, `lower case of name` | text in CAPITALS / small letters (A to Z only) |
 | `trimmed line` | text without the spaces, tabs and line breaks at its start and end |
@@ -265,7 +266,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, begins, changed, kept, ends, invoke, meanwhile, shatter, trimmed, as, ask, at, banish, between, by, cease, clamp, conjure, contains, depth, direction, divided, each, echo, empty, exceeds, falls, file, flat, for, from, gather, horizontal, if, in, inscribe, into, is, larger, least, less, list, minus, more, most, move, new, no, not, note, of, or, otherwise, plus, random, remove, repeat, root, scrawl, set, size, smaller, square, stop, than, times, to, toward, try, vertical, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, as, ask, at, begins, between, by, cease, changed, clamp, conjure, contains, depth, direction, divided, each, empty, ends, exceeds, falls, file, flat, for, from, horizontal, if, in, inscribe, into, invoke, is, kept, larger, least, less, list, meanwhile, minus, more, most, move, new, no, not, of, or, otherwise, plus, raise, random, remove, repeat, return, returning, root, scrawl, set, size, smaller, square, stop, than, times, to, touches, toward, trimmed, try, vertical, whether, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
 
 ## Adding words
 
@@ -313,15 +314,15 @@ and the universe said i love you
 | Library | Words |
 |---|---|
 | `maths` | `pi`, `sine of`, `cosine of`, `tangent of` (degrees), `round`, `round down`, `round up`, `whole part of`, `power of (2, 10)`, `remainder of (17, 5)`, `e`, `logarithm of` (base 10), `natural logarithm of`, `arc sine of`, `arc cosine of`, `arc tangent of` (degrees) |
-| `time` | `wait 2 seconds`, `seconds since start`, `hour now`, `minute now`, `second now`, `day of the month`, `month now`, `year now`, `today` (like `2026-11-04`), `the time now` (like `14:05:09`), `day of the week` (like `Wednesday`), `seconds since 1970` |
+| `time` | `wait 2 seconds`, `seconds since the start`, `the current hour`, `the current minute`, `the current second`, `the day of the month`, `the current month`, `the current year`, `today` (like `2026-11-04`), `the time now` (like `14:05:09`), `the day of the week` (like `Wednesday`), `seconds since 1970` |
 | `window` | A window to etch in, for games and pictures. See below. |
-| `web` | `web page "https://example.com"` (gives back the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, gives back the answer) |
+| `web` | `web page "https://example.com"` (returns the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, returns the answer) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
-| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (gives back its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `imagine game.imagine easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `imagine game.imagine easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"`, `the bytes of the file "cat.png"` (the file as a list of numbers from 0 to 255, for files that aren't text), `fill the file with ("out.bin", numbers)` (the other way) |
 | `letters` | `code of the letter "A"` (65: the number behind a letter), `the letter with code 233` ("é") |
 | `patterns` | Finding text by its shape (`"[0-9]+"` is one or more digits, `"."` any letter, `"(...)"` a piece to keep): `the pattern fits with ("[0-9]+", line)` (yes or no), `matches of the pattern with ("[0-9]+", line)` (every match, as a list of text), `pieces of the pattern with ("([a-z]+)=([0-9]+)", line)` (the bracketed pieces of the first match), `replace the pattern with ("[0-9]+", line, "#")` |
-| `server` | `serve the web with (8080, the command answer)` makes the program a web server for this computer: open `http://127.0.0.1:8080/hello` in a browser and `answer` (a command given text giving back text) is given `"/hello"` and gives back the page. It serves until the program ends, so start it with `meanwhile` to do other things too. `serve the web from the folder with (8080, "site", the command answer)` also sends the files in that folder (`/` is `index.html`), and asks `answer` only about addresses that aren't files. Inside `answer`, `the web message` is what a form or `fetch` sent along (empty for a plain visit), `answer with the file "song.mp3"` sends a file from anywhere instead of the text given back, and `web decoded "a%20b"` ("a b") and `web encoded` turn addresses into text and back. The Tidal OS system side uses these. |
+| `server` | `serve the web with (8080, the command answer)` makes the program a web server for this computer: open `http://127.0.0.1:8080/hello` in a browser and `answer` (a command given text returning text) is given `"/hello"` and returns the page. It serves until the program ends, so start it with `meanwhile` to do other things too. `serve the web from the folder with (8080, "site", the command answer)` also sends the files in that folder (`/` is `index.html`), and asks `answer` only about addresses that aren't files. Inside `answer`, `the web message` is what a form or `fetch` sent along (empty for a plain visit), `answer with the file "song.mp3"` sends a file from anywhere instead of the text given back, and `web decoded "a%20b"` ("a b") and `web encoded` turn addresses into text and back. The Tidal OS system side uses these. |
 
 ### The window library
 
@@ -413,25 +414,25 @@ and the universe said i love you
 
 to pressed, given event (a number):
   set clicks to clicks plus 1
-  put the words in with (the element "#count", "Clicks: " plus clicks)
+  set the text with (the element "#count", "Clicks: " plus clicks)
 and the universe said i love you
 
 genesis:
-  whenever with (the element "button", "click", the command pressed)
+  listen for an event with (the element "button", "click", the command pressed)
 and the universe said i love you
 ```
 
-Every element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `whenever` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
+Every element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `listen for an event` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
 
 | Words (library `page`) | Means |
 |---|---|
-| `the element "sel"`, `elements matching "sel"`, `the element within with (el, "sel")`, `elements within`, `the nearest with (el, "sel")`, `parent of the element`, `the element at with (x, y)` | Finding elements (`the nearest` looks at the element and the ones around it, like CSS `closest`). `the whole window`, `the page`, `the page body` and `the focused element` are elements too. |
-| `the element made from "<li>new</li>"`, `place inside with (el, parent)`, `place first inside`, `place before`, `take away the element`, `empty the element` | Making elements from markup and putting them in the page. |
-| `put the words in with (el, "text")`, `put the markup in`, `words in the element`, `safe markup of words` | What an element holds. `safe markup of` turns `<` and `&` into markup that shows them, for words a person typed. |
+| `the element "sel"`, `elements matching "sel"`, `the element within with (el, "sel")`, `elements within`, `the nearest matching element with (el, "sel")`, `parent of the element`, `the element at with (x, y)` | Finding elements (`the nearest matching element` looks at the element and the ones around it, like CSS `closest`). `the whole window`, `the page`, `the page body` and `the focused element` are elements too. |
+| `the element made from "<li>new</li>"`, `insert as a child with (el, parent)`, `insert as the first child`, `insert before`, `remove the element`, `empty the element` | Making elements from markup and putting them in the page. |
+| `set the text with (el, "text")`, `set the markup`, `words in the element`, `safe markup of words` | What an element holds. `safe markup of` turns `<` and `&` into markup that shows them, for words a person typed. |
 | `value of the element`, `set the value`, `the element is ticked`, `tick the element`, `enable the element`, `focus on the element`, `select all in the element`, `the selected words` | Fields, ticks and buttons. |
-| `set the attribute with (el, "name", "value")`, `drop the attribute`, `attribute of the element`, `give the look with (el, "open")`, `take away the look`, `switch the look with (el, "open", yes)`, `the element has the look`, `set the style with (el, "width", "20px")`, `style of the element` | Attributes, looks (CSS classes) and styles. |
-| `left of the element`, `top of`, `width of`, `height of`, `width of the window`, `height of the window`, `scroll into view`, `scroll to the end` | Where things are, in dots from the top left of the window. |
-| `whenever with (el, "click", the command c)`, `pointer x of the event e`, `pointer y of the event`, `key of the event`, `button of the event`, `wheel of the event`, `the element of the event`, `control held in the event`, `shift held in the event`, `alt held in the event`, `hold back the event`, `stop the event spreading`, `capture the pointer with (el, e)` | Answering the person. |
+| `set the attribute with (el, "name", "value")`, `drop the attribute`, `the attribute value`, `apply the appearance with (el, "open")`, `remove the appearance`, `toggle the appearance with (el, "open", yes)`, `the element has the appearance`, `set the style with (el, "width", "20px")`, `the style value` | Attributes, looks (CSS classes) and styles. |
+| `the left edge of`, `top of`, `width of`, `height of`, `width of the window`, `height of the window`, `scroll into view`, `scroll to the end` | Where things are, in dots from the top left of the window. |
+| `listen for an event with (el, "click", the command c)`, `the pointer x coordinate of e`, `the pointer y coordinate of`, `key of the event`, `button of the event`, `wheel of the event`, `the target of`, `control held in the event`, `shift held in the event`, `alt held in the event`, `hold back the event`, `stop the event spreading`, `capture the pointer with (el, e)` | Answering the person. |
 | `after with (2, the command c)`, `every with (0.5, the command c)`, `wait for the next frame` | Later, and again and again. |
 | `animate with (el, "opacity", "0", "1", 0.3, "ease-out")`, `animate and wait` | Moving smoothly from one value to another (any CSS easing). |
 | `start drawing on with (canvas, 1)`, `drawing width`, `drawing height`, `clear the drawing`, `begin a shape`, `shape point with (x, y)`, `fill the shape`, `fill the shape fading`, `trace the shape`, `fill a dot`, `fill a box`, `fill the drawing fading`, `fill the drawing glowing` | Drawing on a canvas element (the second input of `start drawing on` is how sharp: 1 is every dot of the screen). |
@@ -452,7 +453,7 @@ load high scores from file "scores.json"
 
 `load` needs a name that already holds the right kind of value (here, a table of numbers). Lists, tables, places and your own kinds of things all work, even inside each other. A thing whose file lacks one of its parts gets that part empty, so adding a part to a kind of thing doesn't spoil old saves. If the file holds something else, the problem is `the file "scores.json" doesn't hold a table of numbers.` Use `try:` to carry on instead.
 
-`scores as saved text` gives the same JSON as text, without a file, and `load scores from the text reply` reads it back, so a program can talk to websites and other programs that use JSON (`load` fails with `the text doesn't hold a list of numbers.` if it doesn't fit). The file is JSON, which other programs can read too. To write text holding a quote mark, use the word `quote mark` (and `new line` for a line break): `scrawl "She said " plus quote mark plus "hi" plus quote mark`.
+`scores as saved text` gives the same JSON as text, without a file, and `load scores from the text reply` reads it back, so a program can talk to websites and other programs that use JSON (`load` fails with `the text doesn't hold a list of numbers.` if it doesn't fit). The file is JSON, which other programs can read too. To write text holding a quotation mark, use the word `a quotation mark` (and `new line` for a line break): `scrawl "She said " plus a quotation mark plus "hi" plus a quotation mark`.
 
 ## When something goes wrong while running
 
@@ -471,3 +472,13 @@ if that went wrong:
 The lines under `try:` stop at the first problem, even one deep inside a command they use.
 
 Checking the translator itself: `py -3 test_imagination.py`.
+
+## Reading like English
+
+- `genesis:` just above a definition (`to ...:`, `a ... has:`, `the world remembers:`) only marks where it begins;
+  the program still starts at the one `genesis:` whose lines are commands.
+- `the` may go before a name or a part: `the theme of prefs`, `the size of parts`, `the remainder of (7, 2)`.
+- `return x` leaves a command with x; a command that returns says so in its first line: `to double, given x (a number), returning a number:`.
+- `raise an error with "no fuel"` is a problem of your own, caught by `try:` like any other.
+- `return whether x is 3`: `whether` just reads well; it changes nothing.
+- `the item at 2 in names` is `item 2 of names`; `x rounded to 1 decimal place`; `a quotation mark`; `a list of text values`.

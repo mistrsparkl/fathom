@@ -24,7 +24,7 @@ genesis:
       if key held "left": set player x to player x minus 6
       if key held "right": set player x to player x plus 6
       set player x to clamp player x between 30 and 450
-      if random number from 1 to 20 is 1: gather a falling ball into balls
+      if random number from 1 to 20 is 1: add a falling ball to balls
       set balls to every ball moved down from balls
       for each ball in balls:
         if hits the player with (ball, player x): set playing to no
@@ -45,23 +45,23 @@ genesis:
     reveal the frame
 and the universe said i love you
 
-to a falling ball, giving back a ball:
+to a falling ball, returning a ball:
   set made to conjure a ball
   set birth of made to (random number from 20 to 460) horizontal -20 vertical
   set speed of made to random number from 3 to 8
-  give back made
+  return made
 and the universe said i love you
 
-to every ball moved down from, given balls (a list of balls), giving back a list of balls:
+to every ball moved down from, given balls (a list of balls), returning a list of balls:
   set still falling to a list of balls
   for each ball in balls:
     set moved to ball
     set existence of moved to existence of ball plus 0 horizontal (speed of ball) vertical
-    if existence of moved of vertical falls below 680: gather moved into still falling
-  give back still falling
+    if existence of moved of vertical falls below 680: add moved to still falling
+  return still falling
 and the universe said i love you
 
-to hits the player, given ball (a ball) and player x (a number), giving back yes or no:
+to hits the player, given ball (a ball) and player x (a number), returning yes or no:
   set where to existence of ball
-  give back where of vertical exceeds 586 and where of vertical falls below 630 and where of horizontal is within 44 of player x
+  return where of vertical exceeds 586 and where of vertical falls below 630 and where of horizontal is within 44 of player x
 and the universe said i love you

@@ -58,11 +58,11 @@
     },
     {
       "name": "keyword.control.imagination",
-      "match": "\\b(if that went wrong|if|otherwise|as long as|echo|times|for each|in|from|try|break free|move on|cease|give back|giving back|given|shatter|meanwhile|wait for the others|for a)\\b"
+      "match": "\\b(if that went wrong|if|otherwise|as long as|repeat|times|for each|in|from|try|break free|move on|cease|return|returning|given|raise an error with|whether|meanwhile|wait for the others|for a)\\b"
     },
     {
       "name": "support.function.imagination",
-      "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|gather|banish|inscribe|save|load|move|toward|conjure|invoke|the command)\\b"
+      "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|add|remove|inscribe|save|load|move|toward|conjure|as|invoke|the command)\\b"
     },
     {
       "name": "keyword.operator.imagination",

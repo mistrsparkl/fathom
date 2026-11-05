@@ -1,0 +1,921 @@
+note: Words for a whole screen of your own: a full-screen window drawn with see-through colours, smooth rounded shapes,
+note: real fonts, frosted glass, layers and line icons. For desktops, apps and anything with a look of its own.
+note: Use them in a program with:  use: screen   (Windows, running directly; it needs Pillow: py -3 -m pip install pillow)
+note: Sizes and places are in dots, counted from the top left. On a screen set to show things bigger (like 150%),
+note: a dot is bigger too, so a program looks the same everywhere and text stays sharp.
+note: Colours are "#rrggbb", or "#rrggbbaa" to see through them (aa: 00 is clear, ff is solid). 'colour of hue' makes them from a hue.
+note: For checking a program without anyone there, set IMAGINE_SCREEN_PLAY to a file of steps (see LANGUAGE.md),
+note: IMAGINE_SCREEN_SIZE to a size like 1600x900, and IMAGINE_SCREEN_HIDDEN to 1.
+
+runs only
+
+python:
+  import os, sys, time, math, re, ctypes
+  from ctypes import wintypes
+  try:
+      from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
+  except ImportError:
+      Image = None
+
+  SCREEN = {"open": False}
+  CACHE = {}
+
+  def need_screen():
+      if not SCREEN["open"]:
+          raise RunError(0, "open the screen first, with 'open the screen with \"My app\"'.")
+
+  def remembered(key, make, most=400):
+      if key not in CACHE:
+          if len(CACHE) > most:
+              for old in list(CACHE)[: most // 4]:
+                  del CACHE[old]
+          CACHE[key] = make()
+      return CACHE[key]
+
+  # ---- colours: "#rgb", "#rrggbb", "#rrggbbaa"
+  def colour(c):
+      def make():
+          s = c.strip().lower()
+          if s.startswith("#"):
+              h = s[1:]
+              if len(h) in (3, 4):
+                  h = "".join(ch * 2 for ch in h)
+              if len(h) == 6:
+                  h += "ff"
+              if len(h) == 8 and all(ch in "0123456789abcdef" for ch in h):
+                  return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4, 6))
+          named = {"black": "#000000", "white": "#ffffff", "red": "#ff0000", "green": "#00a000", "blue": "#0000ff", "clear": "#00000000"}
+          if s in named:
+              return colour(named[s])
+          raise RunError(0, f"'{c}' isn't a colour I know. Write colours like \"#0fb5ae\", or \"#0fb5ae80\" to see through them.")
+      return remembered(("colour", c), make, 4000)
+
+  def hue_colour(h, s, l, a):
+      import colorsys
+      r, g, b = colorsys.hls_to_rgb((h % 360) / 360, max(0, min(100, l)) / 100, max(0, min(100, s)) / 100)
+      parts = [round(r * 255), round(g * 255), round(b * 255), round(max(0, min(1, a)) * 255)]
+      return "#" + "".join(f"{p:02x}" for p in parts)
+
+  # ---- the window and what the person does
+  def open_screen(title):
+      if Image is None:
+          raise RunError(0, "the screen library needs Pillow: py -3 -m pip install pillow")
+      if SCREEN["open"]:
+          return
+      import tkinter
+      try:
+          ctypes.windll.shcore.SetProcessDpiAwareness(2)
+      except Exception:
+          pass
+      root = tkinter.Tk()
+      root.title(title)
+      root.configure(bg="#000000")
+      size = os.environ.get("IMAGINE_SCREEN_SIZE", "")
+      hidden = os.environ.get("IMAGINE_SCREEN_HIDDEN", "") == "1"
+      if size:
+          w, h = (int(v) for v in size.lower().split("x"))
+          root.overrideredirect(True)
+          root.geometry(f"{w}x{h}+0+0")
+      else:
+          w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+          root.attributes("-fullscreen", True)
+      if hidden:
+          root.withdraw()
+      frame = tkinter.Frame(root, width=w, height=h, bg="#000000", cursor="arrow")
+      frame.pack(fill="both", expand=True)
+      try:
+          dpi = ctypes.windll.user32.GetDpiForSystem()
+      except Exception:
+          dpi = 96
+      k = float(os.environ.get("IMAGINE_SCREEN_SCALE", "0") or 0) or max(1.0, dpi / 96)
+      SCREEN.update(open=True, root=root, frame=frame, w=w, h=h, k=k, hidden=hidden, lives=True, asked_close=False,
+                    mx=0.0, my=0.0, held=set(), down=set(), up=set(), double=False, wheel=0.0, keys=[], typed="",
+                    ctrl=False, shift=False, alt=False, last=time.perf_counter(), dt=1 / 60, began=time.perf_counter(),
+                    play=None, play_at=0.0, cursor="arrow")
+      SCREEN["image"] = Image.new("RGB", (w, h), (0, 0, 0))
+      SCREEN["targets"] = [{"img": SCREEN["image"], "ox": 0.0, "oy": 0.0, "px": 0, "py": 0}]
+      SCREEN["layers"] = {}
+      names = {"Return": "Enter", "BackSpace": "Backspace", "Left": "ArrowLeft", "Right": "ArrowRight", "Up": "ArrowUp",
+               "Down": "ArrowDown", "Prior": "PageUp", "Next": "PageDown", "space": "Space", "Escape": "Escape", "Tab": "Tab",
+               "Delete": "Delete", "Home": "Home", "End": "End", "Insert": "Insert"}
+
+      def where(e):
+          SCREEN["mx"], SCREEN["my"] = e.x / SCREEN["k"], e.y / SCREEN["k"]
+
+      def mods(e):
+          SCREEN["shift"] = bool(e.state & 0x1)
+          SCREEN["ctrl"] = bool(e.state & 0x4)
+          SCREEN["alt"] = bool(e.state & 0x20000)
+
+      def press(e, b):
+          where(e)
+          SCREEN["held"].add(b)
+          SCREEN["down"].add(b)
+
+      def release(e, b):
+          where(e)
+          SCREEN["held"].discard(b)
+          SCREEN["up"].add(b)
+
+      def key(e):
+          mods(e)
+          sym = e.keysym
+          name = names.get(sym)
+          if name is None:
+              name = sym.lower() if len(sym) == 1 else sym
+          SCREEN["keys"].append(name)
+          ch = e.char
+          if ch and len(ch) == 1 and ord(ch) >= 32 and not SCREEN["ctrl"] and ord(ch) != 127:
+              SCREEN["typed"] += ch
+          return "break"
+
+      def wheel(e):
+          SCREEN["wheel"] += -e.delta / 120
+
+      def close_asked():
+          SCREEN["asked_close"] = True
+
+      frame.bind("<Motion>", where)
+      frame.bind("<ButtonPress-1>", lambda e: press(e, "left"))
+      frame.bind("<ButtonRelease-1>", lambda e: release(e, "left"))
+      frame.bind("<ButtonPress-3>", lambda e: press(e, "right"))
+      frame.bind("<ButtonRelease-3>", lambda e: release(e, "right"))
+      frame.bind("<Double-Button-1>", lambda e: SCREEN.update(double=True))
+      root.bind("<KeyPress>", key)
+      root.bind("<KeyRelease>", mods)
+      root.bind("<MouseWheel>", wheel)
+      root.bind("<Alt-F4>", lambda e: (close_asked(), "break")[1])
+      root.protocol("WM_DELETE_WINDOW", close_asked)
+      root.update()
+      frame.focus_set()
+      if not hidden:
+          root.focus_force()
+      SCREEN["hwnd"] = frame.winfo_id()
+      play = os.environ.get("IMAGINE_SCREEN_PLAY", "")
+      if play:
+          with open(play, encoding="utf-8") as f:
+              SCREEN["play"] = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+          SCREEN["play_at"] = time.perf_counter()
+
+  def blit():
+      if SCREEN["hidden"]:
+          return
+      img = SCREEN["image"]
+      w, h = img.size
+      data = img.tobytes("raw", "BGRX")
+
+      class BITMAPINFOHEADER(ctypes.Structure):
+          _fields_ = [("biSize", wintypes.DWORD), ("biWidth", ctypes.c_long), ("biHeight", ctypes.c_long), ("biPlanes", wintypes.WORD),
+                      ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD), ("biSizeImage", wintypes.DWORD),
+                      ("biXPelsPerMeter", ctypes.c_long), ("biYPelsPerMeter", ctypes.c_long), ("biClrUsed", wintypes.DWORD), ("biClrImportant", wintypes.DWORD)]
+      info = BITMAPINFOHEADER(ctypes.sizeof(BITMAPINFOHEADER), w, -h, 1, 32, 0, 0, 0, 0, 0, 0)
+      dc = ctypes.windll.user32.GetDC(SCREEN["hwnd"])
+      ctypes.windll.gdi32.SetDIBitsToDevice(dc, 0, 0, w, h, 0, 0, 0, h, data, ctypes.byref(info), 0)
+      ctypes.windll.user32.ReleaseDC(SCREEN["hwnd"], dc)
+
+  def play_steps():
+      # steps for checking a program without a person: wait, move, click, down, up, double, right, wheel, key, type, shot, quit
+      steps = SCREEN["play"]
+      now = time.perf_counter()
+      while steps and now >= SCREEN["play_at"]:
+          words = steps.pop(0).split(" ")
+          what, rest = words[0], words[1:]
+          k = SCREEN["k"]
+          if what == "wait":
+              SCREEN["play_at"] = now + float(rest[0])
+          elif what in ("move", "click", "down", "up", "double", "right"):
+              SCREEN["mx"], SCREEN["my"] = float(rest[0]), float(rest[1])
+              if what in ("click", "down", "double"):
+                  SCREEN["held"].add("left")
+                  SCREEN["down"].add("left")
+                  if what != "down":
+                      steps.insert(0, "release")
+                  if what == "double":
+                      SCREEN["double"] = True
+                  return
+              if what == "up":
+                  SCREEN["held"].discard("left")
+                  SCREEN["up"].add("left")
+              if what == "right":
+                  SCREEN["down"].add("right")
+                  SCREEN["up"].add("right")
+          elif what == "release":
+              SCREEN["held"].discard("left")
+              SCREEN["up"].add("left")
+              return
+          elif what == "wheel":
+              SCREEN["wheel"] += float(rest[0])
+          elif what == "key":
+              SCREEN["ctrl"], SCREEN["shift"], SCREEN["alt"] = "ctrl" in rest[1:], "shift" in rest[1:], "alt" in rest[1:]
+              SCREEN["keys"].append(rest[0])
+              steps.insert(0, "lift")
+              return
+          elif what == "lift":
+              SCREEN["ctrl"] = SCREEN["shift"] = SCREEN["alt"] = False
+          elif what == "type":
+              SCREEN["typed"] += " ".join(rest)
+              return
+          elif what == "shot":
+              SCREEN["image"].save(" ".join(rest))
+          elif what == "quit":
+              SCREEN["asked_close"] = True
+              SCREEN["lives"] = False
+
+  def show():
+      need_screen()
+      if len(SCREEN["targets"]) > 1:
+          raise RunError(0, "a layer or a clip is still open: finish it ('end the layer' or 'end clipping') before showing the screen.")
+      blit()
+      for name in ("down", "up"):
+          SCREEN[name] = set()
+      SCREEN.update(double=False, wheel=0.0, keys=[], typed="")
+      if SCREEN["play"] is not None:
+          play_steps()
+      try:
+          SCREEN["root"].update()
+      except Exception:
+          SCREEN["lives"] = False
+      now = time.perf_counter()
+      left = 1 / 60 - (now - SCREEN["last"])
+      if left > 0:
+          time.sleep(left)
+          now = time.perf_counter()
+      SCREEN["dt"] = min(0.25, now - SCREEN["last"])
+      SCREEN["last"] = now
+
+  def close_screen():
+      if SCREEN["open"]:
+          SCREEN["lives"] = False
+          try:
+              SCREEN["root"].destroy()
+          except Exception:
+              pass
+          SCREEN["open"] = False
+
+  def set_cursor(look):
+      need_screen()
+      names = {"arrow": "arrow", "hand": "hand2", "text": "xterm", "move": "fleur", "across": "sb_h_double_arrow",
+               "up and down": "sb_v_double_arrow", "corner": "size_nw_se", "other corner": "size_ne_sw", "wait": "watch"}
+      c = names.get(look, "arrow")
+      if c != SCREEN["cursor"]:
+          SCREEN["cursor"] = c
+          SCREEN["frame"].config(cursor=c)
+
+  def clipboard_text():
+      need_screen()
+      try:
+          return SCREEN["root"].clipboard_get()
+      except Exception:
+          return ""
+
+  def copy_text(s):
+      need_screen()
+      SCREEN["root"].clipboard_clear()
+      SCREEN["root"].clipboard_append(s)
+
+  # ---- where drawing goes: the screen, a layer, or a clip inside them
+  def target():
+      return SCREEN["targets"][-1]
+
+  def px(t, x, y):
+      k = SCREEN["k"]
+      return round((x - t["ox"]) * k), round((y - t["oy"]) * k)
+
+  def size_px(w):
+      return max(0, round(w * SCREEN["k"]))
+
+  def put(t, src, x, y, mask=None):
+      # src (RGBA) over the target at pixel x, y, cut to the target
+      dst = t["img"]
+      if dst.mode == "RGB":
+          dst.paste(src, (x, y), mask if mask is not None else src)
+          return
+      if mask is not None:
+          src = src.copy()
+          src.putalpha(mask)
+      sx, sy = max(0, -x), max(0, -y)
+      w, h = min(src.width - sx, dst.width - x - sx), min(src.height - sy, dst.height - y - sy)
+      if w <= 0 or h <= 0:
+          return
+      if sx or sy or w != src.width or h != src.height:
+          src = src.crop((sx, sy, sx + w, sy + h))
+      dst.alpha_composite(src, (x + sx, y + sy))
+
+  def solid(size, c):
+      return Image.new("RGBA", size, c[:3] + (255,))
+
+  def faded(mask, a):
+      if a >= 255:
+          return mask
+      return ImageChops.multiply(mask, Image.new("L", mask.size, a))
+
+  def corner(r):
+      def make():
+          big = Image.new("L", (r * 4, r * 4), 0)
+          ImageDraw.Draw(big).ellipse((0, 0, r * 8 - 1, r * 8 - 1), fill=255)
+          return big.resize((r, r), Image.LANCZOS)
+      return remembered(("corner", r), make)
+
+  def rounded_mask(w, h, r):
+      def make():
+          m = Image.new("L", (w, h), 255)
+          rr = max(0, min(r, w // 2, h // 2))
+          if rr:
+              c = corner(rr)
+              m.paste(c, (0, 0))
+              m.paste(c.transpose(Image.FLIP_LEFT_RIGHT), (w - rr, 0))
+              m.paste(c.transpose(Image.FLIP_TOP_BOTTOM), (0, h - rr))
+              m.paste(c.transpose(Image.ROTATE_180), (w - rr, h - rr))
+          return m
+      return remembered(("rounded", w, h, r), make, 300)
+
+  def fill_mask(x, y, mask, c):
+      t = target()
+      put(t, solid(mask.size, c), x, y, faded(mask, c[3]))
+
+  def rounded_box(x, y, w, h, r, c):
+      need_screen()
+      t = target()
+      X, Y = px(t, x, y)
+      W, H = size_px(w), size_px(h)
+      if W <= 0 or H <= 0:
+          return
+      col = colour(c)
+      if col[3] == 0:
+          return
+      if r <= 0:
+          ImageDraw.Draw(t["img"], "RGBA").rectangle((X, Y, X + W - 1, Y + H - 1), fill=col)
+          return
+      fill_mask(X, Y, rounded_mask(W, H, size_px(r)), col)
+
+  def outline_box(x, y, w, h, r, c, width):
+      need_screen()
+      t = target()
+      X, Y = px(t, x, y)
+      W, H, R, L = size_px(w), size_px(h), size_px(r), max(1, size_px(width))
+      if W <= 2 * L or H <= 2 * L:
+          return
+      outer = rounded_mask(W, H, R)
+      inner = rounded_mask(W - 2 * L, H - 2 * L, max(0, R - L))
+      ring = outer.copy()
+      hole = Image.new("L", (W, H), 0)
+      hole.paste(inner, (L, L))
+      from PIL import ImageChops
+      ring = ImageChops.subtract(ring, hole)
+      fill_mask(X, Y, ring, colour(c))
+
+  def gradient(W, H, top, bottom, sideways=False):
+      def make():
+          ramp = Image.linear_gradient("L")
+          if sideways:
+              ramp = ramp.rotate(90).transpose(Image.FLIP_LEFT_RIGHT)
+          ramp = ramp.resize((max(1, W), max(1, H)), Image.BILINEAR)
+          a, b = Image.new("RGBA", ramp.size, top), Image.new("RGBA", ramp.size, bottom)
+          return Image.composite(b, a, ramp)
+      return remembered(("gradient", W, H, top, bottom, sideways), make, 120)
+
+  def fading_box(x, y, w, h, r, c1, c2, sideways):
+      need_screen()
+      t = target()
+      X, Y = px(t, x, y)
+      W, H = size_px(w), size_px(h)
+      if W <= 0 or H <= 0:
+          return
+      g = gradient(W, H, colour(c1), colour(c2), sideways)
+      mask = rounded_mask(W, H, size_px(r))
+      from PIL import ImageChops
+      put(t, g, X, Y, ImageChops.multiply(mask, g.getchannel("A")))
+
+  def glow(x, y, radius, c):
+      need_screen()
+      t = target()
+      R = size_px(radius)
+      if R <= 0:
+          return
+      col = colour(c)
+      def make():
+          n = 96
+          g = Image.new("L", (n, n), 0)
+          g.putdata([round(255 * max(0.0, 1 - math.hypot(i % n - n / 2 + 0.5, i // n - n / 2 + 0.5) / (n / 2)) ** 2) for i in range(n * n)])
+          return g.resize((2 * R, 2 * R), Image.BILINEAR)
+      mask = remembered(("glow", R), make, 60)
+      X, Y = px(t, x, y)
+      fill_mask(X - R, Y - R, mask, col)
+
+  def points_px(t, pts):
+      if len(pts) % 2:
+          raise RunError(0, "the points of a shape come in pairs: x, y, x, y...")
+      return [px(t, pts[i], pts[i + 1]) for i in range(0, len(pts), 2)]
+
+  def shape(pts, c):
+      need_screen()
+      t = target()
+      ps = points_px(t, pts)
+      if len(ps) >= 3:
+          ImageDraw.Draw(t["img"], "RGBA").polygon(ps, fill=colour(c))
+
+  def fading_shape(pts, c1, c2, top, bottom):
+      need_screen()
+      t = target()
+      ps = points_px(t, pts)
+      if len(ps) < 3:
+          return
+      x0, y0 = min(p[0] for p in ps), min(p[1] for p in ps)
+      x1, y1 = max(p[0] for p in ps), max(p[1] for p in ps)
+      W, H = x1 - x0 + 1, y1 - y0 + 1
+      mask = Image.new("L", (W, H), 0)
+      ImageDraw.Draw(mask).polygon([(p[0] - x0, p[1] - y0) for p in ps], fill=255)
+      T, B = px(t, 0, top)[1], px(t, 0, bottom)[1]
+      a, b = colour(c1), colour(c2)
+      def at(py):
+          f = 0 if B == T else max(0.0, min(1.0, (py - T) / (B - T)))
+          return tuple(round(a[i] + (b[i] - a[i]) * f) for i in range(4))
+      g = gradient(1, 256, at(y0), at(y1)).resize((W, H))
+      from PIL import ImageChops
+      put(t, g, x0, y0, ImageChops.multiply(mask, g.getchannel("A")))
+
+  def trace(pts, c, width):
+      need_screen()
+      t = target()
+      ps = points_px(t, pts)
+      if len(ps) >= 2:
+          ImageDraw.Draw(t["img"], "RGBA").line(ps, fill=colour(c), width=max(1, size_px(width)), joint="curve")
+
+  def dot(x, y, radius, c):
+      need_screen()
+      t = target()
+      R = radius * SCREEN["k"]
+      if R <= 0:
+          return
+      D = max(1, round(R * 2))
+      def make():
+          big = Image.new("L", (D * 4, D * 4), 0)
+          ImageDraw.Draw(big).ellipse((0, 0, D * 4 - 1, D * 4 - 1), fill=255)
+          return big.resize((D, D), Image.LANCZOS)
+      X, Y = px(t, x, y)
+      fill_mask(X - D // 2, Y - D // 2, remembered(("dot", D), make), colour(c))
+
+  def stroke(x1, y1, x2, y2, c, width):
+      trace([x1, y1, x2, y2], c, width)
+
+  # ---- words
+  FONTS = {}
+
+  def font_file(style):
+      return SCREEN.get("fonts", {}).get(style) or {
+          "regular": "C:/Windows/Fonts/segoeui.ttf", "medium": "C:/Windows/Fonts/segoeui.ttf", "semibold": "C:/Windows/Fonts/seguisb.ttf",
+          "bold": "C:/Windows/Fonts/segoeuib.ttf", "display": "C:/Windows/Fonts/seguisb.ttf", "mono": "C:/Windows/Fonts/consola.ttf",
+          "mono bold": "C:/Windows/Fonts/consolab.ttf"}.get(style, "C:/Windows/Fonts/segoeui.ttf")
+
+  def use_font(style, file):
+      SCREEN.setdefault("fonts", {})[style] = file
+      FONTS.clear()
+
+  def font(size, style):
+      key = (style, round(size * SCREEN.get("k", 1) * 4))
+      if key not in FONTS:
+          try:
+              FONTS[key] = ImageFont.truetype(font_file(style), max(1, key[1] / 4))
+          except OSError:
+              raise RunError(0, f"I couldn't read the font '{font_file(style)}'.")
+      return FONTS[key]
+
+  def text(words, x, y, size, style, c):
+      need_screen()
+      if not words:
+          return
+      t = target()
+      X, Y = px(t, x, y)
+      def make():
+          f = font(size, style)
+          left, top, right, bottom = f.getbbox(words, anchor="la")
+          m = Image.new("L", (max(1, right - left), max(1, bottom - top)), 0)
+          ImageDraw.Draw(m).text((-left, -top), words, font=f, fill=255, anchor="la")
+          return m, left, top
+      # the same words in the same font are drawn once, then only coloured in
+      mask, left, top = remembered(("text", words, size, style, SCREEN["k"]), make, 3000)
+      fill_mask(X + left, Y + top, mask, colour(c))
+
+  def text_width(words, size, style):
+      if not SCREEN.get("k"):
+          SCREEN["k"] = 1
+      return font(size, style).getlength(words) / SCREEN["k"]
+
+  # ---- pictures
+  def picture(file):
+      def make():
+          try:
+              return Image.open(file).convert("RGBA")
+          except Exception:
+              raise RunError(0, f"I couldn't open the picture \"{file}\".")
+      return remembered(("picture", file), make, 40)
+
+  def picture_size(file, which):
+      return picture(file).size[which] / (SCREEN.get("k") or 1)
+
+  def draw_picture(file, x, y, w, h, opacity):
+      need_screen()
+      t = target()
+      W, H = size_px(w), size_px(h)
+      if W <= 0 or H <= 0:
+          return
+      im = remembered(("sized", file, W, H), lambda: picture(file).resize((W, H), Image.LANCZOS), 40)
+      X, Y = px(t, x, y)
+      if opacity < 1:
+          im = im.copy()
+          im.putalpha(faded(im.getchannel("A"), round(255 * max(0, opacity))))
+      put(t, im, X, Y)
+
+  # ---- line icons, from the same SVG markup a web page would use
+  def svg_numbers(s):
+      return [float(v) for v in re.findall(r"-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?", s)]
+
+  def svg_path_points(d):
+      tokens = re.findall(r"[MmLlHhVvCcSsQqTtAaZz]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?", d)
+      shapes, here, start, cmd, last_ctrl, i = [], (0.0, 0.0), (0.0, 0.0), "M", None, 0
+      current = []
+
+      def num():
+          nonlocal i
+          v = float(tokens[i])
+          i += 1
+          return v
+
+      def flag():
+          nonlocal i
+          tok = tokens[i]
+          if len(tok) > 1 and tok[0] in "01":
+              tokens[i] = tok[1:]
+              return float(tok[0])
+          return num()
+
+      def curve(p0, p1, p2, p3):
+          return [((1 - t) ** 3 * p0[0] + 3 * (1 - t) ** 2 * t * p1[0] + 3 * (1 - t) * t * t * p2[0] + t ** 3 * p3[0],
+                   (1 - t) ** 3 * p0[1] + 3 * (1 - t) ** 2 * t * p1[1] + 3 * (1 - t) * t * t * p2[1] + t ** 3 * p3[1]) for t in [j / 12 for j in range(1, 13)]]
+
+      def arc(p0, rx, ry, rot, large, sweep, p1):
+          if rx == 0 or ry == 0:
+              return [p1]
+          phi = math.radians(rot)
+          cp, sp = math.cos(phi), math.sin(phi)
+          dx, dy = (p0[0] - p1[0]) / 2, (p0[1] - p1[1]) / 2
+          x1, y1 = cp * dx + sp * dy, -sp * dx + cp * dy
+          rx, ry = abs(rx), abs(ry)
+          lam = x1 * x1 / (rx * rx) + y1 * y1 / (ry * ry)
+          if lam > 1:
+              rx, ry = rx * math.sqrt(lam), ry * math.sqrt(lam)
+          num_ = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1
+          den = rx * rx * y1 * y1 + ry * ry * x1 * x1
+          co = math.sqrt(max(0, num_ / den)) if den else 0
+          if large == sweep:
+              co = -co
+          cx1, cy1 = co * rx * y1 / ry, -co * ry * x1 / rx
+          cx, cy = cp * cx1 - sp * cy1 + (p0[0] + p1[0]) / 2, sp * cx1 + cp * cy1 + (p0[1] + p1[1]) / 2
+          a1 = math.atan2((y1 - cy1) / ry, (x1 - cx1) / rx)
+          a2 = math.atan2((-y1 - cy1) / ry, (-x1 - cx1) / rx)
+          da = a2 - a1
+          if sweep and da < 0:
+              da += 2 * math.pi
+          if not sweep and da > 0:
+              da -= 2 * math.pi
+          n = max(4, int(abs(da) / (math.pi / 16)))
+          return [(cx + rx * math.cos(a1 + da * j / n) * cp - ry * math.sin(a1 + da * j / n) * sp,
+                   cy + rx * math.cos(a1 + da * j / n) * sp + ry * math.sin(a1 + da * j / n) * cp) for j in range(1, n + 1)]
+
+      while i < len(tokens):
+          if re.match(r"[A-Za-z]", tokens[i]):
+              cmd = tokens[i]
+              i += 1
+          rel = cmd.islower()
+          c = cmd.upper()
+          ox, oy = here if rel else (0.0, 0.0)
+          if c == "Z":
+              current.append(start)
+              shapes.append((current, True))
+              current, here = [], start
+              continue
+          if c == "M":
+              if current:
+                  shapes.append((current, False))
+              here = (ox + num(), oy + num())
+              start, current = here, [here]
+              cmd = "l" if rel else "L"
+          elif c == "L":
+              here = (ox + num(), oy + num())
+              current.append(here)
+          elif c == "H":
+              here = ((here[0] if rel else 0) + num(), here[1])
+              current.append(here)
+          elif c == "V":
+              here = (here[0], (here[1] if rel else 0) + num())
+              current.append(here)
+          elif c in "CS":
+              if c == "C":
+                  p1 = (ox + num(), oy + num())
+              else:
+                  p1 = (2 * here[0] - last_ctrl[0], 2 * here[1] - last_ctrl[1]) if last_ctrl else here
+              p2 = (ox + num(), oy + num())
+              p3 = (ox + num(), oy + num())
+              current += curve(here, p1, p2, p3)
+              here, last_ctrl = p3, p2
+              continue
+          elif c in "QT":
+              q = (ox + num(), oy + num()) if c == "Q" else ((2 * here[0] - last_ctrl[0], 2 * here[1] - last_ctrl[1]) if last_ctrl else here)
+              p3 = (ox + num(), oy + num())
+              p1 = (here[0] + 2 / 3 * (q[0] - here[0]), here[1] + 2 / 3 * (q[1] - here[1]))
+              p2 = (p3[0] + 2 / 3 * (q[0] - p3[0]), p3[1] + 2 / 3 * (q[1] - p3[1]))
+              current += curve(here, p1, p2, p3)
+              here, last_ctrl = p3, q
+              continue
+          elif c == "A":
+              rx, ry, rot = num(), num(), num()
+              large, sweep = flag(), flag()
+              p1 = (ox + num(), oy + num())
+              current += arc(here, rx, ry, rot, large, sweep, p1)
+              here = p1
+          last_ctrl = None
+      if current:
+          shapes.append((current, False))
+      return shapes
+
+  def svg_attr(tag, name, default=None):
+      m = re.search(r"\b" + name + r"\s*=\s*['\"]([^'\"]*)['\"]", tag)
+      return m.group(1) if m else default
+
+  def icon_masks(markup, size_px_):
+      # each part of the icon as (its own colour or None, a smooth mask)
+      def make():
+          view = svg_numbers(svg_attr(markup, "viewBox", "0 0 24 24"))
+          vw = view[2] if len(view) == 4 else 24
+          S = 4
+          scale = size_px_ * S / vw
+          top = re.search(r"<svg[^>]*>", markup)
+          top = top.group(0) if top else ""
+          base_width = float(svg_attr(top, "stroke-width", "1.8") or 1.8)
+          base_fill = svg_attr(top, "fill", "none")
+          base_stroke = svg_attr(top, "stroke", "currentColor")
+          parts = {}
+          for tag in re.findall(r"<(?:path|circle|rect|ellipse|line|polyline|polygon)\b[^>]*>", markup):
+              kind = re.match(r"<(\w+)", tag).group(1)
+              fill = svg_attr(tag, "fill", base_fill)
+              strokec = svg_attr(tag, "stroke", base_stroke)
+              width = float(svg_attr(tag, "stroke-width", str(base_width)))
+              alpha = float(svg_attr(tag, "opacity", "1"))
+              if kind == "path":
+                  shapes = svg_path_points(svg_attr(tag, "d", ""))
+              elif kind in ("circle", "ellipse"):
+                  cx, cy = float(svg_attr(tag, "cx", "0")), float(svg_attr(tag, "cy", "0"))
+                  rx = float(svg_attr(tag, "r", svg_attr(tag, "rx", "0")))
+                  ry = float(svg_attr(tag, "r", svg_attr(tag, "ry", "0")))
+                  shapes = [([(cx + rx * math.cos(a * math.pi / 24), cy + ry * math.sin(a * math.pi / 24)) for a in range(49)], True)]
+              elif kind == "rect":
+                  x0, y0 = float(svg_attr(tag, "x", "0")), float(svg_attr(tag, "y", "0"))
+                  w0, h0 = float(svg_attr(tag, "width", "0")), float(svg_attr(tag, "height", "0"))
+                  r0 = min(float(svg_attr(tag, "rx", "0")), w0 / 2, h0 / 2)
+                  pts = []
+                  for (ccx, ccy, a0) in ((x0 + w0 - r0, y0 + r0, -90), (x0 + w0 - r0, y0 + h0 - r0, 0), (x0 + r0, y0 + h0 - r0, 90), (x0 + r0, y0 + r0, 180)):
+                      pts += [(ccx + r0 * math.cos(math.radians(a0 + d)), ccy + r0 * math.sin(math.radians(a0 + d))) for d in range(0, 91, 15)]
+                  shapes = [(pts + [pts[0]], True)]
+              else:
+                  nums = svg_numbers(svg_attr(tag, "points", "") or " ".join(svg_attr(tag, a, "0") for a in ("x1", "y1", "x2", "y2")))
+                  shapes = [([(nums[j], nums[j + 1]) for j in range(0, len(nums) - 1, 2)], kind == "polygon")]
+              for paint, is_fill in ((fill, True), (strokec, False)):
+                  if not paint or paint == "none":
+                      continue
+                  own = paint if paint.startswith("#") else None
+                  mask = parts.setdefault(own, Image.new("L", (size_px_ * S, size_px_ * S), 0))
+                  d = ImageDraw.Draw(mask)
+                  value = round(255 * alpha)
+                  for pts, closed in shapes:
+                      scaled = [(p[0] * scale, p[1] * scale) for p in pts]
+                      if is_fill and len(scaled) >= 3:
+                          d.polygon(scaled, fill=value)
+                      elif not is_fill and len(scaled) >= 2:
+                          lw = max(1, round(width * scale))
+                          d.line(scaled, fill=value, width=lw, joint="curve")
+                          for p in (scaled[0], scaled[-1]):
+                              d.ellipse((p[0] - lw / 2, p[1] - lw / 2, p[0] + lw / 2, p[1] + lw / 2), fill=value)
+          return [(own, m.resize((size_px_, size_px_), Image.LANCZOS)) for own, m in parts.items()]
+      return remembered(("icon", markup, size_px_), make, 600)
+
+  def icon(markup, x, y, size, c):
+      need_screen()
+      t = target()
+      X, Y = px(t, x, y)
+      P = size_px(size)
+      if P <= 0:
+          return
+      for own, mask in icon_masks(markup, P):
+          fill_mask(X, Y, mask, colour(own) if own else colour(c))
+
+  # ---- layers (drawn once, put on the screen many times), clips, glass and shadows
+  def begin_layer(name, w, h):
+      need_screen()
+      img = Image.new("RGBA", (max(1, size_px(w)), max(1, size_px(h))), (0, 0, 0, 0))
+      SCREEN["targets"].append({"img": img, "ox": 0.0, "oy": 0.0, "px": 0, "py": 0, "name": name})
+
+  def end_layer():
+      need_screen()
+      if len(SCREEN["targets"]) < 2 or "name" not in SCREEN["targets"][-1]:
+          raise RunError(0, "there is no layer to end: start one with 'begin the layer'.")
+      t = SCREEN["targets"].pop()
+      SCREEN["layers"][t["name"]] = t["img"]
+
+  def put_layer(name, x, y, opacity, grow):
+      need_screen()
+      img = SCREEN["layers"].get(name)
+      if img is None:
+          raise RunError(0, f"there is no layer called \"{name}\" yet.")
+      t = target()
+      if grow != 1:
+          img = img.resize((max(1, round(img.width * grow)), max(1, round(img.height * grow))), Image.BILINEAR)
+      if opacity < 1:
+          img = img.copy()
+          img.putalpha(faded(img.getchannel("A"), round(255 * max(0, opacity))))
+      X, Y = px(t, x, y)
+      put(t, img, X, Y)
+
+  def forget_layer(name):
+      SCREEN.get("layers", {}).pop(name, None)
+
+  def begin_clip(x, y, w, h):
+      need_screen()
+      parent = target()
+      X, Y = px(parent, x, y)
+      img = Image.new("RGBA", (max(1, size_px(w)), max(1, size_px(h))), (0, 0, 0, 0))
+      SCREEN["targets"].append({"img": img, "ox": parent["ox"] + x, "oy": parent["oy"] + y, "px": X, "py": Y, "clip": True})
+
+  def end_clip():
+      need_screen()
+      if len(SCREEN["targets"]) < 2 or "clip" not in SCREEN["targets"][-1]:
+          raise RunError(0, "there is no clip to end: start one with 'begin clipping'.")
+      t = SCREEN["targets"].pop()
+      put(target(), t["img"], t["px"], t["py"])
+
+  def frosted(x, y, w, h, r, blur, c):
+      need_screen()
+      t = target()
+      X, Y = px(t, x, y)
+      W, H = size_px(w), size_px(h)
+      img = t["img"]
+      x0, y0, x1, y1 = max(0, X), max(0, Y), min(img.width, X + W), min(img.height, Y + H)
+      if x1 - x0 < 4 or y1 - y0 < 4:
+          return
+      part = img.crop((x0, y0, x1, y1)).convert("RGB")
+      small = part.resize((max(1, part.width // 4), max(1, part.height // 4)), Image.BILINEAR)
+      small = small.filter(ImageFilter.GaussianBlur(max(0.5, blur * SCREEN["k"] / 4)))
+      soft = small.resize(part.size, Image.BILINEAR).convert("RGBA")
+      mask = rounded_mask(W, H, size_px(r)).crop((x0 - X, y0 - Y, x1 - X, y1 - Y))
+      put(t, soft, x0, y0, mask)
+      rounded_box(x, y, w, h, r, c)
+
+  def shadow(x, y, w, h, r, blur, c):
+      need_screen()
+      t = target()
+      k = SCREEN["k"]
+      B = max(1, round(blur * k))
+      W, H = size_px(w), size_px(h)
+      def make():
+          q = 4
+          m = Image.new("L", ((W + 4 * B) // q + 1, (H + 4 * B) // q + 1), 0)
+          inner = rounded_mask(max(1, W // q), max(1, H // q), max(0, size_px(r) // q))
+          m.paste(inner, (2 * B // q, 2 * B // q))
+          m = m.filter(ImageFilter.GaussianBlur(max(0.5, B / q / 2)))
+          return m.resize((W + 4 * B, H + 4 * B), Image.BILINEAR)
+      mask = remembered(("shadow", W, H, size_px(r), B), make, 60)
+      X, Y = px(t, x, y)
+      fill_mask(X - 2 * B, Y - 2 * B, mask, colour(c))
+
+  def save_picture(file):
+      need_screen()
+      SCREEN["image"].save(file)
+
+  def clear(c):
+      need_screen()
+      t = target()
+      col = colour(c)
+      if t["img"].mode == "RGB":
+          t["img"].paste(col[:3], (0, 0, t["img"].width, t["img"].height))
+      else:
+          t["img"].paste(col, (0, 0, t["img"].width, t["img"].height))
+
+  def sea(name, w, h, sharpness):
+      # a layer for something soft and big (like a moving background): drawn small, shown full size
+      begin_layer(name, w * sharpness, h * sharpness)
+
+  def key_went(name):
+      return name in SCREEN.get("keys", [])
+
+to open the screen, given title (text)
+  runs: open_screen({title})
+to close the screen
+  runs: close_screen()
+the screen lives = 0, yes or no, read only
+  runs: SCREEN.get("lives", False)
+the screen was asked to close = 0, yes or no, read only
+  runs: SCREEN.get("asked_close", False)
+to stop asking to close
+  runs: SCREEN.update(asked_close=False)
+screen width = 0, number, read only
+  runs: SCREEN["w"] / SCREEN["k"] if SCREEN["open"] else 0
+screen height = 0, number, read only
+  runs: SCREEN["h"] / SCREEN["k"] if SCREEN["open"] else 0
+screen sharpness = 0, number, read only
+  runs: SCREEN.get("k", 1)
+to show the screen
+  runs: show()
+frame seconds = 0, number, read only
+  runs: SCREEN.get("dt", 1 / 60)
+to save the screen picture to, given file (text)
+  runs: save_picture({file})
+note: ---- drawing
+to clear the drawing with, given colour (text)
+  runs: clear({colour})
+to etch a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text)
+  runs: rounded_box({x}, {y}, {width}, {height}, {radius}, {colour})
+to outline a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text) and thickness (a number)
+  runs: outline_box({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness})
+to etch a fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and top colour (text) and bottom colour (text)
+  runs: fading_box({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, False)
+to etch a sideways fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and left colour (text) and right colour (text)
+  runs: fading_box({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, True)
+to etch a glow, given x (a number) and y (a number) and radius (a number) and colour (text)
+  runs: glow({x}, {y}, {radius}, {colour})
+to etch a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
+  runs: dot({x}, {y}, {radius}, {colour})
+to etch a stroke, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) and thickness (a number)
+  runs: stroke({x}, {y}, {to x}, {to y}, {colour}, {thickness})
+to etch a shape, given points (a list of numbers) and colour (text)
+  runs: shape({points}, {colour})
+to etch a fading shape, given points (a list of numbers) and top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
+  runs: fading_shape({points}, {top colour}, {bottom colour}, {top}, {bottom})
+to trace a shape, given points (a list of numbers) and colour (text) and thickness (a number)
+  runs: trace({points}, {colour}, {thickness})
+to etch text, given words (text) and x (a number) and y (a number) and size (a number) and style (text) and colour (text)
+  runs: text({words}, {x}, {y}, {size}, {style}, {colour})
+to width of text, given words (text) and size (a number) and style (text), returning a number
+  runs: text_width({words}, {size}, {style})
+to use the font, given style (text) and file (text)
+  runs: use_font({style}, {file})
+to etch a picture, given file (text) and x (a number) and y (a number) and width (a number) and height (a number) and opacity (a number)
+  runs: draw_picture({file}, {x}, {y}, {width}, {height}, {opacity})
+to picture width of, given file (text), returning a number
+  runs: picture_size({file}, 0)
+to picture height of, given file (text), returning a number
+  runs: picture_size({file}, 1)
+to etch an icon, given markup (text) and x (a number) and y (a number) and size (a number) and colour (text)
+  runs: icon({markup}, {x}, {y}, {size}, {colour})
+to etch frosted glass, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and tint (text)
+  runs: frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint})
+to etch a shadow, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and colour (text)
+  runs: shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour})
+to colour of hue, given hue (a number) and saturation (a number) and lightness (a number) and opacity (a number), returning text
+  runs: hue_colour({hue}, {saturation}, {lightness}, {opacity})
+note: ---- layers: drawn once, then put on the screen as often as you like (fast); clips keep drawing inside a box
+to begin the layer, given name (text) and width (a number) and height (a number)
+  runs: begin_layer({name}, {width}, {height})
+to end the layer
+  runs: end_layer()
+to etch the layer, given name (text) and x (a number) and y (a number) and opacity (a number) and size (a number)
+  runs: put_layer({name}, {x}, {y}, {opacity}, {size})
+to forget the layer, given name (text)
+  runs: forget_layer({name})
+to begin clipping, given x (a number) and y (a number) and width (a number) and height (a number)
+  runs: begin_clip({x}, {y}, {width}, {height})
+to end clipping
+  runs: end_clip()
+note: ---- what the person does (each frame)
+pointer x = 0, number, read only
+  runs: SCREEN.get("mx", 0)
+pointer y = 0, number, read only
+  runs: SCREEN.get("my", 0)
+the pointer went down = 0, yes or no, read only
+  runs: "left" in SCREEN.get("down", ())
+the pointer went up = 0, yes or no, read only
+  runs: "left" in SCREEN.get("up", ())
+the pointer is held = 0, yes or no, read only
+  runs: "left" in SCREEN.get("held", ())
+the right button went down = 0, yes or no, read only
+  runs: "right" in SCREEN.get("down", ())
+the pointer double clicked = 0, yes or no, read only
+  runs: SCREEN.get("double", False)
+the wheel turned = 0, number, read only
+  runs: SCREEN.get("wheel", 0.0)
+the keys pressed = 0, a list of text, read only
+  runs: list(SCREEN.get("keys", []))
+to the key went down, given key (text), returning yes or no
+  runs: key_went({key})
+the typed letters = 0, text, read only
+  runs: SCREEN.get("typed", "")
+control is held = 0, yes or no, read only
+  runs: SCREEN.get("ctrl", False)
+shift is held = 0, yes or no, read only
+  runs: SCREEN.get("shift", False)
+alt is held = 0, yes or no, read only
+  runs: SCREEN.get("alt", False)
+to set the pointer look to, given look (text)
+  runs: set_cursor({look})
+the clipboard text = 0, text, read only
+  runs: clipboard_text()
+to copy to the clipboard, given words (text)
+  runs: copy_text({words})

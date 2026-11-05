@@ -43,10 +43,10 @@ python:
           raise RunError(0, "there is no letter with the code " + text(number) + ".")
       return chr(int(number))
 
-to code of the letter, given letter (text), giving back a number = imagine_letters::code_of({letter}, {line})
+to code of the letter, given letter (text), returning a number = imagine_letters::code_of({letter}, {line})
   runs: code_of({letter})
   web: imagine_letters::code_of({letter}, {line})
-to the letter with code, given code (a number), giving back text = imagine_letters::letter_with({code}, {line})
+to the letter with code, given code (a number), returning text = imagine_letters::letter_with({code}, {line})
   runs: letter_with({code})
   web: imagine_letters::letter_with({code}, {line})
 

@@ -7,6 +7,7 @@ whisper: 6 canopy, 7 planks, 8 brick, 9 glass, 10 water, 11 deepstone (the floor
 use: window
 use: maths
 
+genesis:
 a land has:
   cells (a list of numbers)
   stale (a list of numbers)
@@ -20,39 +21,44 @@ and the universe said i love you
 
 whisper: ---------------------------------------------------------------- the shape of the island
 
-to hash, given x (a number) and z (a number) and seed (a number), giving back a number:
+genesis:
+to scramble the cell, given x (a number) and z (a number) and seed (a number), returning a number:
   set v to (sine of (x times 127.1 plus z times 311.7 plus seed times 74.7)) times 43758.5453
-  give back v minus (round down v)
+  return v minus (round down v)
 and the universe said i love you
 
-to noise, given x (a number) and z (a number) and cell (a number) and seed (a number), giving back a number:
+genesis:
+to sample the noise, given x (a number) and z (a number) and cell (a number) and seed (a number), returning a number:
   set gx to round down (x divided by cell)
   set gz to round down (z divided by cell)
   set fx to x divided by cell minus gx
   set fz to z divided by cell minus gz
   set fx to fx times fx times (3 minus 2 times fx)
   set fz to fz times fz times (3 minus 2 times fz)
-  set nw to hash with (gx, gz, seed)
-  set ne to hash with (gx plus 1, gz, seed)
-  set sw to hash with (gx, gz plus 1, seed)
-  set se to hash with (gx plus 1, gz plus 1, seed)
+  set nw to scramble the cell with (gx, gz, seed)
+  set ne to scramble the cell with (gx plus 1, gz, seed)
+  set sw to scramble the cell with (gx, gz plus 1, seed)
+  set se to scramble the cell with (gx plus 1, gz plus 1, seed)
   set top to nw plus (ne minus nw) times fx
   set bottom to sw plus (se minus sw) times fx
-  give back top plus (bottom minus top) times fz
+  return top plus (bottom minus top) times fz
 and the universe said i love you
 
-to cell kind, for a land, given x (a number) and y (a number) and z (a number), giving back a number:
-  if y falls below 0: give back 11
-  if y is at least 24: give back 0
-  if x falls below 0 or z falls below 0 or x is at least 48 or z is at least 48: give back 10
-  give back item (1 plus x plus z times 48 plus y times 2304) of cells
+genesis:
+to find the block at, for a land, given x (a number) and y (a number) and z (a number), returning a number:
+  if y falls below 0: return 11
+  if y is at least 24: return 0
+  if x falls below 0 or z falls below 0 or x is at least 48 or z is at least 48: return 10
+  return item (1 plus x plus z times 48 plus y times 2304) of cells
 and the universe said i love you
 
-to put, for a land, given x (a number) and y (a number) and z (a number) and kind (a number):
+genesis:
+to place a block, for a land, given x (a number) and y (a number) and z (a number) and kind (a number):
   if x falls below 0 or z falls below 0 or y falls below 0 or x is at least 48 or z is at least 48 or y is at least 24: cease
   set item (1 plus x plus z times 48 plus y times 2304) of cells to kind
 and the universe said i love you
 
+genesis:
 to plant a tree, for a land, given x (a number) and y (a number) and z (a number):
   for each dy from 2 to 4:
     for each dx from -2 to 2:
@@ -60,39 +66,41 @@ to plant a tree, for a land, given x (a number) and y (a number) and z (a number
         set corner to (size of dx) is 2 and (size of dz) is 2
         if dy is 4 and ((size of dx) is 2 or (size of dz) is 2): move on
         if corner and dy is 2: move on
-        if cell kind with (land, x plus dx, y plus dy, z plus dz) is 0: put with (land, x plus dx, y plus dy, z plus dz, 6)
-  for each dy from 0 to 3: put with (land, x, y plus dy, z, 5)
+        if find the block at with (land, x plus dx, y plus dy, z plus dz) is 0: place a block with (land, x plus dx, y plus dy, z plus dz, 6)
+  for each dy from 0 to 3: place a block with (land, x, y plus dy, z, 5)
 and the universe said i love you
 
-to shape, for a land:
+genesis:
+to shape the island, for a land:
   set cells to a list of numbers
-  echo 55296 times: gather 0 into cells
+  repeat 55296 times: add 0 to cells
   for each x from 0 to 47:
     for each z from 0 to 47:
       set dx to (x minus 23.5) divided by 23.5
       set dz to (z minus 23.5) divided by 23.5
       set reach to dx times dx plus dz times dz
-      set height to 4 plus (noise with (x, z, 14, 1)) times 11 plus (noise with (x, z, 5, 2)) times 3 minus reach times 9
+      set height to 4 plus (sample the noise with (x, z, 14, 1)) times 11 plus (sample the noise with (x, z, 5, 2)) times 3 minus reach times 9
       set height to round (clamp height between 2 and 19)
-      put with (land, x, 0, z, 11)
+      place a block with (land, x, 0, z, 11)
       for each y from 1 to height minus 1:
         set kind to 3
         if y is at least height minus 3: set kind to 2
         if y is height minus 1:
           set kind to 1
           if y is at most 7: set kind to 4
-        put with (land, x, y, z, kind)
+        place a block with (land, x, y, z, kind)
       if height is at most 6:
-        for each y from height to 6: put with (land, x, y, z, 10)
+        for each y from height to 6: place a block with (land, x, y, z, 10)
   for each x from 3 to 44:
     for each z from 3 to 44:
-      if (hash with (x, z, 9)) exceeds 0.965:
+      if (scramble the cell with (x, z, 9)) exceeds 0.965:
         set y to 23
-        as long as y exceeds 0 and cell kind with (land, x, y, z) is 0: set y to y minus 1
-        if cell kind with (land, x, y, z) is 1 and y is at most 17: plant a tree with (land, x, y plus 1, z)
+        as long as y exceeds 0 and find the block at with (land, x, y, z) is 0: set y to y minus 1
+        if find the block at with (land, x, y, z) is 1 and y is at most 17: plant a tree with (land, x, y plus 1, z)
 and the universe said i love you
 
-to make the island, giving back a land:
+genesis:
+to make the island, returning a land:
   set land to conjure a land
   set colours of land to a list of ("#62bb5c", "#8a5a3b", "#8d9298", "#e3d29a", "#7b5a3a", "#3f9a4c", "#c89d66", "#b5523b", "#c3ecf5", "#2f78c4", "#3d4047")
   set shades of land to a list of ("#58ae53", "#7f5236", "#83898f", "#d9c78e", "#715234", "#398f45", "#bd935d", "#a84a35", "#b5e3ee", "#2b6fb6", "#373a40")
@@ -103,34 +111,36 @@ to make the island, giving back a land:
     set cells of land to a list of numbers
     load cells of land from the text contents of file "driftstone island.json"
   otherwise:
-    shape land
+    shape the island land
   for each n from 0 to 35:
-    gather n into stale of land
-    gather 0 into ready of land
-  give back land
+    add n to stale of land
+    add 0 to ready of land
+  return land
 and the universe said i love you
 
 whisper: ---------------------------------------------------------------- drawing the island, a chunk of 8 by 8 columns at a time
 
-to see through, given kind (a number), giving back yes or no:
-  give back kind is 0 or kind is 6 or kind is 9 or kind is 10
+genesis:
+to the block is see through, given kind (a number), returning yes or no:
+  return kind is 0 or kind is 6 or kind is 9 or kind is 10
 and the universe said i love you
 
-to build chunk, for a land, given chunk (a number):
+genesis:
+to build the chunk, for a land, given chunk (a number):
   set cx to (remainder of (chunk, 6)) times 8
   set cz to (round down (chunk divided by 6)) times 8
   start keeping the shapes as "chunk " plus chunk
   for each x from cx to cx plus 7:
     for each z from cz to cz plus 7:
       for each y from 1 to 23:
-        set here to cell kind with (land, x, y, z)
+        set here to find the block at with (land, x, y, z)
         if here is 0 or here is 10: move on
-        set open to see through with (cell kind with (land, x, y plus 1, z))
-        if not open: set open to see through with (cell kind with (land, x plus 1, y, z))
-        if not open: set open to see through with (cell kind with (land, x minus 1, y, z))
-        if not open: set open to see through with (cell kind with (land, x, y, z plus 1))
-        if not open: set open to see through with (cell kind with (land, x, y, z minus 1))
-        if not open: set open to see through with (cell kind with (land, x, y minus 1, z))
+        set open to the block is see through with (find the block at with (land, x, y plus 1, z))
+        if not open: set open to the block is see through with (find the block at with (land, x plus 1, y, z))
+        if not open: set open to the block is see through with (find the block at with (land, x minus 1, y, z))
+        if not open: set open to the block is see through with (find the block at with (land, x, y, z plus 1))
+        if not open: set open to the block is see through with (find the block at with (land, x, y, z minus 1))
+        if not open: set open to the block is see through with (find the block at with (land, x, y minus 1, z))
         if open:
           set colour to item here of colours
           if (remainder of (x plus y plus z, 2)) is 1: set colour to item here of shades
@@ -139,7 +149,8 @@ to build chunk, for a land, given chunk (a number):
   set item (chunk plus 1) of ready to 1
 and the universe said i love you
 
-to touch chunks, for a land, given x (a number) and z (a number):
+genesis:
+to mark the nearby chunks, for a land, given x (a number) and z (a number):
   whisper: the chunk holding this column, and the ones beside it when it is on an edge, need drawing again
   for each dx from -1 to 1:
     for each dz from -1 to 1:
@@ -147,29 +158,33 @@ to touch chunks, for a land, given x (a number) and z (a number):
       set nz to z plus dz
       if nx is at least 0 and nz is at least 0 and nx falls below 48 and nz falls below 48:
         set chunk to (round down (nx divided by 8)) plus (round down (nz divided by 8)) times 6
-        if not (stale contains chunk): gather chunk into stale
+        if not (stale contains chunk): add chunk to stale
 and the universe said i love you
 
-to rebuild the stale ones, for a land:
+genesis:
+to rebuild the stale chunks, for a land:
   as long as size of stale exceeds 0:
-    build chunk with (land, item 1 of stale)
-    banish item 1 from stale
+    build the chunk with (land, item 1 of stale)
+    remove item 1 from stale
 and the universe said i love you
 
-to edge, given one (a place) and other (a place):
+genesis:
+to etch an edge, given one (a place) and other (a place):
   set p to screen place of one
   set q to screen place of other
   etch a line with (p of horizontal, p of vertical, q of horizontal, q of vertical, "#ffffff")
 and the universe said i love you
 
-to face, given one (a place) and two (a place) and three (a place) and four (a place):
-  edge with (one, two)
-  edge with (two, three)
-  edge with (three, four)
-  edge with (four, one)
+genesis:
+to etch a face, given one (a place) and two (a place) and three (a place) and four (a place):
+  etch an edge with (one, two)
+  etch an edge with (two, three)
+  etch an edge with (three, four)
+  etch an edge with (four, one)
 and the universe said i love you
 
-to outline, given x (a number) and y (a number) and z (a number) and eye spot (a place) and look (a place):
+genesis:
+to outline the block, given x (a number) and y (a number) and z (a number) and eye spot (a place) and look (a place):
   whisper: the eight corners must all be in front of the eye, or they have no place on the screen
   for each cx from 0 to 1:
     for each cy from 0 to 1:
@@ -186,21 +201,23 @@ to outline, given x (a number) and y (a number) and z (a number) and eye spot (a
   set ex to eye spot of horizontal
   set ey to eye spot of vertical
   set ez to eye spot of depth
-  if ey exceeds y plus 1: face with (lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, lo horizontal up vertical far depth)
-  if ey falls below y: face with (lo horizontal down vertical near depth, hi horizontal down vertical near depth, hi horizontal down vertical far depth, lo horizontal down vertical far depth)
-  if ex falls below x: face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, lo horizontal up vertical far depth, lo horizontal down vertical far depth)
-  if ex exceeds x plus 1: face with (hi horizontal down vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
-  if ez falls below z: face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal down vertical near depth)
-  if ez exceeds z plus 1: face with (lo horizontal down vertical far depth, lo horizontal up vertical far depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
+  if ey exceeds y plus 1: etch a face with (lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, lo horizontal up vertical far depth)
+  if ey falls below y: etch a face with (lo horizontal down vertical near depth, hi horizontal down vertical near depth, hi horizontal down vertical far depth, lo horizontal down vertical far depth)
+  if ex falls below x: etch a face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, lo horizontal up vertical far depth, lo horizontal down vertical far depth)
+  if ex exceeds x plus 1: etch a face with (hi horizontal down vertical near depth, hi horizontal up vertical near depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
+  if ez falls below z: etch a face with (lo horizontal down vertical near depth, lo horizontal up vertical near depth, hi horizontal up vertical near depth, hi horizontal down vertical near depth)
+  if ez exceeds z plus 1: etch a face with (lo horizontal down vertical far depth, lo horizontal up vertical far depth, hi horizontal up vertical far depth, hi horizontal down vertical far depth)
 and the universe said i love you
 
 whisper: ---------------------------------------------------------------- walking, digging and building
 
-to solid, given kind (a number), giving back yes or no:
-  give back kind is not 0 and kind is not 10
+genesis:
+to the block is solid, given kind (a number), returning yes or no:
+  return kind is not 0 and kind is not 10
 and the universe said i love you
 
-to crowded, for a land, given spot (a place), giving back yes or no:
+genesis:
+to the spot is crowded, for a land, given spot (a place), returning yes or no:
   whisper: does a body 0.6 wide and 1.75 high, standing at spot, overlap a solid block (or the edge of the island)?
   set low x to round down ((spot of horizontal) minus 0.3)
   set high x to round down ((spot of horizontal) plus 0.3)
@@ -208,15 +225,16 @@ to crowded, for a land, given spot (a place), giving back yes or no:
   set high z to round down ((spot of depth) plus 0.3)
   set low y to round down (spot of vertical)
   set high y to round down ((spot of vertical) plus 1.75)
-  if low x falls below 0 or low z falls below 0 or high x exceeds 47 or high z exceeds 47: give back yes
+  if low x falls below 0 or low z falls below 0 or high x exceeds 47 or high z exceeds 47: return yes
   for each x from low x to high x:
     for each z from low z to high z:
       for each y from low y to high y:
-        if solid with (cell kind with (land, x, y, z)): give back yes
-  give back no
+        if the block is solid with (find the block at with (land, x, y, z)): return yes
+  return no
 and the universe said i love you
 
-to aimed cell, for a land, given origin (a place) and look (a place), giving back a list of numbers:
+genesis:
+to find the aimed block, for a land, given origin (a place) and look (a place), returning a list of numbers:
   whisper: the first solid block along the look, within 6 metres, and the empty cell just before it
   set prior x to round down (origin of horizontal)
   set prior y to round down (origin of vertical)
@@ -227,32 +245,34 @@ to aimed cell, for a land, given origin (a place) and look (a place), giving bac
     set x to round down (spot of horizontal)
     set y to round down (spot of vertical)
     set z to round down (spot of depth)
-    if solid with (cell kind with (land, x, y, z)): give back a list of (x, y, z, prior x, prior y, prior z)
+    if the block is solid with (find the block at with (land, x, y, z)): return a list of (x, y, z, prior x, prior y, prior z)
     set prior x to x
     set prior y to y
     set prior z to z
     set travelled to travelled plus 0.03
-  give back a list of numbers
+  return a list of numbers
 and the universe said i love you
 
-to craft, for a land, given recipe (a number), giving back text:
+genesis:
+to craft the recipe, for a land, given recipe (a number), returning text:
   set first to item recipe of a list of (5, 3, 4, 6)
   set first count to item recipe of a list of (1, 3, 2, 2)
   set second to item recipe of a list of (0, 0, 0, 2)
   set second count to item recipe of a list of (0, 0, 0, 1)
   set made to item recipe of a list of (7, 8, 9, 1)
   set made count to item recipe of a list of (4, 2, 1, 1)
-  if item first of bag falls below first count: give back "You need " plus first count plus " " plus item first of names plus "."
-  if second exceeds 0 and item second of bag falls below second count: give back "You need " plus second count plus " " plus item second of names plus "."
+  if item first of bag falls below first count: return "You need " plus first count plus " " plus item first of names plus "."
+  if second exceeds 0 and item second of bag falls below second count: return "You need " plus second count plus " " plus item second of names plus "."
   set item first of bag to item first of bag minus first count
   if second exceeds 0: set item second of bag to item second of bag minus second count
   set item made of bag to item made of bag plus made count
-  give back "Made " plus made count plus " " plus item made of names plus "."
+  return "Made " plus made count plus " " plus item made of names plus "."
 and the universe said i love you
 
-to two digits, given n (a number), giving back text:
-  if n falls below 10: give back "0" plus n
-  give back n as text
+genesis:
+to format two digits, given n (a number), returning text:
+  if n falls below 10: return "0" plus n
+  return n as text
 and the universe said i love you
 
 whisper: ---------------------------------------------------------------- the game
@@ -265,11 +285,11 @@ genesis:
   reveal the frame
   set land to make the island
   set feet to 24.5 horizontal 23 vertical 24.5 depth
-  as long as feet of vertical exceeds 1 and not (crowded with (land, feet minus 0 horizontal 0.1 vertical 0 depth)):
+  as long as feet of vertical exceeds 1 and not (the spot is crowded with (land, feet minus 0 horizontal 0.1 vertical 0 depth)):
     set feet to feet minus 0 horizontal 0.1 vertical 0 depth
   set fall speed to 0
   set on ground to no
-  set turn to 30
+  set turn to 45
   set tilt to -12
   set chosen to 1
   set crafting to no
@@ -305,14 +325,14 @@ genesis:
       if key held "s" or key held "down": set wish to wish minus forward
       if key held "d" or key held "right": set wish to wish plus rightward
       if key held "a" or key held "left": set wish to wish minus rightward
-    set swimming to cell kind with (land, round down (feet of horizontal), round down ((feet of vertical) plus 0.4), round down (feet of depth)) is 10
+    set swimming to find the block at with (land, round down (feet of horizontal), round down ((feet of vertical) plus 0.4), round down (feet of depth)) is 10
     set pace to walk speed
     if swimming: set pace to walk speed times 0.55
     if size of wish exceeds 0: set wish to wish divided by (size of wish) times (pace times dt)
     set step to (wish of horizontal) horizontal 0 vertical 0 depth
-    if not (crowded with (land, feet plus step)): set feet to feet plus step
+    if not (the spot is crowded with (land, feet plus step)): set feet to feet plus step
     set step to 0 horizontal 0 vertical (wish of depth) depth
-    if not (crowded with (land, feet plus step)): set feet to feet plus step
+    if not (the spot is crowded with (land, feet plus step)): set feet to feet plus step
     if swimming:
       set fall speed to fall speed minus 8 times dt
       if key held "space" and pointer held: set fall speed to 3.2
@@ -322,7 +342,7 @@ genesis:
       if key held "space" and on ground and pointer held: set fall speed to 8
     set step to 0 horizontal (fall speed times dt) vertical 0 depth
     set on ground to no
-    if crowded with (land, feet plus step):
+    if the spot is crowded with (land, feet plus step):
       if fall speed falls below 0: set on ground to yes
       set fall speed to 0
     otherwise:
@@ -334,14 +354,14 @@ genesis:
     whisper: -------- what the eye sees, and digging and building
     set eye spot to feet plus 0 horizontal 1.6 vertical 0 depth
     set look to ((cosine of tilt) times (sine of turn)) horizontal (sine of tilt) vertical ((cosine of tilt) times (cosine of turn)) depth
-    set target to aimed cell with (land, eye spot, look)
+    set target to find the aimed block with (land, eye spot, look)
     set aiming to size of target is 6 and pointer held
     if aiming:
       set tx to item 1 of target
       set ty to item 2 of target
       set tz to item 3 of target
       set target id to tx plus ty times 100 plus tz times 10000
-      set kind to cell kind with (land, tx, ty, tz)
+      set kind to find the block at with (land, tx, ty, tz)
       if mouse held and not crafting:
         if target id is not dig target:
           set dig target to target id
@@ -349,12 +369,12 @@ genesis:
         set digging time to digging time plus dt
         set needed to item kind of hardness of land
         if needed exceeds 0 and digging time is at least needed:
-          put with (land, tx, ty, tz, 0)
-          if ty is at most 6 and (cell kind with (land, tx plus 1, ty, tz) is 10 or cell kind with (land, tx minus 1, ty, tz) is 10 or cell kind with (land, tx, ty, tz plus 1) is 10 or cell kind with (land, tx, ty, tz minus 1) is 10 or cell kind with (land, tx, ty plus 1, tz) is 10):
-            put with (land, tx, ty, tz, 10)
+          place a block with (land, tx, ty, tz, 0)
+          if ty is at most 6 and (find the block at with (land, tx plus 1, ty, tz) is 10 or find the block at with (land, tx minus 1, ty, tz) is 10 or find the block at with (land, tx, ty, tz plus 1) is 10 or find the block at with (land, tx, ty, tz minus 1) is 10 or find the block at with (land, tx, ty plus 1, tz) is 10):
+            place a block with (land, tx, ty, tz, 10)
           set item kind of bag of land to item kind of bag of land plus 1
-          touch chunks with (land, tx, tz)
-          rebuild the stale ones land
+          mark the nearby chunks with (land, tx, tz)
+          rebuild the stale chunks land
           set digging time to 0
           set dig target to -1
         if needed is 0 and mouse clicked:
@@ -374,14 +394,14 @@ genesis:
           set message to "That is as high as the sky goes."
           set message time to 2
         otherwise:
-          set was to cell kind with (land, px, py, pz)
-          put with (land, px, py, pz, chosen)
-          if crowded with (land, feet):
-            put with (land, px, py, pz, was)
+          set was to find the block at with (land, px, py, pz)
+          place a block with (land, px, py, pz, chosen)
+          if the spot is crowded with (land, feet):
+            place a block with (land, px, py, pz, was)
           otherwise:
             set item chosen of bag of land to item chosen of bag of land minus 1
-            touch chunks with (land, px, pz)
-            rebuild the stale ones land
+            mark the nearby chunks with (land, px, pz)
+            rebuild the stale chunks land
     otherwise:
       set digging time to 0
       set dig target to -1
@@ -392,7 +412,7 @@ genesis:
     for each n from 1 to 9:
       if key pressed (n as text):
         if crafting and n is at most 4:
-          set message to craft with (land, n)
+          set message to craft the recipe with (land, n)
           set message time to 2.5
         otherwise:
           set chosen to n
@@ -426,11 +446,11 @@ genesis:
     etch a ball with (eye spot minus sun way times 160, 6, "#e8eef7")
     etch a block with (24 horizontal 6.9 vertical 24 depth, 700, 0.1, 700, "#2f78c4")
     if size of stale of land exceeds 0:
-      build chunk with (land, item 1 of stale of land)
-      banish item 1 from stale of land
+      build the chunk with (land, item 1 of stale of land)
+      remove item 1 from stale of land
     for each n from 0 to 35:
       if item (n plus 1) of ready of land is 1: etch the kept shapes "chunk " plus n
-    if aiming: outline with (tx, ty, tz, eye spot, look)
+    if aiming: outline the block with (tx, ty, tz, eye spot, look)
 
     whisper: -------- the things on top: the cross in the middle, the blocks you carry, the workbench
     set w to width of the world
@@ -456,7 +476,7 @@ genesis:
     etch words with item chosen of names of land plus " (" plus item chosen of bag of land plus ")", slot left, slot top minus 26, "#ffffff"
     set hours to round down (remainder of (clock times 24 plus 6, 24))
     set minutes to round down (remainder of (clock times 1440, 60))
-    etch words with "Driftstone   day " plus day plus "   " plus two digits with hours plus ":" plus two digits with minutes, 14, 10, "#ffffff"
+    etch words with "Driftstone   day " plus day plus "   " plus format two digits with hours plus ":" plus format two digits with minutes, 14, 10, "#ffffff"
     if size of stale of land exceeds 0: etch words with "shaping the island... " plus (36 minus size of stale of land) plus " of 36", 14, 34, "#9fe8ff"
     if message time exceeds 0: etch words with message, 14, h minus 128, "#ffffff"
     if crafting:

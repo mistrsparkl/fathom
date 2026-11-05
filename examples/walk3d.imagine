@@ -8,19 +8,19 @@ a coin has:
   taken (yes or no)
 and the universe said i love you
 
-to make coins, giving back a list of coins:
+to make coins, returning a list of coins:
   set coins to a list of coins
   for each k from 1 to 8:
     set c to conjure a coin
     set birth of c to (random number from -20 to 20) horizontal 1 vertical (random number from -20 to 20) depth
-    gather c into coins
-  give back coins
+    add c to coins
+  return coins
 and the universe said i love you
 
-to blocked, given at (a place), giving back yes or no:
+to blocked, given at (a place), returning yes or no:
   for each k from -2 to 2:
-    if size of (flat (at minus ((k times 8) horizontal 1 vertical 6 depth))) falls below 2: give back yes
-  give back no
+    if size of (flat (at minus ((k times 8) horizontal 1 vertical 6 depth))) falls below 2: return yes
+  return no
 and the universe said i love you
 
 genesis:

@@ -29,25 +29,25 @@ to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::dur
   runs: time.sleep(max(0.0, {seconds}))
   web: (await imagine_time::wait({seconds}))
 
-seconds since start = imagine_time::since_start(), number, read only
+seconds since the start = imagine_time::since_start(), number, read only
   runs: time.monotonic() - started
   web: imagine_time::since_start()
-hour now = imagine_time::part_of_today(0), number, read only
+the current hour = imagine_time::part_of_today(0), number, read only
   runs: part_of_today(0)
   web: new Date().getHours()
-minute now = imagine_time::part_of_today(1), number, read only
+the current minute = imagine_time::part_of_today(1), number, read only
   runs: part_of_today(1)
   web: new Date().getMinutes()
-second now = imagine_time::part_of_today(2), number, read only
+the current second = imagine_time::part_of_today(2), number, read only
   runs: part_of_today(2)
   web: new Date().getSeconds()
-day of the month = imagine_time::part_of_today(3), number, read only
+the day of the month = imagine_time::part_of_today(3), number, read only
   runs: part_of_today(3)
   web: new Date().getDate()
-month now = imagine_time::part_of_today(4), number, read only
+the current month = imagine_time::part_of_today(4), number, read only
   runs: part_of_today(4)
   web: (new Date().getMonth() + 1)
-year now = imagine_time::part_of_today(5), number, read only
+the current year = imagine_time::part_of_today(5), number, read only
   runs: part_of_today(5)
   web: new Date().getFullYear()
 
@@ -79,7 +79,7 @@ today = imagine_time::stamp("%Y-%m-%d"), text, read only
 the time now = imagine_time::stamp("%H:%M:%S"), text, read only
   runs: time.strftime("%H:%M:%S")
   web: imagine_time::stamp(false)
-day of the week = imagine_time::weekday(), text, read only
+the day of the week = imagine_time::weekday(), text, read only
   runs: ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[time.localtime().tm_wday]
   web: imagine_time::weekday()
 seconds since 1970 = (double)std::time(nullptr), number, read only

@@ -107,13 +107,13 @@ python:
       except Exception:
           raise RunError(0, f'I couldn\'t send to the web page "{address}".')
 
-to web page, given address (text), giving back text = imagine_web::get({address}, {line})
+to web page, given address (text), returning text = imagine_web::get({address}, {line})
   runs: get({address})
   web: (await imagine_web::get({address}, {line}))
 to download, given address (text) and file (text) = imagine_web::download({address}, {file}, {line})
   runs: download({address}, {file})
   web: (await imagine_web::download({address}, {file}, {line}))
-to send to the web page, given address (text) and message (text), giving back text = imagine_web::send({address}, {message}, {line})
+to send to the web page, given address (text) and message (text), returning text = imagine_web::send({address}, {message}, {line})
   runs: send({address}, {message})
   web: (await imagine_web::send({address}, {message}, {line}))
 

@@ -33,7 +33,7 @@ python:
 
 to beep, given pitch (a number) and seconds (a number) = Beep((DWORD)({pitch}), (DWORD)(1000 * {seconds}))
   runs: beep({pitch}, {seconds})
-to run the command, given command (text), giving back a number = (double)std::system({command}.c_str())
+to run the command, given command (text), returning a number = (double)std::system({command}.c_str())
   runs: run_command({command})
 to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
   runs: open_thing({thing})
@@ -97,9 +97,9 @@ the words given = imagine::arguments, a list of text, read only
 current folder = std::filesystem::current_path().string(), text, read only
   runs: os.getcwd()
   web: imagine_computer::folder()
-to output of the command, given command (text), giving back text = imagine_computer::output_of({command}, {line})
+to output of the command, given command (text), returning text = imagine_computer::output_of({command}, {line})
   runs: output_of({command})
-to environment value of, given name (text), giving back text = imagine_computer::environment({name})
+to environment value of, given name (text), returning text = imagine_computer::environment({name})
   runs: os.environ.get({name}, "")
   web: imagine_computer::environment({name})
 to end the program, given code (a number) = imagine_computer::end_program({code})

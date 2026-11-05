@@ -9,11 +9,11 @@ and the universe said i love you
 
 genesis:
   set shelter to a list of pets
-  gather pet called with ("Rex", 3) into shelter
-  gather pet called with ("Mittens", 12) into shelter
-  gather pet called with ("Bubbles", 1) into shelter
-  gather "sit" into tricks of item 1 of shelter
-  gather "roll over" into tricks of item 1 of shelter
+  add pet called with ("Rex", 3) to shelter
+  add pet called with ("Mittens", 12) to shelter
+  add pet called with ("Bubbles", 1) to shelter
+  add "sit" to tricks of item 1 of shelter
+  add "roll over" to tricks of item 1 of shelter
 
   for each pet in shelter:
     scrawl name of pet, " is ", age of pet, " and knows: ", tricks of pet
@@ -21,33 +21,33 @@ genesis:
   scrawl "Oldest: ", name of oldest in shelter
   scrawl "Ages added up: ", total age of shelter
   set item 3 of shelter to pet called with ("Goldie", 2)
-  banish item 2 from shelter
+  remove item 2 from shelter
   scrawl "Left: ", names in shelter
   if names in shelter contains "Goldie": scrawl "Goldie found a home here."
 and the universe said i love you
 
-to pet called, given name (text) and age (a number), giving back a pet:
+to pet called, given name (text) and age (a number), returning a pet:
   set made to conjure a pet
   set name of made to name
   set age of made to age
-  give back made
+  return made
 and the universe said i love you
 
-to oldest in, given pets (a list of pets), giving back a pet:
+to oldest in, given pets (a list of pets), returning a pet:
   set best to item 1 of pets
   for each pet in pets:
     if age of pet exceeds age of best: set best to pet
-  give back best
+  return best
 and the universe said i love you
 
-to total age of, given pets (a list of pets), giving back a number:
+to total age of, given pets (a list of pets), returning a number:
   set total to 0
   for each pet in pets: set total to total plus age of pet
-  give back total
+  return total
 and the universe said i love you
 
-to names in, given pets (a list of pets), giving back a list of text:
+to names in, given pets (a list of pets), returning a list of text:
   set found to a list of text
-  for each pet in pets: gather name of pet into found
-  give back found
+  for each pet in pets: add name of pet to found
+  return found
 and the universe said i love you

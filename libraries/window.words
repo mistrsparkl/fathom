@@ -1384,13 +1384,13 @@ to etch the picture, given file (text) and x (a number) and y (a number) = imagi
   runs: draw_picture({file}, {x}, {y})
 to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = imagine_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
   runs: draw_picture_turned({file}, {x}, {y}, {size}, {angle})
-to width of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetWidth()
+to width of picture, given file (text), returning a number = (double)imagine_window::picture({file}, {line})->GetWidth()
   runs: size_of_picture({file}, 0)
-to height of picture, given file (text), giving back a number = (double)imagine_window::picture({file}, {line})->GetHeight()
+to height of picture, given file (text), returning a number = (double)imagine_window::picture({file}, {line})->GetHeight()
   runs: size_of_picture({file}, 1)
 to end the world = imagine_window::close()
   runs: close()
-to key held, given key (text), giving back yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])
+to key held, given key (text), returning yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])
   runs: key_name({key}) in win["held"]
 
 the world lives = imagine_window::open_now, yes or no, read only
@@ -1403,7 +1403,7 @@ mouse x = imagine_window::mouse_x_now, number, read only
   runs: win["mouse"][0]
 mouse y = imagine_window::mouse_y_now, number, read only
   runs: win["mouse"][1]
-to key pressed, given key (text), giving back yes or no = (imagine_window::pressed[imagine_window::key_code({key}, {line})])
+to key pressed, given key (text), returning yes or no = (imagine_window::pressed[imagine_window::key_code({key}, {line})])
   runs: key_name({key}) in win["pressed"]
 mouse clicked = imagine_window::clicked, yes or no, read only
   runs: win["clicked"]
@@ -1417,7 +1417,7 @@ to place the eye at, given where (a place) = imagine_window::place_eye({where})
   runs: place_eye({where})
 to aim the eye, given turn (a number) and tilt (a number) = imagine_window::aim_eye({turn}, {tilt})
   runs: aim_eye({turn}, {tilt})
-to screen place of, given where (a place), giving back a flat place = (imagine_window::need_open({line}), imagine_window::screen_place({where}))
+to screen place of, given where (a place), returning a flat place = (imagine_window::need_open({line}), imagine_window::screen_place({where}))
   runs: screen_place({where})
 to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = imagine_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
   runs: block({middle}, {width}, {height}, {depth}, {colour})
@@ -1459,5 +1459,5 @@ mouse right held = imagine_window::right_down, yes or no, read only
 mouse wheel turned = imagine_window::wheel_now, number, read only
   runs: win["wheel"]
 
-to colour from, given red (a number) and green (a number) and blue (a number), giving back text = imagine_window::mix({red}, {green}, {blue})
+to colour from, given red (a number) and green (a number) and blue (a number), returning text = imagine_window::mix({red}, {green}, {blue})
   runs: mix({red}, {green}, {blue})

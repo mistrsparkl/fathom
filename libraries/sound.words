@@ -57,6 +57,46 @@ code:
   			mciSendStringW((L"close " + alias).c_str(), nullptr, 0, nullptr);
   		playing.clear();
   	}
+
+  	// one song at a time, that can be paused, moved about in and made quieter
+  	inline bool song_open = false;
+  	inline std::wstring song_status(const wchar_t* what)
+  	{
+  		wchar_t said[128] = L"";
+  		if (song_open)
+  			mciSendStringW((std::wstring(L"status imagine_song ") + what).c_str(), said, 128, nullptr);
+  		return said;
+  	}
+  	inline void song_stop()
+  	{
+  		if (song_open)
+  			mciSendStringW(L"close imagine_song", nullptr, 0, nullptr);
+  		song_open = false;
+  	}
+  	inline void song_play(const std::string& file, int line)
+  	{
+  		song_stop();
+  		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
+  			imagine::fail(line, "there is no sound file called \"" + file + "\".");
+  		if (mciSendStringW((L"open \"" + wide(file) + L"\" type mpegvideo alias imagine_song").c_str(), nullptr, 0, nullptr) != 0)
+  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  		song_open = true;
+  		mciSendStringW(L"set imagine_song time format milliseconds", nullptr, 0, nullptr);
+  		mciSendStringW(L"play imagine_song", nullptr, 0, nullptr);
+  	}
+  	inline void song_say(const std::wstring& what)
+  	{
+  		if (song_open)
+  			mciSendStringW((L"" + what).c_str(), nullptr, 0, nullptr);
+  	}
+  	inline double song_number(const wchar_t* what) { return _wtof(song_status(what).c_str()) / 1000.0; }
+  	inline void song_seek(double seconds)
+  	{
+  		bool was = song_status(L"mode") == L"playing";
+  		song_say(L"seek imagine_song to " + std::to_wstring((long long)(seconds * 1000)));
+  		if (was)
+  			song_say(L"play imagine_song");
+  	}
   }
 
 python:
@@ -84,6 +124,38 @@ python:
       for alias in playing:
           mci(f"close {alias}", None, 0, None)
       playing.clear()
+  song = {"open": False}
+  def song_status(what):
+      said = ctypes.create_unicode_buffer(128)
+      if song["open"]:
+          mci(f"status imagine_song {what}", said, 128, None)
+      return said.value
+  def song_stop():
+      if song["open"]:
+          mci("close imagine_song", None, 0, None)
+      song["open"] = False
+  def song_play(file):
+      song_stop()
+      if not os.path.exists(file):
+          raise RunError(0, f'there is no sound file called "{file}".')
+      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias imagine_song', None, 0, None) != 0:
+          raise RunError(0, f"I couldn't play '{file}' (it must be a .wav or .mp3 file).")
+      song["open"] = True
+      mci("set imagine_song time format milliseconds", None, 0, None)
+      mci("play imagine_song", None, 0, None)
+  def song_say(what):
+      if song["open"]:
+          mci(what, None, 0, None)
+  def song_number(what):
+      try:
+          return float(song_status(what) or 0) / 1000
+      except ValueError:
+          return 0.0
+  def song_seek(seconds):
+      was = song_status("mode") == "playing"
+      song_say(f"seek imagine_song to {int(max(0, seconds) * 1000)}")
+      if was:
+          song_say("play imagine_song")
 
 to play the sound, given file (text) = imagine_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
@@ -93,3 +165,23 @@ to play the sound again and again, given file (text) = imagine_sound::play({file
   runs: play({file}, False, True)
 to stop the sound = imagine_sound::stop()
   runs: stop()
+to play the song, given file (text) = imagine_sound::song_play({file}, {line})
+  runs: song_play({file})
+to pause the song = imagine_sound::song_say(L"pause imagine_song")
+  runs: song_say("pause imagine_song")
+to carry on the song = imagine_sound::song_say(L"resume imagine_song")
+  runs: song_say("resume imagine_song")
+to stop the song = imagine_sound::song_stop()
+  runs: song_stop()
+the song is playing = (imagine_sound::song_status(L"mode") == L"playing"), yes or no, read only
+  runs: song_status("mode") == "playing"
+the song has ended = (imagine_sound::song_open && imagine_sound::song_status(L"mode") == L"stopped" && imagine_sound::song_number(L"position") + 0.3 >= imagine_sound::song_number(L"length")), yes or no, read only
+  runs: song["open"] and song_status("mode") == "stopped" and song_number("position") + 0.3 >= song_number("length")
+song time = imagine_sound::song_number(L"position"), number, read only
+  runs: song_number("position")
+song length = imagine_sound::song_number(L"length"), number, read only
+  runs: song_number("length")
+to set the song time to, given seconds (a number) = imagine_sound::song_seek({seconds})
+  runs: song_seek({seconds})
+to set the song loudness to, given level (a number) = imagine_sound::song_say(L"setaudio imagine_song volume to " + std::to_wstring((int)(std::clamp({level}, 0.0, 1.0) * 1000)))
+  runs: song_say(f"setaudio imagine_song volume to {int(max(0, min(1, {level})) * 1000)}")

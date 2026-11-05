@@ -14,49 +14,49 @@ the page body = 0, number, read only
   web: imagine_page::number(document.body)
 the focused element = 0, number, read only
   web: imagine_page::number(document.activeElement)
-to the element, given selector (text), giving back a number
+to the element, given selector (text), returning a number
   web: imagine_page::number(document.querySelector({selector}))
-to elements matching, given selector (text), giving back a list of numbers
+to elements matching, given selector (text), returning a list of numbers
   web: imagine_page::numbers(document.querySelectorAll({selector}))
-to the element within, given element (a number) and selector (text), giving back a number
+to the element within, given element (a number) and selector (text), returning a number
   web: imagine_page::number(imagine_page::get({element}, {line}).querySelector({selector}))
-to elements within, given element (a number) and selector (text), giving back a list of numbers
+to elements within, given element (a number) and selector (text), returning a list of numbers
   web: imagine_page::numbers(imagine_page::get({element}, {line}).querySelectorAll({selector}))
-to the nearest, given element (a number) and selector (text), giving back a number
+to the nearest matching element, given element (a number) and selector (text), returning a number
   web: imagine_page::number(imagine_page::get({element}, {line}).closest?.({selector}))
-to parent of the element, given element (a number), giving back a number
+to parent of the element, given element (a number), returning a number
   web: imagine_page::number(imagine_page::get({element}, {line}).parentElement)
-to the element at, given x (a number) and y (a number), giving back a number
+to the element at, given x (a number) and y (a number), returning a number
   web: imagine_page::number(document.elementFromPoint({x}, {y}))
-to the element made from, given markup (text), giving back a number
+to the element made from, given markup (text), returning a number
   web: imagine_page::made({markup}, {line})
 
 note: ---- placing them
-to place inside, given element (a number) and parent (a number)
+to insert as a child, given element (a number) and parent (a number)
   web: imagine_page::get({parent}, {line}).append(imagine_page::get({element}, {line}))
-to place first inside, given element (a number) and parent (a number)
+to insert as the first child, given element (a number) and parent (a number)
   web: imagine_page::get({parent}, {line}).prepend(imagine_page::get({element}, {line}))
-to place before, given element (a number) and other (a number)
+to insert before, given element (a number) and other (a number)
   web: imagine_page::get({other}, {line}).before(imagine_page::get({element}, {line}))
-to take away the element, given element (a number)
+to remove the element, given element (a number)
   web: imagine_page::get({element}, {line}).remove()
 to empty the element, given element (a number)
   web: imagine_page::get({element}, {line}).replaceChildren()
 
 note: ---- what they hold
-to put the words in, given element (a number) and words (text)
+to set the text, given element (a number) and words (text)
   web: (imagine_page::get({element}, {line}).textContent = {words})
-to put the markup in, given element (a number) and markup (text)
+to set the markup, given element (a number) and markup (text)
   web: (imagine_page::get({element}, {line}).innerHTML = {markup})
-to words in the element, given element (a number), giving back text
+to words in the element, given element (a number), returning text
   web: imagine_page::get({element}, {line}).textContent
-to safe markup of, given words (text), giving back text
+to safe markup of, given words (text), returning text
   web: imagine_page::safe({words})
-to value of the element, given element (a number), giving back text
+to value of the element, given element (a number), returning text
   web: String(imagine_page::get({element}, {line}).value ?? "")
 to set the value, given element (a number) and value (text)
   web: (imagine_page::get({element}, {line}).value = {value})
-to the element is ticked, given element (a number), giving back yes or no
+to the element is ticked, given element (a number), returning yes or no
   web: !!imagine_page::get({element}, {line}).checked
 to tick the element, given element (a number) and on (yes or no)
   web: (imagine_page::get({element}, {line}).checked = {on})
@@ -74,29 +74,29 @@ to set the attribute, given element (a number) and name (text) and value (text)
   web: imagine_page::get({element}, {line}).setAttribute({name}, {value})
 to drop the attribute, given element (a number) and name (text)
   web: imagine_page::get({element}, {line}).removeAttribute({name})
-to attribute of the element, given element (a number) and name (text), giving back text
+to the attribute value, given element (a number) and name (text), returning text
   web: (imagine_page::get({element}, {line}).getAttribute({name}) ?? "")
-to give the look, given element (a number) and look (text)
+to apply the appearance, given element (a number) and look (text)
   web: imagine_page::get({element}, {line}).classList.add(...imagine_page::looks({look}))
-to take away the look, given element (a number) and look (text)
+to remove the appearance, given element (a number) and look (text)
   web: imagine_page::get({element}, {line}).classList.remove(...imagine_page::looks({look}))
-to switch the look, given element (a number) and look (text) and on (yes or no)
+to toggle the appearance, given element (a number) and look (text) and on (yes or no)
   web: imagine_page::get({element}, {line}).classList.toggle({look}, {on})
-to the element has the look, given element (a number) and look (text), giving back yes or no
+to the element has the appearance, given element (a number) and look (text), returning yes or no
   web: imagine_page::get({element}, {line}).classList.contains({look})
 to set the style, given element (a number) and property (text) and value (text)
   web: imagine_page::get({element}, {line}).style.setProperty({property}, {value})
-to style of the element, given element (a number) and property (text), giving back text
+to the style value, given element (a number) and property (text), returning text
   web: getComputedStyle(imagine_page::get({element}, {line})).getPropertyValue({property}).trim()
 
 note: ---- where they are and how big
-to left of the element, given element (a number), giving back a number
+to the left edge of, given element (a number), returning a number
   web: imagine_page::get({element}, {line}).getBoundingClientRect().left
-to top of the element, given element (a number), giving back a number
+to the top edge of, given element (a number), returning a number
   web: imagine_page::get({element}, {line}).getBoundingClientRect().top
-to width of the element, given element (a number), giving back a number
+to the width of, given element (a number), returning a number
   web: imagine_page::get({element}, {line}).getBoundingClientRect().width
-to height of the element, given element (a number), giving back a number
+to the height of, given element (a number), returning a number
   web: imagine_page::get({element}, {line}).getBoundingClientRect().height
 width of the window = 0, number, read only
   web: innerWidth
@@ -108,29 +108,29 @@ to scroll to the end, given element (a number)
   web: imagine_page::end({element}, {line})
 
 note: ---- answering the person: 'whenever with (button, "click", the command pressed)' where pressed is given the event
-to whenever, given element (a number) and happening (text) and then (a command given a number)
+to listen for an event, given element (a number) and happening (text) and then (a command given a number)
   web: imagine_page::whenever({element}, {happening}, {then}, {line})
-to pointer x of the event, given event (a number), giving back a number
+to the pointer x coordinate of, given event (a number), returning a number
   web: (imagine_page::event({event}, {line}).clientX ?? 0)
-to pointer y of the event, given event (a number), giving back a number
+to the pointer y coordinate of, given event (a number), returning a number
   web: (imagine_page::event({event}, {line}).clientY ?? 0)
-to key of the event, given event (a number), giving back text
+to key of the event, given event (a number), returning text
   web: (imagine_page::event({event}, {line}).key ?? "")
-to button of the event, given event (a number), giving back a number
+to button of the event, given event (a number), returning a number
   web: (imagine_page::event({event}, {line}).button ?? 0)
-to wheel of the event, given event (a number), giving back a number
+to wheel of the event, given event (a number), returning a number
   web: (imagine_page::event({event}, {line}).deltaY ?? 0)
-to the element of the event, given event (a number), giving back a number
+to the target of, given event (a number), returning a number
   web: imagine_page::number(imagine_page::event({event}, {line}).target)
-to control held in the event, given event (a number), giving back yes or no
+to control held in the event, given event (a number), returning yes or no
   web: imagine_page::held({event}, "ctrlKey", {line})
-to shift held in the event, given event (a number), giving back yes or no
+to shift held in the event, given event (a number), returning yes or no
   web: imagine_page::held({event}, "shiftKey", {line})
-to alt held in the event, given event (a number), giving back yes or no
+to alt held in the event, given event (a number), returning yes or no
   web: imagine_page::held({event}, "altKey", {line})
 to hold back the event, given event (a number)
   web: imagine_page::event({event}, {line}).preventDefault()
-to stop the event spreading, given event (a number)
+to stop spreading, given event (a number)
   web: imagine_page::event({event}, {line}).stopPropagation()
 to capture the pointer, given element (a number) and event (a number)
   web: imagine_page::capture({element}, {event}, {line})
@@ -182,19 +182,19 @@ to play the media, given element (a number)
   web: (await imagine_page::get({element}, {line}).play().catch(() => {}))
 to pause the media, given element (a number)
   web: imagine_page::get({element}, {line}).pause()
-to the media is playing, given element (a number), giving back yes or no
+to the media is playing, given element (a number), returning yes or no
   web: !imagine_page::get({element}, {line}).paused
-to media time of, given element (a number), giving back a number
+to media time of, given element (a number), returning a number
   web: (imagine_page::get({element}, {line}).currentTime || 0)
-to media length of, given element (a number), giving back a number
+to media length of, given element (a number), returning a number
   web: (imagine_page::get({element}, {line}).duration || 0)
 to set the media time, given element (a number) and seconds (a number)
   web: (imagine_page::get({element}, {line}).currentTime = {seconds})
 to set the media loudness, given element (a number) and level (a number)
   web: (imagine_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
-to local copy of, given address (text), giving back text
+to local copy of, given address (text), returning text
   web: (await imagine_page::copy({address}, {line}))
-to loudness bands of, given element (a number) and bands (a number), giving back a list of numbers
+to loudness bands of, given element (a number) and bands (a number), returning a list of numbers
   web: imagine_page::bands({element}, {bands}, {line})
 
 javascript:

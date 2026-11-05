@@ -66,7 +66,7 @@ It's hot.
 
 ```imagination
 genesis:
-  echo 3 times:
+  repeat 3 times:
     scrawl "Hip hip hooray!"
   for each n from 1 to 5:
     scrawl n, " times 7 is ", n times 7
@@ -84,14 +84,14 @@ Hip hip hooray!
 5 times 7 is 35
 ```
 
-`echo` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `as long as ...:`, which keeps going while something is yes.
+`repeat` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `as long as ...:`, which keeps going while something is yes.
 
 ## 5. Lists
 
 ```imagination
 genesis:
   set shopping to a list of ("milk", "eggs")
-  gather "bread" into shopping
+  add "bread" to shopping
   scrawl "I need ", size of shopping, " things: ", shopping
   for each thing in shopping:
     scrawl "- ", thing
@@ -124,8 +124,8 @@ to greet, given who (text):
   scrawl "Hello, ", who, "!"
 and the universe said i love you
 
-to double, given x (a number), giving back a number:
-  give back x times 2
+to double, given x (a number), returning a number:
+  return x times 2
 and the universe said i love you
 ```
 
@@ -135,7 +135,7 @@ Hello, Ann!
 Double 21 is 42
 ```
 
-A command can take **inputs** (after `given`, each with its kind in brackets) and can **give back** an answer. Putting a job in its own command gives it a name, so the program reads like a list of what happens.
+A command can take **inputs** (after `given`, each with its kind in brackets) and can **return** an answer. Putting a job in its own command gives it a name, so the program reads like a list of what happens.
 
 ## 7. Your own kinds of things
 
@@ -200,11 +200,11 @@ No luck: there is no file called "missing.txt" (or it can't be opened).
 Still going.
 ```
 
-Your own commands can go wrong on purpose with `shatter`, and `try:` catches that the same way:
+Your own commands can go wrong on purpose with `raise an error`, and `try:` catches that the same way:
 
 ```imagination
 to fly, given fuel (a number):
-  if fuel falls below 10: shatter with "not enough fuel (only " plus fuel plus ")"
+  if fuel falls below 10: raise an error with "not enough fuel (only " plus fuel plus ")"
   scrawl "Up we go!"
 and the universe said i love you
 
@@ -275,7 +275,7 @@ genesis:
   set name of tom to "Tom"
   set rex to conjure a dog
   set name of rex to "Rex"
-  gather "sit" into tricks of rex
+  add "sit" to tricks of rex
   speak tom
   speak rex
 and the universe said i love you
@@ -291,12 +291,12 @@ Rex barks and knows 1 tricks.
 `the command double` is the command itself, not its answer. You can keep it, give it to another command, and do it later with `invoke`:
 
 ```imagination
-to double, given x (a number), giving back a number:
-  give back x times 2
+to double, given x (a number), returning a number:
+  return x times 2
 and the universe said i love you
 
-to do twice, given f (a command given a number giving back a number) and x (a number), giving back a number:
-  give back invoke f with (invoke f with x)
+to do twice, given f (a command given a number returning a number) and x (a number), returning a number:
+  return invoke f with (invoke f with x)
 and the universe said i love you
 
 genesis:

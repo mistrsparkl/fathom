@@ -55,7 +55,7 @@ NUMBER, YESNO, PLACE, FLAT, TEXT = "number", "yes or no", "place", "flat", "text
 CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D", TEXT: "std::string"}
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
-               "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT}
+               "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT, "text values": TEXT}
 UNREAL = False  # set by 'imagine unreal': libraries/unreal/ words win, and the program starts from ImagineMain()
 # Set by 'imagine web': the script is read into JavaScript instead. Every piece's .cpp then holds JavaScript; most of it
 # is written the same way in both (calls, operators, if, while), and the places where they differ check JS.
@@ -63,12 +63,13 @@ JS = False
 JS_RESERVED = set("""function let var yield await async in of typeof instanceof void delete new this class extends super import
 export default null undefined true false arguments eval with enum implements interface package private protected public
 static imagine""".split())
+MAKING_CPP = False  # yes while a program is being made into C++ (build, unreal, translate)
 UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of running can't use it; the message follows
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
 
-KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
+KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound return returning raise whether horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
 ITEM_NOT_INDEX = {None, ",", ")", "of", "is", "and", "or", "plus", "minus", "times", "divided", "by", "to",
@@ -137,7 +138,7 @@ def holds_command(kind):
 def command_words(kind, word="command"):
     ins, gives = SIGNATURES[kind]
     return word + (" given " + " and ".join(kind_name(k) for k in ins) if ins else "") + \
-        (" giving back " + kind_name(gives) if gives else "")
+        (" returning " + kind_name(gives) if gives else "")
 
 
 def cpp_type(kind):
@@ -226,8 +227,8 @@ def parse_kind(text):
     if words[:2] in (["list", "of"], ["table", "of"], ["lists", "of"], ["tables", "of"]):
         k = parse_kind(" ".join(words[2:]))
         return k and f"{words[0].rstrip('s')} of " + k
-    if words[:1] in (["command"], ["commands"]):  # 'a command given a number and text giving back yes or no'
-        m = re.fullmatch(r"(?:given (.+?))?\s*(?:giving back (.+))?", " ".join(words[1:]))
+    if words[:1] in (["command"], ["commands"]):  # 'a command given a number and text returning yes or no'
+        m = re.fullmatch(r"(?:given (.+?))?\s*(?:returning (.+))?", " ".join(words[1:]))
         if not m:
             return None
         ins = [parse_kind(part) for part in re.split(r"\s+and\s+", m.group(1))] if m.group(1) else []
@@ -243,7 +244,7 @@ def parse_kind(text):
 
 def kind_words():
     return ", ".join(["a number", "yes or no", "text", "a place", "a list of ...", "a table of ...",
-                      "a command given ... giving back ..."] + [f"a {t}" for t in THINGS])
+                      "a command given ... returning ..."] + [f"a {t}" for t in THINGS])
 
 
 def kind_name(kind):
@@ -764,19 +765,25 @@ OLD_WORDS = [  # (old words, how to say it now) - checked anywhere in a line, ou
     (r"\bthe problem\b", "the wound"), (r"\ban? new\b", "conjure a"),
     (r"\bopen a window\b", "open a world"), (r"\bthe window is open\b", "the world lives"),
     (r"\bclose the window\b", "end the world"), (r"\bshow the frame\b", "reveal the frame"),
+    (r"\bquote mark\b", "a quotation mark"), (r"\brounded to [^ ]+ places\b", "rounded to ... decimal places"),
+    (r"\bgiving back\b", "returning"),
 ]
 OLD_STARTS = [  # (old first words, how to say it now) - checked at the start of a line
-    (r"while\b", "as long as"), (r"repeat\b", "echo"), (r"stop the loop$", "break free"),
-    (r"skip to the next( one)?$", "move on"), (r"stop$", "cease"), (r"add\b", "gather ... into"),
-    (r"remove\b", "banish ... from"), (r"write\b", "inscribe ... into"),
+    (r"while\b", "as long as"), (r"echo\b", "repeat"), (r"stop the loop$", "break free"),
+    (r"skip to the next( one)?$", "move on"), (r"stop$", "cease"), (r"gather\b", "add ... to"),
+    (r"banish\b", "remove ... from"), (r"write\b", "inscribe ... into"), (r"give back\b", "return"),
+    (r"shatter\b", "raise an error with"),
 ]
 NEW_WORDS = [  # (new words, the inner words they become) - anywhere outside quote marks
     (r"\bexceeds\b", "is more than"), (r"\bfalls below\b", "is less than"), (r"\bthe wound\b", "the problem"),
-    (r"\bconjure (an?) ", "a new "),
+    (r"\bconjure (an?) ", "a new "), (r"\bwhether\s+", ""), (r"\ba quotation mark\b", "quote mark"),
+    (r"\bthe item at\b(.+?)\bin\b", r"item\1of"), (r"\brounded to\b(.+?)\bdecimal places?\b", r"rounded to\1places"),
 ]
 NEW_STARTS = [  # at the start of a line
-    (r"as long as\b", "while"), (r"echo\b", "repeat"), (r"break free$", "stop the loop"),
-    (r"move on$", "skip to the next one"), (r"cease$", "stop"),
+    (r"as long as\b", "while"), (r"break free$", "stop the loop"),
+    (r"move on$", "skip to the next one"), (r"cease$", "stop"), (r"return\b", "give back"),
+    (r"raise an error\b", "shatter"), (r"an? new (.+?) as (.+)$", r"set \2 to a new \1"),
+    (r"stop (.+?) from spreading$", r"stop spreading \1"),
 ]
 
 
@@ -821,15 +828,13 @@ def surface_part(text, line):
             body = part[lead:]
             for new, inner in NEW_STARTS:
                 body = re.sub("^" + new, inner, body, flags=re.IGNORECASE)
-            m = re.match(r"(gather|banish|inscribe)\b", body, re.IGNORECASE)
-            if m:  # gather x into y -> add x to y; banish x from y -> remove x from y; inscribe x into file -> write x to file
-                verb = m.group(1).lower()
-                body = {"gather": "add", "banish": "remove", "inscribe": "write"}[verb] + body[m.end():]
-                if verb != "banish":
-                    k = body.lower().rfind(" into ")
-                    if k < 0:
-                        raise ScriptError(line, f"'{verb}' looks like '{verb} {'5 into scores' if verb == 'gather' else chr(34) + 'hello' + chr(34) + ' into file ' + chr(34) + 'notes.txt' + chr(34)}'.")
-                    body = body[:k] + " to " + body[k + 6:]
+            m = re.match(r"inscribe\b", body, re.IGNORECASE)
+            if m:  # inscribe x into file -> write x to file
+                body = "write" + body[m.end():]
+                k = body.lower().rfind(" into ")
+                if k < 0:
+                    raise ScriptError(line, "'inscribe' looks like 'inscribe \"hello\" into file \"notes.txt\"'.")
+                body = body[:k] + " to " + body[k + 6:]
             part = part[:lead] + body
         return part
     # 'into' may sit after a quoted part, so turn the whole line, then put the quoted parts back unchanged
@@ -1200,7 +1205,7 @@ class Expr:
                 item = element(v.kind)
                 ins, gives = SIGNATURES.get(f.kind, (None, None))
                 if ins != [item] or (words[0] == "kept" and gives != YESNO) or not gives:
-                    want = f"a command given {kind_name(item)} giving back " + ("yes or no" if words[0] == "kept" else "something")
+                    want = f"a command given {kind_name(item)} returning " + ("yes or no" if words[0] == "kept" else "something")
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs {want}, not {kind_name(f.kind)}.")
                 a, g, line = v.run, f.run, self.line
                 if JS:
@@ -1247,6 +1252,13 @@ class Expr:
         tok, line = self.peek(), self.line
         if tok is None:
             raise ScriptError(line, "This line ends too early: something is missing.")
+        if (tok == "the" and self.peek(1) not in (None, "command") and not self.names.match(self.t, self.i)[0]
+                and not match_command(self.names, self.t[self.i:])[0]):
+            self.i += 1  # 'the theme of prefs' reads as 'theme of prefs', unless a name starts with 'the'
+            try:
+                return self.primary()
+            except ScriptError:
+                self.i -= 1  # not that either: the usual message about the whole phrase
         if re.fullmatch(r"\d+(?:\.\d+)?", tok):
             self.i += 1
             while self.peek() in UNITS:
@@ -1389,7 +1401,7 @@ class Expr:
                 if a.kind != kind:
                     raise ScriptError(line, f"Input {k} of this command must be {kind_name(kind)}, not {kind_name(a.kind)}.")
             if not gives and not getattr(self, "allow_nothing", False):
-                raise ScriptError(line, "This command doesn't give back anything, so it can't be used as a value.")
+                raise ScriptError(line, "This command doesn't return anything, so it can't be used as a value.")
             get, gets = f.run, [a.run for a in args]
             return Value(f"{'(await ' if JS else ''}imagine::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
                          lambda env: invoke_value(get(env), [g(env) for g in gets], line))
@@ -1421,7 +1433,7 @@ class Expr:
                     args.append(self.full())
                 self.take(")")
             if not command.gives:
-                raise ScriptError(line, f"'{' '.join(key)}' doesn't give back anything, so it can't be used as a value.")
+                raise ScriptError(line, f"'{' '.join(key)}' doesn't return anything, so it can't be used as a value.")
             cpp, run = call(key, args, self.names, line)
             return Value(cpp, command.gives, run)
         if tok in ("yes", "no"):
@@ -1742,6 +1754,7 @@ def load_library(name, line, names):
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
     web = None  # the word whose 'web:' line may come next: (where, input names, set its JavaScript)
     web_only = False  # 'web only': the library's words have no C++, only 'web:' lines
+    runs_only = False  # 'runs only': the library's words have no C++, only 'runs:' lines (Python)
     k = 0
     while k < len(rows):
         raw = rows[k]
@@ -1779,6 +1792,8 @@ def load_library(name, line, names):
         pending = web = None
         if stripped == "web only":
             web_only = True
+        elif stripped == "runs only":
+            runs_only = True
         elif stripped.startswith("include:"):
             if not JS:
                 out.append(f"#include {stripped[8:].strip()}")
@@ -1798,14 +1813,14 @@ def load_library(name, line, names):
                     out += block
             else:
                 exec("\n".join(block), space)
-        elif stripped.startswith("to ") and (" = " in stripped or web_only):
+        elif stripped.startswith("to ") and (" = " in stripped or web_only or runs_only):
             head, _, cpp = stripped.partition(" = ") if " = " in stripped else (stripped, "", "")
             try:
                 words, _, inputs, gives = command_head(head + ":", line)
             except ScriptError as err:
                 raise ScriptError(line, where + err.message)
             in_names = [" ".join(w) for w, _ in inputs]
-            for in_name in in_names if not web_only else []:
+            for in_name in in_names if not (web_only or runs_only) else []:
                 if "{" + in_name + "}" not in cpp:
                     raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
             command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
@@ -1824,6 +1839,8 @@ def load_library(name, line, names):
                 web = (where, in_names, set_web)
             elif web_only:
                 command.unusable = f"'{word}' (from the library '{name}') only works in a program made for the web ('imagine web')."
+            elif runs_only and MAKING_CPP:
+                command.unusable = f"'{word}' (from the library '{name}') only works when the program runs directly ('imagine <script>'), not built."
         elif "=" in stripped:
             english, _, rest = stripped.partition("=")
             parts = [p.strip() for p in rest.rsplit(",", 2)]
@@ -1842,6 +1859,8 @@ def load_library(name, line, names):
             def set_value(fn, holder=holder):
                 holder["run"] = lambda env: fn()
             pending = (where, [], set_value)
+            if runs_only and MAKING_CPP and not JS:
+                names.known[tuple(words)] = (UNUSABLE + f"'{english.strip()}' (from the library '{name}') only works when the program runs directly ('imagine <script>'), not built.",) + names.known[tuple(words)][1:]
             if JS or web_only:
                 key = tuple(words)
                 said = "can't be used in a web program yet." if JS else "only works in a program made for the web ('imagine web')."
@@ -1877,7 +1896,12 @@ class Program:
 
 def translate(path):
     """Returns the C++ text for one .imagine file, or raises ScriptError."""
-    return read_script(path)[0]
+    global MAKING_CPP
+    MAKING_CPP = True
+    try:
+        return read_script(path)[0]
+    finally:
+        MAKING_CPP = False
 
 
 FILES = []  # the script, then each script it uses ('use: shapes.imagine'), in the order they were read
@@ -1942,6 +1966,9 @@ def read_script(path):
             auto.append(m.group(1))
 
 
+DEFINITION = re.compile(r"to .+:|an? [a-z][a-z ]* (?:has|is a kind of .+):|the world remembers:")
+
+
 def read_one(path, auto):
     global THINGS
     FILES.clear()
@@ -2003,6 +2030,12 @@ def read_one(path, auto):
         if text_.lower() == "to start:":
             raise ScriptError(n, "'to start:' is now 'genesis:'.")
         if text_.lower() == "genesis:":
+            j = i
+            while j < len(lines) and (not lines[j].strip() or lines[j].strip().startswith("note:")):
+                j += 1
+            if j < len(lines) and DEFINITION.fullmatch(lines[j].strip().lower()):
+                lines[j] = lines[j].strip()  # 'genesis:' over a definition only marks where it begins
+                continue
             text_ = "to start:"
         if text_.startswith("to ") and text_.endswith(":"):
             body = []
@@ -2080,7 +2113,7 @@ def read_one(path, auto):
             if have.versions is None or owner is None or owner in have.versions:
                 raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
             if len(have.kinds) != len(command.kinds) or have.kinds[1:] != command.kinds[1:] or have.gives != gives:
-                raise ScriptError(n, f"Every version of '{' '.join(words)}' must take the same inputs and give back the same kind.")
+                raise ScriptError(n, f"Every version of '{' '.join(words)}' must take the same inputs and return the same kind.")
             have.versions[owner] = command
         else:
             names.commands[tuple(words)] = command
@@ -2253,7 +2286,9 @@ def describe_things(things):
 
 def command_head(header, line):
     """'to greet, given name (text):' -> (['greet'], 'Greet', [(['name'], TEXT)], None)."""
-    m = re.fullmatch(r"to ([a-z ]+?)(?:, for an? ([a-z ]+?))?(?:, given (.+?))?(?:, giving back (.+))?:", header.lower())
+    if "giving back" in header.lower():
+        raise ScriptError(line, "'giving back' is now 'returning'.")
+    m = re.fullmatch(r"to ([a-z ]+?)(?:, for an? ([a-z ]+?))?(?:, given (.+?))?(?:, returning (.+))?:", header.lower())
     if not m:
         raise ScriptError(line, "A command starts like 'to steer toward, given goal (a place) and running (yes or no):'.")
     inputs = []
@@ -2275,7 +2310,7 @@ def command_head(header, line):
     if m.group(4):
         gives = parse_kind(m.group(4))
         if not gives:
-            raise ScriptError(line, f"'giving back' needs a kind, like 'giving back a number'. Kinds are: {kind_words()}.")
+            raise ScriptError(line, f"'returning' needs a kind, like 'returning a number'. Kinds are: {kind_words()}.")
     return words, "".join(w.capitalize() for w in words), inputs, gives
 
 
@@ -2535,10 +2570,10 @@ def statement(n, text_, inner, names, declared, depth):
                         break
             return [f"{tab}while ({strip_parens(v.cpp)})", tab + "{"] + lines + [tab + "}"], run, None
         if tokens[-1:] != ["times"]:
-            raise ScriptError(n, "'echo' looks like 'echo 10 times:'.")
+            raise ScriptError(n, "'repeat' looks like 'repeat 10 times:'.")
         count = expr_to_end(tokens[:-1], 1, names, n)
         if count.kind != NUMBER:
-            raise ScriptError(n, f"'echo' needs a number of times, but this is {kind_name(count.kind)}.")
+            raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
         lines, then = body(loop=True)
         k = f"imagine_count_{depth}_{n}"
         times = count.run
@@ -2573,12 +2608,12 @@ def statement(n, text_, inner, names, declared, depth):
         lines, then = body()
         return [line, tab + "{"] + lines + [tab + "}"], guard(then, n), (which, test)
     if inner:
-        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'echo', 'as long as', 'for each' and 'try' lines can have indented lines under them.")
+        raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'as long as', 'for each' and 'try' lines can have indented lines under them.")
     tokens = tokenize(text_, n)
     if tokens in (["stop", "the", "loop"], ["skip", "to", "the", "next", "one"], ["skip", "to", "the", "next"]):
         if not names.loops:
             said = "break free" if tokens[0] == "stop" else "move on"
-            raise ScriptError(n, f"'{said}' only works inside 'echo', 'as long as' or 'for each'.")
+            raise ScriptError(n, f"'{said}' only works inside 'repeat', 'as long as' or 'for each'.")
         leave = tokens[0] == "stop"
 
         def run(env):
@@ -2586,7 +2621,7 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}{'break' if leave else 'continue'};"], run, None
     if tokens == ["stop"]:
         if names.gives:
-            raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, so leave it with 'give back ...' instead of 'cease'.")
+            raise ScriptError(n, f"This command returns {kind_name(names.gives)}, so leave it with 'return ...' instead of 'cease'.")
 
         def run(env):
             raise Stop()
@@ -2624,10 +2659,10 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         get = v.run
         return [f"{tab}{strip_parens(v.cpp)};"], lambda env: get(env) and None, None
-    if tokens[0] == "shatter":  # 'shatter with "no fuel"': a problem of your own, caught by try: like any other
+    if tokens[0] == "shatter":  # 'raise an error with "no fuel"': a problem of your own, caught by try: like any other
         v = expr_to_end(tokens, 2 if tokens[1:2] == ["with"] else 1, names, n)
         if v.kind != TEXT:
-            raise ScriptError(n, f"'shatter' needs text saying what went wrong, not {kind_name(v.kind)}.")
+            raise ScriptError(n, f"'raise an error with' needs text saying what went wrong, not {kind_name(v.kind)}.")
         get = v.run
 
         def run(env):
@@ -2635,11 +2670,11 @@ def statement(n, text_, inner, names, declared, depth):
         return [f"{tab}imagine::fail({n}, {strip_parens(v.cpp)});"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
-            raise ScriptError(n, "'give back' only works in a command that says what it gives back, like 'to double, given x (a number), giving back a number:'.")
+            raise ScriptError(n, "'return' only works in a command that says what it returns, like 'to double, given x (a number), returning a number:'.")
         v = expr_to_end(tokens, 2, names, n)
         v = fit(v, names.gives) or v
         if v.kind != names.gives:
-            raise ScriptError(n, f"This command gives back {kind_name(names.gives)}, not {kind_name(v.kind)}.")
+            raise ScriptError(n, f"This command returns {kind_name(names.gives)}, not {kind_name(v.kind)}.")
         get = v.run
 
         def run(env):
@@ -2673,7 +2708,7 @@ def statement(n, text_, inner, names, declared, depth):
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         table = expr_to_end(tokens, cut + 1, names, n)
         if not is_table(table.kind) or not table.writable:
-            raise ScriptError(n, f"'banish entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
+            raise ScriptError(n, f"'remove entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
         key = expr_to_end(tokens[:cut], 2, names, n)
         if key.kind != TEXT:
             raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
@@ -2687,7 +2722,7 @@ def statement(n, text_, inner, names, declared, depth):
         if tokens[1] == "item":
             index = expr_to_end(tokens[:cut], 2, names, n)
             if index.kind != NUMBER:
-                raise ScriptError(n, f"'banish item' needs a number, but this is {kind_name(index.kind)}.")
+                raise ScriptError(n, f"'remove item' needs a number, but this is {kind_name(index.kind)}.")
             at = index.run
 
             def run(env):
@@ -2863,7 +2898,7 @@ def statement(n, text_, inner, names, declared, depth):
     near = similar_words(tokens, names)
     if near:
         raise ScriptError(n, f"I don't know '{' '.join(tokens[:4])}'." + near)
-    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, gather, banish, inscribe, if, otherwise, echo, as long as, for each, try, give back, cease, whisper or the name of a command.")
+    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, add, remove, inscribe, if, otherwise, repeat, as long as, for each, try, return, raise an error with, cease, whisper or the name of a command.")
 
 
 def for_each(n, head, body, names, declared, depth):
@@ -3135,12 +3170,15 @@ def find_vcvars():
 
 def build(script, exe):
     """Reads a program script and compiles it into exe. Returns an error message, or None."""
-    global LOGIC
+    global LOGIC, MAKING_CPP
     LOGIC = script.parent
+    MAKING_CPP = True
     try:
         cpp_out, program = read_script(script)
     except ScriptError as err:
         return f"{where(err.line)}: {err.message}"
+    finally:
+        MAKING_CPP = False
     if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
     vcvars = find_vcvars()
@@ -3185,14 +3223,14 @@ WORLD = Path.home() / "Documents" / "ImaginationWorld"  # the Unreal project 'im
 
 def unreal(script, launch=True):
     """Turns a program into the ImaginationWorld Unreal project, builds it, and starts it. Returns an error message, or None."""
-    global LOGIC, UNREAL
-    LOGIC, UNREAL = script.parent, True
+    global LOGIC, UNREAL, MAKING_CPP
+    LOGIC, UNREAL, MAKING_CPP = script.parent, True, True
     try:
         cpp_out, program = read_script(script)
     except ScriptError as err:
         return f"{where(err.line)}: {err.message}"
     finally:
-        UNREAL = False
+        UNREAL = MAKING_CPP = False
     if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
     editor = ENGINE / "Engine" / "Binaries" / "Win64" / "UnrealEditor.exe"
@@ -3225,7 +3263,7 @@ TRY_HELLO = """Imagination: type a line and press Enter to see what it does. For
   set name to "Sam"
   scrawl "Hello, " plus name
   5 plus 3 times 2
-A line ending in ':' (like 'echo 3 times:') takes the indented lines after it; finish them with an empty line.
+A line ending in ':' (like 'repeat 3 times:') takes the indented lines after it; finish them with an empty line.
 'use: maths' brings in a library. Type 'bye' to finish."""
 
 
