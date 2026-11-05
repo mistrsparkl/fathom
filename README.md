@@ -23,3 +23,7 @@ and the universe said i love you
 Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.
 
 Checking Cosmonova itself: `py -3 test_cosmonova.py` runs every test program both ways (directly and built) and checks they print exactly the same.
+
+`cosmonova build game.cosmos` makes machine code: Cosmonova writes LLVM code for the program and LLVM's clang
+turns it into an .exe (install LLVM: `winget install LLVM.LLVM`). What every program needs is in `runtime/machine.cpp`,
+compiled once. Programs that use parts `machine.py` can't make yet are still built through C++ for now.

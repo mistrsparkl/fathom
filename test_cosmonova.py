@@ -613,6 +613,10 @@ def program_checks():
     assert perr('genesis:\n  scrawl body\n' + END)[1] == \
         "I don't know 'body'. If it is a name, set it before this line (like 'set body to 0') or list it as an input of the command."
     assert perr('genesis:\n  set word to "x"\n  add 1 to word\n' + END)[1] == "'add ... to' needs a list or a number, but this is text."
+    made = translate.BUILT_THROUGH
+    print(f"(built: {made.count('machine')} programs straight into machine code, {len(made) - made.count('machine')} through C++ for now)")
+    if os.environ.get("COSMONOVA_SHOW_SKIPPED"):
+        print("\n".join(sorted(set(m.split(": ", 1)[1] for m in made if m != "machine"))))
     if node:
         print(f"(made for the web too: {web_runs[0]} programs; {len(web_skipped)} use words the web doesn't have yet)")
         if os.environ.get("COSMONOVA_SHOW_SKIPPED"):

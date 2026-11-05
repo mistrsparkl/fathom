@@ -5,3 +5,4 @@ mygame.cosmos
 *.json
 !editor/vscode/**/*.json
 *.vsix
+runtime/built/
