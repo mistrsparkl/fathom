@@ -9,7 +9,7 @@ include: <cstdlib>
 link: shell32
 
 code:
-  namespace imagine_computer
+  namespace cosmonova_computer
   {
   	inline std::string user_name()
   	{
@@ -38,22 +38,22 @@ to run the command, given command (text), returning a number = (double)std::syst
 to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
   runs: open_thing({thing})
 
-user name = imagine_computer::user_name(), text, read only
+user name = cosmonova_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME", "")
-  web: imagine_computer::environment("USERNAME")
+  web: cosmonova_computer::environment("USERNAME")
 
 include: <cstdio>
 include: <filesystem>
 
 code:
-  namespace imagine_computer
+  namespace cosmonova_computer
   {
   	inline std::string output_of(const std::string& command, int line)
   	{
   		std::fflush(stdout);
   		FILE* pipe = _popen(command.c_str(), "rb");
   		if (!pipe)
-  			imagine::fail(line, "I couldn't run the command \"" + command + "\".");
+  			cosmonova::fail(line, "I couldn't run the command \"" + command + "\".");
   		std::string all;
   		char chunk[4096];
   		for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, pipe)) > 0;)
@@ -91,25 +91,25 @@ python:
       sys.stderr.flush()
       os._exit(int(code))
 
-the words given = imagine::arguments, a list of text, read only
+the words given = cosmonova::arguments, a list of text, read only
   runs: list(ARGUMENTS)
-  web: imagine_computer::words_given()
+  web: cosmonova_computer::words_given()
 current folder = std::filesystem::current_path().string(), text, read only
   runs: os.getcwd()
-  web: imagine_computer::folder()
-to output of the command, given command (text), returning text = imagine_computer::output_of({command}, {line})
+  web: cosmonova_computer::folder()
+to output of the command, given command (text), returning text = cosmonova_computer::output_of({command}, {line})
   runs: output_of({command})
-to environment value of, given name (text), returning text = imagine_computer::environment({name})
+to environment value of, given name (text), returning text = cosmonova_computer::environment({name})
   runs: os.environ.get({name}, "")
-  web: imagine_computer::environment({name})
-to end the program, given code (a number) = imagine_computer::end_program({code})
+  web: cosmonova_computer::environment({name})
+to end the program, given code (a number) = cosmonova_computer::end_program({code})
   runs: end_program({code})
-  web: imagine::leave({code})
+  web: cosmonova::leave({code})
 
 javascript:
-  const imagine_computer = {
+  const cosmonova_computer = {
     node: typeof process !== "undefined" && !!(process.versions && process.versions.node),
-    environment: (name) => (imagine_computer.node ? process.env[name] || "" : ""),
-    words_given: () => (imagine_computer.node ? process.argv.slice(2) : []),
-    folder: () => (imagine_computer.node ? process.cwd() : ""),
+    environment: (name) => (cosmonova_computer.node ? process.env[name] || "" : ""),
+    words_given: () => (cosmonova_computer.node ? process.argv.slice(2) : []),
+    folder: () => (cosmonova_computer.node ? process.cwd() : ""),
   };

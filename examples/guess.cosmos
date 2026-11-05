@@ -1,5 +1,5 @@
 whisper: Guess the number. The computer picks a number from 1 to 100 and you try to guess it.
-whisper: Run it with: py -3 imagination.py run examples/guess.imagine
+whisper: Run it with: py -3 cosmonova.py run examples/guess.cosmos
 
 genesis:
   scrawl "I'm thinking of a number from 1 to 100."

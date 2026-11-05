@@ -1,29 +1,29 @@
 {
-  "scopeName": "source.imagination",
-  "name": "Imagination",
+  "scopeName": "source.cosmonova",
+  "name": "Cosmonova",
   "patterns": [
     {
-      "name": "comment.line.imagination",
+      "name": "comment.line.cosmonova",
       "match": "^\\s*whisper:.*$"
     },
     {
-      "name": "keyword.control.closing.imagination",
+      "name": "keyword.control.closing.cosmonova",
       "match": "^and the universe said i love you\\s*$"
     },
     {
-      "name": "string.quoted.double.imagination",
+      "name": "string.quoted.double.cosmonova",
       "begin": "\"",
       "end": "\""
     },
     {
-      "name": "constant.numeric.imagination",
+      "name": "constant.numeric.cosmonova",
       "match": "\\b\\d+(\\.\\d+)?\\b"
     },
     {
       "match": "^(genesis)(:)",
       "captures": {
         "1": {
-          "name": "keyword.control.genesis.imagination"
+          "name": "keyword.control.genesis.cosmonova"
         }
       }
     },
@@ -31,10 +31,10 @@
       "match": "^(to)\\s+([a-z ]+?)(?=,|:)",
       "captures": {
         "1": {
-          "name": "keyword.control.imagination"
+          "name": "keyword.control.cosmonova"
         },
         "2": {
-          "name": "entity.name.function.imagination"
+          "name": "entity.name.function.cosmonova"
         }
       }
     },
@@ -42,38 +42,38 @@
       "match": "^(an?)\\s+([a-z ]+?)\\s+(has|is a kind of [a-z ]+?(?: that (?:also )?has)?)(:)",
       "captures": {
         "1": {
-          "name": "keyword.other.imagination"
+          "name": "keyword.other.cosmonova"
         },
         "2": {
-          "name": "entity.name.type.imagination"
+          "name": "entity.name.type.cosmonova"
         },
         "3": {
-          "name": "keyword.other.imagination"
+          "name": "keyword.other.cosmonova"
         }
       }
     },
     {
-      "name": "keyword.other.use.imagination",
+      "name": "keyword.other.use.cosmonova",
       "match": "^use:"
     },
     {
-      "name": "keyword.control.imagination",
+      "name": "keyword.control.cosmonova",
       "match": "\\b(if that went wrong|if|otherwise|as long as|repeat|times|for each|in|from|try|break free|move on|cease|return|returning|given|raise an error with|whether|meanwhile|wait for the others|for a)\\b"
     },
     {
-      "name": "support.function.imagination",
+      "name": "support.function.cosmonova",
       "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|add|remove|inscribe|save|load|move|toward|conjure|as|invoke|the command)\\b"
     },
     {
-      "name": "keyword.operator.imagination",
+      "name": "keyword.operator.cosmonova",
       "match": "\\b(plus|minus|times|divided by|is within|exceeds|falls below|is at least|is at most|is not|is|not|and|or|of|contains|with|touches|begins with|ends with|trimmed|as saved text|as text)\\b"
     },
     {
-      "name": "constant.language.imagination",
+      "name": "constant.language.cosmonova",
       "match": "\\b(yes|no|birth|existence|horizontal|vertical|depth|quote mark|new line|the wound|the world lives)\\b"
     },
     {
-      "name": "storage.type.imagination",
+      "name": "storage.type.cosmonova",
       "match": "\\((a number|text|yes or no|a place|a flat place|an? [a-z ]+|a list of [a-z ]+|a table of [a-z ]+)\\)"
     }
   ]

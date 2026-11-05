@@ -21,7 +21,7 @@ include: <gdiplus.h>
 link: gdiplus
 
 code:
-  namespace imagine_window
+  namespace cosmonova_window
   {
   	inline HWND window = nullptr;
   	inline HDC canvas = nullptr;
@@ -53,7 +53,7 @@ code:
   	inline void need_window(int line)
   	{
   		if (!opened)
-  			imagine::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
+  			cosmonova::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
   		flush3d();
   	}
 
@@ -64,7 +64,7 @@ code:
   			{"blue", RGB(50, 90, 230)}, {"yellow", RGB(245, 210, 40)}, {"orange", RGB(245, 140, 30)},
   			{"purple", RGB(140, 60, 200)}, {"pink", RGB(240, 120, 180)}, {"brown", RGB(130, 80, 40)},
   			{"grey", RGB(128, 128, 128)}, {"gray", RGB(128, 128, 128)}};
-  		std::string low = imagine::lower(name);
+  		std::string low = cosmonova::lower(name);
   		for (const auto& [key, value] : named)
   			if (low == key) return value;
   		if (low.size() == 7 && low[0] == '#' && low.find_first_not_of("0123456789abcdef", 1) == std::string::npos)
@@ -72,7 +72,7 @@ code:
   			unsigned long v = std::stoul(low.substr(1), nullptr, 16);
   			return RGB((v >> 16) & 255, (v >> 8) & 255, v & 255);
   		}
-  		imagine::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
+  		cosmonova::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
   	}
 
   	inline std::string mix(double r, double g, double b)  // 'colour from (255, 136, 0)' is "#ff8800"
@@ -85,7 +85,7 @@ code:
 
   	inline int key_code(const std::string& name, int line)
   	{
-  		std::string k = imagine::lower(name);
+  		std::string k = cosmonova::lower(name);
   		if (k.size() == 1 && ((k[0] >= 'a' && k[0] <= 'z') || (k[0] >= '0' && k[0] <= '9')))
   			return std::toupper((unsigned char)k[0]);
   		static const std::pair<const char*, int> named[] = {
@@ -94,7 +94,7 @@ code:
   			{"tab", VK_TAB}, {"backspace", VK_BACK}};
   		for (const auto& [key, value] : named)
   			if (k == key) return value;
-  		imagine::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
+  		cosmonova::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
   	}
 
   	inline LRESULT CALLBACK on_message(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -138,20 +138,20 @@ code:
   	{
   		timeBeginPeriod(1);  // Sleep to the millisecond, so frames come 60 times a second, not 32
   		if (window)
-  			imagine::fail(line, "a window is already open.");
+  			cosmonova::fail(line, "a window is already open.");
   		if (w < 1 || h < 1 || w > 10000 || h > 10000)
-  			imagine::fail(line, "a window must be from 1 to 10000 dots wide and high.");
+  			cosmonova::fail(line, "a window must be from 1 to 10000 dots wide and high.");
   		width = (int)w; height = (int)h;
   		WNDCLASSW wc{};
   		wc.lpfnWndProc = on_message;
   		wc.hInstance = GetModuleHandleW(nullptr);
   		wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  		wc.lpszClassName = L"ImaginationWindow";
+  		wc.lpszClassName = L"CosmonovaWindow";
   		RegisterClassW(&wc);
   		DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
   		RECT r{0, 0, width, height};
   		AdjustWindowRect(&r, style, FALSE);
-  		window = CreateWindowW(L"ImaginationWindow", wide(title).c_str(), style, CW_USEDEFAULT, CW_USEDEFAULT,
+  		window = CreateWindowW(L"CosmonovaWindow", wide(title).c_str(), style, CW_USEDEFAULT, CW_USEDEFAULT,
   			r.right - r.left, r.bottom - r.top, nullptr, nullptr, wc.hInstance, nullptr);
   		HDC dc = GetDC(window);
   		canvas = CreateCompatibleDC(dc);
@@ -220,7 +220,7 @@ code:
   	inline void set_text_size(double size, int line)
   	{
   		if (!(size >= 1 && size <= 500))
-  			imagine::fail(line, "text can be from 1 to 500 dots high, not " + imagine::text(size) + ".");
+  			cosmonova::fail(line, "text can be from 1 to 500 dots high, not " + cosmonova::text(size) + ".");
   		text_size = (int)std::lround(size);
   		if (canvas)
   		{
@@ -296,10 +296,10 @@ code:
   		if (found != loaded.end())
   			return found->second.get();
   		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
-  			imagine::fail(line, "there is no picture called \"" + file + "\".");
+  			cosmonova::fail(line, "there is no picture called \"" + file + "\".");
   		auto image = std::make_unique<Gdiplus::Image>(wide(file).c_str());
   		if (image->GetLastStatus() != Gdiplus::Ok || image->GetWidth() == 0)
-  			imagine::fail(line, "I couldn't read the picture \"" + file + "\" (use .png or .gif).");
+  			cosmonova::fail(line, "I couldn't read the picture \"" + file + "\" (use .png or .gif).");
   		return (loaded[file] = std::move(image)).get();
   	}
 
@@ -316,7 +316,7 @@ code:
   	{
   		need_window(line);
   		if (!(size > 0 && size <= 100))
-  			imagine::fail(line, "a picture's size must be more than 0 and at most 100, not " + imagine::text(size) + ".");
+  			cosmonova::fail(line, "a picture's size must be more than 0 and at most 100, not " + cosmonova::text(size) + ".");
   		Gdiplus::Image* image = picture(file, line);
   		Gdiplus::Graphics g(canvas);
   		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -338,7 +338,7 @@ code:
   }
 
 code:
-  namespace imagine_window
+  namespace cosmonova_window
   {
   	// The 3D words: the eye (camera) at a place, turned and tilted. Across is horizontal, up is vertical, away is depth.
   	// Shapes wait in items3 until something flat is etched or the frame is revealed. Then the graphics card draws them
@@ -360,7 +360,7 @@ code:
   	inline void need_open(int line)
   	{
   		if (!opened)
-  			imagine::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
+  			cosmonova::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
   	}
   	inline double focal() { return (height / 2.0) / std::tan(30.0 * pi3 / 180.0); }  // 60 degrees from top to bottom
   	inline void axes(double r[3][3])  // rows: the eye's across, up and forward, in the world
@@ -488,16 +488,16 @@ code:
   		gl_tried = true;
   		char* off = nullptr;
   		size_t size = 0;
-  		bool no_gpu = _dupenv_s(&off, &size, "IMAGINE_NO_GPU") == 0 && off;
+  		bool no_gpu = _dupenv_s(&off, &size, "COSMONOVA_NO_GPU") == 0 && off;
   		std::free(off);
   		if (no_gpu)
   			return false;
   		WNDCLASSW wc{};
   		wc.lpfnWndProc = DefWindowProcW;
   		wc.hInstance = GetModuleHandleW(nullptr);
-  		wc.lpszClassName = L"ImaginationGL";
+  		wc.lpszClassName = L"CosmonovaGL";
   		RegisterClassW(&wc);
-  		HWND hidden = CreateWindowExW(0, L"ImaginationGL", L"", WS_POPUP, 0, 0, 16, 16, nullptr, nullptr, wc.hInstance, nullptr);
+  		HWND hidden = CreateWindowExW(0, L"CosmonovaGL", L"", WS_POPUP, 0, 0, 16, 16, nullptr, nullptr, wc.hInstance, nullptr);
   		if (!hidden)
   			return false;
   		gl_dc = GetDC(hidden);
@@ -705,7 +705,7 @@ code:
   	{
   		need_open(line);
   		if (!(w > 0 && h > 0 && d > 0))
-  			imagine::fail(line, "a block's width, height and depth must all be more than 0.");
+  			cosmonova::fail(line, "a block's width, height and depth must all be more than 0.");
   		COLORREF col = colour(c, line);
   		V3 m = v3(middle);
   		double x0 = m.x - w / 2, x1 = m.x + w / 2, y0 = m.y - h / 2, y1 = m.y + h / 2, z0 = m.z - d / 2, z1 = m.z + d / 2;
@@ -731,16 +731,16 @@ code:
   	{
   		need_open(line);
   		if (!(radius > 0))
-  			imagine::fail(line, "a ball's radius must be more than 0.");
+  			cosmonova::fail(line, "a ball's radius must be more than 0.");
   		(keeping.empty() ? items3 : kept[keeping].items).push_back({true, {}, v3(middle), radius, colour(c, line), 0});
   	}
   	inline void start_keeping(const std::string& name, int line)
   	{
   		need_open(line);
   		if (!keeping.empty())
-  			imagine::fail(line, "shapes are already being kept as \"" + keeping + "\". Say 'stop keeping the shapes' first.");
+  			cosmonova::fail(line, "shapes are already being kept as \"" + keeping + "\". Say 'stop keeping the shapes' first.");
   		if (name.empty())
-  			imagine::fail(line, "kept shapes need a name, like \"land\".");
+  			cosmonova::fail(line, "kept shapes need a name, like \"land\".");
   		Kept& k = kept[name];
   		k.items.clear();
   		k.fresh = true;
@@ -749,7 +749,7 @@ code:
   	inline void stop_keeping(int line)
   	{
   		if (keeping.empty())
-  			imagine::fail(line, "no shapes are being kept. Start with: start keeping the shapes as \"land\"");
+  			cosmonova::fail(line, "no shapes are being kept. Start with: start keeping the shapes as \"land\"");
   		keeping.clear();
   	}
   	inline void etch_kept(const std::string& name, int line)
@@ -757,16 +757,16 @@ code:
   		need_open(line);
   		auto it = kept.find(name);
   		if (it == kept.end())
-  			imagine::fail(line, "there are no shapes kept as \"" + name + "\".");
+  			cosmonova::fail(line, "there are no shapes kept as \"" + name + "\".");
   		if (name == keeping)
-  			imagine::fail(line, "the shapes \"" + name + "\" are still being kept. Say 'stop keeping the shapes' first.");
+  			cosmonova::fail(line, "the shapes \"" + name + "\" are still being kept. Say 'stop keeping the shapes' first.");
   		items3.push_back({false, {}, {}, 0, 0, 0, {0, 0, 0}, &it->second});
   	}
   	inline void forget_kept(const std::string& name, int line)
   	{
   		auto it = kept.find(name);
   		if (it == kept.end())
-  			imagine::fail(line, "there are no shapes kept as \"" + name + "\".");
+  			cosmonova::fail(line, "there are no shapes kept as \"" + name + "\".");
   		flush3d();  // anything waiting to be drawn may use them
   		if (it->second.list)
   			glDeleteLists(it->second.list, 1);
@@ -777,7 +777,7 @@ code:
   	inline void set_daylight(double amount, int line)
   	{
   		if (!(amount >= 0 && amount <= 1))
-  			imagine::fail(line, "the daylight is from 0 (dark) to 1 (full), not " + imagine::text(amount) + ".");
+  			cosmonova::fail(line, "the daylight is from 0 (dark) to 1 (full), not " + cosmonova::text(amount) + ".");
   		daylight = amount;
   	}
   	inline void ground(const std::string& a, const std::string& b, int line)
@@ -1096,7 +1096,7 @@ python:
       if GL["tried"]:
           return GL["ok"]
       GL["tried"] = True
-      if os.environ.get("IMAGINE_NO_GPU"):
+      if os.environ.get("COSMONOVA_NO_GPU"):
           return False
       try:
           from PIL import Image, ImageTk
@@ -1362,102 +1362,102 @@ python:
   def graphics_card():
       return win["opened"] and gl_start()
 
-to open a world, given title (text) and width (a number) and height (a number) = imagine_window::open({title}, {width}, {height}, {line})
+to open a world, given title (text) and width (a number) and height (a number) = cosmonova_window::open({title}, {width}, {height}, {line})
   runs: open_window({title}, {width}, {height})
-to consume the window, given colour (text) = imagine_window::clear({colour}, {line})
+to consume the window, given colour (text) = cosmonova_window::clear({colour}, {line})
   runs: clear({colour})
-to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = imagine_window::box({x}, {y}, {width}, {height}, {colour}, {line})
+to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = cosmonova_window::box({x}, {y}, {width}, {height}, {colour}, {line})
   runs: box({x}, {y}, {width}, {height}, {colour})
-to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
+to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = cosmonova_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
   runs: box({x} - {radius}, {y} - {radius}, 2 * {radius}, 2 * {radius}, {colour})
-to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = imagine_window::circle({x}, {y}, {radius}, {colour}, {line})
+to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = cosmonova_window::circle({x}, {y}, {radius}, {colour}, {line})
   runs: circle({x}, {y}, {radius}, {colour})
-to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = imagine_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
+to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = cosmonova_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
   runs: line_between({x}, {y}, {to x}, {to y}, {colour})
-to etch words, given words (text) and x (a number) and y (a number) and colour (text) = imagine_window::write({words}, {x}, {y}, {colour}, {line})
+to etch words, given words (text) and x (a number) and y (a number) and colour (text) = cosmonova_window::write({words}, {x}, {y}, {colour}, {line})
   runs: write({words}, {x}, {y}, {colour})
-to set the text size to, given size (a number) = imagine_window::set_text_size({size}, {line})
+to set the text size to, given size (a number) = cosmonova_window::set_text_size({size}, {line})
   runs: set_text_size({size})
-to reveal the frame = imagine_window::show({line})
+to reveal the frame = cosmonova_window::show({line})
   runs: show()
-to etch the picture, given file (text) and x (a number) and y (a number) = imagine_window::draw_picture({file}, {x}, {y}, {line})
+to etch the picture, given file (text) and x (a number) and y (a number) = cosmonova_window::draw_picture({file}, {x}, {y}, {line})
   runs: draw_picture({file}, {x}, {y})
-to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = imagine_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
+to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = cosmonova_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
   runs: draw_picture_turned({file}, {x}, {y}, {size}, {angle})
-to width of picture, given file (text), returning a number = (double)imagine_window::picture({file}, {line})->GetWidth()
+to width of picture, given file (text), returning a number = (double)cosmonova_window::picture({file}, {line})->GetWidth()
   runs: size_of_picture({file}, 0)
-to height of picture, given file (text), returning a number = (double)imagine_window::picture({file}, {line})->GetHeight()
+to height of picture, given file (text), returning a number = (double)cosmonova_window::picture({file}, {line})->GetHeight()
   runs: size_of_picture({file}, 1)
-to end the world = imagine_window::close()
+to end the world = cosmonova_window::close()
   runs: close()
-to key held, given key (text), returning yes or no = (imagine_window::keys[imagine_window::key_code({key}, {line})])
+to key held, given key (text), returning yes or no = (cosmonova_window::keys[cosmonova_window::key_code({key}, {line})])
   runs: key_name({key}) in win["held"]
 
-the world lives = imagine_window::open_now, yes or no, read only
+the world lives = cosmonova_window::open_now, yes or no, read only
   runs: win["open"]
-width of the world = (double)imagine_window::width, number, read only
+width of the world = (double)cosmonova_window::width, number, read only
   runs: float(win.get("size", (0, 0))[0])
-height of the world = (double)imagine_window::height, number, read only
+height of the world = (double)cosmonova_window::height, number, read only
   runs: float(win.get("size", (0, 0))[1])
-mouse x = imagine_window::mouse_x_now, number, read only
+mouse x = cosmonova_window::mouse_x_now, number, read only
   runs: win["mouse"][0]
-mouse y = imagine_window::mouse_y_now, number, read only
+mouse y = cosmonova_window::mouse_y_now, number, read only
   runs: win["mouse"][1]
-to key pressed, given key (text), returning yes or no = (imagine_window::pressed[imagine_window::key_code({key}, {line})])
+to key pressed, given key (text), returning yes or no = (cosmonova_window::pressed[cosmonova_window::key_code({key}, {line})])
   runs: key_name({key}) in win["pressed"]
-mouse clicked = imagine_window::clicked, yes or no, read only
+mouse clicked = cosmonova_window::clicked, yes or no, read only
   runs: win["clicked"]
-frame time = imagine_window::frame_time, number, read only
+frame time = cosmonova_window::frame_time, number, read only
   runs: win["frame time"]
-mouse held = imagine_window::mouse_down, yes or no, read only
+mouse held = cosmonova_window::mouse_down, yes or no, read only
   runs: win["down"]
 
 note: 3D. The eye is where the picture is seen from. Across is horizontal, up is vertical (more is higher), away is depth.
-to place the eye at, given where (a place) = imagine_window::place_eye({where})
+to place the eye at, given where (a place) = cosmonova_window::place_eye({where})
   runs: place_eye({where})
-to aim the eye, given turn (a number) and tilt (a number) = imagine_window::aim_eye({turn}, {tilt})
+to aim the eye, given turn (a number) and tilt (a number) = cosmonova_window::aim_eye({turn}, {tilt})
   runs: aim_eye({turn}, {tilt})
-to screen place of, given where (a place), returning a flat place = (imagine_window::need_open({line}), imagine_window::screen_place({where}))
+to screen place of, given where (a place), returning a flat place = (cosmonova_window::need_open({line}), cosmonova_window::screen_place({where}))
   runs: screen_place({where})
-to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = imagine_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
+to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = cosmonova_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
   runs: block({middle}, {width}, {height}, {depth}, {colour})
-to etch a cube, given middle (a place) and size (a number) and colour (text) = imagine_window::cube({middle}, {size}, {colour}, {line})
+to etch a cube, given middle (a place) and size (a number) and colour (text) = cosmonova_window::cube({middle}, {size}, {colour}, {line})
   runs: (lambda s: block({middle}, s, s, s, {colour}))({size})
-to etch a ball, given middle (a place) and radius (a number) and colour (text) = imagine_window::ball({middle}, {radius}, {colour}, {line})
+to etch a ball, given middle (a place) and radius (a number) and colour (text) = cosmonova_window::ball({middle}, {radius}, {colour}, {line})
   runs: ball({middle}, {radius}, {colour})
-to etch the ground, given colour (text) and other colour (text) = imagine_window::ground({colour}, {other colour}, {line})
+to etch the ground, given colour (text) and other colour (text) = cosmonova_window::ground({colour}, {other colour}, {line})
   runs: ground({colour}, {other colour})
-the graphics card draws = imagine_window::on_graphics_card(), yes or no, read only
+the graphics card draws = cosmonova_window::on_graphics_card(), yes or no, read only
   runs: graphics_card()
 
 note: Kept shapes: etch 3D shapes once, between 'start keeping the shapes as "land"' and 'stop keeping the shapes', and they aren't drawn yet.
 note: Then 'etch the kept shapes "land"' draws them all, every frame, much faster than etching them one by one (the graphics card keeps them).
-to start keeping the shapes as, given name (text) = imagine_window::start_keeping({name}, {line})
+to start keeping the shapes as, given name (text) = cosmonova_window::start_keeping({name}, {line})
   runs: start_keeping({name})
-to stop keeping the shapes = imagine_window::stop_keeping({line})
+to stop keeping the shapes = cosmonova_window::stop_keeping({line})
   runs: stop_keeping()
-to etch the kept shapes, given name (text) = imagine_window::etch_kept({name}, {line})
+to etch the kept shapes, given name (text) = cosmonova_window::etch_kept({name}, {line})
   runs: etch_kept({name})
-to forget the kept shapes, given name (text) = imagine_window::forget_kept({name}, {line})
+to forget the kept shapes, given name (text) = cosmonova_window::forget_kept({name}, {line})
   runs: forget_kept({name})
-to set the daylight to, given amount (a number) = imagine_window::set_daylight({amount}, {line})
+to set the daylight to, given amount (a number) = cosmonova_window::set_daylight({amount}, {line})
   runs: set_daylight({amount})
 
 note: The pointer: 'hold the pointer' hides it and keeps it in the window, for looking around; 'mouse moved across' and 'mouse moved down' say how far it was moved since the last frame, in dots.
-to hold the pointer = (imagine_window::need_window({line}), imagine_window::pointer_fresh = !imagine_window::pointer_held, imagine_window::pointer_held = true)
+to hold the pointer = (cosmonova_window::need_window({line}), cosmonova_window::pointer_fresh = !cosmonova_window::pointer_held, cosmonova_window::pointer_held = true)
   runs: hold_pointer(True)
-to let go of the pointer = (imagine_window::need_window({line}), imagine_window::pointer_held = false)
+to let go of the pointer = (cosmonova_window::need_window({line}), cosmonova_window::pointer_held = false)
   runs: hold_pointer(False)
-mouse moved across = imagine_window::moved_x, number, read only
+mouse moved across = cosmonova_window::moved_x, number, read only
   runs: win["moved"][0]
-mouse moved down = imagine_window::moved_y, number, read only
+mouse moved down = cosmonova_window::moved_y, number, read only
   runs: win["moved"][1]
-mouse right clicked = imagine_window::right_clicked, yes or no, read only
+mouse right clicked = cosmonova_window::right_clicked, yes or no, read only
   runs: win["right clicked"]
-mouse right held = imagine_window::right_down, yes or no, read only
+mouse right held = cosmonova_window::right_down, yes or no, read only
   runs: win["right down"]
-mouse wheel turned = imagine_window::wheel_now, number, read only
+mouse wheel turned = cosmonova_window::wheel_now, number, read only
   runs: win["wheel"]
 
-to colour from, given red (a number) and green (a number) and blue (a number), returning text = imagine_window::mix({red}, {green}, {blue})
+to colour from, given red (a number) and green (a number) and blue (a number), returning text = cosmonova_window::mix({red}, {green}, {blue})
   runs: mix({red}, {green}, {blue})

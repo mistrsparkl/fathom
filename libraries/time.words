@@ -5,7 +5,7 @@ include: <ctime>
 include: <thread>
 
 code:
-  namespace imagine_time
+  namespace cosmonova_time
   {
   	inline const auto started = std::chrono::steady_clock::now();
   	inline double since_start() { return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(); }
@@ -27,32 +27,32 @@ python:
 
 to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
   runs: time.sleep(max(0.0, {seconds}))
-  web: (await imagine_time::wait({seconds}))
+  web: (await cosmonova_time::wait({seconds}))
 
-seconds since the start = imagine_time::since_start(), number, read only
+seconds since the start = cosmonova_time::since_start(), number, read only
   runs: time.monotonic() - started
-  web: imagine_time::since_start()
-the current hour = imagine_time::part_of_today(0), number, read only
+  web: cosmonova_time::since_start()
+the current hour = cosmonova_time::part_of_today(0), number, read only
   runs: part_of_today(0)
   web: new Date().getHours()
-the current minute = imagine_time::part_of_today(1), number, read only
+the current minute = cosmonova_time::part_of_today(1), number, read only
   runs: part_of_today(1)
   web: new Date().getMinutes()
-the current second = imagine_time::part_of_today(2), number, read only
+the current second = cosmonova_time::part_of_today(2), number, read only
   runs: part_of_today(2)
   web: new Date().getSeconds()
-the day of the month = imagine_time::part_of_today(3), number, read only
+the day of the month = cosmonova_time::part_of_today(3), number, read only
   runs: part_of_today(3)
   web: new Date().getDate()
-the current month = imagine_time::part_of_today(4), number, read only
+the current month = cosmonova_time::part_of_today(4), number, read only
   runs: part_of_today(4)
   web: (new Date().getMonth() + 1)
-the current year = imagine_time::part_of_today(5), number, read only
+the current year = cosmonova_time::part_of_today(5), number, read only
   runs: part_of_today(5)
   web: new Date().getFullYear()
 
 code:
-  namespace imagine_time
+  namespace cosmonova_time
   {
   	inline std::string stamp(const char* shape)
   	{
@@ -73,24 +73,24 @@ code:
   	}
   }
 
-today = imagine_time::stamp("%Y-%m-%d"), text, read only
+today = cosmonova_time::stamp("%Y-%m-%d"), text, read only
   runs: time.strftime("%Y-%m-%d")
-  web: imagine_time::stamp(true)
-the time now = imagine_time::stamp("%H:%M:%S"), text, read only
+  web: cosmonova_time::stamp(true)
+the time now = cosmonova_time::stamp("%H:%M:%S"), text, read only
   runs: time.strftime("%H:%M:%S")
-  web: imagine_time::stamp(false)
-the day of the week = imagine_time::weekday(), text, read only
+  web: cosmonova_time::stamp(false)
+the day of the week = cosmonova_time::weekday(), text, read only
   runs: ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[time.localtime().tm_wday]
-  web: imagine_time::weekday()
+  web: cosmonova_time::weekday()
 seconds since 1970 = (double)std::time(nullptr), number, read only
   runs: float(int(time.time()))
   web: Math.floor(Date.now() / 1000)
 
 javascript:
-  const imagine_time = {
+  const cosmonova_time = {
     started: Date.now(),
     wait: (seconds) => new Promise((done) => setTimeout(done, Math.max(0, seconds) * 1000)),
-    since_start: () => (Date.now() - imagine_time.started) / 1000,
+    since_start: () => (Date.now() - cosmonova_time.started) / 1000,
     stamp(day) {
       const d = new Date(), two = (n) => String(n).padStart(2, "0");
       return day ? `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}` : `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;

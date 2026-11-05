@@ -1,6 +1,6 @@
-#include "ImagineStage.h"
-#include "ImagineBridge.h"
-#include "imagination.h"
+#include "CosmonovaStage.h"
+#include "CosmonovaBridge.h"
+#include "cosmonova.h"
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -22,13 +22,13 @@
 #include "Widgets/SWindow.h"
 #include <thread>
 
-int ImagineMain();  // the program, from Generated/Program.imagine.cpp
+int CosmonovaMain();  // the program, from Generated/Program.cosmos.cpp
 
 namespace
 {
-	imagine_unreal::Frame Shown;  // the frame on the screen now (game thread only)
+	cosmonova_unreal::Frame Shown;  // the frame on the screen now (game thread only)
 
-	// Imagination's metres (across, up, away) to Unreal's centimetres (forward, right, up).
+	// Cosmonova's metres (across, up, away) to Unreal's centimetres (forward, right, up).
 	FVector ToUnreal(double Across, double Up, double Away) { return FVector(Away * 100.0, Across * 100.0, Up * 100.0); }
 
 	const TPair<const char*, FKey> Keys[] = {
@@ -38,7 +38,7 @@ namespace
 	const TCHAR* Digits[] = {TEXT("Zero"), TEXT("One"), TEXT("Two"), TEXT("Three"), TEXT("Four"), TEXT("Five"), TEXT("Six"), TEXT("Seven"), TEXT("Eight"), TEXT("Nine")};
 }
 
-AImagineEye::AImagineEye()
+ACosmonovaEye::ACosmonovaEye()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PrePhysics;
@@ -55,7 +55,7 @@ AImagineEye::AImagineEye()
 	Paint = BasicPaint.Object;
 }
 
-void AImagineEye::BeginPlay()
+void ACosmonovaEye::BeginPlay()
 {
 	Super::BeginPlay();
 	if (APlayerController* Player = GetWorld()->GetFirstPlayerController())
@@ -63,25 +63,25 @@ void AImagineEye::BeginPlay()
 		Player->bShowMouseCursor = true;
 		Player->SetInputMode(FInputModeGameOnly());
 	}
-	imagine::show_hook = [](const std::string& Text, bool Problem)
+	cosmonova::show_hook = [](const std::string& Text, bool Problem)
 	{
-		auto& B = imagine_unreal::bridge();
+		auto& B = cosmonova_unreal::bridge();
 		std::lock_guard<std::mutex> Hold(B.lock);
 		B.messages.push_back({Text, Problem});
 	};
 	std::thread([]
 	{
-		ImagineMain();
-		auto& B = imagine_unreal::bridge();
+		CosmonovaMain();
+		auto& B = cosmonova_unreal::bridge();
 		std::lock_guard<std::mutex> Hold(B.lock);
 		if (B.opened)  // a game that opened a world ends when its program does; otherwise its words stay on the screen
 			B.end_asked = true;
 	}).detach();  // the program runs on its own; 'reveal the frame' waits for Unreal
 }
 
-void AImagineEye::EndPlay(const EEndPlayReason::Type Reason)
+void ACosmonovaEye::EndPlay(const EEndPlayReason::Type Reason)
 {
-	auto& B = imagine_unreal::bridge();
+	auto& B = cosmonova_unreal::bridge();
 	{
 		std::lock_guard<std::mutex> Hold(B.lock);
 		B.lives = false;  // 'the world lives' becomes no, and a waiting 'reveal the frame' goes on
@@ -90,7 +90,7 @@ void AImagineEye::EndPlay(const EEndPlayReason::Type Reason)
 	Super::EndPlay(Reason);
 }
 
-UInstancedStaticMeshComponent* AImagineEye::MeshFor(UStaticMesh* Mesh, const FLinearColor& Colour)
+UInstancedStaticMeshComponent* ACosmonovaEye::MeshFor(UStaticMesh* Mesh, const FLinearColor& Colour)
 {
 	FString Key = Mesh->GetName() + Colour.ToString();
 	if (TObjectPtr<UInstancedStaticMeshComponent>* Found = Meshes.Find(Key))
@@ -111,9 +111,9 @@ UInstancedStaticMeshComponent* AImagineEye::MeshFor(UStaticMesh* Mesh, const FLi
 	return Made;
 }
 
-void AImagineEye::ReadInput()  // with the bridge locked
+void ACosmonovaEye::ReadInput()  // with the bridge locked
 {
-	auto& B = imagine_unreal::bridge();
+	auto& B = cosmonova_unreal::bridge();
 	APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	if (!Player)
 		return;
@@ -152,10 +152,10 @@ void AImagineEye::ReadInput()  // with the bridge locked
 	}
 }
 
-void AImagineEye::Tick(float DeltaSeconds)
+void ACosmonovaEye::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	auto& B = imagine_unreal::bridge();
+	auto& B = cosmonova_unreal::bridge();
 	bool Got = false, Open = false, End = false;
 	std::string Title;
 	int Width = 0, Height = 0;
@@ -185,7 +185,7 @@ void AImagineEye::Tick(float DeltaSeconds)
 	for (const auto& [Text, Problem] : Messages)
 	{
 		FString Line = UTF8_TO_TCHAR(Text.c_str());
-		UE_LOG(LogTemp, Display, TEXT("Imagination: %s"), *Line);
+		UE_LOG(LogTemp, Display, TEXT("Cosmonova: %s"), *Line);
 		if (GEngine)
 			GEngine->AddOnScreenDebugMessage(-1, Problem ? 600.f : 10.f, Problem ? FColor::Red : FColor::White, Line);
 	}
@@ -208,7 +208,7 @@ void AImagineEye::Tick(float DeltaSeconds)
 	if (!Got)
 		return;
 
-	// The eye: Imagination's turn is Unreal's yaw and its tilt is the pitch; 60 degrees from the top of the picture to the bottom.
+	// The eye: Cosmonova's turn is Unreal's yaw and its tilt is the pitch; 60 degrees from the top of the picture to the bottom.
 	const double* E = Shown.eye;
 	SetActorLocationAndRotation(ToUnreal(E[0], E[1], E[2]), FRotator(E[4], E[3], 0));
 	double Aspect = B.width_now / FMath::Max(1.0, B.height_now);
@@ -217,7 +217,7 @@ void AImagineEye::Tick(float DeltaSeconds)
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Wanted;
 	for (const auto& Pair : Meshes)
 		Wanted.Add(Pair.Value.Get());
-	for (const imagine_unreal::Shape& S : Shown.shapes)
+	for (const cosmonova_unreal::Shape& S : Shown.shapes)
 	{
 		FVector At = ToUnreal(S.at.X, S.at.Y, S.at.Z);
 		FVector Scale = S.kind == 0 ? FVector(S.size.Z, S.size.X, S.size.Y) : FVector(2.0 * S.size.X);  // the meshes are 1 m across
@@ -249,13 +249,13 @@ void AImagineEye::Tick(float DeltaSeconds)
 	}
 }
 
-void AImagineHUD::DrawHUD()
+void ACosmonovaHUD::DrawHUD()
 {
 	Super::DrawHUD();
 	if (Shown.shapes.empty() && !Shown.ground)  // a flat game: the background is the colour the window was consumed with
 		DrawRect(Shown.sky, 0, 0, Canvas->SizeX, Canvas->SizeY);
 	UFont* Font = GEngine ? GEngine->GetLargeFont() : nullptr;
-	for (const imagine_unreal::Flat& F : Shown.flats)
+	for (const cosmonova_unreal::Flat& F : Shown.flats)
 	{
 		switch (F.kind)
 		{
@@ -275,13 +275,13 @@ void AImagineHUD::DrawHUD()
 	}
 }
 
-AImagineGameMode::AImagineGameMode()
+ACosmonovaGameMode::ACosmonovaGameMode()
 {
-	DefaultPawnClass = AImagineEye::StaticClass();
-	HUDClass = AImagineHUD::StaticClass();
+	DefaultPawnClass = ACosmonovaEye::StaticClass();
+	HUDClass = ACosmonovaHUD::StaticClass();
 }
 
-void AImagineGameMode::BeginPlay()
+void ACosmonovaGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	UWorld* World = GetWorld();

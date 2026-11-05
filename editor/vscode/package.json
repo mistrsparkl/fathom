@@ -1,7 +1,7 @@
 {
-  "name": "imagination",
-  "displayName": "Imagination",
-  "description": "Colours, indenting and shortcuts for the Imagination language (.imagine files).",
+  "name": "cosmonova",
+  "displayName": "Cosmonova",
+  "description": "Colours, indenting and shortcuts for the Cosmonova language (.cosmos files).",
   "version": "0.3.0",
   "publisher": "speda",
   "engines": {
@@ -14,31 +14,31 @@
   "contributes": {
     "languages": [
       {
-        "id": "imagination",
+        "id": "cosmonova",
         "aliases": [
-          "Imagination"
+          "Cosmonova"
         ],
         "extensions": [
-          ".imagine"
+          ".cosmos"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "imagination",
-        "scopeName": "source.imagination",
-        "path": "./syntaxes/imagination.tmLanguage.json"
+        "language": "cosmonova",
+        "scopeName": "source.cosmonova",
+        "path": "./syntaxes/cosmonova.tmLanguage.json"
       }
     ],
     "snippets": [
       {
-        "language": "imagination",
+        "language": "cosmonova",
         "path": "./snippets.json"
       }
     ],
     "configurationDefaults": {
-      "[imagination]": {
+      "[cosmonova]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
         "editor.detectIndentation": false

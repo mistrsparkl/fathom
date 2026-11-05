@@ -1,5 +1,5 @@
 whisper: Dodge! Move with the left and right arrow keys and dodge the falling balls.
-whisper: Run it with: imagine examples/dodge.imagine      (or build it: imagine build examples/dodge.imagine)
+whisper: Run it with: cosmonova examples/dodge.cosmos      (or build it: cosmonova build examples/dodge.cosmos)
 
 use: window
 

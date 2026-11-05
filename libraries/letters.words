@@ -2,12 +2,12 @@ note: Words for the numbers behind letters (Unicode). Use them in a program with
 note: "A" is 65, "a" is 97, " " is 32, "é" is 233, "😀" is 128512.
 
 code:
-  namespace imagine_letters
+  namespace cosmonova_letters
   {
   	inline double code_of(const std::string& s, int line)
   	{
   		if (s.empty())
-  			imagine::fail(line, "'code of the letter' needs a letter, but the text is empty.");
+  			cosmonova::fail(line, "'code of the letter' needs a letter, but the text is empty.");
   		unsigned char c = (unsigned char)s[0];
   		int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
   		unsigned code = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
@@ -18,7 +18,7 @@ code:
   	inline std::string letter_with(double number, int line)
   	{
   		if (number < 0 || number > 0x10FFFF || number != (double)(long long)number || (number >= 0xD800 && number <= 0xDFFF))
-  			imagine::fail(line, "there is no letter with the code " + imagine::text(number) + ".");
+  			cosmonova::fail(line, "there is no letter with the code " + cosmonova::text(number) + ".");
   		unsigned c = (unsigned)number;
   		std::string out;
   		if (c < 0x80)
@@ -43,22 +43,22 @@ python:
           raise RunError(0, "there is no letter with the code " + text(number) + ".")
       return chr(int(number))
 
-to code of the letter, given letter (text), returning a number = imagine_letters::code_of({letter}, {line})
+to code of the letter, given letter (text), returning a number = cosmonova_letters::code_of({letter}, {line})
   runs: code_of({letter})
-  web: imagine_letters::code_of({letter}, {line})
-to the letter with code, given code (a number), returning text = imagine_letters::letter_with({code}, {line})
+  web: cosmonova_letters::code_of({letter}, {line})
+to the letter with code, given code (a number), returning text = cosmonova_letters::letter_with({code}, {line})
   runs: letter_with({code})
-  web: imagine_letters::letter_with({code}, {line})
+  web: cosmonova_letters::letter_with({code}, {line})
 
 javascript:
-  const imagine_letters = {
+  const cosmonova_letters = {
     code_of(s, line) {
-      if (!s) imagine.fail(line, "'code of the letter' needs a letter, but the text is empty.");
+      if (!s) cosmonova.fail(line, "'code of the letter' needs a letter, but the text is empty.");
       return s.codePointAt(0);
     },
     letter_with(n, line) {
       if (n < 0 || n > 0x10FFFF || n !== Math.trunc(n) || (n >= 0xD800 && n <= 0xDFFF))
-        imagine.fail(line, "there is no letter with the code " + imagine.text(n) + ".");
+        cosmonova.fail(line, "there is no letter with the code " + cosmonova.text(n) + ".");
       return String.fromCodePoint(n);
     },
   };

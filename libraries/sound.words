@@ -10,7 +10,7 @@ include: <mmsystem.h>
 link: winmm
 
 code:
-  namespace imagine_sound
+  namespace cosmonova_sound
   {
   	inline std::wstring wide(const std::string& s)
   	{
@@ -33,7 +33,7 @@ code:
   	{
   		std::wstring path = wide(file);
   		if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
-  			imagine::fail(line, "there is no sound file called \"" + file + "\".");
+  			cosmonova::fail(line, "there is no sound file called \"" + file + "\".");
   		for (size_t k = 0; k < playing.size();)  // close the ones that have finished
   			if (done(playing[k]))
   			{
@@ -44,9 +44,9 @@ code:
   				++k;
   		wchar_t full[MAX_PATH * 4];
   		GetFullPathNameW(path.c_str(), MAX_PATH * 4, full, nullptr);
-  		std::wstring alias = L"imagine_sound_" + std::to_wstring(++made);
+  		std::wstring alias = L"cosmonova_sound_" + std::to_wstring(++made);
   		if (mciSendStringW((L"open \"" + std::wstring(full) + L"\" type mpegvideo alias " + alias).c_str(), nullptr, 0, nullptr) != 0)
-  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  			cosmonova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
   		playing.push_back(alias);
   		mciSendStringW((L"play " + alias + (loop ? L" repeat" : L"") + (wait ? L" wait" : L"")).c_str(), nullptr, 0, nullptr);
   	}
@@ -64,25 +64,25 @@ code:
   	{
   		wchar_t said[128] = L"";
   		if (song_open)
-  			mciSendStringW((std::wstring(L"status imagine_song ") + what).c_str(), said, 128, nullptr);
+  			mciSendStringW((std::wstring(L"status cosmonova_song ") + what).c_str(), said, 128, nullptr);
   		return said;
   	}
   	inline void song_stop()
   	{
   		if (song_open)
-  			mciSendStringW(L"close imagine_song", nullptr, 0, nullptr);
+  			mciSendStringW(L"close cosmonova_song", nullptr, 0, nullptr);
   		song_open = false;
   	}
   	inline void song_play(const std::string& file, int line)
   	{
   		song_stop();
   		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
-  			imagine::fail(line, "there is no sound file called \"" + file + "\".");
-  		if (mciSendStringW((L"open \"" + wide(file) + L"\" type mpegvideo alias imagine_song").c_str(), nullptr, 0, nullptr) != 0)
-  			imagine::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  			cosmonova::fail(line, "there is no sound file called \"" + file + "\".");
+  		if (mciSendStringW((L"open \"" + wide(file) + L"\" type mpegvideo alias cosmonova_song").c_str(), nullptr, 0, nullptr) != 0)
+  			cosmonova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
   		song_open = true;
-  		mciSendStringW(L"set imagine_song time format milliseconds", nullptr, 0, nullptr);
-  		mciSendStringW(L"play imagine_song", nullptr, 0, nullptr);
+  		mciSendStringW(L"set cosmonova_song time format milliseconds", nullptr, 0, nullptr);
+  		mciSendStringW(L"play cosmonova_song", nullptr, 0, nullptr);
   	}
   	inline void song_say(const std::wstring& what)
   	{
@@ -93,9 +93,9 @@ code:
   	inline void song_seek(double seconds)
   	{
   		bool was = song_status(L"mode") == L"playing";
-  		song_say(L"seek imagine_song to " + std::to_wstring((long long)(seconds * 1000)));
+  		song_say(L"seek cosmonova_song to " + std::to_wstring((long long)(seconds * 1000)));
   		if (was)
-  			song_say(L"play imagine_song");
+  			song_say(L"play cosmonova_song");
   	}
   }
 
@@ -115,7 +115,7 @@ python:
           mci(f"close {alias}", None, 0, None)
           playing.remove(alias)
       made[0] += 1
-      alias = f"imagine_sound_{made[0]}"
+      alias = f"cosmonova_sound_{made[0]}"
       if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias {alias}', None, 0, None) != 0:
           raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
       playing.append(alias)
@@ -128,21 +128,21 @@ python:
   def song_status(what):
       said = ctypes.create_unicode_buffer(128)
       if song["open"]:
-          mci(f"status imagine_song {what}", said, 128, None)
+          mci(f"status cosmonova_song {what}", said, 128, None)
       return said.value
   def song_stop():
       if song["open"]:
-          mci("close imagine_song", None, 0, None)
+          mci("close cosmonova_song", None, 0, None)
       song["open"] = False
   def song_play(file):
       song_stop()
       if not os.path.exists(file):
           raise RunError(0, f'there is no sound file called "{file}".')
-      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias imagine_song', None, 0, None) != 0:
+      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias cosmonova_song', None, 0, None) != 0:
           raise RunError(0, f"I couldn't play '{file}' (it must be a .wav or .mp3 file).")
       song["open"] = True
-      mci("set imagine_song time format milliseconds", None, 0, None)
-      mci("play imagine_song", None, 0, None)
+      mci("set cosmonova_song time format milliseconds", None, 0, None)
+      mci("play cosmonova_song", None, 0, None)
   def song_say(what):
       if song["open"]:
           mci(what, None, 0, None)
@@ -153,35 +153,35 @@ python:
           return 0.0
   def song_seek(seconds):
       was = song_status("mode") == "playing"
-      song_say(f"seek imagine_song to {int(max(0, seconds) * 1000)}")
+      song_say(f"seek cosmonova_song to {int(max(0, seconds) * 1000)}")
       if was:
-          song_say("play imagine_song")
+          song_say("play cosmonova_song")
 
-to play the sound, given file (text) = imagine_sound::play({file}, false, false, {line})
+to play the sound, given file (text) = cosmonova_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
-to play the sound and wait, given file (text) = imagine_sound::play({file}, true, false, {line})
+to play the sound and wait, given file (text) = cosmonova_sound::play({file}, true, false, {line})
   runs: play({file}, True, False)
-to play the sound again and again, given file (text) = imagine_sound::play({file}, false, true, {line})
+to play the sound again and again, given file (text) = cosmonova_sound::play({file}, false, true, {line})
   runs: play({file}, False, True)
-to stop the sound = imagine_sound::stop()
+to stop the sound = cosmonova_sound::stop()
   runs: stop()
-to play the song, given file (text) = imagine_sound::song_play({file}, {line})
+to play the song, given file (text) = cosmonova_sound::song_play({file}, {line})
   runs: song_play({file})
-to pause the song = imagine_sound::song_say(L"pause imagine_song")
-  runs: song_say("pause imagine_song")
-to carry on the song = imagine_sound::song_say(L"resume imagine_song")
-  runs: song_say("resume imagine_song")
-to stop the song = imagine_sound::song_stop()
+to pause the song = cosmonova_sound::song_say(L"pause cosmonova_song")
+  runs: song_say("pause cosmonova_song")
+to carry on the song = cosmonova_sound::song_say(L"resume cosmonova_song")
+  runs: song_say("resume cosmonova_song")
+to stop the song = cosmonova_sound::song_stop()
   runs: song_stop()
-the song is playing = (imagine_sound::song_status(L"mode") == L"playing"), yes or no, read only
+the song is playing = (cosmonova_sound::song_status(L"mode") == L"playing"), yes or no, read only
   runs: song_status("mode") == "playing"
-the song has ended = (imagine_sound::song_open && imagine_sound::song_status(L"mode") == L"stopped" && imagine_sound::song_number(L"position") + 0.3 >= imagine_sound::song_number(L"length")), yes or no, read only
+the song has ended = (cosmonova_sound::song_open && cosmonova_sound::song_status(L"mode") == L"stopped" && cosmonova_sound::song_number(L"position") + 0.3 >= cosmonova_sound::song_number(L"length")), yes or no, read only
   runs: song["open"] and song_status("mode") == "stopped" and song_number("position") + 0.3 >= song_number("length")
-song time = imagine_sound::song_number(L"position"), number, read only
+song time = cosmonova_sound::song_number(L"position"), number, read only
   runs: song_number("position")
-song length = imagine_sound::song_number(L"length"), number, read only
+song length = cosmonova_sound::song_number(L"length"), number, read only
   runs: song_number("length")
-to set the song time to, given seconds (a number) = imagine_sound::song_seek({seconds})
+to set the song time to, given seconds (a number) = cosmonova_sound::song_seek({seconds})
   runs: song_seek({seconds})
-to set the song loudness to, given level (a number) = imagine_sound::song_say(L"setaudio imagine_song volume to " + std::to_wstring((int)(std::clamp({level}, 0.0, 1.0) * 1000)))
-  runs: song_say(f"setaudio imagine_song volume to {int(max(0, min(1, {level})) * 1000)}")
+to set the song loudness to, given level (a number) = cosmonova_sound::song_say(L"setaudio cosmonova_song volume to " + std::to_wstring((int)(std::clamp({level}, 0.0, 1.0) * 1000)))
+  runs: song_say(f"setaudio cosmonova_song volume to {int(max(0, min(1, {level})) * 1000)}")

@@ -1,4 +1,4 @@
-// What an Imagination program (on its own thread) and Unreal (on the game thread) share.
+// What a Cosmonova program (on its own thread) and Unreal (on the game thread) share.
 #pragma once
 #include "CoreMinimal.h"
 #include <condition_variable>
@@ -8,9 +8,9 @@
 #include <utility>
 #include <vector>
 
-namespace imagine_unreal
+namespace cosmonova_unreal
 {
-	struct Shape  // a 3D shape, in Imagination's metres: across, up, away
+	struct Shape  // a 3D shape, in Cosmonova's metres: across, up, away
 	{
 		int kind;  // 0 a block, 1 a ball
 		FVector at;

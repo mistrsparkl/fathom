@@ -13,7 +13,7 @@ include: <fstream>
 link: ws2_32
 
 code:
-  namespace imagine_server
+  namespace cosmonova_server
   {
   	inline std::string message;  // what was sent with the request being answered ('the web message')
   	inline std::string file_asked;  // 'answer with the file': sent instead of the answer's text
@@ -28,7 +28,7 @@ code:
   			{".ico", "image/x-icon"}, {".woff2", "font/woff2"}, {".woff", "font/woff"}, {".ttf", "font/ttf"}, {".mp3", "audio/mpeg"},
   			{".wav", "audio/wav"}, {".txt", "text/plain; charset=utf-8"}, {".webp", "image/webp"}};
   		for (const auto& [e, k] : kinds)
-  			if (imagine::lower(end) == e)
+  			if (cosmonova::lower(end) == e)
   				return k;
   		return "text/html; charset=utf-8";
   	}
@@ -98,7 +98,7 @@ code:
   		where.sin_port = htons((u_short)port);
   		where.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // this computer only, so Windows doesn't ask about its firewall
   		if (listener == INVALID_SOCKET || bind(listener, (sockaddr*)&where, sizeof where) != 0 || listen(listener, 16) != 0)
-  			imagine::fail(line, "I couldn't serve the web on port " + imagine::text(port) + " (is something else using it?).");
+  			cosmonova::fail(line, "I couldn't serve the web on port " + cosmonova::text(port) + " (is something else using it?).");
   		for (;;)
   		{
   			SOCKET client = accept(listener, nullptr, nullptr);
@@ -115,7 +115,7 @@ code:
   			}
   			size_t head_end = asked.find("\r\n\r\n");
   			size_t length = 0;
-  			std::string low = imagine::lower(asked.substr(0, head_end));
+  			std::string low = cosmonova::lower(asked.substr(0, head_end));
   			size_t at = low.find("content-length:");
   			if (at != std::string::npos)
   				length = (size_t)std::strtoul(low.c_str() + at + 15, nullptr, 10);
@@ -133,7 +133,7 @@ code:
   			if (!file_for(folder, path, page))
   			{
   				file_asked.clear();
-  				page = imagine::invoke(answer, line, path);
+  				page = cosmonova::invoke(answer, line, path);
   				if (!file_asked.empty())
   				{
   					std::ifstream in(std::filesystem::u8path(file_asked), std::ios::binary);
@@ -158,7 +158,7 @@ code:
   	{
   		std::error_code e;
   		if (!std::filesystem::is_regular_file(std::filesystem::u8path(name), e))
-  			imagine::fail(line, "there is no file called " + name + ".");
+  			cosmonova::fail(line, "there is no file called " + name + ".");
   		file_asked = name;
   	}
   	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line) { serve_from(port, "", answer, line); }
@@ -221,23 +221,23 @@ python:
           raise RunError(0, "I couldn't serve the web on port " + text(port) + " (is something else using it?).")
       server.serve_forever()
 
-to serve the web, given port (a number) and answer (a command given text returning text) = imagine_server::serve({port}, {answer}, {line})
+to serve the web, given port (a number) and answer (a command given text returning text) = cosmonova_server::serve({port}, {answer}, {line})
   runs: serve_from({port}, "", {answer})
-to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text returning text) = imagine_server::serve_from({port}, {folder}, {answer}, {line})
+to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text returning text) = cosmonova_server::serve_from({port}, {folder}, {answer}, {line})
   runs: serve_from({port}, {folder}, {answer})
-the web message = imagine_server::message, text, read only
+the web message = cosmonova_server::message, text, read only
   runs: MESSAGE[0]
-to web decoded, given piece (text), returning text = imagine_server::decoded({piece})
+to web decoded, given piece (text), returning text = cosmonova_server::decoded({piece})
   runs: urllib.parse.unquote_plus({piece})
-  web: imagine_server_web::decoded({piece})
-to web encoded, given piece (text), returning text = imagine_server::encoded({piece})
+  web: cosmonova_server_web::decoded({piece})
+to web encoded, given piece (text), returning text = cosmonova_server::encoded({piece})
   runs: urllib.parse.quote({piece}, safe="-_.~")
   web: encodeURIComponent({piece})
-to answer with the file, given name (text) = imagine_server::answer_with({name}, {line})
+to answer with the file, given name (text) = cosmonova_server::answer_with({name}, {line})
   runs: answer_with({name})
 
 javascript:
-  const imagine_server_web = {
+  const cosmonova_server_web = {
     decoded(piece) {
       try {
         return decodeURIComponent(piece.replace(/\+/g, " "));

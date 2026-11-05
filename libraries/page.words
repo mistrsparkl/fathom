@@ -1,5 +1,5 @@
 note: Words for web pages: finding and making the parts of a page, changing them, and answering what the person does.
-note: Use them in a program with:  use: page   and make it with:  imagine web <script.imagine>
+note: Use them in a program with:  use: page   and make it with:  cosmonova web <script.cosmos>
 note: Every element of the page is a number (0 means none), so elements fit in names, lists and kinds of things.
 note: Sizes and places are in dots (CSS pixels), counted from the top left of the window.
 
@@ -7,270 +7,270 @@ web only
 
 note: ---- finding elements
 the whole window = 0, number, read only
-  web: imagine_page::number(window)
+  web: cosmonova_page::number(window)
 the page = 0, number, read only
-  web: imagine_page::number(document.documentElement)
+  web: cosmonova_page::number(document.documentElement)
 the page body = 0, number, read only
-  web: imagine_page::number(document.body)
+  web: cosmonova_page::number(document.body)
 the focused element = 0, number, read only
-  web: imagine_page::number(document.activeElement)
+  web: cosmonova_page::number(document.activeElement)
 to the element, given selector (text), returning a number
-  web: imagine_page::number(document.querySelector({selector}))
+  web: cosmonova_page::number(document.querySelector({selector}))
 to elements matching, given selector (text), returning a list of numbers
-  web: imagine_page::numbers(document.querySelectorAll({selector}))
+  web: cosmonova_page::numbers(document.querySelectorAll({selector}))
 to the element within, given element (a number) and selector (text), returning a number
-  web: imagine_page::number(imagine_page::get({element}, {line}).querySelector({selector}))
+  web: cosmonova_page::number(cosmonova_page::get({element}, {line}).querySelector({selector}))
 to elements within, given element (a number) and selector (text), returning a list of numbers
-  web: imagine_page::numbers(imagine_page::get({element}, {line}).querySelectorAll({selector}))
+  web: cosmonova_page::numbers(cosmonova_page::get({element}, {line}).querySelectorAll({selector}))
 to the nearest matching element, given element (a number) and selector (text), returning a number
-  web: imagine_page::number(imagine_page::get({element}, {line}).closest?.({selector}))
+  web: cosmonova_page::number(cosmonova_page::get({element}, {line}).closest?.({selector}))
 to parent of the element, given element (a number), returning a number
-  web: imagine_page::number(imagine_page::get({element}, {line}).parentElement)
+  web: cosmonova_page::number(cosmonova_page::get({element}, {line}).parentElement)
 to the element at, given x (a number) and y (a number), returning a number
-  web: imagine_page::number(document.elementFromPoint({x}, {y}))
+  web: cosmonova_page::number(document.elementFromPoint({x}, {y}))
 to the element made from, given markup (text), returning a number
-  web: imagine_page::made({markup}, {line})
+  web: cosmonova_page::made({markup}, {line})
 
 note: ---- placing them
 to insert as a child, given element (a number) and parent (a number)
-  web: imagine_page::get({parent}, {line}).append(imagine_page::get({element}, {line}))
+  web: cosmonova_page::get({parent}, {line}).append(cosmonova_page::get({element}, {line}))
 to insert as the first child, given element (a number) and parent (a number)
-  web: imagine_page::get({parent}, {line}).prepend(imagine_page::get({element}, {line}))
+  web: cosmonova_page::get({parent}, {line}).prepend(cosmonova_page::get({element}, {line}))
 to insert before, given element (a number) and other (a number)
-  web: imagine_page::get({other}, {line}).before(imagine_page::get({element}, {line}))
+  web: cosmonova_page::get({other}, {line}).before(cosmonova_page::get({element}, {line}))
 to remove the element, given element (a number)
-  web: imagine_page::get({element}, {line}).remove()
+  web: cosmonova_page::get({element}, {line}).remove()
 to empty the element, given element (a number)
-  web: imagine_page::get({element}, {line}).replaceChildren()
+  web: cosmonova_page::get({element}, {line}).replaceChildren()
 
 note: ---- what they hold
 to set the text, given element (a number) and words (text)
-  web: (imagine_page::get({element}, {line}).textContent = {words})
+  web: (cosmonova_page::get({element}, {line}).textContent = {words})
 to set the markup, given element (a number) and markup (text)
-  web: (imagine_page::get({element}, {line}).innerHTML = {markup})
+  web: (cosmonova_page::get({element}, {line}).innerHTML = {markup})
 to words in the element, given element (a number), returning text
-  web: imagine_page::get({element}, {line}).textContent
+  web: cosmonova_page::get({element}, {line}).textContent
 to safe markup of, given words (text), returning text
-  web: imagine_page::safe({words})
+  web: cosmonova_page::safe({words})
 to value of the element, given element (a number), returning text
-  web: String(imagine_page::get({element}, {line}).value ?? "")
+  web: String(cosmonova_page::get({element}, {line}).value ?? "")
 to set the value, given element (a number) and value (text)
-  web: (imagine_page::get({element}, {line}).value = {value})
+  web: (cosmonova_page::get({element}, {line}).value = {value})
 to the element is ticked, given element (a number), returning yes or no
-  web: !!imagine_page::get({element}, {line}).checked
+  web: !!cosmonova_page::get({element}, {line}).checked
 to tick the element, given element (a number) and on (yes or no)
-  web: (imagine_page::get({element}, {line}).checked = {on})
+  web: (cosmonova_page::get({element}, {line}).checked = {on})
 to enable the element, given element (a number) and on (yes or no)
-  web: (imagine_page::get({element}, {line}).disabled = !{on})
+  web: (cosmonova_page::get({element}, {line}).disabled = !{on})
 to focus on the element, given element (a number)
-  web: imagine_page::get({element}, {line}).focus()
+  web: cosmonova_page::get({element}, {line}).focus()
 to select all in the element, given element (a number)
-  web: imagine_page::get({element}, {line}).select?.()
+  web: cosmonova_page::get({element}, {line}).select?.()
 the selected words = 0, text, read only
   web: String(getSelection() || "")
 
 note: ---- attributes, looks (CSS classes) and styles
 to set the attribute, given element (a number) and name (text) and value (text)
-  web: imagine_page::get({element}, {line}).setAttribute({name}, {value})
+  web: cosmonova_page::get({element}, {line}).setAttribute({name}, {value})
 to drop the attribute, given element (a number) and name (text)
-  web: imagine_page::get({element}, {line}).removeAttribute({name})
+  web: cosmonova_page::get({element}, {line}).removeAttribute({name})
 to the attribute value, given element (a number) and name (text), returning text
-  web: (imagine_page::get({element}, {line}).getAttribute({name}) ?? "")
+  web: (cosmonova_page::get({element}, {line}).getAttribute({name}) ?? "")
 to apply the appearance, given element (a number) and look (text)
-  web: imagine_page::get({element}, {line}).classList.add(...imagine_page::looks({look}))
+  web: cosmonova_page::get({element}, {line}).classList.add(...cosmonova_page::looks({look}))
 to remove the appearance, given element (a number) and look (text)
-  web: imagine_page::get({element}, {line}).classList.remove(...imagine_page::looks({look}))
+  web: cosmonova_page::get({element}, {line}).classList.remove(...cosmonova_page::looks({look}))
 to toggle the appearance, given element (a number) and look (text) and on (yes or no)
-  web: imagine_page::get({element}, {line}).classList.toggle({look}, {on})
+  web: cosmonova_page::get({element}, {line}).classList.toggle({look}, {on})
 to the element has the appearance, given element (a number) and look (text), returning yes or no
-  web: imagine_page::get({element}, {line}).classList.contains({look})
+  web: cosmonova_page::get({element}, {line}).classList.contains({look})
 to set the style, given element (a number) and property (text) and value (text)
-  web: imagine_page::get({element}, {line}).style.setProperty({property}, {value})
+  web: cosmonova_page::get({element}, {line}).style.setProperty({property}, {value})
 to the style value, given element (a number) and property (text), returning text
-  web: getComputedStyle(imagine_page::get({element}, {line})).getPropertyValue({property}).trim()
+  web: getComputedStyle(cosmonova_page::get({element}, {line})).getPropertyValue({property}).trim()
 
 note: ---- where they are and how big
 to the left edge of, given element (a number), returning a number
-  web: imagine_page::get({element}, {line}).getBoundingClientRect().left
+  web: cosmonova_page::get({element}, {line}).getBoundingClientRect().left
 to the top edge of, given element (a number), returning a number
-  web: imagine_page::get({element}, {line}).getBoundingClientRect().top
+  web: cosmonova_page::get({element}, {line}).getBoundingClientRect().top
 to the width of, given element (a number), returning a number
-  web: imagine_page::get({element}, {line}).getBoundingClientRect().width
+  web: cosmonova_page::get({element}, {line}).getBoundingClientRect().width
 to the height of, given element (a number), returning a number
-  web: imagine_page::get({element}, {line}).getBoundingClientRect().height
+  web: cosmonova_page::get({element}, {line}).getBoundingClientRect().height
 width of the window = 0, number, read only
   web: innerWidth
 height of the window = 0, number, read only
   web: innerHeight
 to scroll into view, given element (a number)
-  web: imagine_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
+  web: cosmonova_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
 to scroll to the end, given element (a number)
-  web: imagine_page::end({element}, {line})
+  web: cosmonova_page::end({element}, {line})
 
 note: ---- answering the person: 'whenever with (button, "click", the command pressed)' where pressed is given the event
 to listen for an event, given element (a number) and happening (text) and then (a command given a number)
-  web: imagine_page::whenever({element}, {happening}, {then}, {line})
+  web: cosmonova_page::whenever({element}, {happening}, {then}, {line})
 to the pointer x coordinate of, given event (a number), returning a number
-  web: (imagine_page::event({event}, {line}).clientX ?? 0)
+  web: (cosmonova_page::event({event}, {line}).clientX ?? 0)
 to the pointer y coordinate of, given event (a number), returning a number
-  web: (imagine_page::event({event}, {line}).clientY ?? 0)
+  web: (cosmonova_page::event({event}, {line}).clientY ?? 0)
 to key of the event, given event (a number), returning text
-  web: (imagine_page::event({event}, {line}).key ?? "")
+  web: (cosmonova_page::event({event}, {line}).key ?? "")
 to button of the event, given event (a number), returning a number
-  web: (imagine_page::event({event}, {line}).button ?? 0)
+  web: (cosmonova_page::event({event}, {line}).button ?? 0)
 to wheel of the event, given event (a number), returning a number
-  web: (imagine_page::event({event}, {line}).deltaY ?? 0)
+  web: (cosmonova_page::event({event}, {line}).deltaY ?? 0)
 to the target of, given event (a number), returning a number
-  web: imagine_page::number(imagine_page::event({event}, {line}).target)
+  web: cosmonova_page::number(cosmonova_page::event({event}, {line}).target)
 to control held in the event, given event (a number), returning yes or no
-  web: imagine_page::held({event}, "ctrlKey", {line})
+  web: cosmonova_page::held({event}, "ctrlKey", {line})
 to shift held in the event, given event (a number), returning yes or no
-  web: imagine_page::held({event}, "shiftKey", {line})
+  web: cosmonova_page::held({event}, "shiftKey", {line})
 to alt held in the event, given event (a number), returning yes or no
-  web: imagine_page::held({event}, "altKey", {line})
+  web: cosmonova_page::held({event}, "altKey", {line})
 to hold back the event, given event (a number)
-  web: imagine_page::event({event}, {line}).preventDefault()
+  web: cosmonova_page::event({event}, {line}).preventDefault()
 to stop spreading, given event (a number)
-  web: imagine_page::event({event}, {line}).stopPropagation()
+  web: cosmonova_page::event({event}, {line}).stopPropagation()
 to capture the pointer, given element (a number) and event (a number)
-  web: imagine_page::capture({element}, {event}, {line})
+  web: cosmonova_page::capture({element}, {event}, {line})
 
 note: ---- later, and every frame
 to after, given seconds (a number) and then (a command)
-  web: imagine_page::after({seconds}, {then}, {line})
+  web: cosmonova_page::after({seconds}, {then}, {line})
 to every, given seconds (a number) and then (a command)
-  web: imagine_page::every({seconds}, {then}, {line})
+  web: cosmonova_page::every({seconds}, {then}, {line})
 to wait for the next frame
   web: (await new Promise((done) => requestAnimationFrame(done)))
 
 note: ---- moving smoothly: a property goes from one value to another ('ease-out', 'linear', or any CSS easing)
 to animate, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
-  web: imagine_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
+  web: cosmonova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
 to animate and wait, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
-  web: (await imagine_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
+  web: (await cosmonova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
 
 note: ---- drawing on a canvas element: start drawing on it, then shapes and dots
 to start drawing on, given element (a number) and sharpness (a number)
-  web: imagine_page::draw_on({element}, {sharpness}, {line})
+  web: cosmonova_page::draw_on({element}, {sharpness}, {line})
 drawing width = 0, number, read only
-  web: imagine_page::pen().width
+  web: cosmonova_page::pen().width
 drawing height = 0, number, read only
-  web: imagine_page::pen().height
+  web: cosmonova_page::pen().height
 to clear the drawing
-  web: imagine_page::pen().clear()
+  web: cosmonova_page::pen().clear()
 to begin a shape
-  web: imagine_page::pen().begin()
+  web: cosmonova_page::pen().begin()
 to shape point, given x (a number) and y (a number)
-  web: imagine_page::pen().point({x}, {y})
+  web: cosmonova_page::pen().point({x}, {y})
 to fill the shape, given colour (text)
-  web: imagine_page::pen().fill({colour})
+  web: cosmonova_page::pen().fill({colour})
 to fill the shape fading, given top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
-  web: imagine_page::pen().fade({top colour}, {bottom colour}, {top}, {bottom})
+  web: cosmonova_page::pen().fade({top colour}, {bottom colour}, {top}, {bottom})
 to trace the shape, given colour (text) and width (a number)
-  web: imagine_page::pen().trace({colour}, {width})
+  web: cosmonova_page::pen().trace({colour}, {width})
 to fill a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
-  web: imagine_page::pen().dot({x}, {y}, {radius}, {colour})
+  web: cosmonova_page::pen().dot({x}, {y}, {radius}, {colour})
 to fill a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text)
-  web: imagine_page::pen().box({x}, {y}, {width}, {height}, {colour})
+  web: cosmonova_page::pen().box({x}, {y}, {width}, {height}, {colour})
 to fill the drawing fading, given top colour (text) and bottom colour (text)
-  web: imagine_page::pen().all_fade({top colour}, {bottom colour})
+  web: cosmonova_page::pen().all_fade({top colour}, {bottom colour})
 to fill the drawing glowing, given x (a number) and y (a number) and radius (a number) and inner colour (text) and outer colour (text)
-  web: imagine_page::pen().glow({x}, {y}, {radius}, {inner colour}, {outer colour})
+  web: cosmonova_page::pen().glow({x}, {y}, {radius}, {inner colour}, {outer colour})
 
 note: ---- sound and video elements
 to play the media, given element (a number)
-  web: (await imagine_page::get({element}, {line}).play().catch(() => {}))
+  web: (await cosmonova_page::get({element}, {line}).play().catch(() => {}))
 to pause the media, given element (a number)
-  web: imagine_page::get({element}, {line}).pause()
+  web: cosmonova_page::get({element}, {line}).pause()
 to the media is playing, given element (a number), returning yes or no
-  web: !imagine_page::get({element}, {line}).paused
+  web: !cosmonova_page::get({element}, {line}).paused
 to media time of, given element (a number), returning a number
-  web: (imagine_page::get({element}, {line}).currentTime || 0)
+  web: (cosmonova_page::get({element}, {line}).currentTime || 0)
 to media length of, given element (a number), returning a number
-  web: (imagine_page::get({element}, {line}).duration || 0)
+  web: (cosmonova_page::get({element}, {line}).duration || 0)
 to set the media time, given element (a number) and seconds (a number)
-  web: (imagine_page::get({element}, {line}).currentTime = {seconds})
+  web: (cosmonova_page::get({element}, {line}).currentTime = {seconds})
 to set the media loudness, given element (a number) and level (a number)
-  web: (imagine_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
+  web: (cosmonova_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
 to local copy of, given address (text), returning text
-  web: (await imagine_page::copy({address}, {line}))
+  web: (await cosmonova_page::copy({address}, {line}))
 to loudness bands of, given element (a number) and bands (a number), returning a list of numbers
-  web: imagine_page::bands({element}, {bands}, {line})
+  web: cosmonova_page::bands({element}, {bands}, {line})
 
 javascript:
   // Elements are numbers in a program; this keeps which number is which (weakly, so taken-away elements are let go).
-  const imagine_page = {
+  const cosmonova_page = {
     known: new Map(),
     numbered: new WeakMap(),
     next: 1,
     number(el) {
       if (!el) return 0;
-      let n = imagine_page.numbered.get(el);
+      let n = cosmonova_page.numbered.get(el);
       if (!n) {
-        n = imagine_page.next++;
-        imagine_page.numbered.set(el, n);
-        imagine_page.known.set(n, new WeakRef(el));
+        n = cosmonova_page.next++;
+        cosmonova_page.numbered.set(el, n);
+        cosmonova_page.known.set(n, new WeakRef(el));
       }
       return n;
     },
-    numbers: (list) => [...list].map(imagine_page.number),
+    numbers: (list) => [...list].map(cosmonova_page.number),
     get(n, line) {
-      const el = n ? imagine_page.known.get(n)?.deref() : null;
-      if (!el) imagine.fail(line, n ? `element ${n} isn't on the page any more.` : "there is no element there (it is 0).");
+      const el = n ? cosmonova_page.known.get(n)?.deref() : null;
+      if (!el) cosmonova.fail(line, n ? `element ${n} isn't on the page any more.` : "there is no element there (it is 0).");
       return el;
     },
     made(markup, line) {
       const t = document.createElement("template");
       t.innerHTML = markup.trim();
-      if (!t.content.firstElementChild) imagine.fail(line, "the markup doesn't make an element.");
-      return imagine_page.number(t.content.firstElementChild);
+      if (!t.content.firstElementChild) cosmonova.fail(line, "the markup doesn't make an element.");
+      return cosmonova_page.number(t.content.firstElementChild);
     },
     safe: (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]),
     looks: (s) => s.split(/\s+/).filter(Boolean),
     end(n, line) {
-      const el = imagine_page.get(n, line);
+      const el = cosmonova_page.get(n, line);
       el.scrollTop = el.scrollHeight;
     },
     // events: each one the person makes gets a number for the command answering it
     events: new Map(),
     next_event: 1,
     event(n, line) {
-      const e = imagine_page.events.get(n);
-      if (!e) imagine.fail(line, `there is no event ${n} (an event is only kept for a little while).`);
+      const e = cosmonova_page.events.get(n);
+      if (!e) cosmonova.fail(line, `there is no event ${n} (an event is only kept for a little while).`);
       return e;
     },
-    held: (n, key, line) => !!imagine_page.event(n, line)[key] || (key === "ctrlKey" && !!imagine_page.event(n, line).metaKey),
+    held: (n, key, line) => !!cosmonova_page.event(n, line)[key] || (key === "ctrlKey" && !!cosmonova_page.event(n, line).metaKey),
     run(then, args) {
       Promise.resolve()
         .then(() => then(...args))
-        .catch((e) => imagine.report(e));
+        .catch((e) => cosmonova.report(e));
     },
     whenever(n, happening, then, line) {
-      if (!then) imagine.fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
-      imagine_page.get(n, line).addEventListener(happening, (e) => {
-        const k = imagine_page.next_event++;
-        imagine_page.events.set(k, e);
-        imagine_page.events.delete(k - 500);
-        imagine_page.run(then, [k]);
+      if (!then) cosmonova.fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
+      cosmonova_page.get(n, line).addEventListener(happening, (e) => {
+        const k = cosmonova_page.next_event++;
+        cosmonova_page.events.set(k, e);
+        cosmonova_page.events.delete(k - 500);
+        cosmonova_page.run(then, [k]);
       });
     },
     capture(n, e, line) {
-      const ev = imagine_page.event(e, line);
+      const ev = cosmonova_page.event(e, line);
       try {
-        if (ev.pointerId !== undefined) imagine_page.get(n, line).setPointerCapture(ev.pointerId);
+        if (ev.pointerId !== undefined) cosmonova_page.get(n, line).setPointerCapture(ev.pointerId);
       } catch {} // a pointer that is already up (or a made-up one) can't be held
     },
-    after: (seconds, then, line) => setTimeout(() => imagine_page.run(then, []), Math.max(0, seconds) * 1000),
-    every: (seconds, then, line) => setInterval(() => imagine_page.run(then, []), Math.max(0.001, seconds) * 1000),
+    after: (seconds, then, line) => setTimeout(() => cosmonova_page.run(then, []), Math.max(0, seconds) * 1000),
+    every: (seconds, then, line) => setInterval(() => cosmonova_page.run(then, []), Math.max(0.001, seconds) * 1000),
     animate(n, property, from, to, seconds, easing, line) {
       const name = property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      return imagine_page.get(n, line).animate([{ [name]: from }, { [name]: to }], { duration: seconds * 1000, easing });
+      return cosmonova_page.get(n, line).animate([{ [name]: from }, { [name]: to }], { duration: seconds * 1000, easing });
     },
     // a canvas, drawn on in dots, sharp on every screen
     canvas: null,
     draw_on(n, sharpness, line) {
-      const el = imagine_page.get(n, line);
-      if (!el.getContext) imagine.fail(line, "only a canvas element can be drawn on.");
+      const el = cosmonova_page.get(n, line);
+      if (!el.getContext) cosmonova.fail(line, "only a canvas element can be drawn on.");
       const ratio = (devicePixelRatio || 1) * Math.min(1, Math.max(0.1, sharpness)), w = el.clientWidth, h = el.clientHeight;
       if (el.width !== Math.round(w * ratio) || el.height !== Math.round(h * ratio)) {
         el.width = Math.round(w * ratio);
@@ -279,7 +279,7 @@ javascript:
       const c = el.getContext("2d");
       c.setTransform(ratio, 0, 0, ratio, 0, 0);
       let first = true;
-      imagine_page.canvas = {
+      cosmonova_page.canvas = {
         width: w, height: h,
         clear: () => c.clearRect(0, 0, w, h),
         begin: () => { c.beginPath(); first = true; },
@@ -312,39 +312,39 @@ javascript:
       };
     },
     pen() {
-      if (!imagine_page.canvas) imagine.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
-      return imagine_page.canvas;
+      if (!cosmonova_page.canvas) cosmonova.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
+      return cosmonova_page.canvas;
     },
     // a whole file fetched into the page, so a song can be moved about in freely
     copies: new Map(),
     async copy(address, line) {
-      if (imagine_page.copies.has(address)) return imagine_page.copies.get(address);
+      if (cosmonova_page.copies.has(address)) return cosmonova_page.copies.get(address);
       let reply;
       try {
         reply = await fetch(address);
       } catch {}
-      if (!reply || !reply.ok) imagine.fail(line, `I couldn't get "${address}".`);
+      if (!reply || !reply.ok) cosmonova.fail(line, `I couldn't get "${address}".`);
       const made = URL.createObjectURL(await reply.blob());
-      if (imagine_page.copies.size > 8) {
-        const [oldest, url] = imagine_page.copies.entries().next().value;
+      if (cosmonova_page.copies.size > 8) {
+        const [oldest, url] = cosmonova_page.copies.entries().next().value;
         URL.revokeObjectURL(url);
-        imagine_page.copies.delete(oldest);
+        cosmonova_page.copies.delete(oldest);
       }
-      imagine_page.copies.set(address, made);
+      cosmonova_page.copies.set(address, made);
       return made;
     },
     // how loud each band of pitches is in a playing sound, from 0 to 1
     hearing: new WeakMap(),
     bands(n, count, line) {
-      const el = imagine_page.get(n, line);
-      let ear = imagine_page.hearing.get(el);
+      const el = cosmonova_page.get(n, line);
+      let ear = cosmonova_page.hearing.get(el);
       if (!ear) {
         const context = new AudioContext(), source = context.createMediaElementSource(el), analyser = context.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
         analyser.connect(context.destination);
         ear = { context, analyser, data: new Uint8Array(analyser.frequencyBinCount) };
-        imagine_page.hearing.set(el, ear);
+        cosmonova_page.hearing.set(el, ear);
       }
       if (ear.context.state === "suspended") ear.context.resume();
       ear.analyser.getByteFrequencyData(ear.data);

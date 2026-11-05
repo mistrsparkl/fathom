@@ -1,8 +1,8 @@
-"""Imagination: a programming language written in plain English words.
+"""Cosmonova: a programming language written in plain English words.
 
-Run a program:         py -3 imagination.py run <script.imagine>      (or: imagine <script.imagine>)
-Build it as an .exe:   py -3 imagination.py build <script.imagine>    (needs Visual Studio's C++ compiler)
-Unreal parts:          py -3 imagination.py <scripts folder> <output folder>
+Run a program:         py -3 cosmonova.py run <script.cosmos>      (or: cosmonova <script.cosmos>)
+Build it as an .exe:   py -3 cosmonova.py build <script.cosmos>    (needs Visual Studio's C++ compiler)
+Unreal parts:          py -3 cosmonova.py <scripts folder> <output folder>
 
 How it works: this file reads a script once, checks it, and turns every piece into two things at the same time:
 a small Python function that does it (what 'run' uses) and the C++ that does it (what 'build' and Unreal use).
@@ -56,13 +56,13 @@ CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D"
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT, "text values": TEXT}
-UNREAL = False  # set by 'imagine unreal': libraries/unreal/ words win, and the program starts from ImagineMain()
-# Set by 'imagine web': the script is read into JavaScript instead. Every piece's .cpp then holds JavaScript; most of it
+UNREAL = False  # set by 'cosmonova unreal': libraries/unreal/ words win, and the program starts from CosmonovaMain()
+# Set by 'cosmonova web': the script is read into JavaScript instead. Every piece's .cpp then holds JavaScript; most of it
 # is written the same way in both (calls, operators, if, while), and the places where they differ check JS.
 JS = False
 JS_RESERVED = set("""function let var yield await async in of typeof instanceof void delete new this class extends super import
 export default null undefined true false arguments eval with enum implements interface package private protected public
-static imagine""".split())
+static cosmonova""".split())
 MAKING_CPP = False  # yes while a program is being made into C++ (build, unreal, translate)
 UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of running can't use it; the message follows
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
@@ -173,7 +173,7 @@ def js_zero(kind):
     if is_list(kind):
         return "[]"
     if is_table(kind):
-        return "imagine::table()"
+        return "cosmonova::table()"
     if is_thing(kind):
         return f"new {js_class(kind)}()"
     if is_command(kind):
@@ -188,7 +188,7 @@ def is_deep(kind):
 
 def js_copy(cpp, kind):
     """In JavaScript a stored list, table, place or thing must be copied by hand, as C++ and Python do."""
-    return f"imagine::dup({strip_parens(cpp)})" if JS and is_deep(kind) else strip_parens(cpp)
+    return f"cosmonova::dup({strip_parens(cpp)})" if JS and is_deep(kind) else strip_parens(cpp)
 
 
 def js_set(target):
@@ -197,7 +197,7 @@ def js_set(target):
 
 
 def js_dots(code):
-    """C++'s 'imagine::text' is JavaScript's 'imagine.text': turn every '::' outside text into '.'."""
+    """C++'s 'cosmonova::text' is JavaScript's 'cosmonova.text': turn every '::' outside text into '.'."""
     out, k, n = [], 0, len(code)
     while k < n:
         c = code[k]
@@ -1042,14 +1042,14 @@ class Expr:
                     or (is_table(v.kind) and r.kind == TEXT)):
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
-            return Value(f"imagine::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+            return Value(f"cosmonova::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
         for words, fn, test in ((("begins", "with"), "begins_with", str.startswith), (("ends", "with"), "ends_with", str.endswith)):
             if self.at(*words):  # 'name begins with "Dr"'
                 self.i += 2
                 r = self.need(self.sum(), TEXT, " ".join(words))
                 self.need(v, TEXT, " ".join(words))
                 a, b = v.run, r.run
-                return Value(f"imagine::{fn}({v.cpp}, {r.cpp})", YESNO, lambda env, test=test: test(a(env), b(env)))
+                return Value(f"cosmonova::{fn}({v.cpp}, {r.cpp})", YESNO, lambda env, test=test: test(a(env), b(env)))
         for words, part, size in ((("touches", "a", "side"), "horizontal", "width"),
                                   (("touches", "the", "top", "or", "bottom"), "vertical", "height")):
             if self.at(*words):  # 'existence touches a side': within radius of the world's edge (or past it)
@@ -1072,7 +1072,7 @@ class Expr:
             r = self.sum()
             (pa, ra), (pb, rb) = self.circle(v), self.circle(r)
             a, b, c, d = pa.run, pb.run, ra.run, rb.run
-            return Value(f"imagine::within({pa.cpp}, {pb.cpp}, {ra.cpp} + {rb.cpp})", YESNO,
+            return Value(f"cosmonova::within({pa.cpp}, {pb.cpp}, {ra.cpp} + {rb.cpp})", YESNO,
                          lambda env: (a(env) - b(env)).size() <= c(env) + d(env))
         if self.at("is", "within"):  # 'existence is within 30 of coin': close enough to touch
             self.i += 2
@@ -1083,7 +1083,7 @@ class Expr:
                 raise ScriptError(self.line, f"'within' compares two numbers or two places, not {kind_name(v.kind)} and {kind_name(r.kind)}.")
             a, b, c = v.run, r.run, reach.run
             gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
-            return Value(f"imagine::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env))
+            return Value(f"cosmonova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env))
         for words, op in self.COMPARE:
             if self.at(*words):
                 self.i += len(words)
@@ -1093,7 +1093,7 @@ class Expr:
                     self.need(r, NUMBER, "Comparing")
                 a, b, f = v.run, r.run, COMPARE_RUN[op]
                 if JS and is_deep(v.kind):  # JavaScript's == only asks whether they are the very same list
-                    return Value(f"({'!' if op == '!=' else ''}imagine::same({v.cpp}, {r.cpp}))", YESNO, lambda env: f(a(env), b(env)))
+                    return Value(f"({'!' if op == '!=' else ''}cosmonova::same({v.cpp}, {r.cpp}))", YESNO, lambda env: f(a(env), b(env)))
                 return Value(f"({v.cpp} {op} {r.cpp})", YESNO, lambda env: f(a(env), b(env)))
         return v
 
@@ -1105,7 +1105,7 @@ class Expr:
             r = self.product()
             a, b = v.run, r.run
             if v.kind == TEXT and op == "+":
-                v = Value(f"(imagine::text({v.cpp}) + imagine::text({r.cpp}))", TEXT,
+                v = Value(f"(cosmonova::text({v.cpp}) + cosmonova::text({r.cpp}))", TEXT,
                           lambda env, a=a, b=b: text(a(env)) + text(b(env)))
                 continue
             if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
@@ -1113,7 +1113,7 @@ class Expr:
             f = operator.add if op == "+" else operator.sub
             run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
             if JS and v.kind != NUMBER:
-                v = Value(f"imagine::{'plus' if op == '+' else 'minus'}({v.cpp}, {r.cpp})", v.kind, run)
+                v = Value(f"cosmonova::{'plus' if op == '+' else 'minus'}({v.cpp}, {r.cpp})", v.kind, run)
                 continue
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
@@ -1130,7 +1130,7 @@ class Expr:
             f = divide if op == "/" else operator.mul
             run = lambda env, a=a, b=b, f=f: f(a(env), b(env))
             if JS and v.kind != NUMBER:
-                v = Value(f"imagine::{'over' if op == '/' else 'times'}({v.cpp}, {r.cpp})", v.kind, run)
+                v = Value(f"cosmonova::{'over' if op == '/' else 'times'}({v.cpp}, {r.cpp})", v.kind, run)
                 continue
             v = Value(f"({v.cpp} {op} {r.cpp})", v.kind, run)
         return v
@@ -1177,7 +1177,7 @@ class Expr:
                 raise ScriptError(self.line, f"I can't make {kind_name(v.kind)} negative.")
             a = v.run
             if JS and v.kind != NUMBER:
-                return Value(f"imagine::negative({v.cpp})", v.kind, lambda env: -a(env))
+                return Value(f"cosmonova::negative({v.cpp})", v.kind, lambda env: -a(env))
             return Value(f"(-{v.cpp})", v.kind, lambda env: -a(env))
         v = self.primary()
         while self.at("of"):  # 'existence of horizontal': a part named after the place or thing
@@ -1195,7 +1195,7 @@ class Expr:
             if v.kind != TEXT:
                 raise ScriptError(self.line, f"'as a number' turns text into a number, but this is {kind_name(v.kind)}.")
             a, line = v.run, self.line
-            return Value(f"imagine::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line))
+            return Value(f"cosmonova::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line))
         for words in (("changed", "by"), ("kept", "by")):
             if self.at(*words):  # 'scores changed by the command double', 'scores kept by the command is big'
                 self.i += 2
@@ -1209,15 +1209,15 @@ class Expr:
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs {want}, not {kind_name(f.kind)}.")
                 a, g, line = v.run, f.run, self.line
                 if JS:
-                    v = Value(f"(await imagine::{words[0]}_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line}))",
+                    v = Value(f"(await cosmonova::{words[0]}_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line}))",
                               v.kind if words[0] == "kept" else "list of " + gives,
                               (lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env))) if words[0] == "kept" else
                               (lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env))))
                 elif words[0] == "kept":
-                    v = Value(f"imagine::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
+                    v = Value(f"cosmonova::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
                               lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env)))
                 else:
-                    v = Value(f"imagine::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", "list of " + gives,
+                    v = Value(f"cosmonova::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", "list of " + gives,
                               lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env)))
                 return v
         if self.at("as", "saved", "text"):  # 'scores as saved text': written out as JSON, as 'save' writes it
@@ -1225,11 +1225,11 @@ class Expr:
             if holds_command(v.kind):
                 raise ScriptError(self.line, "A command can't be saved.")
             a, kind, line = v.run, v.kind, self.line
-            return Value(f"imagine::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line))
+            return Value(f"cosmonova::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line))
         if self.at("as", "text"):
             self.i += 2
             a = v.run
-            return Value(f"imagine::text({v.cpp})", TEXT, lambda env: text(a(env)))
+            return Value(f"cosmonova::text({v.cpp})", TEXT, lambda env: text(a(env)))
         if self.at("rounded", "to"):
             self.i += 2
             self.need(v, NUMBER, "rounded to")
@@ -1239,13 +1239,13 @@ class Expr:
                 if self.at("places") or self.at("place"):
                     self.i += 1
             a, b, line = v.run, places.run, self.line
-            return Value(f"imagine::rounded({v.cpp}, {places.cpp}, {line})", NUMBER, lambda env: rounded(a(env), b(env), line))
+            return Value(f"cosmonova::rounded({v.cpp}, {places.cpp}, {line})", NUMBER, lambda env: rounded(a(env), b(env), line))
         if self.at("split", "by"):
             self.i += 2
             self.need(v, TEXT, "split by")
             by = self.need(self.primary(), TEXT, "split by")
             a, b, line = v.run, by.run, self.line
-            return Value(f"imagine::split({v.cpp}, {by.cpp}, {line})", "list of text", lambda env: split(a(env), b(env), line))
+            return Value(f"cosmonova::split({v.cpp}, {by.cpp}, {line})", "list of text", lambda env: split(a(env), b(env), line))
         return v
 
     def primary(self):
@@ -1285,17 +1285,17 @@ class Expr:
                 if not items:
                     raise RunError(line, "the list is empty, so I can't pick a random item.")
                 return pyrandom.choice(items)
-            return Value(f"imagine::random_item({v.cpp}, {line})", element(v.kind), pick)
+            return Value(f"cosmonova::random_item({v.cpp}, {line})", element(v.kind), pick)
         if self.at("random", "fraction"):  # 'random fraction': a number from 0 up to (not quite) 1
             self.i += 2
-            return Value("imagine::random_fraction()", NUMBER, lambda env: pyrandom.random())
+            return Value("cosmonova::random_fraction()", NUMBER, lambda env: pyrandom.random())
         if self.at("random", "number", "from"):
             self.i += 3
             lo = self.need(self.sum(), NUMBER, "random number")
             self.take("to")
             hi = self.need(self.sum(), NUMBER, "random number")
             a, b = lo.run, hi.run
-            return Value(f"imagine::random({lo.cpp}, {hi.cpp}, {line})", NUMBER, lambda env: random_number(a(env), b(env), line))
+            return Value(f"cosmonova::random({lo.cpp}, {hi.cpp}, {line})", NUMBER, lambda env: random_number(a(env), b(env), line))
         if tok == "(":
             self.i += 1
             v = self.full()
@@ -1334,10 +1334,10 @@ class Expr:
             def put(env, x):
                 items = get(env)
                 items[index_of(items, at(env), line)] = dup(x)
-            v = Value(f"imagine::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
+            v = Value(f"cosmonova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
-                v.cpp_assign, v.cpp_close = f"imagine::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
+                v.cpp_assign, v.cpp_close = f"cosmonova::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
             return v
         made = self.made()  # before names, so a name like 'a' doesn't hide 'a list of'
         if made:
@@ -1353,11 +1353,11 @@ class Expr:
 
             def put(env, x):
                 get(env)[at(env)] = dup(x)
-            v = Value(f"imagine::entry({table.cpp}, {strip_parens(name.cpp)}, {line})", entry_kind(table.kind),
+            v = Value(f"cosmonova::entry({table.cpp}, {strip_parens(name.cpp)}, {line})", entry_kind(table.kind),
                       lambda env: entry_of(get(env), at(env), line), put if table.writable else None)
             v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
             if JS:
-                v.cpp_assign, v.cpp_close = f"imagine::put_entry({table.cpp}, {strip_parens(name.cpp)}, ", ")"
+                v.cpp_assign, v.cpp_close = f"cosmonova::put_entry({table.cpp}, {strip_parens(name.cpp)}, ", ")"
             return v
         for stat in ("sum", "average", "biggest", "smallest"):
             if self.at(stat, "of") and not match_command(self.names, self.t[self.i:])[0]:  # a command called 'sum of' still wins
@@ -1366,14 +1366,14 @@ class Expr:
                 if v.kind != "list of number":
                     raise ScriptError(line, f"'{stat} of' needs a list of numbers, but this is {kind_name(v.kind)}.")
                 a = v.run
-                return Value(f"imagine::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line))
+                return Value(f"cosmonova::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line))
         if self.at("keys", "of"):
             self.i += 2
             table = self.operand()
             if not is_table(table.kind):
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
-            return Value(f"imagine::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
+            return Value(f"cosmonova::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
         if self.at("the", "command"):  # a command kept as a value: 'set f to the command double'
             self.i += 2
             return command_value(self.names, self.t, self, line)
@@ -1403,7 +1403,7 @@ class Expr:
             if not gives and not getattr(self, "allow_nothing", False):
                 raise ScriptError(line, "This command doesn't return anything, so it can't be used as a value.")
             get, gets = f.run, [a.run for a in args]
-            return Value(f"{'(await ' if JS else ''}imagine::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
+            return Value(f"{'(await ' if JS else ''}cosmonova::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
                          lambda env: invoke_value(get(env), [g(env) for g in gets], line))
         key, n = self.names.match(self.t, self.i)
         command_key, command_n = match_command(self.names, self.t[self.i:])
@@ -1463,20 +1463,20 @@ class Expr:
             where = self.need(self.operand(), TEXT, "file")
             w = where.run
             if whole:
-                return Value(f"imagine::read_file({where.cpp}, {line})", TEXT, lambda env: read_file(w(env), line))
-            return Value(f"imagine::read_lines({where.cpp}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)))
+                return Value(f"cosmonova::read_file({where.cpp}, {line})", TEXT, lambda env: read_file(w(env), line))
+            return Value(f"cosmonova::read_lines({where.cpp}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)))
         if self.at("file"):
             self.i += 1
             where = self.need(self.operand(), TEXT, "file")
             self.take("exists")
             w = where.run
-            return Value(f"imagine::file_exists({where.cpp})", YESNO, lambda env: os.path.isfile(w(env)))
+            return Value(f"cosmonova::file_exists({where.cpp})", YESNO, lambda env: os.path.isfile(w(env)))
         for words, fn, f in ((("lines", "of"), "lines_of", lines_of), (("words", "of"), "words_of", str.split)):
             if self.at(*words):
                 self.i += 2
                 v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
-                return Value(f"imagine::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
+                return Value(f"cosmonova::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
         if tok in ("letter", "letters") and self.peek(1) not in ITEM_NOT_INDEX:
             self.i += 1
             first = self.need(self.sum(), NUMBER, tok)
@@ -1488,28 +1488,28 @@ class Expr:
             v = self.need(self.operand(), TEXT, f"'{tok} ... of'")
             a, f = v.run, first.run
             if last_ is None:
-                return Value(f"imagine::letter({v.cpp}, {strip_parens(first.cpp)}, {line})", TEXT, lambda env: letter(a(env), f(env), line))
+                return Value(f"cosmonova::letter({v.cpp}, {strip_parens(first.cpp)}, {line})", TEXT, lambda env: letter(a(env), f(env), line))
             b = last_.run
-            return Value(f"imagine::letters_from({v.cpp}, {strip_parens(first.cpp)}, {strip_parens(last_.cpp)}, {line})", TEXT,
+            return Value(f"cosmonova::letters_from({v.cpp}, {strip_parens(first.cpp)}, {strip_parens(last_.cpp)}, {line})", TEXT,
                          lambda env: letters_from(a(env), f(env), b(env), line))
         if self.at("trimmed"):  # 'trimmed line': without spaces, tabs and line breaks at either end
             self.i += 1
             v = self.need(self.operand(), TEXT, "trimmed")
             a = v.run
-            return Value(f"imagine::trimmed({v.cpp})", TEXT, lambda env: a(env).strip(" \t\r\n"))
+            return Value(f"cosmonova::trimmed({v.cpp})", TEXT, lambda env: a(env).strip(" \t\r\n"))
         for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
             if self.at(*words):
                 self.i += 3
                 v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
-                return Value(f"imagine::{fn}({v.cpp})", TEXT, lambda env, table=table: a(env).translate(table))
+                return Value(f"cosmonova::{fn}({v.cpp})", TEXT, lambda env, table=table: a(env).translate(table))
         if self.at("position", "of"):
             self.i += 2
             part = self.need(self.sum(), TEXT, "position of")
             self.take("in")
             v = self.need(self.operand(), TEXT, "position of ... in")
             a, b = v.run, part.run
-            return Value(f"imagine::position({v.cpp}, {part.cpp})", NUMBER, lambda env: float(a(env).find(b(env)) + 1))
+            return Value(f"cosmonova::position({v.cpp}, {part.cpp})", NUMBER, lambda env: float(a(env).find(b(env)) + 1))
         if self.at("replace"):
             self.i += 1
             old = self.need(self.sum(), TEXT, "replace")
@@ -1518,7 +1518,7 @@ class Expr:
             self.take("in")
             v = self.need(self.operand(), TEXT, "replace ... in")
             a, o, w = v.run, old.run, new.run
-            return Value(f"imagine::replace_all({v.cpp}, {old.cpp}, {new.cpp}, {line})", TEXT,
+            return Value(f"cosmonova::replace_all({v.cpp}, {old.cpp}, {new.cpp}, {line})", TEXT,
                          lambda env: replace_all(a(env), o(env), w(env), line))
         if self.at("join"):
             self.i += 1
@@ -1528,7 +1528,7 @@ class Expr:
             self.take("with")
             between = self.need(self.operand(), TEXT, "join ... with")
             a, b = v.run, between.run
-            return Value(f"imagine::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
+            return Value(f"cosmonova::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
         if self.at("sorted"):
             start = self.i
             self.i += 1
@@ -1545,7 +1545,7 @@ class Expr:
                             raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
                         a = v.run
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
-                        return Value(f"imagine::sorted_by({v.cpp}, {by})", v.kind,
+                        return Value(f"cosmonova::sorted_by({v.cpp}, {by})", v.kind,
                                      lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])])
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
@@ -1558,14 +1558,14 @@ class Expr:
                     raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
                 a = v.run
                 run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
-                return Value(f"imagine::{word}({v.cpp})", v.kind, run)
+                return Value(f"cosmonova::{word}({v.cpp})", v.kind, run)
         if self.at("last", "item", "of"):
             self.i += 3
             v = self.operand()
             if not is_list(v.kind):
                 raise ScriptError(line, f"'last item of' needs a list, but this is {kind_name(v.kind)}.")
             a = v.run
-            return Value(f"imagine::last({v.cpp}, {line})", element(v.kind), lambda env: last(a(env), line))
+            return Value(f"cosmonova::last({v.cpp}, {line})", element(v.kind), lambda env: last(a(env), line))
         if self.at("square", "root", "of"):
             self.i += 3
             v = self.need(self.sum(), NUMBER, "square root")
@@ -1580,9 +1580,9 @@ class Expr:
             if v.kind in (PLACE, FLAT):
                 return Value(f"({v.cpp}).Size()", NUMBER, lambda env: a(env).size())
             if v.kind == TEXT:
-                return Value(f"imagine::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
+                return Value(f"cosmonova::letters({v.cpp})", NUMBER, lambda env: letters(a(env)))
             if is_list(v.kind) or is_table(v.kind):
-                return Value(f"imagine::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
+                return Value(f"cosmonova::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
             self.i += 1
@@ -1684,7 +1684,7 @@ def load_words(name, line):
     return names, info
 
 
-LIBRARY_HELP = """A library is <name>.words, next to the script or in Imagination's libraries folder. Its lines:
+LIBRARY_HELP = """A library is <name>.words, next to the script or in Cosmonova's libraries folder. Its lines:
   include: <cmath>                    a C++ header to include
   link: shell32                       a system library to link with
   code:                               C++ lines (indented below) the words can use
@@ -1713,9 +1713,9 @@ def part_of(owner, key):
             fields = get(env).fields
             fields["birth"], fields["existence"] = dup(x), dup(x)
         v.store = born
-        v.cpp_assign, v.cpp_close = f"imagine::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
+        v.cpp_assign, v.cpp_close = f"cosmonova::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
         if JS:
-            v.cpp_assign = f"imagine::born({strip_parens(owner.cpp)}, "
+            v.cpp_assign = f"cosmonova::born({strip_parens(owner.cpp)}, "
     return v
 
 
@@ -1838,9 +1838,9 @@ def load_library(name, line, names):
                     command.cpp, command.unusable = src, None
                 web = (where, in_names, set_web)
             elif web_only:
-                command.unusable = f"'{word}' (from the library '{name}') only works in a program made for the web ('imagine web')."
+                command.unusable = f"'{word}' (from the library '{name}') only works in a program made for the web ('cosmonova web')."
             elif runs_only and MAKING_CPP:
-                command.unusable = f"'{word}' (from the library '{name}') only works when the program runs directly ('imagine <script>'), not built."
+                command.unusable = f"'{word}' (from the library '{name}') only works when the program runs directly ('cosmonova <script>'), not built."
         elif "=" in stripped:
             english, _, rest = stripped.partition("=")
             parts = [p.strip() for p in rest.rsplit(",", 2)]
@@ -1860,10 +1860,10 @@ def load_library(name, line, names):
                 holder["run"] = lambda env: fn()
             pending = (where, [], set_value)
             if runs_only and MAKING_CPP and not JS:
-                names.known[tuple(words)] = (UNUSABLE + f"'{english.strip()}' (from the library '{name}') only works when the program runs directly ('imagine <script>'), not built.",) + names.known[tuple(words)][1:]
+                names.known[tuple(words)] = (UNUSABLE + f"'{english.strip()}' (from the library '{name}') only works when the program runs directly ('cosmonova <script>'), not built.",) + names.known[tuple(words)][1:]
             if JS or web_only:
                 key = tuple(words)
-                said = "can't be used in a web program yet." if JS else "only works in a program made for the web ('imagine web')."
+                said = "can't be used in a web program yet." if JS else "only works in a program made for the web ('cosmonova web')."
                 names.known[key] = (UNUSABLE + f"'{english.strip()}' (from the library '{name}') {said}",) + names.known[key][1:]
 
                 def set_web(src, key=key):
@@ -1895,7 +1895,7 @@ class Program:
 
 
 def translate(path):
-    """Returns the C++ text for one .imagine file, or raises ScriptError."""
+    """Returns the C++ text for one .cosmos file, or raises ScriptError."""
     global MAKING_CPP
     MAKING_CPP = True
     try:
@@ -1904,23 +1904,23 @@ def translate(path):
         MAKING_CPP = False
 
 
-FILES = []  # the script, then each script it uses ('use: shapes.imagine'), in the order they were read
+FILES = []  # the script, then each script it uses ('use: shapes.cosmos'), in the order they were read
 PER_FILE = 100000  # a line number n in FILES[k] is kept as k * PER_FILE + n
 
 
 def where(line):
-    """'guess.imagine line 3' for a kept line number."""
+    """'guess.cosmos line 3' for a kept line number."""
     k, n = divmod(line, PER_FILE)
     return f"{FILES[k] if k < len(FILES) else '?'} line {n}"
 
 
 def run_where(line):
-    """How an error while running names its line: 'Line 3' in the program itself, 'shapes.imagine line 3' in a used script."""
+    """How an error while running names its line: 'Line 3' in the program itself, 'shapes.cosmos line 3' in a used script."""
     return f"Line {line}" if line < PER_FILE else where(line)
 
 
 def gather(path, from_line=None, seen=None):
-    """The lines of a script with every 'use: other.imagine' line replaced by that script's lines.
+    """The lines of a script with every 'use: other.cosmos' line replaced by that script's lines.
 
     Returns (lines, numbers): numbers[i] is the kept line number of lines[i]."""
     seen = set() if seen is None else seen
@@ -1936,7 +1936,7 @@ def gather(path, from_line=None, seen=None):
             raise ScriptError(k * PER_FILE + n, "'note:' is now 'whisper:'.")
         if raw.strip().lower().startswith("whisper:"):  # read as an inner 'note:' line
             raw = raw[:len(raw) - len(raw.lstrip())] + "note:" + raw.strip()[8:]
-        m = re.fullmatch(r"\s*use:\s*(.+\.imagine)\s*", raw, re.IGNORECASE)
+        m = re.fullmatch(r"\s*use:\s*(.+\.cosmos)\s*", raw, re.IGNORECASE)
         if m and not raw[:1].isspace():
             other = path.parent / m.group(1).strip()
             if not other.exists():
@@ -1952,7 +1952,7 @@ def gather(path, from_line=None, seen=None):
 
 
 def read_script(path):
-    """Reads one .imagine file. Returns (C++ text, Program or None), or raises ScriptError.
+    """Reads one .cosmos file. Returns (C++ text, Program or None), or raises ScriptError.
 
     A program that uses a library's words without 'use:' gets that library by itself."""
     auto = []
@@ -2020,7 +2020,7 @@ def read_one(path, auto):
                 if not m:
                     raise ScriptError(numbers[i - 1], "A setting looks like 'name: number', e.g. 'look limit: 30 degrees'.")
                 words = m.group(1).split()
-                cpp = f"Imagine_{snake(path.stem.split())}::{snake(words)}"
+                cpp = f"Cosmonova_{snake(path.stem.split())}::{snake(words)}"
                 number = float(m.group(2))
                 names.add(words, cpp, NUMBER, True, lambda env, number=number: number)
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
@@ -2049,7 +2049,7 @@ def read_one(path, auto):
                                   f"The command '{'genesis' if text_ == 'to start:' else text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
             i += 1
             continue
-        if text_.lower().startswith("use:"):  # a library ('use: x.imagine' lines were already replaced by gather)
+        if text_.lower().startswith("use:"):  # a library ('use: x.cosmos' lines were already replaced by gather)
             lib = " ".join(text_[4:].split()).lower()
             if lib in auto:
                 continue
@@ -2152,29 +2152,29 @@ def read_one(path, auto):
         if not program:
             raise ScriptError(1, "Only programs of their own (with 'genesis:') can be made for the web.")
         files = json.dumps(FILES, ensure_ascii=False)
-        ns = [f"const Imagine_{snake(path.stem.split())} = {{"] + settings + ["};", ""] if settings else []
+        ns = [f"const Cosmonova_{snake(path.stem.split())} = {{"] + settings + ["};", ""] if settings else []
         body = js_dots("\n".join(structs + ns + out + [""] + functions))
-        top = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
+        top = [f"// Generated from {path.name} by cosmonova.py. Edit the .cosmos file, not this one.",
                "(async () => {",
-               'const { imagine, FMath, FVector, FVector2D } = globalThis.imagination || require("./imagination.js");', ""]
-        return "\n".join(top + libs + [body, f"await imagine.main({files}, Start);", "})();"]) + "\n", Program(names.commands)
+               'const { cosmonova, FMath, FVector, FVector2D } = globalThis.cosmonova || require("./cosmonova.js");', ""]
+        return "\n".join(top + libs + [body, f"await cosmonova.main({files}, Start);", "})();"]) + "\n", Program(names.commands)
     if program:
         protos = [f"{cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
-        head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
-                '#include "imagination.h"', ""] + libs + structs + protos + [""]
+        head = [f"// Generated from {path.name} by cosmonova.py. Edit the .cosmos file, not this one.",
+                '#include "cosmonova.h"', ""] + libs + structs + protos + [""]
         files = ", ".join('"' + f.replace("\\", "\\\\").replace('"', '\\"') + '"' for f in FILES)
-        start = "int ImagineMain()\n{\n\tint count = 0;\n\tchar** given = nullptr;" if UNREAL else "int main(int count, char** given)\n{"
-        functions.append(f"{start}\n\timagine::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\timagine::wait_for_others();\n\t}}\n"
-                         f"\tcatch (const imagine::Problem& problem)\n\t{{\n\t\timagine::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
+        start = "int CosmonovaMain()\n{\n\tint count = 0;\n\tchar** given = nullptr;" if UNREAL else "int main(int count, char** given)\n{"
+        functions.append(f"{start}\n\tcosmonova::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\tcosmonova::wait_for_others();\n\t}}\n"
+                         f"\tcatch (const cosmonova::Problem& problem)\n\t{{\n\t\tcosmonova::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
         # The class's header must declare each command, so they can call each other (C++ needs that).
         wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
-        head = [f"// Generated from {path.name} by imagination.py. Edit the .imagine file, not this one.",
+        head = [f"// Generated from {path.name} by cosmonova.py. Edit the .cosmos file, not this one.",
                 f"// {info['header']} declares these in {info['class']}:"] + wanted + [
                 f'#include "{info["header"]}"', ""] + libs
-    ns = [f"namespace Imagine_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
+    ns = [f"namespace Cosmonova_{snake(path.stem.split())}", "{"] + settings + ["}", ""] if settings else []
     return "\n".join(head + ns + out + [""] + functions) + "\n", Program(names.commands) if program else None
 
 
@@ -2249,10 +2249,10 @@ def describe_things(things):
             fields = " ".join(f"this.{snake(w)} = {js_zero(k)};" for w, k in THINGS[name])
             spec = ", ".join(json.dumps([" ".join(w), snake(w), k]) for w, k in THINGS[name])
             out.append(f"class {cls} {{ constructor() {{ {fields} }} }}")
-            out.append(f"imagine::kind({cls}, {json.dumps(name)}, [{spec}]);")
+            out.append(f"cosmonova::kind({cls}, {json.dumps(name)}, [{spec}]);")
         return out + [""]
     if things:
-        out.append("namespace imagine\n{")
+        out.append("namespace cosmonova\n{")
         out += [f"\tstruct {cpp_type('thing ' + name)};" for name, _, _ in things]
         for name, _, _ in things:
             cpp = cpp_type("thing " + name)
@@ -2279,7 +2279,7 @@ def describe_things(things):
             loads = "".join(f' if (auto p = d.part("{" ".join(w)}"); p && !load(*p, v.{snake(w)})) return false;' for w, k in THINGS[name])
             out.append(f"\tinline bool load(const SavedData& d, {cpp}& v) {{ if (d.type != SavedData::Table) return false; v = {cpp}{{}};{loads} return true; }}")
         out.append("}")
-        out += [f"using imagine::{cpp_type('thing ' + name)};" for name, _, _ in things]
+        out += [f"using cosmonova::{cpp_type('thing ' + name)};" for name, _, _ in things]
         out.append("")
     return out
 
@@ -2327,7 +2327,7 @@ def fit(v, kind):
         return v
     if is_thing(v.kind) and is_thing(kind) and is_kind_of(v.kind, kind):
         get, name, things = v.run, kind[6:], THINGS
-        made = f"imagine::as_kind({strip_parens(v.cpp)}, {js_class(kind)})" if JS else f"{cpp_type(kind)}({strip_parens(v.cpp)})"
+        made = f"cosmonova::as_kind({strip_parens(v.cpp)}, {js_class(kind)})" if JS else f"{cpp_type(kind)}({strip_parens(v.cpp)})"
         return Value(made, kind, lambda env: as_kind(get(env), name, things))
     return None
 
@@ -2488,11 +2488,11 @@ def attempt(n, tried, handler, names, declared, depth):
         except RunError as err:
             env[cpp] = err.message
             fix_run(env)
-    caught = f"imagine_problem_{n}"
+    caught = f"cosmonova_problem_{n}"
     if JS:
         return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch ({caught})", tab + "{",
-                 f"{tab}\tconst {cpp} = imagine::problem_text({caught});"] + fix_lines + [tab + "}"]), run
-    return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch (const imagine::Problem& {caught})", tab + "{",
+                 f"{tab}\tconst {cpp} = cosmonova::problem_text({caught});"] + fix_lines + [tab + "}"]), run
+    return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch (const cosmonova::Problem& {caught})", tab + "{",
              f"{tab}\tconst std::string {cpp} = {caught}.message;"] + fix_lines + [tab + "}"]), run
 
 
@@ -2515,7 +2515,7 @@ def block(runs):
 
 
 def guard(run, n):
-    """Turns a surprise inside Imagination into a plain message with the line it happened on."""
+    """Turns a surprise inside Cosmonova into a plain message with the line it happened on."""
     def guarded(env):
         try:
             run(env)
@@ -2524,7 +2524,7 @@ def guard(run, n):
         except RecursionError:
             raise RunError(n, "commands called each other too many times in a row (they may never stop).")
         except Exception as err:
-            raise RunError(n, f"something went wrong inside Imagination: {err}")
+            raise RunError(n, f"something went wrong inside Cosmonova: {err}")
     return guarded
 
 
@@ -2575,7 +2575,7 @@ def statement(n, text_, inner, names, declared, depth):
         if count.kind != NUMBER:
             raise ScriptError(n, f"'repeat' needs a number of times, but this is {kind_name(count.kind)}.")
         lines, then = body(loop=True)
-        k = f"imagine_count_{depth}_{n}"
+        k = f"cosmonova_count_{depth}_{n}"
         times = count.run
 
         def run(env):
@@ -2584,7 +2584,7 @@ def statement(n, text_, inner, names, declared, depth):
                 if not then(env):
                     break
         if JS:
-            head = f"{tab}for (let {k} = 0, {k}_end = imagine::repeats({strip_parens(count.cpp)}); {k} < {k}_end; ++{k})"
+            head = f"{tab}for (let {k} = 0, {k}_end = cosmonova::repeats({strip_parens(count.cpp)}); {k} < {k}_end; ++{k})"
             return [head, tab + "{"] + lines + [tab + "}"], run, None
         return [f"{tab}for (long long {k} = 0; {k} < (long long)({strip_parens(count.cpp)}); ++{k})", tab + "{"] + lines + [tab + "}"], run, None
     if colon and re.match(r"(if |otherwise\b)", text_):
@@ -2627,7 +2627,7 @@ def statement(n, text_, inner, names, declared, depth):
             raise Stop()
         return [f"{tab}return;"], run, None
     if tokens == ["wait", "for", "the", "others"]:
-        return [f"{tab}{'await ' if JS else ''}imagine::wait_for_others();"], lambda env: wait_for_others(), None
+        return [f"{tab}{'await ' if JS else ''}cosmonova::wait_for_others();"], lambda env: wait_for_others(), None
     if tokens[0] == "meanwhile":  # 'meanwhile download with ...': the command goes on alongside the lines after this one
         rest = tokens[1 + (tokens[1:2] == [","]):]
         key, size = match_command(names, rest)
@@ -2649,8 +2649,8 @@ def statement(n, text_, inner, names, declared, depth):
         else:
             raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'." + library_hint(rest))
         if JS:  # shortcut: it sees the names as they are when it runs, not a copy made when it started
-            return [f"{tab}imagine::meanwhile(async () => {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
-        return [f"{tab}imagine::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
+            return [f"{tab}cosmonova::meanwhile(async () => {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
+        return [f"{tab}cosmonova::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
     if tokens[0] == "invoke":
         e = Expr(tokens, names, n)
         e.allow_nothing = True
@@ -2667,7 +2667,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             raise RunError(n, get(env))
-        return [f"{tab}imagine::fail({n}, {strip_parens(v.cpp)});"], run, None
+        return [f"{tab}cosmonova::fail({n}, {strip_parens(v.cpp)});"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
             raise ScriptError(n, "'return' only works in a command that says what it returns, like 'to double, given x (a number), returning a number:'.")
@@ -2692,7 +2692,7 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             s = text(get(env))
             write_file(w(env), s + "\n" if adding else s, n, "ab" if adding else "wb")
-        return [f"{tab}imagine::{fn}({strip_parens(where.cpp)}, imagine::text({strip_parens(v.cpp)}), {n});"], run, None
+        return [f"{tab}cosmonova::{fn}({strip_parens(where.cpp)}, cosmonova::text({strip_parens(v.cpp)}), {n});"], run, None
     if tokens[0] == "add" and "to" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("to")
         target = writable_list(tokens[cut + 1:], names, n, "add to")
@@ -2713,7 +2713,7 @@ def statement(n, text_, inner, names, declared, depth):
         if key.kind != TEXT:
             raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
         get, at = table.run, key.run
-        return ([f"{tab}imagine::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
+        return ([f"{tab}cosmonova::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
                 lambda env: remove_entry(get(env), at(env), n), None)
     if tokens[0] == "remove" and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
@@ -2728,7 +2728,7 @@ def statement(n, text_, inner, names, declared, depth):
             def run(env):
                 items = seq(env)
                 items.pop(index_of(items, at(env), n))
-            return [f"{tab}imagine::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"], run, None
+            return [f"{tab}cosmonova::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"], run, None
         v = expr_to_end(tokens[:cut], 1, names, n)
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so it has no {kind_name(v.kind)} to remove.")
@@ -2738,7 +2738,7 @@ def statement(n, text_, inner, names, declared, depth):
             items, x = seq(env), get(env)
             if x in items:
                 items.remove(x)
-        return [f"{tab}imagine::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
+        return [f"{tab}cosmonova::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
     if tokens[0] == "draw":
         raise ScriptError(n, "'draw' is now 'etch', like: etch a circle with 100, 100, 20, \"orange\".")
     if tokens[0] == "say":
@@ -2751,8 +2751,8 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             print("".join(text(g(env)) for g in gets))
-        shown = ', '.join('imagine::text(' + strip_parens(p.cpp) + ')' for p in parts)
-        return [f"{tab}imagine::say([{shown}]);" if JS else f"{tab}imagine::say({{{shown}}});"], run, None
+        shown = ', '.join('cosmonova::text(' + strip_parens(p.cpp) + ')' for p in parts)
+        return [f"{tab}cosmonova::say([{shown}]);" if JS else f"{tab}cosmonova::say({{{shown}}});"], run, None
     if tokens[0] == "ask":
         return ask(tokens, names, declared, n, tab)
     if tokens[0] == "load" and "from" in tokens and tokens[len(tokens) - tokens[::-1].index("from"):][:2] == ["the", "text"]:
@@ -2768,9 +2768,9 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, "A command can't be loaded.")
         put, kind, things, w = target.store, target.kind, THINGS, source.run
         if JS:
-            return ([f"{tab}{js_set(target)}imagine::load_text({strip_parens(source.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
+            return ([f"{tab}{js_set(target)}cosmonova::load_text({strip_parens(source.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
                     lambda env: put(env, load_text(w(env), kind, things, n)), None)
-        return ([f"{tab}imagine::load_text({strip_parens(target.cpp)}, {strip_parens(source.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
+        return ([f"{tab}cosmonova::load_text({strip_parens(target.cpp)}, {strip_parens(source.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
                 lambda env: put(env, load_text(w(env), kind, things, n)), None)
     for verb, joint in (("save", "to"), ("load", "from")):
         if tokens[0] == verb and joint in tokens and tokens[len(tokens) - tokens[::-1].index(joint):][:1] == ["file"]:
@@ -2784,7 +2784,7 @@ def statement(n, text_, inner, names, declared, depth):
             if verb == "save":
                 v = expr_to_end(tokens[:cut], 1, names, n)
                 get, kind = v.run, v.kind
-                return ([f"{tab}imagine::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"],
+                return ([f"{tab}cosmonova::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"],
                         lambda env: write_file(w(env), saved(get(env), kind, n) + "\n", n), None)
             e = Expr(tokens[1:cut], names, n)
             target = e.full()
@@ -2792,9 +2792,9 @@ def statement(n, text_, inner, names, declared, depth):
                 raise ScriptError(n, f"'{' '.join(tokens[1:cut])}' can't be changed, so I can't load into it.")
             put, kind, things = target.store, target.kind, THINGS
             if JS:
-                return ([f"{tab}{js_set(target)}imagine::load_file({strip_parens(where.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
+                return ([f"{tab}{js_set(target)}cosmonova::load_file({strip_parens(where.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
                         lambda env: put(env, load_saved(w(env), kind, things, n)), None)
-            return ([f"{tab}imagine::load_file({strip_parens(target.cpp)}, {strip_parens(where.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
+            return ([f"{tab}cosmonova::load_file({strip_parens(target.cpp)}, {strip_parens(where.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
                     lambda env: put(env, load_saved(w(env), kind, things, n)), None)
     key, size = match_command(names, tokens)
     if key:
@@ -2840,7 +2840,7 @@ def statement(n, text_, inner, names, declared, depth):
                     there(env, dup(x))
                 return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};", f"{tab}{names.known[('existence',)][0]} = {js_copy(cpp, kind)};"], run, None
             if JS and cpp in OWNER_PARAMS:  # the thing a command is for: change the caller's own
-                return [f"{tab}imagine::replace_thing({cpp}, {strip_parens(v.cpp)});"], lambda env: put(env, get(env)), None
+                return [f"{tab}cosmonova::replace_thing({cpp}, {strip_parens(v.cpp)});"], lambda env: put(env, get(env)), None
             return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], lambda env: put(env, get(env)), None
         hint = library_hint(tokens)
         if hint:
@@ -2883,7 +2883,7 @@ def statement(n, text_, inner, names, declared, depth):
         step = e.need(e.sum(), NUMBER, "move")
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
-        s = f"imagine_step_{depth}_{n}"
+        s = f"cosmonova_step_{depth}_{n}"
         target = names.value(key)
         now, put, g, st = target.run, target.store, goal.run, step.run
 
@@ -2917,9 +2917,9 @@ def for_each(n, head, body, names, declared, depth):
         if not is_list(seq.kind):
             raise ScriptError(n, f"'for each ... in' needs a list, but this is {kind_name(seq.kind)}.")
         kind = element(seq.kind)
-        line = f"{tab}for (const {cpp_type(kind)} {cpp} : imagine::copy({strip_parens(seq.cpp)}))"
+        line = f"{tab}for (const {cpp_type(kind)} {cpp} : cosmonova::copy({strip_parens(seq.cpp)}))"
         if JS:
-            line = f"{tab}for (const {cpp} of imagine::dup({strip_parens(seq.cpp)}))"
+            line = f"{tab}for (const {cpp} of cosmonova::dup({strip_parens(seq.cpp)}))"
         get = seq.run
         simple = kind in (NUMBER, YESNO, TEXT)
 
@@ -2933,7 +2933,7 @@ def for_each(n, head, body, names, declared, depth):
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         kind = NUMBER
-        end = f"imagine_end_{n}"
+        end = f"cosmonova_end_{n}"
         line = f"{tab}for ({'let' if JS else 'double'} {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
         a, b = lo.run, hi.run
 
@@ -3071,7 +3071,7 @@ def ask(tokens, names, declared, n, tab):
 
     def run(env):
         env[cpp] = reader(question)
-    cpp_reader = {NUMBER: "imagine::ask_number", YESNO: "imagine::ask_yes_no", TEXT: "imagine::ask_text"}[kind]
+    cpp_reader = {NUMBER: "cosmonova::ask_number", YESNO: "cosmonova::ask_yes_no", TEXT: "cosmonova::ask_text"}[kind]
     return [f"{tab}{cpp} = {cpp_reader}({cpp_text(tokens[1])});"], run, None
 
 
@@ -3184,8 +3184,8 @@ def build(script, exe):
     vcvars = find_vcvars()
     if not vcvars:
         return "I can't find the C++ compiler. Install Visual Studio with 'Desktop development with C++'."
-    work = Path(tempfile.mkdtemp(prefix="imagine_"))
-    cpp = work / f"{script.stem}.imagine.cpp"
+    work = Path(tempfile.mkdtemp(prefix="cosmonova_"))
+    cpp = work / f"{script.stem}.cosmos.cpp"
     cpp.write_text(cpp_out, encoding="utf-8")
     bat = work / "build.bat"
     bat.write_text(f'@call "{vcvars}" >nul 2>&1\r\n@cl /nologo /utf-8 /EHsc /std:c++20 /O2 /W0 /I"{HERE / "runtime"}" '
@@ -3193,13 +3193,13 @@ def build(script, exe):
     result = subprocess.run(["cmd", "/c", str(bat)])
     if result.returncode != 0:
         log = (work / "compile.log").read_text(errors="replace")
-        return f"Imagination wrote C++ the compiler didn't accept. That is a bug in Imagination (or a library), not in your script.\n{log}"
+        return f"Cosmonova wrote C++ the compiler didn't accept. That is a bug in Cosmonova (or a library), not in your script.\n{log}"
     return None
 
 
 def web(script, folder=None):
-    """Turns a program into JavaScript: <name>.js and imagination.js (what every web program uses) in folder.
-    Returns an error message, or None. Run it with node, or load both into a page (imagination.js first)."""
+    """Turns a program into JavaScript: <name>.js and cosmonova.js (what every web program uses) in folder.
+    Returns an error message, or None. Run it with node, or load both into a page (cosmonova.js first)."""
     global LOGIC, JS
     LOGIC, JS = script.parent, True
     try:
@@ -3213,16 +3213,16 @@ def web(script, folder=None):
     folder = Path(folder) if folder else script.parent
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{script.stem}.js").write_text(js_out, encoding="utf-8")
-    shutil.copy2(HERE / "runtime" / "imagination.js", folder / "imagination.js")
+    shutil.copy2(HERE / "runtime" / "cosmonova.js", folder / "cosmonova.js")
     return None
 
 
 ENGINE = Path(r"C:\Program Files\Epic Games\UE_5.8")
-WORLD = Path.home() / "Documents" / "ImaginationWorld"  # the Unreal project 'imagine unreal' builds into
+WORLD = Path.home() / "Documents" / "CosmonovaWorld"  # the Unreal project 'cosmonova unreal' builds into
 
 
 def unreal(script, launch=True):
-    """Turns a program into the ImaginationWorld Unreal project, builds it, and starts it. Returns an error message, or None."""
+    """Turns a program into the CosmonovaWorld Unreal project, builds it, and starts it. Returns an error message, or None."""
     global LOGIC, UNREAL, MAKING_CPP
     LOGIC, UNREAL, MAKING_CPP = script.parent, True, True
     try:
@@ -3237,29 +3237,29 @@ def unreal(script, launch=True):
     if not editor.exists():
         return f"I can't find Unreal Engine at {ENGINE}."
     shutil.copytree(HERE / "unreal", WORLD, dirs_exist_ok=True)
-    made = WORLD / "Source" / "ImaginationWorld" / "Generated"
+    made = WORLD / "Source" / "CosmonovaWorld" / "Generated"
     made.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(HERE / "runtime" / "imagination.h", made / "imagination.h")
-    target = made / "Program.imagine.cpp"
+    shutil.copy2(HERE / "runtime" / "cosmonova.h", made / "cosmonova.h")
+    target = made / "Program.cosmos.cpp"
     if not target.exists() or target.read_text(encoding="utf-8") != cpp_out:  # unchanged files aren't compiled again
         target.write_text(cpp_out, encoding="utf-8")
     subprocess.run(["taskkill", "/f", "/im", "UnrealEditor.exe"], capture_output=True)
     log = WORLD / "Saved" / "build.log"
     log.parent.mkdir(parents=True, exist_ok=True)
-    project = WORLD / "ImaginationWorld.uproject"
+    project = WORLD / "CosmonovaWorld.uproject"
     print(f"Building {project} (the first time takes a few minutes)...")
     with open(log, "w", encoding="utf-8", errors="replace") as out:
-        result = subprocess.run([str(ENGINE / "Engine" / "Build" / "BatchFiles" / "Build.bat"), "ImaginationWorldEditor", "Win64",
+        result = subprocess.run([str(ENGINE / "Engine" / "Build" / "BatchFiles" / "Build.bat"), "CosmonovaWorldEditor", "Win64",
                                  "Development", f"-Project={project}", "-WaitMutex"], stdout=out, stderr=subprocess.STDOUT)
     if result.returncode != 0:
         lines = [l for l in log.read_text(errors="replace").splitlines() if "error" in l.lower()]
-        return "Unreal didn't accept the C++. That is a bug in Imagination (or a library), not in your script.\n" + "\n".join(lines[:20]) + f"\n(all of it: {log})"
+        return "Unreal didn't accept the C++. That is a bug in Cosmonova (or a library), not in your script.\n" + "\n".join(lines[:20]) + f"\n(all of it: {log})"
     if launch:
         subprocess.Popen([str(editor), str(project), "-game", "-windowed", "-ResX=1280", "-ResY=720", "-nosplash"])
     return None
 
 
-TRY_HELLO = """Imagination: type a line and press Enter to see what it does. For example:
+TRY_HELLO = """Cosmonova: type a line and press Enter to see what it does. For example:
   set name to "Sam"
   scrawl "Hello, " plus name
   5 plus 3 times 2
@@ -3338,15 +3338,15 @@ def try_it(read=input, show=print):
 
 
 USAGE = """Use:
-  imagine <script.imagine>                     run a program
-  imagine run <script.imagine>                 the same
-  imagine build <script.imagine>               make it into an .exe (needs Visual Studio's C++ compiler)
-  imagine check <script.imagine>               look for mistakes without running it
-  imagine unreal <script.imagine>              run it inside Unreal Engine: the 3D words become a real lit world
-  imagine web <script.imagine> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
-  imagine                                      try lines out, one at a time
-  imagine <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
-(imagine is short for: py -3 imagination.py)"""
+  cosmonova <script.cosmos>                     run a program
+  cosmonova run <script.cosmos>                 the same
+  cosmonova build <script.cosmos>               make it into an .exe (needs Visual Studio's C++ compiler)
+  cosmonova check <script.cosmos>               look for mistakes without running it
+  cosmonova unreal <script.cosmos>              run it inside Unreal Engine: the 3D words become a real lit world
+  cosmonova web <script.cosmos> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
+  cosmonova                                      try lines out, one at a time
+  cosmonova <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
+(cosmonova is short for: py -3 cosmonova.py)"""
 
 
 def main(argv):
@@ -3354,7 +3354,7 @@ def main(argv):
     args = argv[1:]
     if not args:
         return try_it()
-    if args[0].lower().endswith(".imagine"):
+    if args[0].lower().endswith(".cosmos"):
         args = ["run"] + args
     if len(args) > 2 and args[0] == "run":  # the words after the script are for the program: 'the words given'
         ARGUMENTS[:] = args[2:]
@@ -3387,11 +3387,11 @@ def main(argv):
         if not script.exists():
             print(f"There is no script called {script}.")
             return 2
-        problem = unreal(script, launch=not os.environ.get("IMAGINE_NO_LAUNCH"))
+        problem = unreal(script, launch=not os.environ.get("COSMONOVA_NO_LAUNCH"))
         if problem:
             print(problem)
             return 1
-        print(f"Built {WORLD}" + ("" if os.environ.get("IMAGINE_NO_LAUNCH") else " and started it."))
+        print(f"Built {WORLD}" + ("" if os.environ.get("COSMONOVA_NO_LAUNCH") else " and started it."))
         return 0
     if len(args) == 2 and args[0] in ("run", "build"):
         script = Path(args[1])
@@ -3418,8 +3418,8 @@ def main(argv):
     OUT.mkdir(parents=True, exist_ok=True)
     failed = False
     wanted = set()
-    for path in sorted(LOGIC.glob("*.imagine")):
-        target = OUT / f"{path.stem}.imagine.cpp"
+    for path in sorted(LOGIC.glob("*.cosmos")):
+        target = OUT / f"{path.stem}.cosmos.cpp"
         wanted.add(target.name)
         try:
             cpp_out = translate(path)
@@ -3429,7 +3429,7 @@ def main(argv):
             continue
         if not target.exists() or target.read_text(encoding="utf-8") != cpp_out:
             target.write_text(cpp_out, encoding="utf-8")
-    for old in OUT.glob("*.imagine.cpp"):
+    for old in OUT.glob("*.cosmos.cpp"):
         if old.name not in wanted:
             old.unlink()
     return 1 if failed else 0

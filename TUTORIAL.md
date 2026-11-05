@@ -1,16 +1,16 @@
-# Learning Imagination
+# Learning Cosmonova
 
-This walks through Imagination from the very first line to a small game. Every program here really works: the self-check runs each one and compares what it prints with what is written under it.
+This walks through Cosmonova from the very first line to a small game. Every program here really works: the self-check runs each one and compares what it prints with what is written under it.
 
-To run a program, save it in a file ending in `.imagine` (for example `hello.imagine`) and type:
+To run a program, save it in a file ending in `.cosmos` (for example `hello.cosmos`) and type:
 
 ```
-imagine hello.imagine
+cosmonova hello.cosmos
 ```
 
 ## 1. Saying something
 
-```imagination
+```cosmonova
 genesis:
   scrawl "Hello!"
 and the universe said i love you
@@ -26,7 +26,7 @@ A program is made of **commands**. `genesis:` is where every program begins (`ge
 
 ## 2. Remembering things
 
-```imagination
+```cosmonova
 genesis:
   set name to "Sam"
   set age to 11
@@ -44,7 +44,7 @@ Next year Sam will be 12.
 
 ## 3. Choosing
 
-```imagination
+```cosmonova
 genesis:
   set temperature to 31
   if temperature exceeds 30:
@@ -64,7 +64,7 @@ It's hot.
 
 ## 4. Doing things again
 
-```imagination
+```cosmonova
 genesis:
   repeat 3 times:
     scrawl "Hip hip hooray!"
@@ -88,7 +88,7 @@ Hip hip hooray!
 
 ## 5. Lists
 
-```imagination
+```cosmonova
 genesis:
   set shopping to a list of ("milk", "eggs")
   add "bread" to shopping
@@ -113,7 +113,7 @@ A list keeps several values in order. Items are counted from 1.
 
 ## 6. Your own commands
 
-```imagination
+```cosmonova
 genesis:
   greet with "Sam"
   greet with "Ann"
@@ -139,7 +139,7 @@ A command can take **inputs** (after `given`, each with its kind in brackets) an
 
 ## 7. Your own kinds of things
 
-```imagination
+```cosmonova
 a pet has:
   name (text)
   age (a number)
@@ -180,12 +180,12 @@ and the universe said i love you
 A mistake in the script is found before it runs, and explained in plain words:
 
 ```
-guess.imagine line 4: I don't know 'scroe'. Did you mean 'score'?
+guess.cosmos line 4: I don't know 'scroe'. Did you mean 'score'?
 ```
 
 A problem while it runs stops it with the line where it happened. To carry on instead, use `try:`:
 
-```imagination
+```cosmonova
 genesis:
   try:
     scrawl contents of file "missing.txt"
@@ -202,7 +202,7 @@ Still going.
 
 Your own commands can go wrong on purpose with `raise an error`, and `try:` catches that the same way:
 
-```imagination
+```cosmonova
 to fly, given fuel (a number):
   if fuel falls below 10: raise an error with "not enough fuel (only " plus fuel plus ")"
   scrawl "Up we go!"
@@ -247,13 +247,13 @@ Setting `birth` also makes `existence` start at the same place.
 
 The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
 
-`examples/dodge.imagine` is a bigger game: dodge the falling balls.
+`examples/dodge.cosmos` is a bigger game: dodge the falling balls.
 
 ## 11. Kinds of kinds
 
 A dog is a kind of pet: it has everything a pet has, and more. A command for pets works on dogs too, unless dogs have their own version:
 
-```imagination
+```cosmonova
 a pet has:
   name (text)
 and the universe said i love you
@@ -290,7 +290,7 @@ Rex barks and knows 1 tricks.
 
 `the command double` is the command itself, not its answer. You can keep it, give it to another command, and do it later with `invoke`:
 
-```imagination
+```cosmonova
 to double, given x (a number), returning a number:
   return x times 2
 and the universe said i love you
@@ -316,7 +316,7 @@ and the universe said i love you
 
 `meanwhile` starts a command and carries straight on. `wait for the others` waits until they are all done:
 
-```imagination
+```cosmonova
 to note down, given name (text):
   inscribe "hello from " plus name into file name plus ".txt"
 and the universe said i love you
@@ -337,7 +337,7 @@ hello from first / hello from second
 
 Websites and other programs often speak JSON. `as saved text` writes anything as JSON, and `load ... from the text` reads it back. `patterns` find text by its shape:
 
-```imagination
+```cosmonova
 genesis:
   set scores to a table of numbers
   set entry "Sam" of scores to 31
@@ -362,5 +362,5 @@ The `web` library gets and sends pages (`web page`, `send to the web page`), `se
 ## Where next
 
 - `LANGUAGE.md` lists everything the language can do.
-- Type `imagine` on its own to try lines out one at a time.
-- `imagine build game.imagine` makes a program into an `.exe` that runs on its own and fast.
+- Type `cosmonova` on its own to try lines out one at a time.
+- `cosmonova build game.cosmos` makes a program into an `.exe` that runs on its own and fast.

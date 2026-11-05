@@ -1,10 +1,10 @@
-// The Unreal side of an Imagination program: the eye (camera) that shows each frame, the flat drawing on top, and the game mode.
+// The Unreal side of a Cosmonova program: the eye (camera) that shows each frame, the flat drawing on top, and the game mode.
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/Pawn.h"
-#include "ImagineStage.generated.h"
+#include "CosmonovaStage.generated.h"
 
 class UCameraComponent;
 class UInstancedStaticMeshComponent;
@@ -12,12 +12,12 @@ class UMaterialInterface;
 class UStaticMesh;
 
 UCLASS()
-class AImagineEye : public APawn
+class ACosmonovaEye : public APawn
 {
 	GENERATED_BODY()
 
 public:
-	AImagineEye();
+	ACosmonovaEye();
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -46,7 +46,7 @@ private:
 };
 
 UCLASS()
-class AImagineHUD : public AHUD
+class ACosmonovaHUD : public AHUD
 {
 	GENERATED_BODY()
 
@@ -55,11 +55,11 @@ public:
 };
 
 UCLASS()
-class AImagineGameMode : public AGameModeBase
+class ACosmonovaGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	AImagineGameMode();
+	ACosmonovaGameMode();
 	virtual void BeginPlay() override;
 };

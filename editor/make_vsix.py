@@ -1,4 +1,4 @@
-"""Packs editor/vscode into imagination.vsix, so VS Code can install it:  code --install-extension editor/imagination.vsix"""
+"""Packs editor/vscode into cosmonova.vsix, so VS Code can install it:  code --install-extension editor/cosmonova.vsix"""
 import json
 import zipfile
 from pathlib import Path
@@ -29,7 +29,7 @@ types = """<?xml version="1.0" encoding="utf-8"?>
   <Default Extension=".vsixmanifest" ContentType="text/xml"/>
 </Types>
 """
-out = HERE / "imagination.vsix"
+out = HERE / "cosmonova.vsix"
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("[Content_Types].xml", types)
     z.writestr("extension.vsixmanifest", manifest)

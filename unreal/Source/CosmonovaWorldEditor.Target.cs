@@ -1,12 +1,12 @@
 using UnrealBuildTool;
 
-public class ImaginationWorldEditorTarget : TargetRules
+public class CosmonovaWorldEditorTarget : TargetRules
 {
-	public ImaginationWorldEditorTarget(TargetInfo Target) : base(Target)
+	public CosmonovaWorldEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.Add("ImaginationWorld");
+		ExtraModuleNames.Add("CosmonovaWorld");
 	}
 }

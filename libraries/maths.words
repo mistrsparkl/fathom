@@ -19,7 +19,7 @@ to tangent of, given angle (a number), returning a number = std::tan({angle} * 3
 
 to round, given x (a number), returning a number = std::round({x})
   runs: (lambda a: math.copysign(math.floor(abs(a)) + (abs(a) - math.floor(abs(a)) >= 0.5), a))({x})
-  web: imagine_maths::round({x})
+  web: cosmonova_maths::round({x})
 to round down, given x (a number), returning a number = std::floor({x})
   runs: float(math.floor({x}))
   web: Math.floor({x})
@@ -64,6 +64,6 @@ to whole part of, given x (a number), returning a number = std::trunc({x})
   web: Math.trunc({x})
 
 javascript:
-  const imagine_maths = {
+  const cosmonova_maths = {
     round: (x) => Math.sign(x) * Math.round(Math.abs(x)),  // halves go away from zero, as C++ does
   };

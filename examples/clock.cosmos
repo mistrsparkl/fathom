@@ -1,5 +1,5 @@
 whisper: A countdown that uses two libraries.
-whisper: Run it with: imagine examples/clock.imagine
+whisper: Run it with: cosmonova examples/clock.cosmos
 
 use: time
 use: maths
