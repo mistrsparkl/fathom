@@ -192,9 +192,17 @@
     }
     return o + '"';
   }
-  function saved(v, line) {
+  function saved(v, line, kind = "") {  // kind: what it is saved as (a speaker also says which kind of thing it is)
     if (typeof v === "number") return saved_number(v, line);
     if (v === undefined) return "null";
+    if (kind.startsWith("list of ") && Array.isArray(v)) return "[" + v.map((x) => saved(x, line, kind.slice(8))).join(", ") + "]";
+    if (kind.startsWith("table of ") && v instanceof Map)
+      return "{" + [...v.keys()].sort(order).map((k) => saved_string(k) + ": " + saved(v.get(k), line, kind.slice(9))).join(", ") + "}";
+    if (kind.startsWith("thing ") && v !== null && typeof v === "object" && v.constructor.spec) {
+      const parts = v.constructor.spec.map(([words, member, part]) => `${saved_string(words)}: ${saved(v[member], line, part)}`);
+      if (kinds[kind.slice(6)] && kinds[kind.slice(6)].able) parts.unshift(`"is a": ${saved_string(v.constructor.title)}`);
+      return "{" + parts.join(", ") + "}";
+    }
     if (typeof v === "boolean") return v ? "true" : "false";
     if (typeof v === "string") return saved_string(v);
     if (v === null || typeof v === "function") fail(line, "I can't save a command in a file.");
@@ -215,6 +223,10 @@
     if (kind.startsWith("list of ") && isList) return d.map((x) => from_saved(x, kind.slice(8)));
     if (kind.startsWith("table of ") && isTable) return new Map(Object.keys(d).map((k) => [k, from_saved(d[k], kind.slice(9))]));
     if (kind.startsWith("thing ") && d === null) return undefined;
+    if (kind.startsWith("thing ") && kinds[kind.slice(6)].able) {  // a speaker: made as the kind it says it is
+      if (!isTable || !kinds[kind.slice(6)].able.includes(d["is a"])) throw new NotSaved();
+      return from_saved(d, "thing " + d["is a"]);
+    }
     if (kind.startsWith("thing ") && isTable) {
       const Kind = kinds[kind.slice(6)], made = new Kind();
       const loose = (key) => key.replace(/[ _-]/g, "").replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -494,7 +506,8 @@
       }
     },
 
-    saved_text: (v, line) => saved(v, line),
+    saved_text: (v, line, kind) => saved(v, line, kind),
+    able_kinds(able, names) { kinds[able].able = names; },
     load_text(data, kind, kindName, line) {
       const v = reading(data, kind);
       if (v === NotSaved) fail(line, `the text doesn't hold ${kindName}.`);
@@ -505,7 +518,7 @@
       if (v === NotSaved) fail(line, `the file "${path}" doesn't hold ${kindName}.`);
       return v;
     },
-    save_file(v, path, line) { stellanova.write_file(path, saved(v, line) + "\n", line); },
+    save_file(v, path, line, kind) { stellanova.write_file(path, saved(v, line, kind) + "\n", line); },
     file_exists(path) {
       try {
         return !!fs && fs.statSync(path).isFile();

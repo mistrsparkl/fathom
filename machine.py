@@ -23,7 +23,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
-ABLE = set()  # kinds that are shared abilities ('thing speaker'): their empty value is nothing
+ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
 
 
 class Unsupported(Exception):
@@ -129,8 +129,9 @@ declare i1 @cn_is_kind(ptr, ptr)
 declare void @cn_field_put(ptr, i32, ptr)
 declare void @cn_replace(ptr, ptr)
 declare ptr @cn_sorted_by(ptr, i32, i32)
-declare ptr @cn_saved_text(ptr, i32)
-declare void @cn_save_file(ptr, ptr, i32)
+declare ptr @cn_saved_text(ptr, ptr, i32)
+declare void @cn_save_file(ptr, ptr, ptr, i32)
+declare void @cn_able_kind(ptr, ptr)
 declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
 declare void @cn_meanwhile(ptr, ptr, i64)
@@ -171,6 +172,9 @@ class Module:
             self.constants.append(f"@g.{cpp} = internal global {ll_type(kind)} {zero_const(kind)}")
             start.put(f"store {ll_type(kind)} {start.zero(kind)}, ptr @g.{cpp}")
             start.put(f"call void @cn_root(ptr @g.{cpp}, i64 8)")
+        for able, kinds in ABLE.items():  # each kind a saved speaker may be loaded as
+            for kind in kinds:
+                start.put(f"call void @cn_able_kind(ptr {start.spec(able)}, ptr {start.shape(kind)})")
         main = ["define i32 @main(i32 %count, ptr %given) {", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
         for name in files:
             const, _ = self.text(name)
@@ -320,6 +324,8 @@ class Fn:
             return out
         if kind.startswith("command("):
             raise Unsupported(kind)
+        if kind in ABLE:  # just the ability: the kinds it may be are kept by the library (see finish)
+            return self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
         if kind in THINGS:
             thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
             for k, (_, _, part_kind) in enumerate(THINGS[kind]):

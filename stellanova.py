@@ -616,7 +616,10 @@ def saved(v, kind, line):
         return "{" + ", ".join(f"{json.dumps(k, ensure_ascii=False)}: {saved(v[k], entry_kind(kind), line)}" for k in sorted(v)) + "}"
     if v is None:
         return "null"
-    return "{" + ", ".join(f'"{" ".join(w)}": {saved(v.fields[snake(w)], k, line)}' for w, k in v.spec) + "}"
+    parts = [f'"{" ".join(w)}": {saved(v.fields[snake(w)], k, line)}' for w, k in v.spec]
+    if kind[6:] in ABLE:  # a speaker: which kind of thing it is, so loading can make one again
+        parts.insert(0, f'"is a": {json.dumps(v.name, ensure_ascii=False)}')
+    return "{" + ", ".join(parts) + "}"
 
 
 class NotSaved(Exception):
@@ -640,6 +643,10 @@ def from_saved(d, kind, things):
         return {k: from_saved(x, entry_kind(kind), things) for k, x in d.items()}
     if is_thing(kind) and d is None:
         return None
+    if is_thing(kind) and kind[6:] in ABLE:
+        if isinstance(d, dict) and isinstance(d.get("is a"), str) and d["is a"] in things and can("thing " + d["is a"], kind[6:]):
+            return from_saved(d, "thing " + d["is a"], things)
+        raise NotSaved()
     if is_thing(kind) and isinstance(d, dict):
         t = Thing(kind[6:], things)
         loose = {loose_key(key): x for key, x in d.items()}  # a web service's "windSpeed" or "wind_speed" is 'wind speed'
@@ -1649,8 +1656,9 @@ class Expr:
             if holds_command(v.kind):
                 raise ScriptError(self.line, "A command can't be saved.")
             a, kind, line = v.run, v.kind, self.line
-            return with_ir(Value(f"stellanova::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line)),
-                           lambda f: f.op(f"call ptr @cn_saved_text(ptr {f.box(machine.emit(f, v), v.kind)}, i32 {line})"))
+            shown = f", {json.dumps(kind)}" if JS else ""
+            return with_ir(Value(f"stellanova::saved_text({v.cpp}, {line}{shown})", TEXT, lambda env: saved(a(env), kind, line)),
+                           lambda f: f.op(f"call ptr @cn_saved_text(ptr {f.box(machine.emit(f, v), v.kind)}, ptr {f.shape(v.kind)}, i32 {line})"))
         if self.at("as", "text"):
             self.i += 2
             a = v.run
@@ -2630,7 +2638,7 @@ def read_one(path, auto):
                 raise ScriptError(n, "'anything that can' can't be used in Unreal parts yet.")
             THINGS[name] = []
             ABLE[name] = [tuple(w.split()) for w in re.split(r"\s+and\s+", able.group(2))]
-            machine.ABLE.add("thing " + name)
+            machine.ABLE["thing " + name] = []
             things.append((name, n, []))
             continue
         m = (re.fullmatch(r"an? ([a-z][a-z ]*?) is a kind of (?:an? )?([a-z][a-z ]*?)(?: that (?:also )?has)?:", text_.lower())
@@ -2716,6 +2724,10 @@ def read_one(path, auto):
         heads.append(item[0])
         commands.append(item[1])
         made.append(item[2])
+    for able in ABLE:  # the kinds a saved speaker may be loaded as
+        machine.ABLE["thing " + able] = ["thing " + k for k in THINGS if can("thing " + k, able)]
+        if JS:
+            structs.append(f"stellanova::able_kinds({json.dumps(able)}, {json.dumps([k[6:] for k in machine.ABLE['thing ' + able]])});")
     if JS:
         for (words, cpp, inputs, gives), command in zip(heads, made):
             command.js = f"{cpp}_{snake(inputs[0][1][6:].split())}" if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else cpp
@@ -3673,8 +3685,10 @@ def statement(n, text_, inner, names, declared, depth):
                 v = expr_to_end(tokens[:cut], 1, names, n)
                 get, kind = v.run, v.kind
                 run = with_ir(lambda env: write_file(w(env), saved(get(env), kind, n) + "\n", n),
-                              lambda f: f.put_checked(f"call void @cn_save_file(ptr {f.box(machine.emit(f, v), v.kind)}, ptr {machine.emit(f, where)}, i32 {n})"))
-                return [f"{tab}stellanova::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"], run, None
+                              lambda f: f.put_checked(f"call void @cn_save_file(ptr {f.box(machine.emit(f, v), v.kind)}, ptr {machine.emit(f, where)}, "
+                                                      f"ptr {f.shape(v.kind)}, i32 {n})"))
+                shown = f", {json.dumps(kind)}" if JS else ""
+                return [f"{tab}stellanova::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n}{shown});"], run, None
             e = Expr(tokens[1:cut], names, n)
             target = e.full()
             if e.i != len(e.t) or not target.writable or getattr(target, "cpp_assign", None):

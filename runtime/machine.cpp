@@ -19,6 +19,9 @@
 // made since a thread's current line began (cn_statement), and everything inside those.
 // A thread stops for the collector only at safe points (making a value, starting a line). A thread inside a library
 // word (waiting, reading the web...) is 'parked' with its registers kept, so the collector never waits for it.
+// 'a speaker is anything that can speak': ability -> each kind that can (by name) -> its shape, for saving and loading
+static std::map<std::string, std::map<std::string, V*>> able_kinds;
+
 namespace gc
 {
 	struct Thread
@@ -122,6 +125,9 @@ namespace gc
 		}
 		for (const auto& [from, size] : roots)
 			look(from, from + size);
+		for (const auto& [able, kinds] : able_kinds)
+			for (const auto& [name, shape] : kinds)
+				reach(shape);
 		while (!work.empty())
 		{
 			V* v = work.back();
@@ -428,11 +434,12 @@ static V* copy_of(const V* v)
 }
 
 // A value written out as JSON, as stellanova.h's save() writes it (a thing's parts by their names, in order).
-static std::string saved_of(const V* v, int line)
+static std::string saved_of(const V* v, const V* shape, int line)  // shape: the kind it is saved as (nullptr: as it is)
 {
 	std::string out;
 	if (!v)
 		return "null";
+	const V* inner = shape && !is_small(shape->tag) && shape->tag == 'l' && !full(shape)->items.empty() ? full(shape)->items[0] : nullptr;
 	switch (v->tag)
 	{
 	case 'n': stellanova::save(out, v->d, line); break;
@@ -444,25 +451,40 @@ static std::string saved_of(const V* v, int line)
 	case 'l':
 		out += "[";
 		for (size_t k = 0; k < full(v)->items.size(); ++k)
-			out += (k ? ", " : "") + saved_of(full(v)->items[k], line);
+			out += (k ? ", " : "") + saved_of(full(v)->items[k], inner, line);
 		out += "]";
 		break;
 	default:  // a table, or a thing
 	{
 		out += "{";
 		bool first = true;
-		auto part = [&](const std::string& key, const V* x) {
+		auto part = [&](const std::string& key, const V* x, const V* within) {
 			out += first ? "" : ", ";
 			first = false;
 			stellanova::save(out, key, line);
-			out += ": " + saved_of(x, line);
+			out += ": " + saved_of(x, within, line);
 		};
 		if (v->tag == 'm')
+		{
+			const V* each = shape && shape->tag == 'm' && !full(shape)->table.empty() ? full(shape)->table.begin()->second : nullptr;
 			for (const auto& [key, x] : full(v)->table)
-				part(key, x);
+				part(key, x, each);
+		}
 		else
+		{
+			const V* own = shape && shape->tag == 'k' ? shape : nullptr;
+			if (own)
+				if (auto able = able_kinds.find(full(own)->kind->name); able != able_kinds.end())
+				{
+					out += "\"is a\": ";  // a speaker: which kind of thing it is, so loading can make one again
+					stellanova::save(out, full(v)->kind->name, line);
+					first = false;
+					auto it = able->second.find(full(v)->kind->name);
+					own = it == able->second.end() ? nullptr : it->second;
+				}
 			for (size_t k = 0; k < full(v)->items.size(); ++k)
-				part(full(v)->kind->fields[k], full(v)->items[k]);
+				part(full(v)->kind->fields[k], full(v)->items[k], own && k < full(own)->items.size() ? full(own)->items[k] : nullptr);
+		}
 		out += "}";
 	}
 	}
@@ -530,6 +552,12 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 		{
 			out = nullptr;  // null: nothing
 			return true;
+		}
+		if (auto able = able_kinds.find(full(shape)->kind->name); able != able_kinds.end())  // a speaker: made as the kind it says it is
+		{
+			const D* is = d.type == D::Table ? d.part("is a") : nullptr;
+			auto it = is && is->type == D::Text ? able->second.find(is->words) : able->second.end();
+			return it != able->second.end() && loaded_into(d, it->second, out);
 		}
 		if (d.type != D::Table)
 			return false;
@@ -792,8 +820,13 @@ extern "C"
 				stellanova::fail(line, (is_file ? "the file \"" + full(from)->s + "\"" : std::string("the text")) + " doesn't hold " + full(kind)->s + ".");
 			return out;)
 	}
-	V* cn_saved_text(V* v, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, line));) }
-	void cn_save_file(V* v, V* path, int line) { GUARDED(, stellanova::write_file(full(path)->s, saved_of(v, line) + "\n", line);) }
+	V* cn_saved_text(V* v, V* shape, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, shape, line));) }
+	void cn_save_file(V* v, V* path, V* shape, int line) { GUARDED(, stellanova::write_file(full(path)->s, saved_of(v, shape, line) + "\n", line);) }
+	void cn_able_kind(const char* able, V* shape)  // at the start: a kind a saved speaker may be loaded as
+	{
+		std::string name(able);
+		able_kinds[name.substr(0, name.find('\x01'))][full(shape)->kind->name] = shape;
+	}
 	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
 	{
 		V* out = copy_of(list);
