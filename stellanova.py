@@ -1056,12 +1056,16 @@ def pick_ir(f, test, a, b):
 
 
 def load_ir(target, source, fn, n):
-    """'load scores from file ...' in machine code: Stellanova's own C++ reads it into a new value, which is then stored."""
+    """'load scores from file ...' in machine code: the library reads it into a new value shaped like the name's kind."""
     if not target.ir_store:
         return None
-    template = (f"[&] {{ {cpp_type(target.kind)} loaded{{}}; stellanova::{fn}(loaded, {{s0}}, "
-                f"{cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {{line}}); return loaded; }}()")
-    return lambda f: target.ir_store(f, machine.wrap(f, "builtins", "", template, [source], target.kind, cpp_type, n))
+
+    def write(f):
+        shape = f.shape(target.kind)
+        got = f.call("ptr", "cn_load", ("ptr", machine.emit(f, source)), ("ptr", shape), ("i32", str(int(fn == "load_file"))),
+                     ("ptr", f.text_const(kind_name(target.kind))), ("i32", str(n)))
+        target.ir_store(f, f.unbox(got, target.kind))
+    return write
 
 
 def within_ir(f, a, b, reach):

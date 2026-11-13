@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
-            "cn_saved_text", "cn_save_file"}
+            "cn_saved_text", "cn_save_file", "cn_load"}
 
 
 class Unsupported(Exception):
@@ -127,6 +127,7 @@ declare void @cn_replace(ptr, ptr)
 declare ptr @cn_sorted_by(ptr, i32)
 declare ptr @cn_saved_text(ptr, i32)
 declare void @cn_save_file(ptr, ptr, i32)
+declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
 """
 
@@ -294,6 +295,25 @@ class Fn:
         finally:
             if into is not None:
                 self.lines, self.ended = saved, ended
+
+    def shape(self, kind):
+        """What 'load X from' fills: an empty value of the kind, a list's or table's one item showing its items' kind."""
+        if kind.startswith("list of "):
+            out = self.op("call ptr @cn_list_new()")
+            self.put(f"call void @cn_list_add(ptr {out}, ptr {self.shape(kind[8:])})")
+            return out
+        if kind.startswith("table of "):
+            out = self.op("call ptr @cn_table_new()")
+            self.put(f"call void @cn_entry_put(ptr {out}, ptr {self.text_const('')}, ptr {self.shape(kind[9:])})")
+            return out
+        if kind.startswith("command("):
+            raise Unsupported(kind)
+        if kind in THINGS:
+            thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
+            for k, (_, _, part_kind) in enumerate(THINGS[kind]):
+                self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {self.shape(part_kind)})")
+            return thing
+        return self.box(self.zero(kind), kind)
 
     def spec(self, kind):
         """A kind of thing as the library reads it: its name and its parts' names, split by \\x01."""

@@ -167,6 +167,75 @@ static std::string saved_of(const V* v, int line)
 	return out;
 }
 
+// 'load X from ...': saved data read into a new value shaped like shape (a list's or table's one item shows its items' kind)
+static V* empty_like(const V* shape)
+{
+	if (shape->tag == 'l' || shape->tag == 'm')
+		return fresh(shape->tag);
+	V* v = copy_of(shape);
+	if (v->tag == 'k')
+		for (V*& x : v->items)
+			x = empty_like(x);
+	return v;
+}
+
+static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
+{
+	using D = stellanova::SavedData;
+	switch (shape->tag)
+	{
+	case 'n': if (d.type != D::Number) return false; out = cn_box_number(d.number); return true;
+	case 'y': if (d.type != D::YesNo) return false; out = cn_box_yesno(d.yes); return true;
+	case 't': if (d.type != D::Text) return false; out = cn_make_text(d.words); return true;
+	case 'p':
+	case 'f':
+	{
+		size_t size = shape->tag == 'p' ? 3 : 2;
+		if (d.type != D::List || d.items.size() != size)
+			return false;
+		for (const D& x : d.items)
+			if (x.type != D::Number)
+				return false;
+		out = shape->tag == 'p' ? cn_place(d.items[0].number, d.items[1].number, d.items[2].number) : cn_flat(d.items[0].number, d.items[1].number);
+		return true;
+	}
+	case 'l':
+		if (d.type != D::List)
+			return false;
+		out = fresh('l');
+		for (const D& x : d.items)
+		{
+			V* item = nullptr;
+			if (!loaded_into(x, shape->items[0], item))
+				return false;
+			out->items.push_back(item);
+		}
+		return true;
+	case 'm':
+		if (d.type != D::Table)
+			return false;
+		out = fresh('m');
+		for (const auto& [key, x] : d.parts)
+		{
+			V* item = nullptr;
+			if (!loaded_into(x, shape->table.begin()->second, item))
+				return false;
+			out->table[key] = item;
+		}
+		return true;
+	case 'k':
+		if (d.type != D::Table)
+			return false;
+		out = empty_like(shape);  // a part the data doesn't have stays empty
+		for (size_t k = 0; k < shape->kind->fields.size(); ++k)
+			if (const D* p = d.part(shape->kind->fields[k]); p && !loaded_into(*p, shape->items[k], out->items[k]))
+				return false;
+		return true;
+	default:
+		return false;  // a command can't be saved
+	}
+}
+
 // A list's item number: counted from 1, as people count.
 static size_t index_of(const V* list, double number, int line)
 {
@@ -373,6 +442,19 @@ extern "C"
 		v->kind = kind;
 		v->items.resize(kind->fields.size());
 		return v;
+	}
+	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
+	{
+		GUARDED(nullptr,
+			std::string all = is_file ? stellanova::read_file(from->s, line) : from->s;
+			stellanova::SavedReader reader{all};
+			stellanova::SavedData d;
+			V* out = nullptr;
+			bool ok = reader.value(d);
+			reader.space();
+			if (!ok || reader.i != all.size() || !loaded_into(d, shape, out))
+				stellanova::fail(line, (is_file ? "the file \"" + from->s + "\"" : std::string("the text")) + " doesn't hold " + kind->s + ".");
+			return out;)
 	}
 	V* cn_saved_text(V* v, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, line));) }
 	void cn_save_file(V* v, V* path, int line) { GUARDED(, stellanova::write_file(path->s, saved_of(v, line) + "\n", line);) }
