@@ -395,6 +395,15 @@ def program_checks():
                'and the universe said i love you\n')
     assert out.stdout == "tea costs 3.5\nBob's cake costs 12\n1\nthe database said: no such table: nowhere.\n", repr(out.stdout)
 
+    # JSON from web services: other spellings of a part's name, null, and parts not asked for
+    q = "plus a quotation mark plus"
+    out = both('a forecast has:\n  city (text)\n  temperature (a number)\n  wind speed (a number)\nand the universe said i love you\n\n'
+               f'genesis:\n  set reply to "{{" {q} "city" {q} ": " {q} "Oslo" {q} ", " {q} "temperature" {q} ": null, " {q} "Wind_Speed" {q} '
+               f'": 7, " {q} "extra" {q} ": [1, null]}}"\n'
+               '  set f to conjure a forecast\n  load f from the text reply\n'
+               '  scrawl the city of f, " ", the temperature of f, " ", the wind speed of f\nand the universe said i love you\n')
+    assert out.stdout == "Oslo 0 7\n", repr(out.stdout)
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

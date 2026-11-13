@@ -214,7 +214,12 @@
     if (kind.startsWith("table of ") && isTable) return new Map(Object.keys(d).map((k) => [k, from_saved(d[k], kind.slice(9))]));
     if (kind.startsWith("thing ") && isTable) {
       const Kind = kinds[kind.slice(6)], made = new Kind();
-      for (const [words, member, part] of Kind.spec) if (Object.prototype.hasOwnProperty.call(d, words)) made[member] = from_saved(d[words], part);
+      const loose = (key) => key.replace(/[ _-]/g, "").replace(/[A-Z]/g, (c) => c.toLowerCase());
+      const near = new Map(Object.keys(d).map((key) => [loose(key), key]));  // a web service's "windSpeed" or "wind_speed" is 'wind speed'
+      for (const [words, member, part] of Kind.spec) {
+        const key = Object.prototype.hasOwnProperty.call(d, words) ? words : near.get(loose(words));
+        if (key !== undefined && d[key] !== null) made[member] = from_saved(d[key], part);  // missing, or null: the part stays empty
+      }
       return made;
     }
     throw new NotSaved();

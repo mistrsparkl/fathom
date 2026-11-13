@@ -630,11 +630,17 @@ def from_saved(d, kind, things):
         return {k: from_saved(x, entry_kind(kind), things) for k, x in d.items()}
     if is_thing(kind) and isinstance(d, dict):
         t = Thing(kind[6:], things)
+        loose = {loose_key(key): x for key, x in d.items()}  # a web service's "windSpeed" or "wind_speed" is 'wind speed'
         for w, k in t.spec:
-            if " ".join(w) in d:
-                t.fields[snake(w)] = from_saved(d[" ".join(w)], k, things)
+            x = d[" ".join(w)] if " ".join(w) in d else loose.get(loose_key(" ".join(w)))
+            if x is not None:  # missing, or null: the part stays empty
+                t.fields[snake(w)] = from_saved(x, k, things)
         return t
     raise NotSaved()
+
+
+def loose_key(key):
+    return re.sub(r"[ _-]", "", key).translate(ASCII_DOWN)
 
 
 def no_constant(name):
@@ -2787,7 +2793,7 @@ def describe_things(things):
             cpp = cpp_type("thing " + name)
             parts = ' out += ", ";'.join(f' out += "\\"{" ".join(w)}\\": "; save(out, v.{snake(w)}, line);' for w, k in THINGS[name])
             out.append(f'\tinline void save(std::string& out, const {cpp}& v, int line) {{ out += "{{";{parts} out += "}}"; }}')
-            loads = "".join(f' if (auto p = d.part("{" ".join(w)}"); p && !load(*p, v.{snake(w)})) return false;' for w, k in THINGS[name])
+            loads = "".join(f' if (auto p = d.part("{" ".join(w)}"); p && p->type != SavedData::Nothing && !load(*p, v.{snake(w)})) return false;' for w, k in THINGS[name])
             out.append(f"\tinline bool load(const SavedData& d, {cpp}& v) {{ if (d.type != SavedData::Table) return false; v = {cpp}{{}};{loads} return true; }}")
         out.append("}")
         out += [f"using stellanova::{cpp_type('thing ' + name)};" for name, _, _ in things]

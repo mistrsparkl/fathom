@@ -498,7 +498,18 @@ namespace stellanova
 			for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // the last one wins, as in Python
 				if (it->first == key)
 					return &it->second;
+			for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // a web service's "windSpeed" or "wind_speed" is 'wind speed'
+				if (loose(it->first) == loose(key))
+					return &it->second;
 			return nullptr;
+		}
+		static std::string loose(const std::string& key)
+		{
+			std::string out;
+			for (char c : key)
+				if (c != ' ' && c != '_' && c != '-')
+					out += static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+			return out;
 		}
 	};
 

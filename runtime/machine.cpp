@@ -522,7 +522,7 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 			return false;
 		out = empty_like(shape);  // a part the data doesn't have stays empty
 		for (size_t k = 0; k < full(shape)->kind->fields.size(); ++k)
-			if (const D* p = d.part(full(shape)->kind->fields[k]); p && !loaded_into(*p, full(shape)->items[k], full(out)->items[k]))
+			if (const D* p = d.part(full(shape)->kind->fields[k]); p && p->type != D::Nothing && !loaded_into(*p, full(shape)->items[k], full(out)->items[k]))
 				return false;
 		return true;
 	default:
