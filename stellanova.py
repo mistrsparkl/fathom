@@ -1396,6 +1396,23 @@ class Expr:
             gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
             return with_ir(Value(f"stellanova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env)),
                            lambda f: within_ir(f, v, r, reach))
+        if self.at("is", "one", "of") or self.at("is", "not", "one", "of"):  # 'answer is one of ("yes", "y")'
+            negated = self.at("is", "not")
+            self.i += 4 if negated else 3
+            if self.at("("):  # the choices written out: read as 'a list containing (...)'
+                self.t[self.i:self.i] = ["list", "containing"]
+            r = self.sum()
+            if not (is_list(r.kind) and element(r.kind) == v.kind):
+                raise ScriptError(self.line, f"'is one of' needs choices of the same kind, like 'answer is one of (\"yes\", \"y\")', "
+                                             f"but this is {kind_name(r.kind)}.")
+            a, b = r.run, v.run
+            found = with_ir(builtin("stellanova::contains({a0}, {a1})", YESNO, lambda env: b(env) in a(env), [r, v]),
+                            lambda f: contains_ir(f, r, v))
+            if not negated:
+                return found
+            c = found.run
+            return with_ir(Value(f"(!{found.cpp})", YESNO, lambda env: not c(env)),
+                           lambda f: f.op(f"xor i1 {machine.emit(f, found)}, true"))
         for words, op in self.COMPARE:
             if self.at(*words):
                 self.i += len(words)
@@ -1761,10 +1778,14 @@ class Expr:
             self.i += n
             command = self.names.commands[key]
             needs = len(command.kinds)
+            least = needs - len(getattr(command, "usual", {}))  # inputs with a usual value may be left out
             if self.at("with"):
                 self.i += 1
             args = []
-            if needs == 1:
+            ends = self.peek() in ITEM_NOT_INDEX or self.peek() in ("then", "exceeds", "falls")
+            if least == 0 and ends:
+                pass
+            elif needs == 1 or (least <= 1 and not (self.at("(") and "," in self.t[self.i:max(self.i, closing_bracket(self.t, self.i))])):
                 args = [self.operand()]
             elif needs > 1:
                 if not self.at("("):
@@ -2492,6 +2513,7 @@ def read_one(path, auto):
     made = []  # the Command for each head
     for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
         command = Command(cpp, [kind for _, kind in inputs], gives)
+        command.usual = USUAL.get(cpp, {})
         have = names.commands.get(tuple(words))
         if have is not None:
             owner = inputs[0][1] if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else None
@@ -2517,6 +2539,7 @@ def read_one(path, auto):
             if kind_ in versions or nearest_version(own, kind_) is not command:
                 continue
             copy = Command(cpp, [kind_] + command.kinds[1:], gives)
+            copy.usual = command.usual
             versions[kind_] = copy
             extra.append(((words, cpp, [(inputs[0][0], kind_)] + inputs[1:], gives), (text_, n, body), copy))
     for item in extra:
@@ -2727,19 +2750,31 @@ def command_head(header, line):
             raise ScriptError(line, f"There is no kind of thing called '{owner}'." + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
         inputs.append((owner.split(), "thing " + owner))
         OWNERS["".join(w.capitalize() for w in words)] = "thing " + owner
+    usual = {}
     if m.group(3):
-        for part in re.split(r"\s+and\s+(?=[a-z ]+\()", m.group(3)):
-            pm = re.fullmatch(r"([a-z ]+?)\s*\(([a-z ]+)\)", part.strip())
-            kind = pm and parse_kind(pm.group(2))
+        given = header[m.start(3):m.end(3)]  # as written: a usual value's text keeps its capitals
+        for part in re.split(r"\s+and\s+(?=[A-Za-z ]+\()", given):
+            pm = re.fullmatch(r"([A-Za-z ]+?)\s*\(([A-Za-z ]+?)(?:\s*,\s*usually\s+(.+?))?\s*\)", part.strip())
+            kind = pm and parse_kind(pm.group(2).lower())
             if not kind:
-                raise ScriptError(line, f"An input looks like 'goal (a place)'. Kinds are: {kind_words()}.")
-            inputs.append((pm.group(1).split(), kind))
+                raise ScriptError(line, f"An input looks like 'goal (a place)', or 'name (text, usually \"friend\")'. Kinds are: {kind_words()}.")
+            if pm.group(3) is not None:
+                if not re.fullmatch(r'"[^"]*"|-?\d+(?:\.\d+)?|yes|no', pm.group(3).strip(), re.IGNORECASE):
+                    raise ScriptError(line, "A usual value is written out, like 'usually \"friend\"', 'usually 3' or 'usually yes'.")
+                usual[len(inputs)] = pm.group(3).strip()
+            elif usual:
+                raise ScriptError(line, "Inputs with a usual value go last, after the ones without.")
+            inputs.append((pm.group(1).lower().split(), kind))
+    USUAL["".join(w.capitalize() for w in words)] = usual
     gives = None
     if m.group(4):
         gives = parse_kind(m.group(4))
         if not gives:
             raise ScriptError(line, f"'returning' needs a kind, like 'returning a number'. Kinds are: {kind_words()}.")
     return words, "".join(w.capitalize() for w in words), inputs, gives
+
+
+USUAL = {}  # a command's C++ name -> {input number: the value it usually has, as written}
 
 
 def is_kind_of(kind, other):
@@ -3581,7 +3616,14 @@ def statement(n, text_, inner, names, declared, depth):
     near = similar_words(tokens, names)
     if near:
         raise ScriptError(n, f"I don't know '{' '.join(tokenize(text_, n)[:4])}'." + near)  # as written, with its grammar
-    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, add, remove, inscribe, if, otherwise, repeat, as long as, for each, try, return, raise an error with, cease, whisper or the name of a command.")
+    starts = ["set", "move", "scrawl", "ask", "add", "remove", "inscribe", "if", "otherwise", "repeat", "as long as", "for each",
+              "try", "return", "raise an error with", "cease", "whisper", "depending on", "whenever", "every", "meanwhile",
+              "invoke", "save", "load", "conjure", "break free", "move on"] + [" ".join(k) for k in names.commands]
+    for size in (3, 2, 1):  # a misspelt first word (or words): the nearest way a line can start
+        guess = difflib.get_close_matches(" ".join(tokens[:size]), [s for s in starts if len(s.split()) == size], n=1, cutoff=0.75)
+        if guess:
+            raise ScriptError(n, f"I don't know how to start a line with '{' '.join(tokens[:size])}'. Did you mean '{guess[0]}'?")
+    raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'. Lines start with set, move, scrawl, ask, add, remove, inscribe, if, otherwise, repeat, as long as, for each, depending on, whenever, every, try, return, raise an error with, cease, whisper or the name of a command.")
 
 
 def for_each(n, head, body, names, declared, depth):
@@ -3647,6 +3689,9 @@ def call(key, args, names, n):
     if command.versions and args and is_thing(args[0].kind):
         command = nearest_version(command.versions, args[0].kind) or command
     kinds = command.kinds
+    usual = getattr(command, "usual", {})
+    while len(args) < len(kinds) and len(args) in usual:  # left out: the value it usually has
+        args = args + [expr_to_end(tokenize(usual[len(args)], n), 0, names, n)]
     if len(args) != len(kinds):
         raise ScriptError(n, f"'{' '.join(key)}' needs {len(kinds)} input{'s' if len(kinds) != 1 else ''}, but this gives it {len(args)}.")
     args = [fit(a, kind) or a for a, kind in zip(args, kinds)] if len(args) == len(kinds) else args

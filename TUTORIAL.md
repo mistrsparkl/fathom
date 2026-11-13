@@ -214,6 +214,32 @@ Double 21 is 42
 
 A command can take **inputs** (after `given`, each with its kind in brackets) and can **return** an answer. Putting a job in its own command gives it a name, so the program reads like a list of what happens.
 
+### Usual values
+
+An input can have a usual value. Leave it out when calling, and the command gets that value:
+
+```stellanova
+to greet, given name (text, usually "friend") and count (a number, usually 1):
+  repeat count times:
+    scrawl "Hello, [name]!"
+and the universe said i love you
+
+genesis:
+  greet
+  greet with "Sam"
+  greet with ("Jo", 2)
+and the universe said i love you
+```
+
+```output
+Hello, friend!
+Hello, Sam!
+Hello, Jo!
+Hello, Jo!
+```
+
+Inputs with a usual value go last. The value is written out: text, a number, `yes` or `no`.
+
 ## 7. Your own kinds of things
 
 ```stellanova

@@ -329,6 +329,29 @@ def program_checks():
     assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
                      "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
 
+    # is one of
+    out = both('genesis:\n  set answer to "y"\n  set sizes to a list containing (1, 2, 3)\n'
+               '  scrawl answer is one of ("yes", "y", "sure"), " ", 2 is one of sizes, " ", 5 is not one of sizes, " ", answer is not one of ("y", "n")\n'
+               '  if answer is one of ("yes", "y"): scrawl "agreed"\nand the universe said i love you\n')
+    assert out.stdout == "yes yes yes no\nagreed\n", repr(out.stdout)
+    assert perr('genesis:\n  scrawl 2 is one of ("a", "b")\n' + END)[1].startswith("'is one of' needs choices of the same kind")
+
+    # inputs with usual values can be left out
+    out = both('to greet, given name (text, usually "Friend") and count (a number, usually 1):\n  repeat count times:\n'
+               '    scrawl "Hello, [name]!"\nand the universe said i love you\n\n'
+               'to label, given n (a number) and unit (text, usually "cm"), returning text:\n  return "[n] [unit]"\nand the universe said i love you\n\n'
+               'genesis:\n  greet\n  greet with "Sam"\n  greet with ("Jo", 2)\n'
+               '  scrawl label with 5, " ", label with (5, "m"), " ", (label with 7) plus "!"\nand the universe said i love you\n')
+    assert out.stdout == "Hello, Friend!\nHello, Sam!\nHello, Jo!\nHello, Jo!\n5 cm 5 m 7 cm!\n", repr(out.stdout)
+    assert perr('to f, given a (a number, usually 1) and b (a number):\n  cease\n' + END)[1] == \
+        "Inputs with a usual value go last, after the ones without."
+    assert perr('to f, given a (a number, usually x):\n  cease\n' + END)[1].startswith("A usual value is written out")
+
+    # a misspelt first word gets a guess
+    assert perr('genesis:\n  scrwal 1\n' + END)[1] == "I don't know how to start a line with 'scrwal'. Did you mean 'scrawl'?"
+    assert perr('genesis:\n  fro each n from 1 to 3: scrawl n\n' + END)[1] == \
+        "I don't know how to start a line with 'fro each'. Did you mean 'for each'?"
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'
