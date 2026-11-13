@@ -66,6 +66,7 @@ namespace gc
 			ULONG_PTR low, high;
 			GetCurrentThreadStackLimits(&low, &high);
 			t->top = reinterpret_cast<char*>(high);
+			t->sp = t->top;  // nothing to look at until its registers are kept
 			std::lock_guard<std::mutex> hold(stop_lock);
 			threads.push_back(t);
 			mine.t = t;
@@ -239,6 +240,7 @@ extern "C"
 		t->state = 0;
 		if (!gc::stopping)  // (both are seq_cst: a collector starting now sees this thread running and waits for it)
 			return;
+		gc::keep_registers(t);  // (a thread new to machine code has none kept yet)
 		std::unique_lock<std::mutex> hold(gc::stop_lock);
 		t->state = 2;  // not yet: wait until the collector is done
 		gc::stop_cv.notify_all();

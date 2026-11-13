@@ -299,6 +299,13 @@ def program_checks():
                '  scrawl the entry "k70000" of names\nand the universe said i love you\n')
     assert out.stdout == "7350315000 10 pet 70000 21000\npet 70000\n", repr(out.stdout)
 
+    # a library's own C++ threads calling a command: each thread joins the collector the first time it runs machine code
+    out = both('use: burst\n\nto label, given n (a number), returning text:\n  set parts to a list containing (n, n plus 1, n times 2)\n'
+               '  return "item " plus the sum of parts\nand the universe said i love you\n\n'
+               'genesis:\n  scrawl burst with (20000, the command label)\nand the universe said i love you\n',
+               others={"burst.words": 'note: test: C++ threads of its own calling a command\n\ncode:\n  #include <thread>\n  namespace burst\n  {\n  \tinline double go(double count, std::function<std::string(double)> f)\n  \t{\n  \t\tstd::vector<std::thread> ts; std::vector<double> sizes(4);\n  \t\tfor (int k = 0; k < 4; k++) ts.emplace_back([&, k] { for (double n = 1; n <= count; n++) sizes[k] += static_cast<double>(f(n).size()); });\n  \t\tfor (auto& t : ts) t.join();\n  \t\treturn sizes[0] + sizes[1] + sizes[2] + sizes[3];\n  \t}\n  }\n\npython:\n  def burst_go(count, f):\n      return 4 * sum(len(f(float(n))) for n in range(1, int(count) + 1))\n\nto burst with, given count (a number) and f (a command given a number returning text), returning a number = burst::go({count}, {f})\n  runs: burst_go({count}, {f})\n'})
+    assert out.stdout == "788904\n", repr(out.stdout)
+
     # meanwhile: commands going alongside the rest, each with its own copy of the names; a problem in one stops everything.
     out = both('to count up, given name (text) and delay (a number):\n  wait delay\n  inscribe name plus " done" into file name plus ".txt"\nand the universe said i love you\n\nto fail later:\n  wait 0.2 seconds\n  raise an error with "the helper broke"\nand the universe said i love you\n\ngenesis:\n  set started to seconds since the start\n  set names to a list of ("a", "b", "c")\n  for each who in names: meanwhile count up with who, 0.5\n  set names to a list of text\n  wait for the others\n  scrawl contents of file "a.txt", " ", contents of file "b.txt", " ", contents of file "c.txt"\n  scrawl seconds since the start minus started falls below 1.4\n  meanwhile count up with "d", 0.3\n  scrawl "main goes on"\n  meanwhile fail later\n  wait 1 seconds\n  scrawl "never"\nand the universe said i love you\n')
     assert (out.stdout, out.stderr) == ('a done b done c done\nyes\nmain goes on\n', 'Line 8: the helper broke\n'), repr((out.stdout, out.stderr))
