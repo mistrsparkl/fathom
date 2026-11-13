@@ -3507,7 +3507,37 @@ def command_value(names, tokens, e, line):
     v = Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
     if c.inputs is None:
         v.ir = lambda f: f"@cn_user_{machine_name(c.cpp, [((), k) for k in c.kinds])}"
+    elif getattr(c, "library", None):
+        v.ir = lambda f: library_command_ir(f, c, line)
     return v
+
+
+class Piece:
+    """A bit of machine code standing in for a Value or a statement (it has only .ir and .kind)."""
+
+    def __init__(self, ir, kind=None):
+        self.ir, self.kind = ir, kind
+
+
+def library_command_ir(f, c, line):
+    """'the command square root of' in machine code: a small function of the program's own that calls the library word."""
+    import hashlib
+    template = c.cpp
+    for k, in_name in enumerate(c.inputs):
+        template = template.replace("{" + in_name + "}", "{a%d}" % k)
+    name = "lib_" + hashlib.sha1("|".join([c.library, template, str(line)] + c.kinds).encode("utf-8")).hexdigest()[:16]
+    made = f.module.__dict__.setdefault("library_commands", set())
+    if name not in made:
+        made.add(name)
+        inputs = [(f"in{k}", kind) for k, kind in enumerate(c.kinds)]
+        args = [Piece(lambda g, cpp=cpp, kind=kind: g.load(cpp, kind), kind) for cpp, kind in inputs]
+
+        def body(g):
+            out = machine.wrap(g, c.library, LIBRARY_HEADS[c.library], template, args, c.gives, cpp_type, line)
+            if c.gives:
+                g.finish_with(f"ret {machine.ll_type(c.gives)} {out}")
+        machine.function(f.module, name, inputs, c.gives, Piece(body))
+    return f"@cn_user_{name}"
 
 
 def writable_list(tokens, names, n, what):

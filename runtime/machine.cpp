@@ -52,6 +52,7 @@ static std::string show(const V* v)
 	case 't': return v->s;
 	case 'p': return stellanova::text(v->x) + " horizontal " + stellanova::text(v->y) + " vertical " + stellanova::text(v->z) + " depth";
 	case 'f': return stellanova::text(v->x) + " horizontal " + stellanova::text(v->y) + " vertical";
+	case 'c': return "a command";
 	case 'l':
 	{
 		if (v->items.empty())

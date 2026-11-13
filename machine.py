@@ -376,7 +376,7 @@ class Fn:
         if kind == YESNO:
             return self.op(f"call ptr @cn_text_yesno(i1 {value})")
         ll_type(kind)
-        return self.op(f"call ptr @cn_show(ptr {value})")
+        return self.op(f"call ptr @cn_show(ptr {self.box(value, kind)})")
 
     def done(self):
         params = ", ".join(f"{ll_type(k)} %p.{cpp}" for cpp, k in self.inputs)
