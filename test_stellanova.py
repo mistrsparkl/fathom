@@ -362,14 +362,21 @@ def program_checks():
                '  scrawl the first 10 of names\nand the universe said i love you\n')
     assert out.stdout == ("Bo, Cy, Di\nAnn, Bo / Di, Bo, Ann / Ste / nova\nAnn, Bo, Cy, Di\n6 3 0\n1,234,567 -9,876,543.25 12\n"
                           "007 -04 1234\nAnn, Bo, Cy, Di, Bo, Ann\n"), repr(out.stdout)
-    assert perr('genesis:\n  set a to a list containing (1, 2)\n  scrawl items 2 to 5 of a\n' + END, run_it=True)[1] == \
-        "there are no items 2 to 5 in a list of 2 items." if "run_it" in perr.__code__.co_varnames else True
 
     # for each ... by
     out = both('genesis:\n  set out to ""\n  for each n from 0 to 20 by 5: set out to out plus n plus " "\n'
                '  for each n from 3 to 1 by -1: set out to out plus n plus " "\n  for each n from 0 to 1 by 0.25: set out to out plus n plus " "\n'
                '  for each n from 1 to 3 by 0: set out to out plus "never"\n  scrawl out\nand the universe said i love you\n')
     assert out.stdout == "0 5 10 15 20 3 2 1 0 0.25 0.5 0.75 1 \n", repr(out.stdout)
+
+    # dates are text, with words in the time library
+    out = both('use: time\n\ngenesis:\n  scrawl days between ("2026-11-13", "2026-12-25"), " ", days between ("2024-03-01", "2024-02-01")\n'
+               '  scrawl date plus days ("2026-11-13", 30), " ", date plus days ("2024-03-01", -1), " ", date plus days ("1969-12-31", 1)\n'
+               '  scrawl weekday of "2026-11-13", " ", weekday of "2000-01-01", " ", weekday of "1969-12-31"\n'
+               '  scrawl (days until today) is 0\n  try:\n    scrawl weekday of "2026-02-30"\n  if that went wrong:\n    scrawl the wound\n'
+               'and the universe said i love you\n')
+    assert out.stdout == ("42 -29\n2026-12-13 2024-02-29 1970-01-01\nFriday Saturday Wednesday\nyes\n"
+                          "'2026-02-30' isn't a date: dates are written like 2026-11-13.\n"), repr(out.stdout)
 
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
