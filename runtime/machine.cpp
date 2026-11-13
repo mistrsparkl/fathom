@@ -829,6 +829,19 @@ extern "C"
 		GUARDED(nullptr, stellanova::fail(line, "this " + words[0] + " is nothing, so it has no " + words[static_cast<size_t>(k) + 1] + ".");)
 		return nullptr;
 	}
+	V* cn_able(V* thing, const char* able, const char* what, int line)  // 'speak s': s must be something
+	{
+		if (!thing)
+		{
+			GUARDED(nullptr, stellanova::fail(line, std::string("this ") + able + " is nothing, so it can't " + what + ".");)
+		}
+		return thing;
+	}
+	bool cn_is_kind(V* thing, const char* spec)  // is it this kind of thing (not a kind of it)?
+	{
+		const std::string& name = full(thing)->kind->name;
+		return std::strncmp(spec, name.c_str(), name.size()) == 0 && (spec[name.size()] == '\x01' || spec[name.size()] == 0);
+	}
 	V* cn_field(V* thing, int k) { return full(thing)->items[static_cast<size_t>(k)]; }
 	void cn_field_put(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = copy_of(x); }
 	void cn_replace(V* thing, V* with)  // 'set ball to ...' inside a command for a ball: the caller's ball itself changes

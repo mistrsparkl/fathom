@@ -22,7 +22,8 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
-            "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by"}
+            "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
+ABLE = set()  # kinds that are shared abilities ('thing speaker'): their empty value is nothing
 
 
 class Unsupported(Exception):
@@ -123,6 +124,8 @@ declare ptr @cn_thing(ptr)
 declare ptr @cn_as_kind(ptr, ptr)
 declare ptr @cn_field(ptr, i32)
 declare ptr @cn_something(ptr, ptr, i32, i32)
+declare ptr @cn_able(ptr, ptr, ptr, i32)
+declare i1 @cn_is_kind(ptr, ptr)
 declare void @cn_field_put(ptr, i32, ptr)
 declare void @cn_replace(ptr, ptr)
 declare ptr @cn_sorted_by(ptr, i32, i32)
@@ -295,6 +298,8 @@ class Fn:
                 return self.op("call ptr @cn_list_new()")
             if kind.startswith("table of "):
                 return self.op("call ptr @cn_table_new()")
+            if kind in ABLE:
+                return "null"
             thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
             for k, (_, _, part_kind) in enumerate(THINGS[kind]):
                 self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {self.box(self.zero(part_kind), part_kind)})")

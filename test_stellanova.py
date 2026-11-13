@@ -336,6 +336,11 @@ def program_checks():
     assert out.stdout == "yes yes yes no\nagreed\n", repr(out.stdout)
     assert perr('genesis:\n  scrawl 2 is one of ("a", "b")\n' + END)[1].startswith("'is one of' needs choices of the same kind")
 
+    # a command with no inputs, followed by more words (it takes no input from them)
+    out = both('to greeting, returning text:\n  return "hi"\nand the universe said i love you\n\ngenesis:\n  scrawl greeting as saved text\n'
+               'and the universe said i love you\n')
+    assert out.stdout == '"hi"\n', repr(out.stdout)
+
     # inputs with usual values can be left out
     out = both('to greet, given name (text, usually "Friend") and count (a number, usually 1):\n  repeat count times:\n'
                '    scrawl "Hello, [name]!"\nand the universe said i love you\n\n'
@@ -422,6 +427,18 @@ def program_checks():
     assert out.stdout == ("nothing\nyes\nyes orc\na enemy (name: orc, health: 5), nothing\n[{\"name\": \"orc\", \"health\": 5}, null]\n"
                           "a enemy (name: orc, health: 5), nothing yes\nthis enemy is nothing, so it has no health.\n"), repr(out.stdout)
     assert out.stderr == "Line 35: this enemy is nothing, so it has no health.\n", repr(out.stderr)
+
+    # shared abilities: 'a speaker is anything that can speak and shout twice.'
+    out = both('a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\ngenesis:\n  conjure a dog as rex\n  set the name of rex to "Rex"\n  conjure a robot as robo\n  set the serial of robo to 42\n  set crowd to a list of speakers\n  add rex to crowd\n  add robo to crowd\n  for each s in crowd:\n    scrawl speak s\n    shout twice with (s, "hi")\n  scrawl crowd\n  set quiet to no speaker\n  scrawl quiet is nothing\n  set quiet to robo\n  scrawl speak quiet\n  set quiet to no speaker\n  scrawl speak quiet\nand the universe said i love you\n')
+    assert out.stdout == ("Woof, I am Rex\nhi hi!\nBeep 42\nhihi\na dog (name: Rex), a robot (serial: 42)\nyes\nBeep 42\n"), repr(out.stdout)
+    assert out.stderr == "Line 44: this speaker is nothing, so it can't speak.\n", repr(out.stderr)
+    able = 'a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\n'
+    assert perr(able + 'a cat has:\n  lives (a number)\n' + END + 'genesis:\n  conjure a cat as tom\n  set crowd to a list of speakers\n'
+                '  add tom to crowd\n' + END)[1] == "This list holds speakers, so I can't add a cat to it."
+    assert perr(able + 'genesis:\n  conjure a speaker as x\n' + END)[1] == \
+        "A speaker is anything that can speak and shout twice, so conjure one of those instead (dog, robot)."
+    assert perr(able + 'to purr, for a dog:\n  cease\n' + END + 'genesis:\n  set s to no speaker\n  purr s\n' + END)[1] == \
+        "A speaker can only speak and shout twice, not 'purr'."
 
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'

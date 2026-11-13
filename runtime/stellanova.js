@@ -350,6 +350,10 @@
       if (items.includes(undefined)) fail(line, "a list sorted by a part can't hold nothing.");
       return dup(items).sort((a, b) => order(part(a), part(b)));
     },
+    able(table, able, what, line, thing, ...rest) {  // 'speak s': the version for whatever kind of thing s is
+      if (thing === undefined) fail(line, `this ${able} is nothing, so it can't ${what}.`);
+      return table[thing.constructor.title](thing, ...rest);
+    },
     something(thing, kind, part, line) {
       if (thing === undefined) fail(line, `this ${kind} is nothing, so it has no ${part}.`);
       return thing;

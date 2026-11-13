@@ -97,6 +97,8 @@ OWNER_PARAMS = set()  # the C++ names of the things commands are for ('to bounce
 # Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
 OWNERS = {}
 PARENTS = {}  # kind of thing -> the kind it is a kind of ('a dog is a kind of pet')
+ABLE = {}  # 'a speaker is anything that can speak': 'speaker' -> [('speak',)], the commands every one of them has
+NAMES_NOW = [None]  # the Names of the script being read (fit() asks which kinds can do an ability's commands)
 
 # The parts of a place, written after it: 'existence of horizontal'.
 PLACE_PARTS = {("horizontal",): "X", ("vertical",): "Y", ("depth",): "Z"}
@@ -189,6 +191,8 @@ def js_zero(kind):
         return "[]"
     if is_table(kind):
         return "stellanova::table()"
+    if is_thing(kind) and kind[6:] in ABLE:
+        return "undefined"
     if is_thing(kind):
         return f"new {js_class(kind)}()"
     if is_command(kind):
@@ -362,6 +366,8 @@ def py_zero(kind, things):
         return []
     if is_table(kind):
         return {}
+    if is_thing(kind) and kind[6:] in ABLE:
+        return None
     if is_thing(kind):
         return Thing(kind[6:], things)
     if is_command(kind):
@@ -1874,7 +1880,7 @@ class Expr:
                 self.i += 1
             args = []
             ends = self.peek() in ITEM_NOT_INDEX or self.peek() in ("then", "exceeds", "falls")
-            if least == 0 and ends:
+            if needs == 0 or (least == 0 and ends):
                 pass
             elif needs == 1 or (least <= 1 and not (self.at("(") and "," in self.t[self.i:max(self.i, closing_bracket(self.t, self.i))])):
                 args = [self.operand()]
@@ -2128,6 +2134,10 @@ class Expr:
                 self.i += len(lead)
                 for n in range(min(5, len(self.t) - self.i), 0, -1):
                     name = " ".join(self.t[self.i:self.i + n])
+                    if name in ABLE:
+                        kinds_ = [k for k in THINGS if k not in ABLE and can("thing " + k, name)]
+                        raise ScriptError(self.line, f"A {name} is anything that can {' and '.join(' '.join(w) for w in ABLE[name])}, so conjure one of "
+                                                     f"those instead" + (f" ({', '.join(kinds_)})." if kinds_ else "."))
                     if name in THINGS:
                         self.i += n
                         things = THINGS
@@ -2532,10 +2542,13 @@ def read_one(path, auto):
     THINGS = {}
     OWNERS.clear()
     PARENTS.clear()
+    ABLE.clear()
+    machine.ABLE.clear()
     reset_fields()
     first = next((t.strip() for t in lines if t.strip() and not t.strip().startswith("note:")), "")
     if not first.startswith("this is part of:"):
         names, info = Names(), None  # a program of its own
+        NAMES_NOW[0] = names
         for lib in auto:
             used.add(lib)
             libs += load_library(lib, 1, names)
@@ -2607,6 +2620,18 @@ def read_one(path, auto):
                 raise ScriptError(n, f"The library '{lib}' is already used above.")
             used.add(lib)
             libs += load_library(lib, n, names)
+            continue
+        able = re.fullmatch(r"an? ([a-z][a-z ]*?) is anything that can ([a-z][a-z ]*?)\.?", text_.lower())
+        if able:  # a shared ability: any kind of thing with its own version of each command fits
+            name = " ".join(able.group(1).split())
+            if name in THINGS or name in BASIC_WORDS:
+                raise ScriptError(n, f"There is already a kind of thing called '{name}'.")
+            if UNREAL:
+                raise ScriptError(n, "'anything that can' can't be used in Unreal parts yet.")
+            THINGS[name] = []
+            ABLE[name] = [tuple(w.split()) for w in re.split(r"\s+and\s+", able.group(2))]
+            machine.ABLE.add("thing " + name)
+            things.append((name, n, []))
             continue
         m = (re.fullmatch(r"an? ([a-z][a-z ]*?) is a kind of (?:an? )?([a-z][a-z ]*?)(?: that (?:also )?has)?:", text_.lower())
              or re.fullmatch(r"an? ([a-z][a-z ]*?) has:()", text_.lower()))
@@ -2775,7 +2800,7 @@ def describe_things(things):
             for words, kind in THINGS[PARENTS[name]]:
                 THINGS[name].append((words, kind))
                 FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
-        elif not fields:
+        elif not fields and name not in ABLE:
             raise ScriptError(n, f"Say what a {name} has, one thing per indented line, like: name (text)")
         for fn, text_ in fields:
             m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
@@ -2929,10 +2954,21 @@ def is_kind_of(kind, other):
     return kind == other
 
 
+def can(kind, able):
+    """Can this kind of thing do everything the ability needs?"""
+    commands = NAMES_NOW[0].commands if NAMES_NOW[0] else {}
+    return kind[6:] not in ABLE and all(w in commands and commands[w].versions and nearest_version(commands[w].versions, kind)
+                                        for w in ABLE[able])
+
+
 def fit(v, kind):
-    """v as the kind wanted: itself, or a dog made into a pet (a copy with just a pet's parts). None if it can't be."""
+    """v as the kind wanted: itself, a dog made into a pet (a copy with just a pet's parts), or a dog as a speaker (itself,
+    all its parts kept). None if it can't be."""
     if v.kind == kind:
         return v
+    if is_thing(v.kind) and is_thing(kind) and kind[6:] in ABLE and can(v.kind, kind[6:]):
+        same = Value(v.cpp, kind, v.run)
+        return with_ir(same, lambda f: machine.emit(f, v))
     if is_thing(v.kind) and is_thing(kind) and is_kind_of(v.kind, kind):
         get, name, things = v.run, kind[6:], THINGS
         made = f"stellanova::as_kind({strip_parens(v.cpp)}, {js_class(kind)})" if JS else f"{cpp_type(kind)}({strip_parens(v.cpp)})"
@@ -3848,6 +3884,59 @@ def for_each(n, head, body, names, declared, depth):
     return [line, tab + "{"] + lines + [tab + "}"], run, None
 
 
+def able_call(key, command, args, names, n):
+    """'speak s' where s is a speaker: the version for whatever kind of thing s is now."""
+    able, what = args[0].kind[6:], " ".join(key)
+    if key not in ABLE[able]:
+        raise ScriptError(n, f"A {able} can only {' and '.join(' '.join(w) for w in ABLE[able])}, not '{what}'.")
+    kinds = command.kinds
+    args = args[:1] + [fit(a, k) or a for a, k in zip(args[1:], kinds[1:])]
+    for k, (a, kind) in enumerate(zip(args[1:], kinds[1:]), 2):
+        if a.kind != kind:
+            raise ScriptError(n, f"Input {k} of '{what}' must be {kind_name(kind)}, not {kind_name(a.kind)}.")
+    versions = command.versions
+    pairs = [("thing " + t, nearest_version(versions, "thing " + t)) for t in THINGS if t not in ABLE]
+    pairs = [(k, ver) for k, ver in pairs if ver is not None]
+    gets = [a.run for a in args]
+
+    def run(env):
+        given = [g(env) for g in gets]
+        if given[0] is None:
+            raise RunError(n, f"this {able} is nothing, so it can't {what}.")
+        return nearest_version(versions, "thing " + given[0].name).runner(*given)
+
+    def write(f):
+        done = [machine.emit(f, a) for a in args]
+        done = done[:1] + [f.copied(x, a.kind) for x, a in zip(done[1:], args[1:])]
+        f.op(f"call ptr @cn_able(ptr {done[0]}, ptr {f.module.bytes_const(able.encode())}, ptr {f.module.bytes_const(what.encode())}, i32 {n})")
+        slot = None
+        if command.gives:
+            slot = f"%able{f.label('')}"
+            f.entry.append(f"  {slot} = alloca {machine.ll_type(command.gives)}")
+        joined = f.label("joined")
+        for kind, ver in pairs:
+            yes, no = f.label("is"), f.label("isnt")
+            f.branch(f.op(f"call i1 @cn_is_kind(ptr {done[0]}, ptr {f.spec(kind)})"), yes, no)
+            f.place(yes)
+            given = ", ".join(f"{machine.ll_type(k)} {x}" for x, k in zip(done, [kind] + ver.kinds[1:]))
+            name = machine_name(ver.cpp, [((), k) for k in ver.kinds])
+            if slot:
+                out = f.op(f"call {machine.ll_type(command.gives)} @cn_user_{name}({given})")
+                f.put(f"store {machine.ll_type(command.gives)} {out}, ptr {slot}")
+            else:
+                f.put(f"call void @cn_user_{name}({given})")
+            f.check()
+            f.jump(joined)
+            f.place(no)
+        f.jump(joined)  # (never: cn_able let only kinds that can through)
+        f.place(joined)
+        return f.op(f"load {machine.ll_type(command.gives)}, ptr {slot}") if slot else None
+    run.ir = write
+    table = ", ".join(f"{json.dumps(k[6:])}: {ver.js}" for k, ver in pairs) if JS else ""
+    rest = "".join(", " + strip_parens(a.cpp) for a in args)
+    return f"(await stellanova::able({{{table}}}, {json.dumps(able)}, {json.dumps(what)}, {n}{rest}))", run
+
+
 def call(key, args, names, n):
     """Calling a command, after checking its inputs. Returns (C++, run)."""
     command = names.commands[key]
@@ -3859,6 +3948,8 @@ def call(key, args, names, n):
         args = args + [expr_to_end(tokenize(usual[len(args)], n), 0, names, n)]
     if len(args) != len(kinds):
         raise ScriptError(n, f"'{' '.join(key)}' needs {len(kinds)} input{'s' if len(kinds) != 1 else ''}, but this gives it {len(args)}.")
+    if args and is_thing(args[0].kind) and args[0].kind[6:] in ABLE and command.versions:
+        return able_call(key, command, args, names, n)
     args = [fit(a, kind) or a for a, kind in zip(args, kinds)] if len(args) == len(kinds) else args
     for k, (a, kind) in enumerate(zip(args, kinds), 1):
         if a.kind != kind:

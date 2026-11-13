@@ -471,6 +471,22 @@ load high scores from file "scores.json"
 
 `scores as saved text` gives the same JSON as text, without a file, and `load scores from the text reply` reads it back, so a program can talk to websites and other programs that use JSON (`load` fails with `the text doesn't hold a list of numbers.` if it doesn't fit). The file is JSON, which other programs can read too.
 
+**Shared abilities.** Different kinds of things can share what they can do. `a speaker is anything that can speak.` (one line, at the top level) makes a new kind: any kind of thing with its own `to speak, for a ...:` command is a speaker, and keeps all its parts. A list of speakers can hold dogs and robots together, and `speak s` does the speaking the way that kind of thing does it, as the program runs:
+
+```
+a speaker is anything that can speak.
+
+to speak, for a dog, returning text:
+  return "Woof"
+and the universe said i love you
+
+to speak, for a robot, returning text:
+  return "Beep"
+and the universe said i love you
+```
+
+A speaker can only do what it was described with (`anything that can speak and sing` for more). A speaker name starts as nothing, and `conjure` makes a dog or a robot, not a speaker.
+
 **Nothing.** A name for a kind of thing can hold nothing: `set best to no enemy`. `if best is nothing` and `if best is something` ask which. Asking for a part of nothing (`the health of best`) stops with `this enemy is nothing, so it has no health.` Nothing shows as `nothing` and saves as `null`. It is handy for a command that may not find anything:
 
 ```
