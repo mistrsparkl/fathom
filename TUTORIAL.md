@@ -99,6 +99,19 @@ And boots.
 
 Each line under it is a value (or several, with commas), a `:`, then what to do. `anything else:` is for every other value.
 
+### Watching a program run
+
+`stellanova watch` runs a program and shows each line as it happens, with the names it changed:
+
+```
+> stellanova watch hot.stella
+▸ line 2: set temperature to 31
+    temperature: 31
+▸ line 3: if temperature exceeds 30:   → yes
+▸ line 4: scrawl "It's hot."
+It's hot.
+```
+
 ## 4. Doing things again
 
 ```stellanova

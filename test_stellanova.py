@@ -320,6 +320,15 @@ def program_checks():
     assert out.stdout == "watching\ntick 1\ntick 2\ntick 3\npast two\ntick 4\nbye\n", repr(out.stdout)
     assert perr('genesis:\n  every banana:\n    scrawl 1\n' + END)[1] == "Write 'every 2 seconds:' or 'every frame:'."
 
+    # stellanova watch: each line as it runs, the names it changed, and each if's answer
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "w.stella").write_text('genesis:\n  set coins to 3\n  if coins exceeds 2:\n    scrawl "rich"\n'
+                                          '  for each n from 1 to 2:\n    add n to coins\nand the universe said i love you\n', encoding="utf-8")
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "watch", "w.stella"], capture_output=True, text=True,
+                               encoding="utf-8", cwd=d).stdout
+    assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
+                     "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

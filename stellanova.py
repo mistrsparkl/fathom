@@ -2314,6 +2314,7 @@ def gather(path, from_line=None, seen=None):
         raise ScriptError(k * PER_FILE + 1, f"A script can have at most {PER_FILE - 1} lines.")
     lines, numbers = [], []
     for n, raw in enumerate(own, 1):
+        SOURCE[k * PER_FILE + n] = raw.strip()
         if raw.strip().lower().startswith("note:"):
             raise ScriptError(k * PER_FILE + n, "'note:' is now 'whisper:'.")
         if raw.strip().lower().startswith("whisper:"):  # read as an inner 'note:' line
@@ -2895,6 +2896,8 @@ def statements(body, names, declared, depth):
         out += lines
         if branch:
             which, cond = branch
+            if WATCHING and cond is not None:
+                cond = watched_test(cond, n)
             if which == "if":
                 chain = [(cond, run)]
                 runs.append(choose(chain))
@@ -3081,8 +3084,66 @@ def block(runs):
     return with_ir(run, write)
 
 
+WATCHING = False  # 'stellanova watch': each line is shown as it runs, with the names it changed
+SOURCE = {}  # a kept line number -> the line as it was written
+HIDDEN = ("depending_value", "whenever_was", "whenever_now", "every_next")  # names Stellanova makes for itself
+
+
+def names_shown(env):
+    out = {}
+    for k, v in env.items():
+        if not k.startswith(HIDDEN) and not callable(v):
+            try:
+                s = text(v)
+            except Exception:
+                continue
+            out[re.sub(r"_\d+$", "", k).replace("_", " ")] = s if len(s) <= 70 else s[:67] + "..."  # (a loop's name ends in its line)
+    return out
+
+
+def watch_line(n, after=""):
+    sys.stdout.flush()
+    where_ = f"line {n}" if n < PER_FILE else where(n)
+    print(f"\u25b8 {where_}: {SOURCE.get(n, '?')}{after}", flush=True)
+
+
+TESTED = threading.local()  # the line whose test was just shown ('if ...: -> yes'), so it isn't shown twice
+
+
+def watched(run, n):
+    """run, showing its line before it runs and the names it changed after (a line with indented lines below leaves
+    the changes to them)."""
+    def go(env):
+        if getattr(TESTED, "line", None) != n:
+            watch_line(n)
+        TESTED.line = None
+        if SOURCE.get(n, "").endswith(":"):
+            return run(env)
+        before = names_shown(env)
+        try:
+            run(env)
+        finally:
+            for k, v in names_shown(env).items():
+                if before.get(k) != v:
+                    print(f"    {k}: {v}", flush=True)
+    return go
+
+
+def watched_test(cond, n):
+    def go(env):
+        answer = cond(env)
+        watch_line(n, f"   \u2192 {'yes' if answer else 'no'}")
+        TESTED.line = n if answer else None
+        return answer
+    return go
+
+
 def guard(run, n):
     """Turns a surprise inside Stellanova into a plain message with the line it happened on."""
+    if WATCHING and not getattr(run, "watched", False):
+        run = watched(run, n)
+        run.watched = True
+
     def guarded(env):
         try:
             run(env)
@@ -4028,6 +4089,7 @@ USAGE = """Use:
   stellanova build <script.stella>               make it into an .exe (needs LLVM: winget install LLVM.LLVM)
   stellanova check <script.stella>               look for mistakes without running it
   stellanova unreal <script.stella>              run it inside Unreal Engine: the 3D words become a real lit world
+  stellanova watch <script.stella>               run it, showing each line as it runs and the names it changes
   stellanova web <script.stella> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
   stellanova                                      try lines out, one at a time
   stellanova <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
@@ -4044,6 +4106,10 @@ def main(argv):
     if len(args) > 2 and args[0] == "run":  # the words after the script are for the program: 'the words given'
         ARGUMENTS[:] = args[2:]
         args = args[:2]
+    if len(args) == 2 and args[0] == "watch":  # runs it directly, showing each line and the names it changes
+        global WATCHING
+        WATCHING = True
+        args = ["run", args[1]]
     if len(args) == 2 and args[0] == "check":
         LOGIC = Path(args[1]).parent
         try:
