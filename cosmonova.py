@@ -92,6 +92,7 @@ UNITS = set("degrees degree cm centimetres seconds second per squared percent me
 TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
+OWNER_KINDS = {}  # the same, -> the kind of thing (machine code finds its parts with it)
 OWNER_PARAMS = set()  # the C++ names of the things commands are for ('to bounce, for a ball:' gets 'ball')
 # Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
 OWNERS = {}
@@ -750,6 +751,7 @@ def looped(then):
         except NextRound:
             pass
         return True
+    step.inner = then  # so a missing piece is named by what it really is
     return with_ir(step, getattr(then, "ir", None))  # machine.loop makes 'break free' and 'move on' jumps
 
 
@@ -990,12 +992,30 @@ def with_ir(x, write):
     return x
 
 
+HOLES = re.compile(r"\{([as])(\d+)\}|\{line\}")
+
+
+def builtin(template, kind, run, args, line=0):
+    """A value made by one of Cosmonova's own C++ functions. template is its C++ with {a0}/{s0} for each input's C++
+    (s: without outer brackets) and {line}; the machine code calls the same function, from the prebuilt library."""
+    def fill(m):
+        if not m.group(1):
+            return str(line)
+        a = args[int(m.group(2))].cpp
+        return strip_parens(a) if m.group(1) == "s" else a
+    v = Value(HOLES.sub(fill, template), kind, run)  # all at once, so an input's own C++ is never filled again
+    return with_ir(v, lambda f: machine.wrap(f, "builtins", "", template, args, kind, cpp_type, line))
+
+
 NUMBER_OPS = {"+": "fadd", "-": "fsub", "*": "fmul", "/": "fdiv"}
 COMPARE_OPS = {">": "ogt", "<": "olt", ">=": "oge", "<=": "ole", "!=": "une", "==": "oeq"}
 
 
 def compare_ir(f, op, left, right):
     a, b = machine.emit(f, left), machine.emit(f, right)
+    if machine.ll_type(left.kind) == "ptr" and left.kind != TEXT and op in ("==", "!="):  # lists, places, things...
+        same = f.op(f"call i1 @cn_equal(ptr {a}, ptr {b})")
+        return same if op == "==" else f.op(f"xor i1 {same}, true")
     if left.kind == NUMBER:
         return f.op(f"fcmp {COMPARE_OPS[op]} double {a}, {b}")
     if left.kind == YESNO and op in ("==", "!="):
@@ -1007,11 +1027,73 @@ def compare_ir(f, op, left, right):
 
 
 def number_ir(f, op, left, right):
+    if left.kind in (PLACE, FLAT):  # a place moved, made bigger or turned around
+        a = machine.emit(f, left)
+        if op == "neg":
+            return f.op(f"call ptr @cn_place_scale(i32 0, ptr {a}, double {machine.number(-1.0)})")
+        if op in ("+", "-"):
+            return f.op(f"call ptr @cn_place_op(i32 {0 if op == '+' else 1}, ptr {a}, ptr {machine.emit(f, right)})")
+        return f.op(f"call ptr @cn_place_scale(i32 {0 if op == '*' else 1}, ptr {a}, double {machine.emit(f, right)})")
     if left.kind != NUMBER:
         raise machine.Unsupported(f"maths on {kind_name(left.kind)}")
     if op == "neg":
         return f.op(f"fneg double {machine.emit(f, left)}")
     return f.op(f"{NUMBER_OPS[op]} double {machine.emit(f, left)}, {machine.emit(f, right)}")
+
+
+def contains_ir(f, whole, part):
+    a, b = machine.emit(f, whole), machine.emit(f, part)
+    if whole.kind == TEXT:
+        return f.op(f"call i1 @cn_text_contains(ptr {a}, ptr {b})")
+    if is_table(whole.kind):
+        return f.op(f"call i1 @cn_table_has(ptr {a}, ptr {b})")
+    return f.op(f"call i1 @cn_list_contains(ptr {a}, ptr {f.box(b, part.kind)})")
+
+
+def pick_ir(f, test, a, b):
+    x, y = machine.emit(f, a), machine.emit(f, b)
+    return f.op(f"select i1 {f.op(f'fcmp {test} double {y}, {x}')}, double {y}, double {x}")
+
+
+def load_ir(target, source, fn, n):
+    """'load scores from file ...' in machine code: Cosmonova's own C++ reads it into a new value, which is then stored."""
+    if not target.ir_store:
+        return None
+    template = (f"[&] {{ {cpp_type(target.kind)} loaded{{}}; cosmonova::{fn}(loaded, {{s0}}, "
+                f"{cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {{line}}); return loaded; }}()")
+    return lambda f: target.ir_store(f, machine.wrap(f, "builtins", "", template, [source], target.kind, cpp_type, n))
+
+
+def within_ir(f, a, b, reach):
+    """a and b (numbers or places) no further apart than reach."""
+    x, y = machine.emit(f, a), machine.emit(f, b)
+    if a.kind == NUMBER:
+        gap = f.op(f"call double @llvm.fabs.f64(double {f.op(f'fsub double {x}, {y}')})")
+    else:
+        gap = f.op(f"call double @cn_place_size(ptr {f.op(f'call ptr @cn_place_op(i32 1, ptr {x}, ptr {y})')})")
+    return f.op(f"fcmp ole double {gap}, {machine.emit(f, reach)}")
+
+
+def field_index(kind, member):
+    return next(k for k, (cpp, _, _) in enumerate(machine.THINGS[kind]) if cpp == member)
+
+
+def thing_part_ir(owner_ir, kind, member, part_kind):
+    """A part of a thing: (get, put) machine-code writers. owner_ir(f) gives the thing itself (not a copy)."""
+    k = field_index(kind, member)
+
+    def get(f):
+        return f.unbox(f.op(f"call ptr @cn_field(ptr {owner_ir(f)}, i32 {k})"), part_kind)
+
+    def put(f, x):
+        f.put(f"call void @cn_field_put(ptr {owner_ir(f)}, i32 {k}, ptr {f.box(x, part_kind)})")
+    return get, put
+
+
+WORLD_KINDS = {}  # 'the world remembers:' names: C++ name -> kind (for machine code's shared names)
+LIBRARY_HEADS = {}  # a library's name -> the C++ its words need above them (includes and code)
+LIBRARY_VALUES = {}  # a library word for a value: its words -> the library's name
+SETTING_NUMBERS = {}  # a setting's C++ name -> its number
 
 
 def join_ir(f, parts):
@@ -1076,10 +1158,25 @@ class Names:
         cpp, kind, read_only, run = self.known[key]
         if cpp.startswith(UNUSABLE):
             raise ScriptError(0, cpp[len(UNUSABLE):])
-        if isinstance(run, tuple):  # (get, put): a part of the thing a command is for
-            return Value(cpp, kind, run[0], None if read_only else run[1])
+        if isinstance(run, tuple):  # (get, put): a shared name, or the thing a command is for, or one of its parts
+            v = Value(cpp, kind, run[0], None if read_only else run[1])
+            if cpp in WORLD_KINDS:
+                v.ir, v.ir_store = (lambda f: f.load(cpp, kind)), (lambda f, x: f.store(cpp, kind, x))
+            elif "." in cpp:  # 'speed' inside 'to bounce, for a ball:' is the ball's speed
+                own, member = cpp.split(".", 1)
+                v.ir, v.ir_store = thing_part_ir(lambda f: f.load(own, f.slots[own][1]), OWNER_KINDS[own], member, kind)
+            else:  # the whole thing: setting it changes the caller's thing
+                v.ir = lambda f: f.load(cpp, kind)
+                v.ir_store = lambda f, x: f.put(f"call void @cn_replace(ptr {f.load(cpp, kind)}, ptr {x})")
+            return v
         if run is not None:  # a setting, an Unreal word or a library word
-            return Value(cpp, kind, run, None if read_only else (lambda env, x: run(env)))
+            v = Value(cpp, kind, run, None if read_only else (lambda env, x: run(env)))
+            if cpp in SETTING_NUMBERS:
+                v.ir = lambda f: machine.number(SETTING_NUMBERS[cpp])
+            elif key in LIBRARY_VALUES:
+                lib = LIBRARY_VALUES[key]
+                v.ir = lambda f: machine.wrap(f, lib, LIBRARY_HEADS[lib], cpp, [], kind, cpp_type, 0)
+            return v
         get = lambda env: env[cpp]
 
         def put(env, x):
@@ -1189,7 +1286,7 @@ class Expr:
             at, size = part_of(v, ("existence",)), part_of(v, ("radius",))
         elif v.kind in (PLACE, FLAT):
             at, size = v, (self.names.value(("radius",)) if self.names.known.get(("radius",), (None, None))[1] == NUMBER
-                           else Value("0", NUMBER, lambda env: 0))
+                           else with_ir(Value("0", NUMBER, lambda env: 0), lambda f: machine.number(0.0)))
         else:
             raise ScriptError(self.line, f"'touches' needs a thing or a place, not {kind_name(v.kind)}.")
         if at.kind != PLACE and at.kind != FLAT or size.kind != NUMBER:
@@ -1205,14 +1302,15 @@ class Expr:
                     or (is_table(v.kind) and r.kind == TEXT)):
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
             a, b = v.run, r.run
-            return Value(f"cosmonova::contains({v.cpp}, {r.cpp})", YESNO, lambda env: b(env) in a(env))
+            return with_ir(builtin("cosmonova::contains({a0}, {a1})", YESNO, lambda env: b(env) in a(env), [v, r]),
+                           lambda f: contains_ir(f, v, r))
         for words, fn, test in ((("begins", "with"), "begins_with", str.startswith), (("ends", "with"), "ends_with", str.endswith)):
             if self.at(*words):  # 'name begins with "Dr"'
                 self.i += 2
                 r = self.need(self.sum(), TEXT, " ".join(words))
                 self.need(v, TEXT, " ".join(words))
                 a, b = v.run, r.run
-                return Value(f"cosmonova::{fn}({v.cpp}, {r.cpp})", YESNO, lambda env, test=test: test(a(env), b(env)))
+                return builtin(f"cosmonova::{fn}({{a0}}, {{a1}})", YESNO, lambda env, test=test: test(a(env), b(env)), [v, r])
         for words, part, size in ((("touches", "a", "side"), "horizontal", "width"),
                                   (("touches", "the", "top", "or", "bottom"), "vertical", "height")):
             if self.at(*words):  # 'existence touches a side': within radius of the world's edge (or past it)
@@ -1228,15 +1326,21 @@ class Expr:
                 r = self.names.value(("radius",))
                 far = self.names.value(edge)
                 a, b, c = at.run, r.run, far.run
-                return Value(f"({at.cpp} <= {r.cpp} || {at.cpp} >= {far.cpp} - {r.cpp})", YESNO,
-                             lambda env: a(env) <= b(env) or a(env) >= c(env) - b(env))
+                near = with_ir(Value("", YESNO, None), lambda f, at=at, r=r: compare_ir(f, "<=", at, r))
+                edge_gap = with_ir(Value("", NUMBER, None), lambda f, far=far, r=r: number_ir(f, "-", far, r))
+                past = with_ir(Value("", YESNO, None), lambda f, at=at, e=edge_gap: compare_ir(f, ">=", at, e))
+                return with_ir(Value(f"({at.cpp} <= {r.cpp} || {at.cpp} >= {far.cpp} - {r.cpp})", YESNO,
+                                     lambda env: a(env) <= b(env) or a(env) >= c(env) - b(env)),
+                               lambda f, near=near, past=past: machine.short_circuit(f, near, past, True))
         if self.at("touches"):  # 'ball touches coin': the two circles (existence and radius) overlap
             self.i += 1
             r = self.sum()
             (pa, ra), (pb, rb) = self.circle(v), self.circle(r)
             a, b, c, d = pa.run, pb.run, ra.run, rb.run
-            return Value(f"cosmonova::within({pa.cpp}, {pb.cpp}, {ra.cpp} + {rb.cpp})", YESNO,
-                         lambda env: (a(env) - b(env)).size() <= c(env) + d(env))
+            both_radii = with_ir(Value("", NUMBER, None), lambda f: number_ir(f, "+", ra, rb))
+            return with_ir(Value(f"cosmonova::within({pa.cpp}, {pb.cpp}, {ra.cpp} + {rb.cpp})", YESNO,
+                                 lambda env: (a(env) - b(env)).size() <= c(env) + d(env)),
+                           lambda f: within_ir(f, pa, pb, both_radii))
         if self.at("is", "within"):  # 'existence is within 30 of coin': close enough to touch
             self.i += 2
             reach = self.need(self.sum(), NUMBER, "within")
@@ -1246,7 +1350,8 @@ class Expr:
                 raise ScriptError(self.line, f"'within' compares two numbers or two places, not {kind_name(v.kind)} and {kind_name(r.kind)}.")
             a, b, c = v.run, r.run, reach.run
             gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
-            return Value(f"cosmonova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env))
+            return with_ir(Value(f"cosmonova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env)),
+                           lambda f: within_ir(f, v, r, reach))
         for words, op in self.COMPARE:
             if self.at(*words):
                 self.i += len(words)
@@ -1330,8 +1435,13 @@ class Expr:
                 self.i = start
         runs = [x.run for x in parts]
         cpp = "FVector" if len(parts) == 3 else "FVector2D"
-        return Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
-                     lambda env: Place(*[f(env) for f in runs]))
+        def write(f):
+            done = [machine.emit(f, x) for x in parts]
+            if len(done) == 3:
+                return f.op(f"call ptr @cn_place(double {done[0]}, double {done[1]}, double {done[2]})")
+            return f.op(f"call ptr @cn_flat(double {done[0]}, double {done[1]})")
+        return with_ir(Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
+                             lambda env: Place(*[f(env) for f in runs])), write)
 
     def single(self):
         if self.peek() in ("-", "minus"):
@@ -1379,18 +1489,23 @@ class Expr:
                               (lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env))) if words[0] == "kept" else
                               (lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env))))
                 elif words[0] == "kept":
-                    v = Value(f"cosmonova::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
-                              lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env)))
+                    seq, held = v, f
+                    v = with_ir(Value(f"cosmonova::kept_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", v.kind,
+                                      lambda env: (lambda fn: [dup(x) for x in a(env) if invoke_value(fn, [x], line)])(g(env))),
+                                lambda fn: machine.by_command(fn, machine.emit(fn, seq), machine.emit(fn, held), item, gives, True, line))
                 else:
-                    v = Value(f"cosmonova::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", "list of " + gives,
-                              lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env)))
+                    seq, held = v, f
+                    v = with_ir(Value(f"cosmonova::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})", "list of " + gives,
+                                      lambda env: (lambda fn: [dup(invoke_value(fn, [x], line)) for x in a(env)])(g(env))),
+                                lambda fn: machine.by_command(fn, machine.emit(fn, seq), machine.emit(fn, held), item, gives, False, line))
                 return v
         if self.at("as", "saved", "text"):  # 'scores as saved text': written out as JSON, as 'save' writes it
             self.i += 3
             if holds_command(v.kind):
                 raise ScriptError(self.line, "A command can't be saved.")
             a, kind, line = v.run, v.kind, self.line
-            return Value(f"cosmonova::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line))
+            return with_ir(Value(f"cosmonova::saved_text({v.cpp}, {line})", TEXT, lambda env: saved(a(env), kind, line)),
+                           lambda f: f.op(f"call ptr @cn_saved_text(ptr {f.box(machine.emit(f, v), v.kind)}, i32 {line})"))
         if self.at("as", "text"):
             self.i += 2
             a = v.run
@@ -1412,7 +1527,7 @@ class Expr:
             self.need(v, TEXT, "split by")
             by = self.need(self.primary(), TEXT, "split by")
             a, b, line = v.run, by.run, self.line
-            return Value(f"cosmonova::split({v.cpp}, {by.cpp}, {line})", "list of text", lambda env: split(a(env), b(env), line))
+            return builtin("cosmonova::split({a0}, {a1}, {line})", "list of text", lambda env: split(a(env), b(env), line), [v, by], line)
         return v
 
     def primary(self):
@@ -1453,10 +1568,11 @@ class Expr:
                 if not items:
                     raise RunError(line, "the list is empty, so I can't pick a random item.")
                 return pyrandom.choice(items)
-            return Value(f"cosmonova::random_item({v.cpp}, {line})", element(v.kind), pick)
+            return builtin("cosmonova::random_item({a0}, {line})", element(v.kind), pick, [v], line)
         if self.at("random", "fraction"):  # 'random fraction': a number from 0 up to (not quite) 1
             self.i += 2
-            return Value("cosmonova::random_fraction()", NUMBER, lambda env: pyrandom.random())
+            return with_ir(Value("cosmonova::random_fraction()", NUMBER, lambda env: pyrandom.random()),
+                           lambda f: f.op("call double @cn_random_fraction()"))
         if self.at("random", "number", "from"):
             self.i += 3
             lo = self.need(self.sum(), NUMBER, "random number")
@@ -1505,6 +1621,11 @@ class Expr:
                 items[index_of(items, at(env), line)] = dup(x)
             v = Value(f"cosmonova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
+            v.ir = lambda f: f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
+                                            ("i32", line), checked=True), v.kind)
+            if seq.writable:
+                v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
+                                                 ("ptr", f.box(x, v.kind)), ("i32", line), checked=True)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
                 v.cpp_assign, v.cpp_close = f"cosmonova::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
             return v
@@ -1524,6 +1645,10 @@ class Expr:
                 get(env)[at(env)] = dup(x)
             v = Value(f"cosmonova::entry({table.cpp}, {strip_parens(name.cpp)}, {line})", entry_kind(table.kind),
                       lambda env: entry_of(get(env), at(env), line), put if table.writable else None)
+            v.ir = lambda f: f.unbox(f.call("ptr", "cn_entry", ("ptr", machine.emit(f, table)), ("ptr", machine.emit(f, name)),
+                                            ("i32", line), checked=True), v.kind)
+            if table.writable:
+                v.ir_store = lambda f, x: f.put(f"call void @cn_entry_put(ptr {machine.emit(f, table)}, ptr {machine.emit(f, name)}, ptr {f.box(x, v.kind)})")
             v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
             if JS:
                 v.cpp_assign, v.cpp_close = f"cosmonova::put_entry({table.cpp}, {strip_parens(name.cpp)}, ", ")"
@@ -1535,14 +1660,17 @@ class Expr:
                 if v.kind != "list of number":
                     raise ScriptError(line, f"'{stat} of' needs a list of numbers, but this is {kind_name(v.kind)}.")
                 a = v.run
-                return Value(f"cosmonova::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line))
+                which = ("sum", "average", "biggest", "smallest").index(stat)
+                return with_ir(Value(f"cosmonova::{stat}_of({v.cpp}, {line})", NUMBER, lambda env, stat=stat: list_stat(stat, a(env), line)),
+                               lambda f, which=which, v=v: f.call("double", "cn_list_stat", ("i32", which), ("ptr", machine.emit(f, v)),
+                                                                  ("i32", line), checked=True))
         if self.at("keys", "of"):
             self.i += 2
             table = self.operand()
             if not is_table(table.kind):
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
-            return Value(f"cosmonova::keys({table.cpp})", "list of text", lambda env: sorted(get(env)))
+            return builtin("cosmonova::keys({a0})", "list of text", lambda env: sorted(get(env)), [table])
         if self.at("the", "command"):  # a command kept as a value: 'set f to the command double'
             self.i += 2
             return command_value(self.names, self.t, self, line)
@@ -1572,8 +1700,10 @@ class Expr:
             if not gives and not getattr(self, "allow_nothing", False):
                 raise ScriptError(line, "This command doesn't return anything, so it can't be used as a value.")
             get, gets = f.run, [a.run for a in args]
-            return Value(f"{'(await ' if JS else ''}cosmonova::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
-                         lambda env: invoke_value(get(env), [g(env) for g in gets], line))
+            held = f
+            return with_ir(Value(f"{'(await ' if JS else ''}cosmonova::invoke({', '.join([strip_parens(f.cpp), str(line)] + [strip_parens(a.cpp) for a in args])}){')' if JS else ''}", gives,
+                                 lambda env: invoke_value(get(env), [g(env) for g in gets], line)),
+                           lambda fn: machine.invoke(fn, machine.emit(fn, held), [(machine.emit(fn, a), a.kind) for a in args], ins, gives, line))
         key, n = self.names.match(self.t, self.i)
         command_key, command_n = match_command(self.names, self.t[self.i:])
         if key and n >= command_n:  # the longer match wins: 'balls moved down' is a command even when 'balls' is a name
@@ -1617,7 +1747,7 @@ class Expr:
             self.take("and")
             hi = self.need(self.sum(), NUMBER, "clamp")
             x, a, b = v.run, lo.run, hi.run
-            return Value(f"FMath::Clamp({v.cpp}, {lo.cpp}, {hi.cpp})", NUMBER, lambda env: min(max(x(env), a(env)), b(env)))
+            return builtin("FMath::Clamp({a0}, {a1}, {a2})", NUMBER, lambda env: min(max(x(env), a(env)), b(env)), [v, lo, hi])
         for word, fn, f in (("smaller", "Min", min), ("larger", "Max", max)):
             if self.at(word, "of"):
                 self.i += 2
@@ -1625,27 +1755,29 @@ class Expr:
                 self.take("and")
                 b = self.need(self.sum(), NUMBER, f"{word} of")
                 x, y = a.run, b.run
-                return Value(f"FMath::{fn}({a.cpp}, {b.cpp})", NUMBER, lambda env, f=f: f(x(env), y(env)))
+                # as Python's min and max: the first, unless the second is smaller (or larger)
+                return with_ir(Value(f"FMath::{fn}({a.cpp}, {b.cpp})", NUMBER, lambda env, f=f: f(x(env), y(env))),
+                               lambda f, a=a, b=b, test="olt" if word == "smaller" else "ogt": pick_ir(f, test, a, b))
         if self.at("contents", "of", "file") or self.at("lines", "of", "file"):
             whole = self.at("contents")
             self.i += 3
             where = self.need(self.operand(), TEXT, "file")
             w = where.run
             if whole:
-                return Value(f"cosmonova::read_file({where.cpp}, {line})", TEXT, lambda env: read_file(w(env), line))
-            return Value(f"cosmonova::read_lines({where.cpp}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)))
+                return builtin("cosmonova::read_file({a0}, {line})", TEXT, lambda env: read_file(w(env), line), [where], line)
+            return builtin("cosmonova::read_lines({a0}, {line})", "list of text", lambda env: lines_of(read_file(w(env), line)), [where], line)
         if self.at("file"):
             self.i += 1
             where = self.need(self.operand(), TEXT, "file")
             self.take("exists")
             w = where.run
-            return Value(f"cosmonova::file_exists({where.cpp})", YESNO, lambda env: os.path.isfile(w(env)))
+            return builtin("cosmonova::file_exists({a0})", YESNO, lambda env: os.path.isfile(w(env)), [where])
         for words, fn, f in ((("lines", "of"), "lines_of", lines_of), (("words", "of"), "words_of", str.split)):
             if self.at(*words):
                 self.i += 2
                 v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
-                return Value(f"cosmonova::{fn}({v.cpp})", "list of text", lambda env, f=f: f(a(env)))
+                return builtin(f"cosmonova::{fn}({{a0}})", "list of text", lambda env, f=f: f(a(env)), [v])
         if tok in ("letter", "letters") and self.peek(1) not in ITEM_NOT_INDEX:
             self.i += 1
             first = self.need(self.sum(), NUMBER, tok)
@@ -1657,28 +1789,28 @@ class Expr:
             v = self.need(self.operand(), TEXT, f"'{tok} ... of'")
             a, f = v.run, first.run
             if last_ is None:
-                return Value(f"cosmonova::letter({v.cpp}, {strip_parens(first.cpp)}, {line})", TEXT, lambda env: letter(a(env), f(env), line))
+                return builtin("cosmonova::letter({a0}, {s1}, {line})", TEXT, lambda env: letter(a(env), f(env), line), [v, first], line)
             b = last_.run
-            return Value(f"cosmonova::letters_from({v.cpp}, {strip_parens(first.cpp)}, {strip_parens(last_.cpp)}, {line})", TEXT,
-                         lambda env: letters_from(a(env), f(env), b(env), line))
+            return builtin("cosmonova::letters_from({a0}, {s1}, {s2}, {line})", TEXT,
+                         lambda env: letters_from(a(env), f(env), b(env), line), [v, first, last_], line)
         if self.at("trimmed"):  # 'trimmed line': without spaces, tabs and line breaks at either end
             self.i += 1
             v = self.need(self.operand(), TEXT, "trimmed")
             a = v.run
-            return Value(f"cosmonova::trimmed({v.cpp})", TEXT, lambda env: a(env).strip(" \t\r\n"))
+            return builtin("cosmonova::trimmed({a0})", TEXT, lambda env: a(env).strip(" \t\r\n"), [v])
         for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
             if self.at(*words):
                 self.i += 3
                 v = self.need(self.operand(), TEXT, " ".join(words))
                 a = v.run
-                return Value(f"cosmonova::{fn}({v.cpp})", TEXT, lambda env, table=table: a(env).translate(table))
+                return builtin(f"cosmonova::{fn}({{a0}})", TEXT, lambda env, table=table: a(env).translate(table), [v])
         if self.at("position", "of"):
             self.i += 2
             part = self.need(self.sum(), TEXT, "position of")
             self.take("in")
             v = self.need(self.operand(), TEXT, "position of ... in")
             a, b = v.run, part.run
-            return Value(f"cosmonova::position({v.cpp}, {part.cpp})", NUMBER, lambda env: float(a(env).find(b(env)) + 1))
+            return builtin("cosmonova::position({a0}, {a1})", NUMBER, lambda env: float(a(env).find(b(env)) + 1), [v, part])
         if self.at("replace"):
             self.i += 1
             old = self.need(self.sum(), TEXT, "replace")
@@ -1687,8 +1819,8 @@ class Expr:
             self.take("in")
             v = self.need(self.operand(), TEXT, "replace ... in")
             a, o, w = v.run, old.run, new.run
-            return Value(f"cosmonova::replace_all({v.cpp}, {old.cpp}, {new.cpp}, {line})", TEXT,
-                         lambda env: replace_all(a(env), o(env), w(env), line))
+            return builtin("cosmonova::replace_all({a0}, {a1}, {a2}, {line})", TEXT,
+                         lambda env: replace_all(a(env), o(env), w(env), line), [v, old, new], line)
         if self.at("join"):
             self.i += 1
             v = self.operand()
@@ -1697,7 +1829,7 @@ class Expr:
             self.take("with")
             between = self.need(self.operand(), TEXT, "join ... with")
             a, b = v.run, between.run
-            return Value(f"cosmonova::join({v.cpp}, {between.cpp})", TEXT, lambda env: b(env).join(text(x) for x in a(env)))
+            return builtin("cosmonova::join({a0}, {a1})", TEXT, lambda env: b(env).join(text(x) for x in a(env)), [v, between])
         if self.at("sorted"):
             start = self.i
             self.i += 1
@@ -1714,8 +1846,10 @@ class Expr:
                             raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
                         a = v.run
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
-                        return Value(f"cosmonova::sorted_by({v.cpp}, {by})", v.kind,
-                                     lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])])
+                        k = field_index(thing, member)
+                        return with_ir(Value(f"cosmonova::sorted_by({v.cpp}, {by})", v.kind,
+                                             lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])]),
+                                       lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k})"))
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
         for word in ("sorted", "reversed"):
@@ -1727,19 +1861,19 @@ class Expr:
                     raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
                 a = v.run
                 run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
-                return Value(f"cosmonova::{word}({v.cpp})", v.kind, run)
+                return builtin(f"cosmonova::{word}({{a0}})", v.kind, run, [v])
         if self.at("last", "item", "of"):
             self.i += 3
             v = self.operand()
             if not is_list(v.kind):
                 raise ScriptError(line, f"'last item of' needs a list, but this is {kind_name(v.kind)}.")
             a = v.run
-            return Value(f"cosmonova::last({v.cpp}, {line})", element(v.kind), lambda env: last(a(env), line))
+            return builtin("cosmonova::last({a0}, {line})", element(v.kind), lambda env: last(a(env), line), [v], line)
         if self.at("square", "root", "of"):
             self.i += 3
             v = self.need(self.sum(), NUMBER, "square root")
             a = v.run
-            return Value(f"FMath::Sqrt({v.cpp})", NUMBER, lambda env: math.sqrt(x) if (x := a(env)) >= 0 else math.nan)
+            return builtin("FMath::Sqrt({a0})", NUMBER, lambda env: math.sqrt(x) if (x := a(env)) >= 0 else math.nan, [v])
         if self.at("size", "of"):
             self.i += 2
             v = self.sum()
@@ -1748,31 +1882,37 @@ class Expr:
                 return with_ir(Value(f"FMath::Abs({v.cpp})", NUMBER, lambda env: abs(a(env))),
                                lambda f: f.op(f"call double @llvm.fabs.f64(double {machine.emit(f, v)})"))
             if v.kind in (PLACE, FLAT):
-                return Value(f"({v.cpp}).Size()", NUMBER, lambda env: a(env).size())
+                return with_ir(Value(f"({v.cpp}).Size()", NUMBER, lambda env: a(env).size()),
+                               lambda f: f.op(f"call double @cn_place_size(ptr {machine.emit(f, v)})"))
             if v.kind == TEXT:
                 return with_ir(Value(f"cosmonova::letters({v.cpp})", NUMBER, lambda env: letters(a(env))),
                                lambda f: f.op(f"call double @cn_letters(ptr {machine.emit(f, v)})"))
             if is_list(v.kind) or is_table(v.kind):
-                return Value(f"cosmonova::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env))))
+                return with_ir(Value(f"cosmonova::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env)))),
+                               lambda f: f.op(f"call double @cn_count(ptr {machine.emit(f, v)})"))
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
             self.i += 1
             v = self.need(self.operand(), PLACE, "flat")
             a = v.run
-            return Value(f"FVector2D({v.cpp})", FLAT, lambda env: Place(*a(env).parts()[:2]))
+            def write(f):
+                p = machine.emit(f, v)
+                x, y = (f.op(f"call double @cn_part(ptr {p}, i32 {k})") for k in (0, 1))
+                return f.op(f"call ptr @cn_flat(double {x}, double {y})")
+            return with_ir(Value(f"FVector2D({v.cpp})", FLAT, lambda env: Place(*a(env).parts()[:2])), write)
         if self.at("direction", "of"):
             self.i += 2
             v = self.need(self.sum(), FLAT, "direction of")
             a = v.run
-            return Value(f"FMath::RadiansToDegrees(FMath::Atan2(({v.cpp}).Y, ({v.cpp}).X))", NUMBER,
-                         lambda env: (lambda q: math.atan2(q.fields["Y"], q.fields["X"]) * 180.0 / 3.14159265358979323846)(a(env)))
+            return builtin("FMath::RadiansToDegrees(FMath::Atan2(({a0}).Y, ({a0}).X))", NUMBER,
+                         lambda env: (lambda q: math.atan2(q.fields["Y"], q.fields["X"]) * 180.0 / 3.14159265358979323846)(a(env)), [v])
         if self.at("angle", "from"):
             self.i += 2
             a = self.need(self.sum(), NUMBER, "angle from")
             self.take("to")
             b = self.need(self.sum(), NUMBER, "angle from")
             x, y = a.run, b.run
-            return Value(f"FMath::UnwindDegrees({b.cpp} - {a.cpp})", NUMBER, lambda env: unwind(y(env) - x(env)))
+            return builtin("FMath::UnwindDegrees({a0} - {a1})", NUMBER, lambda env: unwind(y(env) - x(env)), [b, a])
         if tok in KEYWORDS:
             raise ScriptError(line, f"'{tok}' can't go here.")
         raise ScriptError(line, self.names.unknown(self.t, self.i))
@@ -1788,7 +1928,8 @@ class Expr:
                     if name in THINGS:
                         self.i += n
                         things = THINGS
-                        return Value(js_zero("thing " + name) if JS else f"{cpp_type('thing ' + name)}{{}}", "thing " + name, lambda env: Thing(name, things))
+                        return with_ir(Value(js_zero("thing " + name) if JS else f"{cpp_type('thing ' + name)}{{}}", "thing " + name,
+                                             lambda env: Thing(name, things)), lambda f, name=name: f.zero("thing " + name))
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
@@ -1798,7 +1939,8 @@ class Expr:
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return Value(zero("table of " + k) if JS else f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {})
+                        return with_ir(Value(zero("table of " + k) if JS else f"{cpp_type('table of ' + k)}()", "table of " + k, lambda env: {}),
+                                       lambda f: f.op("call ptr @cn_table_new()"))
                 raise ScriptError(self.line, f"Say what the table holds, like 'a table of numbers'. Kinds are: {kind_words()}.")
         for lead in (("a", "list", "of"), ("an", "empty", "list", "of"), ("list", "of"), ("empty", "list", "of"), ("list", "containing")):
             if self.at(*lead):
@@ -1821,13 +1963,19 @@ class Expr:
                     kind = "list of " + items[0].kind
                     runs = [v.run for v in items]
                     listed = ', '.join(js_copy(v.cpp, v.kind) if JS else strip_parens(v.cpp) for v in items)
-                    return Value(f"[{listed}]" if JS else f"{cpp_type(kind)}{{{listed}}}", kind,
-                                 lambda env: [dup(f(env)) for f in runs])
+                    def write(f, items=items):
+                        made_list = f.op("call ptr @cn_list_new()")
+                        for v in items:
+                            f.put(f"call void @cn_list_add(ptr {made_list}, ptr {f.box(machine.emit(f, v), v.kind)})")
+                        return made_list
+                    return with_ir(Value(f"[{listed}]" if JS else f"{cpp_type(kind)}{{{listed}}}", kind,
+                                         lambda env: [dup(f(env)) for f in runs]), write)
                 for n in range(min(16, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return Value("[]" if JS else f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: [])
+                        return with_ir(Value("[]" if JS else f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: []),
+                                       lambda f: f.op("call ptr @cn_list_new()"))
                 raise ScriptError(self.line, f"Say what the list holds, like 'a list of numbers'. Kinds are: {kind_words()}.")
         self.i = start
         return None
@@ -1884,11 +2032,22 @@ def part_of(owner, key):
     def put(env, x):
         get(env).fields[member] = dup(x)
     v = Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+    if owner.kind in (PLACE, FLAT):
+        k = "XYZ".index(member)
+        v.ir = lambda f: f.op(f"call double @cn_part(ptr {machine.emit(f, owner)}, i32 {k})")
+        v.ir_store = lambda f, x: f.put(f"call void @cn_part_put(ptr {machine.emit(f, owner)}, i32 {k}, double {x})")
+    else:
+        v.ir, v.ir_store = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, member, kind)
+    if not owner.writable:
+        v.ir_store = None
     if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:
         def born(env, x):
             fields = get(env).fields
             fields["birth"], fields["existence"] = dup(x), dup(x)
         v.store = born
+        _, put_birth = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, "birth", kind)
+        _, put_existence = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, "existence", kind)
+        v.ir_store = lambda f, x: (put_birth(f, x), put_existence(f, x))
         v.cpp_assign, v.cpp_close = f"cosmonova::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
         if JS:
             v.cpp_assign = f"cosmonova::born({strip_parens(owner.cpp)}, "
@@ -2000,6 +2159,7 @@ def load_library(name, line, names):
                 if "{" + in_name + "}" not in cpp:
                     raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
             command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
+            command.library = name
             word = " ".join(words)
 
             def missing(*args, word=word):
@@ -2029,6 +2189,7 @@ def load_library(name, line, names):
             words = english.strip().lower().split()
             holder = {"run": not_here(line, f"'{english.strip()}' (from the library '{name}')")}
             names.add(words, ", ".join(parts[:-1]), kind, True, lambda env, holder=holder: holder["run"](env))
+            LIBRARY_VALUES[tuple(words)] = name
             if not read_only:
                 raise ScriptError(line, where + "library words for values must be 'read only' for now.")
 
@@ -2047,6 +2208,7 @@ def load_library(name, line, names):
                 web = (where, [], set_web)
         else:
             raise ScriptError(line, where + f"I don't understand '{stripped}'.\n{LIBRARY_HELP}")
+    LIBRARY_HEADS[name] = "\n".join(out)
     return out + [""]
 
 
@@ -2199,6 +2361,7 @@ def read_one(path, auto):
                 cpp = f"Cosmonova_{snake(path.stem.split())}::{snake(words)}"
                 number = float(m.group(2))
                 names.add(words, cpp, NUMBER, True, lambda env, number=number: number)
+                SETTING_NUMBERS[cpp] = number
                 value = m.group(2) if "." in m.group(2) else m.group(2) + ".0"
                 settings.append(f"\t{snake(words)}: {value},{'  // ' + m.group(3) if m.group(3) else ''}" if JS else
                                 f"\tconstexpr double {snake(words)} = {value};{'  // ' + m.group(3) if m.group(3) else ''}")
@@ -2361,6 +2524,7 @@ SHARED = {}  # the values of 'the world remembers:' names, while a program runs 
 def remember(rows, names):
     """'the world remembers:' lines: names every command shares. Returns the C++ (or JavaScript) that makes them."""
     SHARED.clear()
+    WORLD_KINDS.clear()
     out = []
     for n, text_ in rows:
         m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
@@ -2384,12 +2548,14 @@ def remember(rows, names):
         def put(env, x, cpp=cpp):
             SHARED[cpp] = dup(x)
         names.add(words, cpp, kind, False, (get, put))
+        WORLD_KINDS[cpp] = kind
         out.append(f"let {cpp} = {js_zero(kind)};" if JS else f"inline {cpp_type(kind)} {cpp} = {zero(kind)};")
     return out + ([""] if out else [])
 
 
 def describe_things(things):
     """Reads 'a pet has:' descriptions; returns the C++ structs."""
+    machine.THINGS.clear()
     described = set()
     for name, n, fields in things:
         if name in PARENTS:
@@ -2419,6 +2585,7 @@ def describe_things(things):
             THINGS[name].insert(next(i for i, (w, _) in enumerate(THINGS[name]) if w == ["birth"]) + 1, (["existence"], kind))
             FIELDS.setdefault(("existence",), {})["thing " + name] = ("existence", kind)
         described.add(name)
+        machine.THINGS["thing " + name] = [(snake(w), w, k) for w, k in THINGS[name]]
     out = []
     if things and JS:
         for name, _, _ in things:
@@ -2544,7 +2711,8 @@ def fit(v, kind):
     if is_thing(v.kind) and is_thing(kind) and is_kind_of(v.kind, kind):
         get, name, things = v.run, kind[6:], THINGS
         made = f"cosmonova::as_kind({strip_parens(v.cpp)}, {js_class(kind)})" if JS else f"{cpp_type(kind)}({strip_parens(v.cpp)})"
-        return Value(made, kind, lambda env: as_kind(get(env), name, things))
+        return with_ir(Value(made, kind, lambda env: as_kind(get(env), name, things)),
+                       lambda f: f.op(f"call ptr @cn_as_kind(ptr {machine.emit(f, v)}, ptr {f.spec(kind)})"))
     return None
 
 
@@ -2568,6 +2736,11 @@ def params(cpp, inputs):
                      for i, (w, k) in enumerate(inputs))
 
 
+def machine_name(cpp, inputs):
+    """A command's name in machine code: a command for a kind of thing has one version per kind ('Bounce__ball')."""
+    return f"{cpp}__{snake(inputs[0][1][6:].split())}" if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else cpp
+
+
 def function(head, line, body, names, info, command=None):
     words, name, inputs, gives = head
     local = Names()
@@ -2584,6 +2757,7 @@ def function(head, line, body, names, info, command=None):
                 env[own].fields = dup(x).fields  # change the caller's thing itself, not a copy
             local.add(in_words, own, kind, False, (lambda env, own=own: env[own], put_all))
             OWNER_PARAMS.add(own)
+            OWNER_KINDS[own] = kind
             for part_words, part_kind in THINGS[kind[6:]]:
                 member = snake(part_words)
 
@@ -2617,7 +2791,7 @@ def function(head, line, body, names, info, command=None):
         made = command or names.commands[tuple(words)]
         made.runner = runner
         # what machine.py needs to write this command (a command for a kind of thing can't be made into machine code yet)
-        made.machine = None if name in OWNERS else (name, [(snake(w), k) for w, k in inputs], gives, run)
+        made.machine = (machine_name(name, inputs), [(snake(w), k) for w, k in inputs], gives, run)
     if JS:
         title = getattr(command, "js", name) if command else name
         return "\n".join([f"async function {title}({', '.join(snake(w) for w, _ in inputs)})", "{"]
@@ -2707,6 +2881,7 @@ def attempt(n, tried, handler, names, declared, depth):
         except RunError as err:
             env[cpp] = err.message
             fix_run(env)
+    with_ir(run, lambda f: machine.attempt(f, try_run, cpp, fix_run))
     caught = f"cosmonova_problem_{n}"
     if JS:
         return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch ({caught})", tab + "{",
@@ -2748,6 +2923,7 @@ def guard(run, n):
             raise RunError(n, "commands called each other too many times in a row (they may never stop).")
         except Exception as err:
             raise RunError(n, f"something went wrong inside Cosmonova: {err}")
+    guarded.inner = run  # so a missing piece is named by what it really is
     return with_ir(guarded, getattr(run, "ir", None))
 
 
@@ -2885,7 +3061,7 @@ def statement(n, text_, inner, names, declared, depth):
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         get = v.run
-        return [f"{tab}{strip_parens(v.cpp)};"], lambda env: get(env) and None, None
+        return [f"{tab}{strip_parens(v.cpp)};"], with_ir(lambda env: get(env) and None, lambda f: machine.emit(f, v) and None), None
     if tokens[0] == "shatter":  # 'raise an error with "no fuel"': a problem of your own, caught by try: like any other
         v = expr_to_end(tokens, 2 if tokens[1:2] == ["with"] else 1, names, n)
         if v.kind != TEXT:
@@ -2894,6 +3070,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             raise RunError(n, get(env))
+        with_ir(run, lambda f: (f.put(f"call void @cn_raise(i32 {n}, ptr {machine.emit(f, v)})"), f.check()))
         return [f"{tab}cosmonova::fail({n}, {strip_parens(v.cpp)});"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
@@ -2920,6 +3097,8 @@ def statement(n, text_, inner, names, declared, depth):
         def run(env):
             s = text(get(env))
             write_file(w(env), s + "\n" if adding else s, n, "ab" if adding else "wb")
+        shown = with_ir(Value("", TEXT, None), lambda f: f.as_text(machine.emit(f, v), v.kind))
+        with_ir(run, lambda f: machine.wrap(f, "builtins", "", f"cosmonova::{fn}({{s0}}, {{s1}}, {{line}})", [where, shown], None, cpp_type, n))
         return [f"{tab}cosmonova::{fn}({strip_parens(where.cpp)}, cosmonova::text({strip_parens(v.cpp)}), {n});"], run, None
     if tokens[0] == "add" and "to" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("to")
@@ -2943,9 +3122,11 @@ def statement(n, text_, inner, names, declared, depth):
         if v.kind != element(target.kind):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
+        added = with_ir(lambda env: seq(env).append(dup(get(env))),
+                        lambda f: f.put(f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         if JS:
-            return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], lambda env: seq(env).append(dup(get(env))), None
-        return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], lambda env: seq(env).append(dup(get(env))), None
+            return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None
+        return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], added, None
     if tokens[:2] == ["remove", "entry"] and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         table = expr_to_end(tokens, cut + 1, names, n)
@@ -2956,7 +3137,9 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
         get, at = table.run, key.run
         return ([f"{tab}cosmonova::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
-                lambda env: remove_entry(get(env), at(env), n), None)
+                with_ir(lambda env: remove_entry(get(env), at(env), n),
+                        lambda f: f.call("void", "cn_entry_remove", ("ptr", machine.emit(f, table)), ("ptr", machine.emit(f, key)),
+                                         ("i32", n), checked=True)), None)
     if tokens[0] == "remove" and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         target = writable_list(tokens[cut + 1:], names, n, "remove from")
@@ -2970,6 +3153,8 @@ def statement(n, text_, inner, names, declared, depth):
             def run(env):
                 items = seq(env)
                 items.pop(index_of(items, at(env), n))
+            with_ir(run, lambda f: f.call("void", "cn_list_remove_item", ("ptr", machine.emit(f, target)),
+                                          ("double", machine.emit(f, index)), ("i32", n), checked=True))
             return [f"{tab}cosmonova::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"], run, None
         v = expr_to_end(tokens[:cut], 1, names, n)
         if v.kind != element(target.kind):
@@ -2980,6 +3165,7 @@ def statement(n, text_, inner, names, declared, depth):
             items, x = seq(env), get(env)
             if x in items:
                 items.remove(x)
+        with_ir(run, lambda f: f.put(f"call void @cn_list_remove_value(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         return [f"{tab}cosmonova::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
     if tokens[0] == "draw":
         raise ScriptError(n, "'draw' is now 'etch', like: etch a circle with 100, 100, 20, \"orange\".")
@@ -3013,8 +3199,9 @@ def statement(n, text_, inner, names, declared, depth):
         if JS:
             return ([f"{tab}{js_set(target)}cosmonova::load_text({strip_parens(source.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
                     lambda env: put(env, load_text(w(env), kind, things, n)), None)
+        run = with_ir(lambda env: put(env, load_text(w(env), kind, things, n)), load_ir(target, source, "load_text", n))
         return ([f"{tab}cosmonova::load_text({strip_parens(target.cpp)}, {strip_parens(source.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
-                lambda env: put(env, load_text(w(env), kind, things, n)), None)
+                run, None)
     for verb, joint in (("save", "to"), ("load", "from")):
         if tokens[0] == verb and joint in tokens and tokens[len(tokens) - tokens[::-1].index(joint):][:1] == ["file"]:
             cut = len(tokens) - 1 - tokens[::-1].index(joint)
@@ -3027,8 +3214,9 @@ def statement(n, text_, inner, names, declared, depth):
             if verb == "save":
                 v = expr_to_end(tokens[:cut], 1, names, n)
                 get, kind = v.run, v.kind
-                return ([f"{tab}cosmonova::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"],
-                        lambda env: write_file(w(env), saved(get(env), kind, n) + "\n", n), None)
+                run = with_ir(lambda env: write_file(w(env), saved(get(env), kind, n) + "\n", n),
+                              lambda f: f.put_checked(f"call void @cn_save_file(ptr {f.box(machine.emit(f, v), v.kind)}, ptr {machine.emit(f, where)}, i32 {n})"))
+                return [f"{tab}cosmonova::save_file({strip_parens(v.cpp)}, {strip_parens(where.cpp)}, {n});"], run, None
             e = Expr(tokens[1:cut], names, n)
             target = e.full()
             if e.i != len(e.t) or not target.writable or getattr(target, "cpp_assign", None):
@@ -3037,8 +3225,9 @@ def statement(n, text_, inner, names, declared, depth):
             if JS:
                 return ([f"{tab}{js_set(target)}cosmonova::load_file({strip_parens(where.cpp)}, {json.dumps(target.kind)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n}){getattr(target, 'cpp_close', '')};"],
                         lambda env: put(env, load_saved(w(env), kind, things, n)), None)
+            run = with_ir(lambda env: put(env, load_saved(w(env), kind, things, n)), load_ir(target, where, "load_file", n))
             return ([f"{tab}cosmonova::load_file({strip_parens(target.cpp)}, {strip_parens(where.cpp)}, {cpp_text(chr(34) + kind_name(target.kind) + chr(34))}, {n});"],
-                    lambda env: put(env, load_saved(w(env), kind, things, n)), None)
+                    run, None)
     key, size = match_command(names, tokens)
     if key:
         start = size + (tokens[size:size + 1] == ["with"])
@@ -3065,7 +3254,8 @@ def statement(n, text_, inner, names, declared, depth):
         assign = getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
         if JS:
             assign = js_set(target)
-        return [f"{tab}{assign}{js_copy(v.cpp, v.kind)}{getattr(target, 'cpp_close', '')};"], lambda env: put(env, get(env)), None
+        write = (lambda f: target.ir_store(f, machine.emit(f, v))) if target.ir_store else None
+        return [f"{tab}{assign}{js_copy(v.cpp, v.kind)}{getattr(target, 'cpp_close', '')};"], with_ir(lambda env: put(env, get(env)), write), None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:
@@ -3084,6 +3274,13 @@ def statement(n, text_, inner, names, declared, depth):
                     x = get(env)
                     put(env, x)
                     there(env, dup(x))
+                birth, existence = names.value(key), names.value(("existence",))
+                if birth.ir_store and existence.ir_store:
+                    def write(f):
+                        x = machine.emit(f, v)
+                        birth.ir_store(f, x)
+                        existence.ir_store(f, x)
+                    with_ir(run, write)
                 return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};", f"{tab}{names.known[('existence',)][0]} = {js_copy(cpp, kind)};"], run, None
             if JS and cpp in OWNER_PARAMS:  # the thing a command is for: change the caller's own
                 return [f"{tab}cosmonova::replace_thing({cpp}, {strip_parens(v.cpp)});"], lambda env: put(env, get(env)), None
@@ -3113,6 +3310,12 @@ def statement(n, text_, inner, names, declared, depth):
             def run(env):
                 env[cpp] = dup(get(env))
                 env["existence"] = dup(env[cpp])
+
+            def write(f):
+                x = machine.emit(f, v)
+                f.store(cpp, v.kind, x)
+                f.store("existence", v.kind, x)
+            with_ir(run, write)
             return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};", f"{tab}existence = {js_copy(cpp, v.kind)};"], run, None
 
         def run(env):
@@ -3202,6 +3405,8 @@ def for_each(n, head, body, names, declared, depth):
                 break
     if tokens[cut] == "from":
         with_ir(run, lambda f: machine.count_from(f, cpp, lo, hi, then))
+    else:
+        with_ir(run, lambda f: machine.each_in(f, cpp, kind, seq, then))
     return [line, tab + "{"] + lines + [tab + "}"], run, None
 
 
@@ -3230,13 +3435,29 @@ def call(key, args, names, n):
                 err.line = n
             raise
     cpp = command.cpp
-    if command.inputs is None and command.versions is None:  # one of the script's own commands
+    if command.inputs is None:  # one of the script's own commands: after it, look whether a problem happened in it
         def write(f, command=command, args=args):
-            given = ", ".join(f"{machine.ll_type(a.kind)} {machine.emit(f, a)}" for a in args)
+            done = [machine.emit(f, a) for a in args]
+            if command.cpp not in OWNERS or not done:  # inputs are copies, except the thing a command for a kind changes
+                done = [f.copied(x, a.kind) for x, a in zip(done, args)]
+            else:
+                done = done[:1] + [f.copied(x, a.kind) for x, a in zip(done[1:], args[1:])]
+            given = ", ".join(f"{machine.ll_type(a.kind)} {x}" for x, a in zip(done, args))
+            name = machine_name(command.cpp, [((), k) for k in command.kinds])
+            out = None
             if command.gives:
-                return f.op(f"call {machine.ll_type(command.gives)} @cn_user_{command.cpp}({given})")
-            f.put(f"call void @cn_user_{command.cpp}({given})")
+                out = f.op(f"call {machine.ll_type(command.gives)} @cn_user_{name}({given})")
+            else:
+                f.put(f"call void @cn_user_{name}({given})")
+            f.check()
+            return out
         run.ir = write
+    elif getattr(command, "library", None):  # a library word: one of the library's C functions
+        template = command.cpp
+        for k, in_name in enumerate(command.inputs):
+            template = template.replace("{" + in_name + "}", "{a%d}" % k)
+        lib = command.library
+        run.ir = lambda f: machine.wrap(f, lib, LIBRARY_HEADS[lib], template, args, command.gives, cpp_type, n)
     if getattr(command, "unusable", None):
         raise ScriptError(n, command.unusable)
     if command.inputs is not None:  # a library word: put each input into its {input name} place
@@ -3279,7 +3500,10 @@ def command_value(names, tokens, e, line):
         body = re.sub("|".join(re.escape(g) for g in given), lambda m: given[m.group(0)], c.cpp)
         ins = ", ".join(f"{cpp_type(k_)} _{k}" for k, k_ in enumerate(c.kinds))
         cpp = f"{cpp_type(kind)}([&]({ins}) {{ {'return ' if c.gives else ''}{body}; }})"
-    return Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
+    v = Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
+    if c.inputs is None:
+        v.ir = lambda f: f"@cn_user_{machine_name(c.cpp, [((), k) for k in c.kinds])}"
+    return v
 
 
 def writable_list(tokens, names, n, what):
@@ -3429,19 +3653,24 @@ def find_vcvars():
     return bat if bat and bat.exists() else None
 
 
+MACHINE_UNITS = {}  # the built-in and library words the program being built uses (see machine.wrap)
 BUILT_THROUGH = []  # for each build: "machine", or the script and what kept it from being made into machine code
 
 
 def machine_code(program):
     """The whole program as LLVM code (raises machine.Unsupported for what can't be made into machine code yet)."""
     module = machine.Module()
-    for key, command in program.commands.items():
-        if command.inputs is not None:  # a library word: only a problem if the program uses it (its call has no writer)
+    module.shared = dict(WORLD_KINDS)
+    for key, base in program.commands.items():
+        if base.inputs is not None:  # a library word: only a problem if the program uses it (its call has no writer)
             continue
-        if getattr(command, "machine", None) is None:
-            raise machine.Unsupported(f"the command '{' '.join(key)}'")
-        name, inputs, gives, run = command.machine
-        machine.function(module, name, inputs, gives, run)
+        for command in (base.versions.values() if base.versions else [base]):  # a version for each kind of thing
+            if getattr(command, "machine", None) is None:
+                raise machine.Unsupported(f"the command '{' '.join(key)}'")
+            name, inputs, gives, run = command.machine
+            machine.function(module, name, inputs, gives, run)
+    MACHINE_UNITS.clear()
+    MACHINE_UNITS.update(module.units)
     return module.finish(FILES)
 
 
@@ -3465,7 +3694,7 @@ def build(script, exe):
             BUILT_THROUGH.append(f"{script.name}: {missing}")  # shortcut: the C++ way stays until every part is in machine.py
         else:
             BUILT_THROUGH.append("machine")
-            return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="cosmonova_"))
+            return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="cosmonova_"), MACHINE_UNITS)
     vcvars = find_vcvars()
     if not vcvars:
         return "I can't find the C++ compiler. Install Visual Studio with 'Desktop development with C++'."
