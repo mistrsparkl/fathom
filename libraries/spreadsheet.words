@@ -1,0 +1,110 @@
+note: Words for spreadsheets (CSV text, as spreadsheet programs save it). Use them in a program with:  use: spreadsheet
+note: Each row is a list of text, so 'item 2 of item 1 of rows' is the second cell of the first row.
+
+code:
+  namespace stellanova_spreadsheet
+  {
+  	inline std::vector<std::vector<std::string>> rows_of(const std::string& s)
+  	{
+  		std::vector<std::vector<std::string>> rows;
+  		std::vector<std::string> row;
+  		std::string cell;
+  		bool quoted = false, any = false;
+  		for (size_t k = 0; k < s.size(); ++k)
+  		{
+  			char c = s[k];
+  			if (quoted)
+  			{
+  				if (c == '"' && k + 1 < s.size() && s[k + 1] == '"')
+  					cell += '"', ++k;
+  				else if (c == '"')
+  					quoted = false;
+  				else
+  					cell += c;
+  				continue;
+  			}
+  			if (c == '"')
+  				quoted = any = true;
+  			else if (c == ',')
+  				row.push_back(cell), cell.clear(), any = true;
+  			else if (c == '\n' || c == '\r')
+  			{
+  				if (c == '\r' && k + 1 < s.size() && s[k + 1] == '\n')
+  					++k;
+  				row.push_back(cell), cell.clear(), rows.push_back(row), row.clear(), any = false;
+  			}
+  			else
+  				cell += c, any = true;
+  		}
+  		if (any || !cell.empty() || !row.empty())
+  			row.push_back(cell), rows.push_back(row);
+  		return rows;
+  	}
+  	inline std::string text_of(const std::vector<std::vector<std::string>>& rows)
+  	{
+  		std::string out;
+  		for (const auto& row : rows)
+  		{
+  			for (size_t k = 0; k < row.size(); ++k)
+  			{
+  				const std::string& cell = row[k];
+  				if (k)
+  					out += ',';
+  				if (cell.find_first_of(",\"\r\n") == std::string::npos)
+  				{
+  					out += cell;
+  					continue;
+  				}
+  				out += '"';
+  				for (char c : cell)
+  					out += c == '"' ? std::string("\"\"") : std::string(1, c);
+  				out += '"';
+  			}
+  			out += '\n';
+  		}
+  		return out;
+  	}
+  }
+
+python:
+  import csv
+  import io
+  def rows_of(s):
+      return [list(row) for row in csv.reader(io.StringIO(s, newline=""))]
+  def text_of(rows):
+      out = io.StringIO()
+      csv.writer(out, lineterminator="\n").writerows(rows)
+      return out.getvalue()
+
+to rows of the spreadsheet, given text (text), returning a list of lists of text = stellanova_spreadsheet::rows_of({text})
+  runs: rows_of({text})
+  web: stellanova_spreadsheet::rows_of({text})
+to the spreadsheet of, given rows (a list of lists of text), returning text = stellanova_spreadsheet::text_of({rows})
+  runs: text_of({rows})
+  web: stellanova_spreadsheet::text_of({rows})
+
+javascript:
+  const stellanova_spreadsheet = {
+    rows_of(s) {
+      const rows = [];
+      let row = [], cell = "", quoted = false, any = false;
+      for (let k = 0; k < s.length; k++) {
+        const c = s[k];
+        if (quoted) {
+          if (c === '"' && s[k + 1] === '"') { cell += '"'; k++; }
+          else if (c === '"') quoted = false;
+          else cell += c;
+          continue;
+        }
+        if (c === '"') quoted = any = true;
+        else if (c === ",") { row.push(cell); cell = ""; any = true; }
+        else if (c === "\n" || c === "\r") {
+          if (c === "\r" && s[k + 1] === "\n") k++;
+          row.push(cell); rows.push(row); row = []; cell = ""; any = false;
+        } else { cell += c; any = true; }
+      }
+      if (any || cell || row.length) { row.push(cell); rows.push(row); }
+      return rows;
+    },
+    text_of: (rows) => rows.map((row) => row.map((c) => /[,"\r\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c).join(",") + "\n").join(""),
+  };

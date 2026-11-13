@@ -92,7 +92,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, page, patterns, screen, server, sound, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -377,6 +377,12 @@ def program_checks():
                'and the universe said i love you\n')
     assert out.stdout == ("42 -29\n2026-12-13 2024-02-29 1970-01-01\nFriday Saturday Wednesday\nyes\n"
                           "'2026-02-30' isn't a date: dates are written like 2026-11-13.\n"), repr(out.stdout)
+
+    # the spreadsheet library: CSV text <-> rows
+    out = both('use: spreadsheet\n\ngenesis:\n  set rows to rows of the spreadsheet ("name,note" plus new line plus "Ann," plus a quotation mark '
+               'plus "a, b" plus a quotation mark plus new line)\n  for each row in rows:\n    scrawl join row with " | "\n'
+               '  add a list containing ("Bo", "x") to rows\n  scrawl the spreadsheet of rows\nand the universe said i love you\n')
+    assert out.stdout == 'name | note\nAnn | a, b\nname,note\nAnn,"a, b"\nBo,x\n\n', repr(out.stdout)
 
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
