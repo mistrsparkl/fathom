@@ -290,6 +290,14 @@ def program_checks():
     assert perr('genesis:\n  invoke 5\n' + END)[1] == "'invoke' needs a command, like 'invoke the command double with 4', not a number."
     assert perr('genesis:\n  set f to the command nothing\n' + END)[1] == "'the command' needs the name of a command after it, like 'the command double'."
 
+    # a number names a table's entry by its written form: 3 is the entry "3"
+    out = both('genesis:\n  set ages to a table of numbers\n  set the entry 3 of ages to 10\n  set the entry 2.5 of ages to 7\n'
+               '  add 1 to the entry 3 of ages\n  scrawl ages\n  scrawl the entry "3" of ages, " ", ages contains 3, " ", ages contains 4\n'
+               '  remove entry 2.5 from ages\n  scrawl the keys of ages\nand the universe said i love you\n')
+    assert out.stdout == "2.5: 7, 3: 11\n11 yes no\n3\n", repr(out.stdout)
+    assert perr('genesis:\n  set ages to a table of numbers\n  scrawl the entry yes of ages\n' + END)[1] == \
+        "A table's entries are named with text or a number, but this is yes or no."
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

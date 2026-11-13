@@ -159,7 +159,7 @@ and the universe said i love you
 | a flat place | `300 horizontal 200 vertical`, `flat (goal minus centre of mass)` (across and down only) |
 | text | `"hello"`, `name`, `"Hi " plus name` (words between quote marks) |
 | a list of ... | `a list of numbers` (empty), `a list of (3, 5, 7)`, `a list of pets`. Holds one kind of thing, in order. |
-| a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. |
+| a table of ... | `a table of numbers` (empty). Looks things up by a name (text), like a phone book. A number works as a name too: `the entry 3 of ages` is the entry "3". |
 
 **birth and existence.** `set birth to 300 horizontal 200 vertical` says where something starts, and puts `existence` (where it is now) at the same place. Move `existence`, and `set existence to birth` sends it back.
 

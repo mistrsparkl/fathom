@@ -1041,6 +1041,17 @@ def number_ir(f, op, left, right):
     return f.op(f"{NUMBER_OPS[op]} double {machine.emit(f, left)}, {machine.emit(f, right)}")
 
 
+def key_text(v, line):
+    """A table's entry is named by text; a number names the entry with its written form (3 is the entry "3")."""
+    if v.kind == TEXT:
+        return v
+    if v.kind != NUMBER:
+        raise ScriptError(line, f"A table's entries are named with text or a number, but this is {kind_name(v.kind)}.")
+    a = v.run
+    return with_ir(Value(f"stellanova::text({v.cpp})", TEXT, lambda env: text(a(env))),
+                   lambda f: f.as_text(machine.emit(f, v), v.kind))
+
+
 def contains_ir(f, whole, part):
     a, b = machine.emit(f, whole), machine.emit(f, part)
     if whole.kind == TEXT:
@@ -1302,6 +1313,8 @@ class Expr:
         if self.at("contains"):
             self.i += 1
             r = self.sum()
+            if is_table(v.kind) and r.kind == NUMBER:
+                r = key_text(r, self.line)
             if not (v.kind == r.kind == TEXT or (is_list(v.kind) and element(v.kind) == r.kind)
                     or (is_table(v.kind) and r.kind == TEXT)):
                 raise ScriptError(self.line, f"I can't look for {kind_name(r.kind)} in {kind_name(v.kind)}.")
@@ -1638,7 +1651,7 @@ class Expr:
             return made
         if tok == "entry" and self.peek(1) not in ITEM_NOT_INDEX:
             self.i += 1
-            name = self.need(self.sum(), TEXT, "entry")
+            name = key_text(self.sum(), self.line)
             self.take("of")
             table = self.operand()
             if not is_table(table.kind):
@@ -3140,9 +3153,7 @@ def statement(n, text_, inner, names, declared, depth):
         table = expr_to_end(tokens, cut + 1, names, n)
         if not is_table(table.kind) or not table.writable:
             raise ScriptError(n, f"'remove entry ... from' needs a table that can be changed, but this is {kind_name(table.kind)}.")
-        key = expr_to_end(tokens[:cut], 2, names, n)
-        if key.kind != TEXT:
-            raise ScriptError(n, f"A table's entries are named with text, but this is {kind_name(key.kind)}.")
+        key = key_text(expr_to_end(tokens[:cut], 2, names, n), n)
         get, at = table.run, key.run
         return ([f"{tab}stellanova::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
                 with_ir(lambda env: remove_entry(get(env), at(env), n),
