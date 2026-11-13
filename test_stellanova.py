@@ -195,7 +195,7 @@ def program_checks():
                ' plus ": [" plus q plus "\\u00e9\\ud83d\\ude00" plus q plus "], " plus q plus "age" plus q plus ": 2, "'
                ' plus q plus "age" plus q plus ": 3, " plus q plus "other" plus q plus ": null}" into file "p.json"\n'
                '  set p to conjure a pet\n  load p from file "p.json"\n  scrawl p\n'
-               '  for each bad in a list of ("[1, 2", "[1, true]", "[NaN]", "[01]", "{}", "  [ ]  x", "[1.]", "[" plus q plus "a" plus q plus "]"):\n'
+               '  for each bad in a list of ("[1, 2", "[1, true]", "[[NaN]]", "[01]", "{}", "  [ ]  x", "[1.]", "[" plus q plus "a" plus q plus "]"):\n'
                '    inscribe bad into file "bad.json"\n    try:\n      load ys from file "bad.json"\n'
                '    if that went wrong:\n      scrawl the wound\n  inscribe "  [ 4 , 5e1, -0.5E+1 ]  " into file "ok.json"\n'
                '  load ys from file "ok.json"\n  scrawl ys\n  set zero to 0\n  set n to 1 divided by zero\n  save n to file "n.json"\n' + END)
@@ -297,6 +297,21 @@ def program_checks():
     assert out.stdout == "2.5: 7, 3: 11\n11 yes no\n3\n", repr(out.stdout)
     assert perr('genesis:\n  set ages to a table of numbers\n  scrawl the entry yes of ages\n' + END)[1] == \
         "A table's entries are named with text or a number, but this is yes or no."
+
+    # words in brackets inside text are filled in; a pattern's brackets stay
+    out = both('a pet has:\n  name (text)\nand the universe said i love you\n\ngenesis:\n  set name to "Sam"\n  set count to 3\n'
+               '  conjure a pet as rex\n  set the name of rex to "Rex"\n  scrawl "Hello, [name]! [count] coins, next [count plus 1]."\n'
+               '  scrawl "[the name of rex] says hi", " and [0-9] [^B] [ ] [[kept]] stay"\nand the universe said i love you\n')
+    assert out.stdout == "Hello, Sam! 3 coins, next 4.\nRex says hi and [0-9] [^B] [ ] [kept] stay\n", repr(out.stdout)
+    assert perr('genesis:\n  scrawl "Hi [scroe]"\n' + END)[1].startswith("I don't know 'scroe'.")
+
+    # depending on: one value, many choices (worked out once)
+    out = both('to describe, given weather (text):\n  depending on weather:\n    "rain": scrawl "umbrella"\n    "snow", "hail":\n'
+               '      scrawl "coat"\n      scrawl "boots"\n    anything else: scrawl "enjoy the [weather]"\nand the universe said i love you\n\n'
+               'genesis:\n  for each w in a list containing ("rain", "hail", "sun"): describe with w\n'
+               '  depending on 7 plus 1:\n    8: scrawl "eight"\nand the universe said i love you\n')
+    assert out.stdout == "umbrella\ncoat\nboots\nenjoy the sun\neight\n", repr(out.stdout)
+    assert perr('genesis:\n  depending on 1:\n    anything else: scrawl 1\n' + END)[1] == "Put at least one choice before 'anything else:'."
 
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'

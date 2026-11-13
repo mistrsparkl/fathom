@@ -898,15 +898,42 @@ def outside_quotes(text, change):
     return "".join(part if k % 2 else change(part, k == 0) for k, part in enumerate(parts))
 
 
-def surface(text, line):
+FILLED = re.compile(r"\[([A-Za-z][A-Za-z0-9' ]*)\]")  # words in square brackets inside text: '[name]', '[count plus 1]'
+
+
+def fill_in(text):
+    """'"Hello, [name]!"' becomes '("Hello, " plus (name) plus "!")': what the words in brackets hold, put into the text.
+    Brackets holding anything but words (like a pattern's [0-9]) are left as they are; doubled ones ('[[like this]]')
+    are shown as single brackets."""
+    def one(m):
+        pieces = FILLED.split(m.group(0)[1:-1].replace("[[", "\x01").replace("]]", "\x02"))
+        shown = [p.replace("\x01", "[").replace("\x02", "]") for p in pieces]
+        if len(pieces) == 1:
+            return '"' + shown[0] + '"'
+        out = ['"' + shown[0] + '"']
+        for k in range(1, len(pieces), 2):
+            out.append(f"({pieces[k].strip()})")
+            if pieces[k + 1]:
+                out.append('"' + shown[k + 1] + '"')
+        return "(" + " plus ".join(out) + ")"
+    return re.sub(r'"[^"]*"', one, text)
+
+
+def surface(text, line, filled=False):
     """A script line in the language's words, turned into the inner words (old words are a mistake).
 
     'if done: cease' is two parts; each is turned on its own."""
+    if not filled:
+        text = fill_in(text)
     head, colon, rest = split_colon(text)
     out = surface_part(head, line)
     if colon:
-        out += ":" + (" " + surface(rest.strip(), line) if rest.strip() else "")
+        out += ":" + (" " + surface(rest.strip(), line, True) if rest.strip() else "")
     return out
+
+
+assert fill_in('scrawl "Hi [name], [n plus 1]!" and "[0-9] [[NaN]]"') == \
+    'scrawl ("Hi " plus (name) plus ", " plus (n plus 1) plus "!") and "[0-9] [NaN]"'
 
 
 def surface_part(text, line):
@@ -2857,6 +2884,11 @@ def statements(body, names, declared, depth):
             continue
         if raw.strip().lower() == "if that went wrong:":
             raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
+        if raw.strip().lower().startswith("depending on ") and raw.strip().endswith(":"):
+            start = k - 1 - len(inner)
+            rows = rows[:start] + depending_rows(n, raw.strip(), inner, indent) + rows[k:]
+            k = start
+            continue
         said = raw.strip()
         lines, run, branch = statement(n, said if said.startswith("note:") else surface(said, n), inner, names, declared, depth)
         out += lines
@@ -2876,6 +2908,62 @@ def statements(body, names, declared, depth):
             chain = None
             runs.append(guard(run, n))
     return out, block(runs)
+
+
+DIGIT_WORDS = "zero one two three four five six seven eight nine".split()
+
+
+def top_commas(text):
+    """text split at its commas that aren't inside quote marks or brackets."""
+    parts, depth, quoted, start = [], 0, False, 0
+    for i, ch in enumerate(text):
+        if ch == '"':
+            quoted = not quoted
+        elif not quoted and ch == "(":
+            depth += 1
+        elif not quoted and ch == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and ch == ",":
+            parts.append(text[start:i].strip())
+            start = i + 1
+    return parts + [text[start:].strip()]
+
+
+def depending_rows(n, said, inner, indent):
+    """'depending on weather:' with lines like '"rain": ...' and 'anything else: ...', as the if / otherwise if lines it
+    means. The value is worked out once, into a name of its own."""
+    subject = said[len("depending on"):].rstrip()[:-1].strip()
+    if not subject:
+        raise ScriptError(n, "Say what to look at, like 'depending on weather:'.")
+    if not inner:
+        raise ScriptError(n, "Put the choices on the indented lines below, like '\"rain\": scrawl \"Take an umbrella\"'.")
+    held = "depending value " + " ".join(DIGIT_WORDS[int(d)] for d in str(n))
+    pad = " " * indent
+    out = [(n, f"{pad}set {held} to {subject}")]
+    width = len(inner[0][1].expandtabs(4)) - len(inner[0][1].expandtabs(4).lstrip())
+    first, other = True, False
+    for m, raw in inner:
+        here = len(raw.expandtabs(4)) - len(raw.expandtabs(4).lstrip())
+        if here > width:  # a choice's own indented lines
+            out.append((m, pad + "    " + raw.expandtabs(4)[width:]))
+            continue
+        if here < width:
+            raise ScriptError(m, "This line is indented differently from the lines around it.")
+        head, colon, rest = split_colon(raw.strip())
+        if not colon:
+            raise ScriptError(m, "Each choice is the value, a ':', then what to do, like '\"rain\": scrawl \"Take an umbrella\"'.")
+        if other:
+            raise ScriptError(m, "'anything else:' is the last choice.")
+        if head.strip().lower() == "anything else":
+            if first:
+                raise ScriptError(m, "Put at least one choice before 'anything else:'.")
+            out.append((m, f"{pad}otherwise:{(' ' + rest.strip()) if rest.strip() else ''}"))
+            other = True
+            continue
+        test = " or ".join(f"{held} is ({v})" for v in top_commas(head))
+        out.append((m, f"{pad}{'if' if first else 'otherwise if'} {test}:{(' ' + rest.strip()) if rest.strip() else ''}"))
+        first = False
+    return out
 
 
 def attempt(n, tried, handler, names, declared, depth):

@@ -24,6 +24,22 @@ A program is made of **commands**. `genesis:` is where every program begins (`ge
 
 `scrawl` shows something on the screen. Text goes between quote marks.
 
+Words in square brackets inside text are filled in with what they hold:
+
+```stellanova
+genesis:
+  set name to "Sam"
+  set coins to 3
+  scrawl "Hello, [name]! You have [coins] coins, and [coins plus 1] after this one."
+and the universe said i love you
+```
+
+```output
+Hello, Sam! You have 3 coins, and 4 after this one.
+```
+
+Only brackets holding words are filled in, so a pattern like `"[0-9]"` stays as it is. To show brackets around words, double them: `"[[NaN]]"` shows `[NaN]`.
+
 ## 2. Remembering things
 
 ```stellanova
@@ -61,6 +77,27 @@ It's hot.
 ```
 
 `if` does its indented lines only when the thing after it is yes. `otherwise if` and `otherwise` are tried in turn when the ones above them were no.
+
+When the choice is about one value, `depending on` reads better:
+
+```stellanova
+genesis:
+  set weather to "snow"
+  depending on weather:
+    "rain": scrawl "Take an umbrella."
+    "snow", "hail":
+      scrawl "Wear a coat."
+      scrawl "And boots."
+    anything else: scrawl "Enjoy the day."
+and the universe said i love you
+```
+
+```output
+Wear a coat.
+And boots.
+```
+
+Each line under it is a value (or several, with commas), a `:`, then what to do. `anything else:` is for every other value.
 
 ## 4. Doing things again
 
