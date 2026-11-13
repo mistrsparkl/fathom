@@ -123,6 +123,33 @@ Hip hip hooray!
 
 `repeat` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `as long as ...:`, which keeps going while something is yes.
 
+### Whenever and every
+
+A command can say what to do whenever something happens, and every so often. Those lines start once the command's other lines are done, and go on until the program ends:
+
+```stellanova
+genesis:
+  set ticks to 0
+  every 0.1 seconds:
+    set ticks to ticks plus 1
+    scrawl "tick [ticks]"
+  whenever ticks is 3:
+    scrawl "That's three."
+    end the program with 0
+  scrawl "Waiting..."
+and the universe said i love you
+```
+
+```output
+Waiting...
+tick 1
+tick 2
+tick 3
+That's three.
+```
+
+In a game, `every frame:` holds what happens each frame (moving, drawing), and `whenever key pressed "space":` what a key does. The frame is shown after each round on its own, and it all stops when the window is closed.
+
 ## 5. Lists
 
 ```stellanova

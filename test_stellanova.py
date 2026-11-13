@@ -313,6 +313,13 @@ def program_checks():
     assert out.stdout == "umbrella\ncoat\nboots\nenjoy the sun\neight\n", repr(out.stdout)
     assert perr('genesis:\n  depending on 1:\n    anything else: scrawl 1\n' + END)[1] == "Put at least one choice before 'anything else:'."
 
+    # whenever / every: after the other lines, again and again until the program ends
+    out = both('genesis:\n  set ticks to 0\n  every 0.05 seconds:\n    set ticks to ticks plus 1\n    scrawl "tick [ticks]"\n'
+               '  whenever ticks exceeds 2:\n    scrawl "past two"\n  whenever ticks is 4:\n    scrawl "bye"\n    end the program with 0\n'
+               '  scrawl "watching"\nand the universe said i love you\n')
+    assert out.stdout == "watching\ntick 1\ntick 2\ntick 3\npast two\ntick 4\nbye\n", repr(out.stdout)
+    assert perr('genesis:\n  every banana:\n    scrawl 1\n' + END)[1] == "Write 'every 2 seconds:' or 'every frame:'."
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

@@ -187,6 +187,9 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `move turn rate toward 20 by at most 5` | Change a number toward a goal, but by no more than the step. |
 | `if fallen: cease` | Do the part after the colon only when it is yes. |
 | `if ...:` / `otherwise if ...:` / `otherwise:` | With indented lines below, for longer choices. |
+| `whenever ticks exceeds 2:` | With indented lines below: they run each time it turns yes. Checked again and again once the command's other lines are done. |
+| `every 2 seconds:` | With indented lines below: they run every 2 seconds, once the command's other lines are done. |
+| `every frame:` | With indented lines below: they run once a frame while the world lives (the frame is revealed after them on its own). `whenever key pressed "space":` works alongside it. |
 | `depending on weather:` | Choices about one value. Each indented line is a value (or several, with commas), `:`, and what to do, like `"rain": scrawl "Umbrella!"`. The last can be `anything else: ...`. The value is worked out once. |
 | `scrawl "Hello, [name]! [count plus 1] left."` | Words in square brackets inside text are filled in with what they hold. Brackets holding anything but words (a pattern's `[0-9]`) stay as they are; `[[like this]]` shows `[like this]`. |
 | `scrawl "Score: ", score` | Show things on the screen, one after another, then start a new line. |

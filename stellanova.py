@@ -2851,6 +2851,7 @@ def statements(body, names, declared, depth):
     out, runs = [], []
     rows = [(n, r) for n, r in body if r.strip()]
     indent = len(rows[0][1].expandtabs(4)) - len(rows[0][1].expandtabs(4).lstrip()) if rows else 0
+    rows = watch_rows(rows, indent)
     chain = None  # the if / otherwise if / otherwise choices being collected
     k = 0
     while k < len(rows):
@@ -2963,6 +2964,68 @@ def depending_rows(n, said, inner, indent):
         test = " or ".join(f"{held} is ({v})" for v in top_commas(head))
         out.append((m, f"{pad}{'if' if first else 'otherwise if'} {test}:{(' ' + rest.strip()) if rest.strip() else ''}"))
         first = False
+    return out
+
+
+def watch_rows(rows, indent):
+    """'whenever <something>:', 'every 2 seconds:' and 'every frame:' blocks, taken out of rows and put in a loop after
+    the other lines: it goes on until the world ends ('every frame:' is there) or the program ends.
+    'whenever' runs its lines each time its yes-or-no turns to yes; the frame is revealed after each round on its own."""
+    def width(raw):
+        return len(raw.expandtabs(4)) - len(raw.expandtabs(4).lstrip())
+
+    kept, watches, k = [], [], 0
+    while k < len(rows):
+        n, raw = rows[k]
+        k += 1
+        inner = []
+        while k < len(rows) and width(rows[k][1]) > indent:
+            inner.append(rows[k])
+            k += 1
+        low = raw.strip().lower()
+        if width(raw) == indent and low.endswith(":") and (low.startswith("whenever ") or low.startswith("every ")):
+            head = raw.strip()[:-1].strip()
+            if not inner:
+                raise ScriptError(n, "Say what to do on the indented lines below the ':'.")
+            if low.startswith("whenever "):
+                watches.append(("whenever", head[len("whenever "):].strip(), n, inner))
+            elif low == "every frame:":
+                watches.append(("frame", None, n, inner))
+            else:
+                m = re.fullmatch(r"every (.+?) seconds?", head, re.IGNORECASE)
+                if not m:
+                    raise ScriptError(n, "Write 'every 2 seconds:' or 'every frame:'.")
+                watches.append(("every", m.group(1), n, inner))
+            continue
+        kept.append((n, raw))
+        kept += inner
+    if not watches:
+        return rows
+    pad, deep = " " * indent, " " * (indent + 4)
+    framed = any(w[0] == "frame" for w in watches)
+    first = watches[0][2]
+    out = list(kept)
+    loop = []
+    for kind, what, n, inner in watches:
+        name = " ".join(DIGIT_WORDS[int(d)] for d in str(n))
+        base = width(inner[0][1])
+
+        def body(more):
+            return [(m, deep + " " * more + raw.expandtabs(4)[base:]) for m, raw in inner]
+        if kind == "whenever":
+            out.append((n, f"{pad}set whenever was {name} to no"))
+            loop += [(n, f"{deep}set whenever now {name} to ({what})"),
+                     (n, f"{deep}if whenever now {name} and not whenever was {name}:")] + body(4)
+            loop.append((n, f"{deep}set whenever was {name} to whenever now {name}"))
+        elif kind == "every":
+            out.append((n, f"{pad}set every next {name} to seconds since the start plus ({what})"))
+            loop += [(n, f"{deep}if not (seconds since the start falls below every next {name}):"),
+                     (n, f"{deep}    set every next {name} to every next {name} plus ({what})")] + body(4)
+        else:
+            loop += body(0)
+    out.append((first, f"{pad}as long as {'the world lives' if framed else 'yes'}:"))
+    out += loop
+    out.append((first, f"{deep}{'reveal the frame' if framed else 'wait 0.01'}"))
     return out
 
 
