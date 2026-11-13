@@ -12,18 +12,26 @@ struct ThingKind
 	std::vector<std::string> fields;
 };
 
-struct V
+struct V  // every value begins like this, and a number or a yes/no is only this (so a million numbers stay small)
 {
 	char tag = 'n';  // n number, y yes or no, t text, l list, m table, p place, f flat place, k thing, c command
+	bool marked = false;  // the collector reached it
 	double d = 0;  // a number, or 1 / 0 for yes / no
+};
+
+struct Full : V  // every other value: text, lists, tables, places, things and commands
+{
 	double x = 0, y = 0, z = 0;  // a place
 	std::string s;  // text
 	std::vector<V*> items;  // a list's items, or a thing's parts (in the order they were described)
 	std::map<std::string, V*> table;
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
-	bool marked = false;  // the collector reached it
 };
+
+inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
+inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
+inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
 namespace stellanova { struct Problem; }
@@ -67,22 +75,22 @@ T cn_to_cpp(V* v)
 	else if constexpr (std::is_same_v<T, bool>)
 		return v->d != 0;
 	else if constexpr (std::is_same_v<T, std::string>)
-		return v->s;
+		return full(v)->s;
 	else if constexpr (std::is_same_v<T, FVector>)
-		return FVector(v->x, v->y, v->z);
+		return FVector(full(v)->x, full(v)->y, full(v)->z);
 	else if constexpr (std::is_same_v<T, FVector2D>)
-		return FVector2D(v->x, v->y);
+		return FVector2D(full(v)->x, full(v)->y);
 	else if constexpr (cn_is_vector<T>::value)
 	{
 		T out;
-		for (V* x : v->items)
+		for (V* x : full(v)->items)
 			out.push_back(cn_to_cpp<typename cn_is_vector<T>::item>(x));
 		return out;
 	}
 	else if constexpr (cn_is_table<T>::value)
 	{
 		T out;
-		for (const auto& [key, x] : v->table)
+		for (const auto& [key, x] : full(v)->table)
 			out[key] = cn_to_cpp<typename cn_is_table<T>::item>(x);
 		return out;
 	}
@@ -135,7 +143,7 @@ struct cn_is_function<std::function<R(A...)>> : std::true_type
 	static std::function<R(A...)> make(V* v)
 	{
 		using Gives = std::conditional_t<std::is_void_v<R>, void, typename cn_machine<std::conditional_t<std::is_void_v<R>, double, R>>::type>;
-		auto target = reinterpret_cast<Gives (*)(typename cn_machine<A>::type...)>(v->command);
+		auto target = reinterpret_cast<Gives (*)(typename cn_machine<A>::type...)>(full(v)->command);
 		return [target](A... a) -> R {
 			cn_unpark();  // machine code runs again: the collector waits for it as usual
 			struct Again { ~Again() { cn_park(); } } again;
