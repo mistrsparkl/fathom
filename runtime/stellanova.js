@@ -339,6 +339,49 @@
     sorted: (items) => [...items].sort(order),
     sorted_by: (items, part) => dup(items).sort((a, b) => order(part(a), part(b))),
     reversed: (items) => dup(items).reverse(),
+    items_from(items, first, last, line) {
+      if (Math.floor(first) !== first || Math.floor(last) !== last || first < 1 || last > items.length || first > last + 1)
+        fail(line, `there are no items ${numberText(first)} to ${numberText(last)} in a list of ${items.length} items.`);
+      return dup(items.slice(first - 1, last));
+    },
+    first_of(items, count, line, end = false) {
+      if (Math.floor(count) !== count || count < 0)
+        fail(line, `I can't take ${numberText(count)} of something: it must be a whole number, 0 or more.`);
+      const all = typeof items === "string" ? letters_in(items) : items;
+      const part = end ? all.slice(Math.max(0, all.length - count)) : all.slice(0, count);
+      return typeof items === "string" ? part.join("") : dup(part);
+    },
+    last_of(items, count, line) {
+      return stellanova.first_of(items, count, line, true);
+    },
+    unique(items) {
+      const out = [];
+      for (const x of items) if (!out.some((y) => same(x, y))) out.push(dup(x));
+      return out;
+    },
+    shuffled(items) {
+      const out = dup(items);
+      for (let k = out.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [out[k], out[j]] = [out[j], out[k]];
+      }
+      return out;
+    },
+    with_commas(n) {
+      let s = numberText(n), sign = "";
+      if (s.startsWith("-")) [sign, s] = ["-", s.slice(1)];
+      const [whole, ...rest] = s.split(".");
+      if (!/^\d+$/.test(whole)) return sign + s;
+      return sign + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (rest.length ? "." + rest.join(".") : "");
+    },
+    padded(n, digits, line) {
+      if (Math.floor(digits) !== digits || digits < 0)
+        fail(line, `I can't pad to ${numberText(digits)} digits: it must be a whole number, 0 or more.`);
+      let s = numberText(n), sign = "";
+      if (s.startsWith("-")) [sign, s] = ["-", s.slice(1)];
+      const [whole, ...rest] = s.split(".");
+      return sign + whole.padStart(digits, "0") + (rest.length ? "." + rest.join(".") : "");
+    },
     sum_of(items) {
       let total = 0;
       for (const x of items) total += x;
@@ -394,6 +437,7 @@
       return all.slice(first - 1, last).join("");
     },
     position(s, part) {
+      if (Array.isArray(s)) return s.findIndex((x) => same(x, part)) + 1;
       const at = s.indexOf(part);
       return at < 0 ? 0 : letters_in(s.slice(0, at)).length + 1;
     },

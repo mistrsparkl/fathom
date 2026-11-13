@@ -481,16 +481,27 @@ def repeat(f, count, body):
     loop(f, lambda: f.op(f"icmp slt i64 {f.op(f'load i64, ptr {k}')}, {rounds}"), body, step)
 
 
-def count_from(f, cpp, lo, hi, body):
-    """'for each n from 1 to 10:' (the end is worked out once, before the first round)."""
+def count_from(f, cpp, lo, hi, body, by=None):
+    """'for each n from 1 to 10:', or '... by 5' (the end and the step are worked out once, before the first round)."""
     f.store(cpp, NUMBER, emit(f, lo))
     last = f"%last{f.label('')}"
     f.entry.append(f"  {last} = alloca double")
     f.put(f"store double {emit(f, hi)}, ptr {last}")
+    size = f"%by{f.label('')}"
+    f.entry.append(f"  {size} = alloca double")
+    f.put(f"store double {emit(f, by) if by is not None else number(1.0)}, ptr {size}")
 
     def step():
-        f.store(cpp, NUMBER, f.op(f"fadd double {f.load(cpp, NUMBER)}, {number(1.0)}"))
-    loop(f, lambda: f.op(f"fcmp ole double {f.load(cpp, NUMBER)}, {f.op(f'load double, ptr {last}')}"), body, step)
+        f.store(cpp, NUMBER, f.op(f"fadd double {f.load(cpp, NUMBER)}, {f.op(f'load double, ptr {size}')}"))
+
+    def test():
+        x, end, s = f.load(cpp, NUMBER), f.op(f"load double, ptr {last}"), f.op(f"load double, ptr {size}")
+        if by is None:
+            return f.op(f"fcmp ole double {x}, {end}")
+        up = f.op(f"and i1 {f.op(f'fcmp ogt double {s}, 0.0')}, {f.op(f'fcmp ole double {x}, {end}')}")
+        down = f.op(f"and i1 {f.op(f'fcmp olt double {s}, 0.0')}, {f.op(f'fcmp oge double {x}, {end}')}")
+        return f.op(f"or i1 {up}, {down}")
+    loop(f, test, body, step)
 
 
 def each_in(f, cpp, kind, seq, body):

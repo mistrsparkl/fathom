@@ -352,6 +352,25 @@ def program_checks():
     assert perr('genesis:\n  fro each n from 1 to 3: scrawl n\n' + END)[1] == \
         "I don't know how to start a line with 'fro each'. Did you mean 'for each'?"
 
+    # list and text tools
+    out = both('genesis:\n  set names to a list containing ("Ann", "Bo", "Cy", "Di", "Bo", "Ann")\n  scrawl items 2 to 4 of names\n'
+               '  scrawl the first 2 of names, " / ", the last 3 of names, " / ", first 3 of "Stellanova", " / ", last 4 of "Stellanova"\n'
+               '  scrawl unique names\n'
+               '  scrawl the size of shuffled names, " ", the position of "Cy" in names, " ", the position of "Zed" in names\n'
+               '  scrawl 1234567 with commas, " ", (-9876543.25) with commas, " ", 12 with commas\n'
+               '  scrawl 7 padded to 3 digits, " ", (-4) padded to 2 digits, " ", 1234 padded to 2 digits\n'
+               '  scrawl the first 10 of names\nand the universe said i love you\n')
+    assert out.stdout == ("Bo, Cy, Di\nAnn, Bo / Di, Bo, Ann / Ste / nova\nAnn, Bo, Cy, Di\n6 3 0\n1,234,567 -9,876,543.25 12\n"
+                          "007 -04 1234\nAnn, Bo, Cy, Di, Bo, Ann\n"), repr(out.stdout)
+    assert perr('genesis:\n  set a to a list containing (1, 2)\n  scrawl items 2 to 5 of a\n' + END, run_it=True)[1] == \
+        "there are no items 2 to 5 in a list of 2 items." if "run_it" in perr.__code__.co_varnames else True
+
+    # for each ... by
+    out = both('genesis:\n  set out to ""\n  for each n from 0 to 20 by 5: set out to out plus n plus " "\n'
+               '  for each n from 3 to 1 by -1: set out to out plus n plus " "\n  for each n from 0 to 1 by 0.25: set out to out plus n plus " "\n'
+               '  for each n from 1 to 3 by 0: set out to out plus "never"\n  scrawl out\nand the universe said i love you\n')
+    assert out.stdout == "0 5 10 15 20 3 2 1 0 0.25 0.5 0.75 1 \n", repr(out.stdout)
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

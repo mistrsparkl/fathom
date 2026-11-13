@@ -203,6 +203,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `greet with name, 3` | Do your own command `greet`, giving it its inputs in order. A command without inputs is just its name: `greet`. |
 | `for each score in scores:` | Do the indented lines once for every item of a list, with `score` being that item. |
 | `for each n from 1 to 10:` | The same for each whole number from 1 to 10. |
+| `for each n from 0 to 100 by 5:` | Counting in steps: 0, 5, 10 ... 100. A step below 0 counts down (`from 10 to 1 by -1`). |
 | `add 5 to scores` | Put an item at the end of a list. |
 | `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
@@ -245,12 +246,17 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `upper case of name`, `lower case of name` | text in CAPITALS / small letters (A to Z only) |
 | `trimmed line` | text without the spaces, tabs and line breaks at its start and end |
 | `name begins with "Dr"`, `name ends with ".txt"` | yes or no |
-| `position of "lo" in name` | where it first appears, counted from 1 (0 if it isn't there) |
+| `position of "lo" in name` | where it first appears, counted from 1 (0 if it isn't there); in a list, which item it is (`position of "Bo" in names`) |
 | `replace "a" with "b" in name` | text with every "a" changed to "b" |
 | `line split by ", "` | text cut into a list of text at every ", " |
 | `join names with ", "` | a list made into one text, with ", " between the items |
 | `sorted scores`, `reversed scores` | a copy of a list, smallest first / back to front |
 | `last item of scores` | the last item of a list |
+| `items 2 to 5 of scores` | a list of those items |
+| `first 3 of scores`, `last 3 of scores` | the first or last few items of a list (or letters of text); all of them when there are fewer |
+| `unique names`, `shuffled names` | a copy without repeats (first ones kept) / in a random order |
+| `1234567 with commas` | "1,234,567" |
+| `7 padded to 3 digits` | "007" |
 | `sum of scores`, `average of scores`, `biggest of scores`, `smallest of scores` | worked out from a list of numbers |
 | `scores changed by the command double` | a new list: the command done to every item (see Commands as values) |
 | `scores kept by the command big one` | a new list of just the items the command says yes to |
@@ -273,7 +279,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 
 ## Names
 
-Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, as, ask, at, begins, between, by, cease, changed, clamp, conjure, contains, depth, direction, divided, each, empty, ends, exceeds, falls, file, flat, for, from, horizontal, if, in, inscribe, into, invoke, is, kept, larger, least, less, list, meanwhile, minus, more, most, move, new, no, not, of, or, otherwise, plus, raise, random, remove, repeat, return, returning, root, scrawl, set, size, smaller, square, stop, than, times, to, touches, toward, trimmed, try, vertical, whether, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`.
+Names can be several words (`turn needed`, `braking speed`). They can't use the language's own words: and, angle, as, ask, at, begins, between, by, cease, changed, clamp, conjure, contains, depth, direction, divided, each, empty, ends, exceeds, falls, file, flat, for, from, horizontal, if, in, inscribe, into, invoke, is, kept, larger, least, less, list, meanwhile, minus, more, most, move, new, no, not, of, or, otherwise, plus, raise, random, remove, repeat, return, returning, root, scrawl, set, size, smaller, square, stop, than, times, to, touches, toward, trimmed, try, vertical, whether, while, whisper, with, wound, write, yes. Some phrases are the language's too, so avoid names that start them: `entry`, `keys of`, `sum of`, `average of`, `biggest of`, `smallest of`, `rounded to`, `letter`, `letters`, `upper case`, `lower case`, `position of`, `replace`, `join`, `sorted`, `reversed`, `last item of`, `split by`, `items`, `first`, `last`, `unique`, `shuffled`, `with commas`, `padded to`.
 
 ## Adding words
 

@@ -677,6 +677,53 @@ def letters_from(s, first, last, line):
     return s[int(first) - 1:int(last)]
 
 
+def items_from(items, first, last, line):
+    if math.floor(first) != first or math.floor(last) != last or first < 1 or last > len(items) or first > last + 1:
+        raise RunError(line, f"there are no items {text(first)} to {text(last)} in a list of {len(items)} items.")
+    return [dup(x) for x in items[int(first) - 1:int(last)]]
+
+
+def first_of(items, count, line, end=False):
+    """The first (or last) count items of a list or letters of text: all of them when there are fewer."""
+    if math.floor(count) != count or count < 0:
+        raise RunError(line, f"I can't take {text(count)} of something: it must be a whole number, 0 or more.")
+    n = int(count)
+    part = (items[len(items) - n:] if n else items[:0]) if end else items[:n]
+    return part if isinstance(items, str) else [dup(x) for x in part]
+
+
+def unique(items):
+    out = []
+    for x in items:
+        if x not in out:
+            out.append(dup(x))
+    return out
+
+
+def shuffled(items):
+    out = [dup(x) for x in items]
+    pyrandom.shuffle(out)
+    return out
+
+
+def with_commas(n):
+    s = text(n)
+    sign, s = ("-", s[1:]) if s.startswith("-") else ("", s)
+    whole, dot, rest = s.partition(".")
+    if not whole.isdigit():
+        return sign + s
+    return sign + f"{int(whole):,}" + dot + rest
+
+
+def padded(n, digits, line):
+    if math.floor(digits) != digits or digits < 0:
+        raise RunError(line, f"I can't pad to {text(digits)} digits: it must be a whole number, 0 or more.")
+    s = text(n)
+    sign, s = ("-", s[1:]) if s.startswith("-") else ("", s)
+    whole, dot, rest = s.partition(".")
+    return sign + whole.rjust(int(digits), "0") + dot + rest
+
+
 def replace_all(s, old, new, line):
     if not old:
         raise RunError(line, "I can't replace empty text.")
@@ -1583,6 +1630,19 @@ class Expr:
             a, b, line = v.run, places.run, self.line
             return with_ir(Value(f"stellanova::rounded({v.cpp}, {places.cpp}, {line})", NUMBER, lambda env: rounded(a(env), b(env), line)),
                            lambda f: f.op(f"call double @cn_rounded(double {machine.emit(f, v)}, double {machine.emit(f, places)}, i32 {line})"))
+        if self.at("with", "commas"):  # '1234567 with commas' is "1,234,567"
+            self.i += 2
+            self.need(v, NUMBER, "with commas")
+            a = v.run
+            return builtin("stellanova::with_commas({s0})", TEXT, lambda env: with_commas(a(env)), [v])
+        if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"
+            self.i += 2
+            self.need(v, NUMBER, "padded to")
+            digits = self.need(self.primary(), NUMBER, "padded to")
+            if self.peek() in ("digits", "digit"):
+                self.i += 1
+            a, b, line = v.run, digits.run, self.line
+            return builtin("stellanova::padded({s0}, {s1}, {line})", TEXT, lambda env: padded(a(env), b(env), line), [v, digits], line)
         if self.at("split", "by"):
             self.i += 2
             self.need(v, TEXT, "split by")
@@ -1871,10 +1931,17 @@ class Expr:
                 return builtin(f"stellanova::{fn}({{a0}})", TEXT, lambda env, table=table: a(env).translate(table), [v])
         if self.at("position", "of"):
             self.i += 2
-            part = self.need(self.sum(), TEXT, "position of")
+            part = self.sum()
             self.take("in")
-            v = self.need(self.operand(), TEXT, "position of ... in")
+            v = self.operand()
             a, b = v.run, part.run
+            if is_list(v.kind):  # 'position of "Bo" in names': which item it is, or 0
+                if element(v.kind) != part.kind:
+                    raise ScriptError(line, f"'position of ... in' looks for {kind_name(element(v.kind))} in this list, not {kind_name(part.kind)}.")
+                return builtin("stellanova::position({a0}, {a1})", NUMBER,
+                               lambda env: float(next((k for k, x in enumerate(a(env), 1) if x == b(env)), 0)), [v, part])
+            self.need(part, TEXT, "position of")
+            self.need(v, TEXT, "position of ... in")
             return builtin("stellanova::position({a0}, {a1})", NUMBER, lambda env: float(a(env).find(b(env)) + 1), [v, part])
         if self.at("replace"):
             self.i += 1
@@ -1927,6 +1994,38 @@ class Expr:
                 a = v.run
                 run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
                 return builtin(f"stellanova::{word}({{a0}})", v.kind, run, [v])
+        if tok == "items" and self.peek(1) not in ITEM_NOT_INDEX and not self.names.match(self.t, self.i)[0]:
+            self.i += 1  # 'items 2 to 5 of names'
+            first = self.need(self.sum(), NUMBER, "items")
+            self.take("to")
+            last_ = self.need(self.sum(), NUMBER, "items ... to")
+            self.take("of")
+            v = self.operand()
+            if not is_list(v.kind):
+                raise ScriptError(line, f"'items ... to ... of' needs a list, but this is {kind_name(v.kind)}.")
+            a, f, b = v.run, first.run, last_.run
+            return builtin("stellanova::items_from({a0}, {s1}, {s2}, {line})", v.kind,
+                           lambda env: items_from(a(env), f(env), b(env), line), [v, first, last_], line)
+        if (tok in ("first", "last") and self.peek(1) not in ITEM_NOT_INDEX and self.peek(1) != "item"
+                and not self.names.match(self.t, self.i)[0]):
+            self.i += 1  # 'first 3 of names', 'last 2 of word'
+            count = self.need(self.sum(), NUMBER, tok)
+            self.take("of")
+            v = self.operand()
+            if not (is_list(v.kind) or v.kind == TEXT):
+                raise ScriptError(line, f"'{tok} ... of' needs a list or text, but this is {kind_name(v.kind)}.")
+            a, c, end = v.run, count.run, tok == "last"
+            fn = "last_of" if end else "first_of"
+            return builtin(f"stellanova::{fn}({{a0}}, {{s1}}, {{line}})", v.kind,
+                           lambda env: first_of(a(env), c(env), line, end), [v, count], line)
+        for word, run_ in (("unique", unique), ("shuffled", shuffled)):
+            if self.at(word):
+                self.i += 1
+                v = self.operand()
+                if not is_list(v.kind):
+                    raise ScriptError(line, f"'{word}' needs a list, but this is {kind_name(v.kind)}.")
+                a = v.run
+                return builtin(f"stellanova::{word}({{a0}})", v.kind, lambda env, r=run_: r(a(env)), [v])
         if self.at("last", "item", "of"):
             self.i += 3
             v = self.operand()
@@ -3655,18 +3754,27 @@ def for_each(n, head, body, names, declared, depth):
         lo = e.need(e.sum(), NUMBER, "for each ... from")
         e.take("to")
         hi = e.need(e.sum(), NUMBER, "for each ... from")
+        step = None
+        if e.at("by"):  # 'for each n from 0 to 100 by 5', 'from 10 to 1 by -1' (by 0: no rounds)
+            e.i += 1
+            step = e.need(e.sum(), NUMBER, "for each ... by")
         if e.i != len(e.t):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         kind = NUMBER
-        end = f"stellanova_end_{n}"
-        line = f"{tab}for ({'let' if JS else 'double'} {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
-        a, b = lo.run, hi.run
+        end, by = f"stellanova_end_{n}", f"stellanova_by_{n}"
+        let = 'let' if JS else 'double'
+        if step is None:
+            line = f"{tab}for ({let} {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}; {cpp} <= {end}; {cpp} += 1)"
+        else:
+            line = (f"{tab}for ({let} {cpp} = {strip_parens(lo.cpp)}, {end} = {strip_parens(hi.cpp)}, {by} = {strip_parens(step.cpp)}; "
+                    f"({by} > 0 && {cpp} <= {end}) || ({by} < 0 && {cpp} >= {end}); {cpp} += {by})")
+        a, b, s = lo.run, hi.run, (step.run if step else lambda env: 1.0)
 
         def items(env):
-            x, last = a(env), b(env)
-            while x <= last:
+            x, last, by_ = a(env), b(env), s(env)
+            while (by_ > 0 and x <= last) or (by_ < 0 and x >= last):
                 yield x
-                x += 1
+                x += by_
     names.add(words, cpp, kind, read_only=True)
     lines, then = body(loop=True)
     del names.known[tuple(words)]
@@ -3677,7 +3785,7 @@ def for_each(n, head, body, names, declared, depth):
             if not then(env):
                 break
     if tokens[cut] == "from":
-        with_ir(run, lambda f: machine.count_from(f, cpp, lo, hi, then))
+        with_ir(run, lambda f: machine.count_from(f, cpp, lo, hi, then, step))
     else:
         with_ir(run, lambda f: machine.each_in(f, cpp, kind, seq, then))
     return [line, tab + "{"] + lines + [tab + "}"], run, None

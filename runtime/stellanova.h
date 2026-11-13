@@ -871,6 +871,105 @@ namespace stellanova
 		return at == std::string::npos ? 0.0 : letters(s.substr(0, at)) + 1;
 	}
 
+	template <typename T>
+	double position(const std::vector<T>& items, const T& item)
+	{
+		for (size_t k = 0; k < items.size(); ++k)
+			if (items[k] == item)
+				return static_cast<double>(k + 1);
+		return 0.0;
+	}
+
+	template <typename T>
+	std::vector<T> items_from(const std::vector<T>& items, double first, double last, int line)
+	{
+		double size = static_cast<double>(items.size());
+		if (std::floor(first) != first || std::floor(last) != last || first < 1 || last > size || first > last + 1)
+			fail(line, "there are no items " + text(first) + " to " + text(last) + " in a list of " + text(size) + " items.");
+		return std::vector<T>(items.begin() + static_cast<size_t>(first) - 1, items.begin() + static_cast<size_t>(last));
+	}
+
+	inline size_t how_many(double count, double size, int line)
+	{
+		if (std::floor(count) != count || count < 0)
+			fail(line, "I can't take " + text(count) + " of something: it must be a whole number, 0 or more.");
+		return static_cast<size_t>(std::min(count, size));
+	}
+
+	template <typename T>
+	std::vector<T> first_of(const std::vector<T>& items, double count, int line)
+	{
+		return std::vector<T>(items.begin(), items.begin() + how_many(count, static_cast<double>(items.size()), line));
+	}
+
+	template <typename T>
+	std::vector<T> last_of(const std::vector<T>& items, double count, int line)
+	{
+		return std::vector<T>(items.end() - how_many(count, static_cast<double>(items.size()), line), items.end());
+	}
+
+	inline std::string first_of(const std::string& s, double count, int line)
+	{
+		std::vector<std::string> all = letters_in(s), part = first_of(all, count, line);
+		std::string out;
+		for (const auto& x : part)
+			out += x;
+		return out;
+	}
+
+	inline std::string last_of(const std::string& s, double count, int line)
+	{
+		std::vector<std::string> all = letters_in(s), part = last_of(all, count, line);
+		std::string out;
+		for (const auto& x : part)
+			out += x;
+		return out;
+	}
+
+	template <typename T>
+	std::vector<T> unique(const std::vector<T>& items)
+	{
+		std::vector<T> out;
+		for (const auto& x : items)
+			if (std::find(out.begin(), out.end(), x) == out.end())
+				out.push_back(x);
+		return out;
+	}
+
+	// '1234567 with commas' is "1,234,567"; '7 padded to 3 digits' is "007".
+	inline std::string with_commas(double n)
+	{
+		std::string s = text(n), sign;
+		if (!s.empty() && s[0] == '-')
+			sign = "-", s = s.substr(1);
+		size_t dot = s.find('.');
+		std::string whole = s.substr(0, dot), rest = dot == std::string::npos ? "" : s.substr(dot);
+		if (whole.empty() || whole.find_first_not_of("0123456789") != std::string::npos)
+			return sign + s;
+		std::string out;
+		for (size_t k = 0; k < whole.size(); ++k)
+		{
+			if (k && (whole.size() - k) % 3 == 0)
+				out += ',';
+			out += whole[k];
+		}
+		return sign + out + rest;
+	}
+
+	inline std::string padded(double n, double digits, int line)
+	{
+		if (std::floor(digits) != digits || digits < 0)
+			fail(line, "I can't pad to " + text(digits) + " digits: it must be a whole number, 0 or more.");
+		std::string s = text(n), sign;
+		if (!s.empty() && s[0] == '-')
+			sign = "-", s = s.substr(1);
+		size_t dot = s.find('.');
+		std::string whole = s.substr(0, dot), rest = dot == std::string::npos ? "" : s.substr(dot);
+		if (whole.size() < static_cast<size_t>(digits))
+			whole = std::string(static_cast<size_t>(digits) - whole.size(), '0') + whole;
+		return sign + whole + rest;
+	}
+
 	inline std::string replace_all(std::string s, const std::string& from, const std::string& to, int line)
 	{
 		if (from.empty())
@@ -1055,6 +1154,13 @@ namespace stellanova
 		if (items.empty())
 			fail(line, "the list is empty, so I can't pick a random item.");
 		return items[static_cast<size_t>(random(1, static_cast<double>(items.size()), line)) - 1];
+	}
+
+	template <typename T>
+	std::vector<T> shuffled(std::vector<T> items)
+	{
+		std::shuffle(items.begin(), items.end(), random_engine());
+		return items;
 	}
 
 	// How many letters text has (not bytes: "é" is one letter).
