@@ -404,6 +404,19 @@ def program_checks():
                '  scrawl the city of f, " ", the temperature of f, " ", the wind speed of f\nand the universe said i love you\n')
     assert out.stdout == "Oslo 0 7\n", repr(out.stdout)
 
+    # check lines, and stellanova test
+    out = both('genesis:\n  scrawl 1\n  check 1 plus 1 is 3\n  scrawl "not reached"\nand the universe said i love you\n')
+    assert out.stdout == "1\n" and out.stderr == ("Line 3: this check failed: 1 plus 1 is 3\n"), (out.stdout, out.stderr)
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "t.stella").write_text('to double, given x (a number), returning a number:\n  return x times 2\nand the universe said i love you\n\n'
+                                          'to test doubling:\n  check double with 2 is 4\nand the universe said i love you\n\n'
+                                          'to test names:\n  set names to a list containing ("Ann", "Bo")\n  check the size of names is 3\n'
+                                          'and the universe said i love you\n\ngenesis:\n  scrawl "genesis"\nand the universe said i love you\n', encoding="utf-8")
+        tested = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "test", "t.stella"], capture_output=True, text=True,
+                                encoding="utf-8", cwd=d)
+    assert (tested.stdout, tested.returncode) == ("\u2713 test doubling\n\u2717 test names: line 11: this check failed: the size of names is 3\n"
+                                                  "2 tests: 1 passed, 1 failed.\n", 1), (tested.stdout, tested.returncode)
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

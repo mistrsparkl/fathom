@@ -19,6 +19,7 @@ and the universe said i love you
 - `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
 - `stellanova` on its own lets you try lines out one at a time.
 - `stellanova check game.stella` looks for mistakes without running it.
+- `stellanova test game.stella` runs its `to test ...:` commands and shows which `check` lines failed.
 - `stellanova watch game.stella` runs it line by line, showing each line and the names it changes.
 
 Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.

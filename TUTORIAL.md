@@ -99,6 +99,38 @@ And boots.
 
 Each line under it is a value (or several, with commas), a `:`, then what to do. `anything else:` is for every other value.
 
+### Testing your commands
+
+A `check` line says something that should be so. Put checks in commands whose names start with `test`:
+
+```stellanova
+to double, given x (a number), returning a number:
+  return x times 2
+and the universe said i love you
+
+to test doubling:
+  check double with 2 is 4
+  check double with 0 is 0
+and the universe said i love you
+
+genesis:
+  scrawl double with 21
+and the universe said i love you
+```
+
+```output
+42
+```
+
+`stellanova test maths.stella` runs every test (not genesis) and shows which passed:
+
+```
+✓ test doubling
+1 test: 1 passed, 0 failed.
+```
+
+A check that isn't so says which line and what failed: `✗ test doubling: line 7: this check failed: double with 0 is 1`.
+
 ### Watching a program run
 
 `stellanova watch` runs a program and shows each line as it happens, with the names it changed:

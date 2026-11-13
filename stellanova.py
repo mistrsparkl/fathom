@@ -3031,6 +3031,15 @@ def statements(body, names, declared, depth):
             rows = rows[:start] + depending_rows(n, raw.strip(), inner, indent) + rows[k:]
             k = start
             continue
+        words_ = raw.strip().lower().split()
+        if (words_[:1] == ["check"] and not inner
+                and not any(tuple(words_[:len(key)]) == key for key in names.commands if key[0] == "check")):  # not 'check fuel with 5'
+            pad = raw[:len(raw) - len(raw.lstrip())]
+            what = raw.strip()[6:].strip()
+            shown = what.replace('"', "'").replace("[", "(").replace("]", ")")
+            rows[k - 1:k] = [(n, f"{pad}if not ({what}):"), (n, f'{pad}  raise an error with "this check failed: {shown}"')]
+            k -= 1
+            continue
         said = raw.strip()
         lines, run, branch = statement(n, said if said.startswith("note:") else surface(said, n), inner, names, declared, depth)
         out += lines
@@ -4023,8 +4032,28 @@ def strip_parens(cpp):
 
 # ---------------------------------------------------------------- running and building
 
-def run_program(script):
-    """Runs a program directly. Returns the exit code (0 when it finished, 1 when it stopped with an error)."""
+def run_tests(program):
+    """'stellanova test': runs each command whose name starts with 'test' (and has no inputs), not genesis."""
+    tests = [(key, c) for key, c in program.commands.items() if key[0] == "test" and not c.kinds and c.inputs is None]
+    if not tests:
+        print("There are no tests: a test is a command like 'to test adding:' with 'check' lines in it.")
+        return 1
+    failed = 0
+    for key, command in tests:
+        try:
+            command.runner()
+            print(f"\u2713 {' '.join(key)}")
+        except RunError as err:
+            failed += 1
+            sys.stdout.flush()
+            at = run_where(err.line)
+            print(f"\u2717 {' '.join(key)}: {at[:1].lower() + at[1:]}: {err.message}")
+    print(f"{len(tests)} test{'s' if len(tests) != 1 else ''}: {len(tests) - failed} passed, {failed} failed.")
+    return 1 if failed else 0
+
+
+def run_program(script, tests=False):
+    """Runs a program directly (or its tests). Returns the exit code (0 when it finished, 1 when it stopped with an error)."""
     global LOGIC
     LOGIC = script.parent
     try:
@@ -4042,6 +4071,9 @@ def run_program(script):
 
     def go():
         try:
+            if tests:
+                result["code"] = run_tests(program)
+                return
             program.start()
             wait_for_others()
         except RunError as err:
@@ -4248,6 +4280,7 @@ USAGE = """Use:
   stellanova build <script.stella>               make it into an .exe (needs LLVM: winget install LLVM.LLVM)
   stellanova check <script.stella>               look for mistakes without running it
   stellanova unreal <script.stella>              run it inside Unreal Engine: the 3D words become a real lit world
+  stellanova test <script.stella>                run each command called 'to test ...:' and show which checks failed
   stellanova watch <script.stella>               run it, showing each line as it runs and the names it changes
   stellanova web <script.stella> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
   stellanova                                      try lines out, one at a time
@@ -4265,6 +4298,8 @@ def main(argv):
     if len(args) > 2 and args[0] == "run":  # the words after the script are for the program: 'the words given'
         ARGUMENTS[:] = args[2:]
         args = args[:2]
+    if len(args) == 2 and args[0] == "test":
+        return run_program(Path(args[1]), tests=True)
     if len(args) == 2 and args[0] == "watch":  # runs it directly, showing each line and the names it changes
         global WATCHING
         WATCHING = True
