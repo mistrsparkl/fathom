@@ -496,10 +496,12 @@ static V* empty_like(const V* shape)
 {
 	if (shape->tag == 'l' || shape->tag == 'm')
 		return fresh(shape->tag);
-	V* v = copy_of(shape);
-	if (v->tag == 'k')
-		for (V*& x : full(v)->items)
-			x = empty_like(x);
+	if (shape->tag != 'k')
+		return copy_of(shape);
+	V* v = fresh('k');  // part by part, not copy_of: a shape may hold itself (a spot's list of spots)
+	full(v)->kind = full(shape)->kind;
+	for (const V* x : full(shape)->items)
+		full(v)->items.push_back(empty_like(x));
 	return v;
 }
 
@@ -876,6 +878,10 @@ extern "C"
 		return std::strncmp(spec, name.c_str(), name.size()) == 0 && (spec[name.size()] == '\x01' || spec[name.size()] == 0);
 	}
 	V* cn_field(V* thing, int k) { return full(thing)->items[static_cast<size_t>(k)]; }
+	// A shape's pieces are shared, not copied: a shape may hold itself (a spot's list of spots) before it is finished.
+	void cn_field_shape(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = x; }
+	void cn_shape_item(V* list, V* x) { full(list)->items.push_back(x); }
+	void cn_shape_entry(V* table, V* x) { full(table)->table[""] = x; }
 	void cn_field_put(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = copy_of(x); }
 	void cn_replace(V* thing, V* with)  // 'set ball to ...' inside a command for a ball: the caller's ball itself changes
 	{

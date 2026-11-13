@@ -6,3 +6,10 @@ mygame.stella
 !editor/vscode/**/*.json
 *.vsix
 runtime/built/
+!editor/studio/ui/
+!editor/studio/package.json
+!editor/studio/package-lock.json
+editor/studio/node_modules/
+editor/studio/generated/
+editor/studio/ui/screens.js
+editor/studio/ui/stellanova.js

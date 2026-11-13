@@ -1,0 +1,98 @@
+genesis:|Where a program begins.
+and the universe said i love you|Ends a command, a description or genesis (unindented).
+to … :|Makes a command of your own.
+to … returning|A command that gives back a value.
+usually|An input's usual value, used when a call leaves it out: name (text, usually "friend").
+a … has:|Describes a new kind of thing and its parts.
+is a kind of|A kind of thing that has everything another kind has: a dog is a kind of pet:
+is anything that can|A shared ability: a speaker is anything that can speak.
+the world remembers:|Names every command can use and change.
+use:|Brings in a library (use: window) or another script (use: shapes.stella).
+whisper:|A note for people; the computer skips it.
+set … to|Gives a name a value.
+scrawl|Shows text or values.
+ask|Asks the person a question; the answer goes into a name.
+add … to|Adds to a number, or puts an item at the end of a list.
+remove … from|Takes an item out of a list.
+inscribe … into file|Makes or replaces a file with this text.
+if|Does the indented lines only when this is so.
+otherwise|What to do when the 'if' above wasn't so (otherwise if … for another test).
+repeat … times|Does the indented lines this many times.
+as long as|Does the indented lines again and again while this is so.
+for each … in|Does the indented lines once for each item of a list.
+for each … from … to|Does the indented lines for each number from one to another (by 5 to count in steps).
+depending on|Picks lines by a value: each indented line starts with a value, then anything else.
+whenever|Lines that run each time something becomes so, after genesis's other lines.
+every … seconds|Lines that run every few seconds.
+every frame|Lines that run for each picture drawn in a window game.
+try|Lines that might go wrong; what to do instead goes under 'if that went wrong:'.
+if that went wrong|After 'try:': what to do when it went wrong (the wound says why).
+the wound|Inside 'if that went wrong:', the reason, as text.
+raise an error with|Stops with a problem of your own (try: can catch it).
+return|Gives a value back from a command.
+cease|Stops the command (or the program, in genesis).
+break free|Leaves the loop it is in.
+move on|Skips to the next round of the loop.
+meanwhile|Starts a command going on its own; the next line carries on straight away.
+wait for the others|Waits for every 'meanwhile' command to finish.
+conjure a … as|Makes a new thing of a kind and names it.
+no …|Nothing: a thing that isn't there (set target to no enemy).
+is nothing|Whether a thing name holds nothing.
+is something|Whether a thing name holds a thing.
+check|Stops with 'this check failed' when this isn't so (stellanova test runs 'to test …:' commands).
+save … to file|Keeps any value in a file (as JSON).
+load … from file|Puts a saved value back into a name.
+as saved text|A value written out as JSON text.
+as text|A value as text.
+a list of|A new empty list of a kind of value.
+a list containing|A list with these items.
+a table of|A new empty table (names to values).
+entry … of|One entry of a table.
+item … of|One item of a list, counted from 1.
+items … to … of|A list of some of the items.
+first … of|The first few items of a list (or letters of text).
+last … of|The last few items of a list (or letters of text).
+last item of|The last item of a list.
+the size of|How many items, letters or entries; how far a place is from 0.
+contains|Whether a list holds an item, text holds some text, or a table has an entry.
+is one of|Whether a value is any of these: answer is one of ("yes", "y").
+unique|A copy of a list without repeats.
+shuffled|A copy of a list in a random order.
+sorted|A copy of a list, smallest first (sorted pets by age for things).
+reversed|A copy of a list, back to front.
+join … with|A list made into one text, with this between the items.
+position of … in|Where something first appears, counted from 1 (0 if it isn't there).
+replace … with … in|Text with every one of some text replaced.
+split by|Text cut into a list of text at each of these.
+trimmed|Text without spaces or line breaks at either end.
+upper case of|Text in capitals.
+lower case of|Text in small letters.
+letter … of|One letter of text, counted from 1.
+letters … to … of|Some letters of text.
+rounded to|A number rounded to some decimal places.
+with commas|A number as text with commas: 1234567 is "1,234,567".
+padded to … digits|A number as text with zeros in front: 7 is "007".
+sum of|All the numbers of a list added up.
+average of|The average of a list of numbers.
+biggest of|The biggest number in a list.
+smallest of|The smallest number in a list.
+keys of|The names of a table's entries, as a list of text.
+random number from … to|A random whole number.
+random item of|A random item of a list.
+square root of|The square root of a number.
+contents of file|Everything in a file, as text.
+lines of file|A file's lines, as a list of text.
+file … exists|Whether a file is there.
+exceeds|More than.
+falls below|Less than.
+is at least|More than or the same as.
+is at most|Less than or the same as.
+is within … of|Close enough: existence is within 30 of coin.
+plus|Adds numbers (or joins text).
+minus|Takes one number from another.
+times|Multiplies.
+divided by|Divides.
+a quotation mark|The " letter, for text that holds one.
+new line|A line break, as text.
+invoke|Runs a command held in a name.
+whisper|Shows a message for the person writing the program, not the one using it.

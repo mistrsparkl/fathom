@@ -106,6 +106,189 @@ to end the program, given code (a number) = stellanova_computer::end_program({co
   runs: end_program({code})
   web: stellanova::leave({code})
 
+note: ---- programs running alongside: start one, read what it writes as it goes, type answers into it, stop it
+
+include: <map>
+include: <memory>
+include: <mutex>
+include: <thread>
+
+code:
+  namespace stellanova_computer
+  {
+  	struct Running
+  	{
+  		HANDLE process = nullptr, job = nullptr, typing = nullptr;
+  		std::string out, err;
+  		bool out_done = false, err_done = false;
+  		std::mutex lock;
+  	};
+  	inline std::map<int, std::shared_ptr<Running>>& programs() { static std::map<int, std::shared_ptr<Running>> all; return all; }
+  	inline std::mutex& programs_lock() { static std::mutex m; return m; }
+  	inline std::shared_ptr<Running> program(double id, int line)
+  	{
+  		std::lock_guard<std::mutex> hold(programs_lock());
+  		auto it = programs().find((int)id);
+  		if (it == programs().end())
+  			stellanova::fail(line, "there is no program " + stellanova::text(id) + " (start one with 'start the program').");
+  		return it->second;
+  	}
+  	inline void read_into(HANDLE from, std::shared_ptr<Running> r, bool errors)
+  	{
+  		char chunk[4096];
+  		DWORD got = 0;
+  		while (ReadFile(from, chunk, sizeof chunk, &got, nullptr) && got > 0)
+  		{
+  			std::lock_guard<std::mutex> hold(r->lock);
+  			for (DWORD k = 0; k < got; ++k)
+  				if (chunk[k] != '\r')
+  					(errors ? r->err : r->out) += chunk[k];
+  		}
+  		CloseHandle(from);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		(errors ? r->err_done : r->out_done) = true;
+  	}
+  	inline double start_program(const std::string& command, const std::string& folder, int line)
+  	{
+  		SECURITY_ATTRIBUTES shared{sizeof shared, nullptr, TRUE};
+  		HANDLE out_read, out_write, err_read, err_write, in_read, in_write;
+  		if (!CreatePipe(&out_read, &out_write, &shared, 0) || !CreatePipe(&err_read, &err_write, &shared, 0) || !CreatePipe(&in_read, &in_write, &shared, 0))
+  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  		for (HANDLE own : {out_read, err_read, in_write})  // the program gets only its own ends
+  			SetHandleInformation(own, HANDLE_FLAG_INHERIT, 0);
+  		STARTUPINFOA start{};
+  		start.cb = sizeof start;
+  		start.dwFlags = STARTF_USESTDHANDLES;
+  		start.hStdOutput = out_write;
+  		start.hStdError = err_write;
+  		start.hStdInput = in_read;
+  		PROCESS_INFORMATION made{};
+  		std::string line_ = command;
+  		auto r = std::make_shared<Running>();
+  		r->job = CreateJobObjectA(nullptr, nullptr);  // so stopping it stops what it started too
+  		JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+  		limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+  		SetInformationJobObject(r->job, JobObjectExtendedLimitInformation, &limits, sizeof limits);
+  		bool ok = CreateProcessA(nullptr, line_.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr,
+  			folder.empty() ? nullptr : folder.c_str(), &start, &made);
+  		CloseHandle(out_write);
+  		CloseHandle(err_write);
+  		CloseHandle(in_read);
+  		if (!ok)
+  		{
+  			for (HANDLE h : {out_read, err_read, in_write, r->job})
+  				CloseHandle(h);
+  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  		}
+  		AssignProcessToJobObject(r->job, made.hProcess);
+  		ResumeThread(made.hThread);
+  		CloseHandle(made.hThread);
+  		r->process = made.hProcess;
+  		r->typing = in_write;
+  		std::thread(read_into, out_read, r, false).detach();
+  		std::thread(read_into, err_read, r, true).detach();
+  		std::lock_guard<std::mutex> hold(programs_lock());
+  		static int next = 0;
+  		programs()[++next] = r;
+  		return next;
+  	}
+  	inline std::string new_output(double id, bool errors, int line)
+  	{
+  		auto r = program(id, line);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		std::string got;
+  		std::swap(got, errors ? r->err : r->out);
+  		return got;
+  	}
+  	inline void type_into(double id, const std::string& words, int line)
+  	{
+  		auto r = program(id, line);
+  		std::string sent = words + "\n";
+  		DWORD put = 0;
+  		if (r->typing)
+  			WriteFile(r->typing, sent.data(), (DWORD)sent.size(), &put, nullptr);
+  	}
+  	inline bool is_running(double id, int line)  // until it has ended and everything it wrote has been read
+  	{
+  		auto r = program(id, line);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		return WaitForSingleObject(r->process, 0) == WAIT_TIMEOUT || !r->out_done || !r->err_done;
+  	}
+  	inline double exit_code(double id, int line)
+  	{
+  		auto r = program(id, line);
+  		DWORD code = 0;
+  		GetExitCodeProcess(r->process, &code);
+  		return code == STILL_ACTIVE ? -1 : (double)code;
+  	}
+  	inline void stop_program(double id, int line)
+  	{
+  		auto r = program(id, line);
+  		TerminateJobObject(r->job, 1);
+  	}
+  }
+
+python:
+  import threading
+  RUNNING = {}
+  def start_program(command, folder):
+      sys.stdout.flush()
+      try:
+          p = subprocess.Popen(command, cwd=folder or None, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+      except OSError:
+          raise RunError(0, "I couldn't start the program \"" + command + "\".")
+      r = {"p": p, "out": [], "err": [], "lock": threading.Lock()}
+      def read(stream, key):
+          for piece in iter(lambda: stream.read1(4096), b""):
+              with r["lock"]:
+                  r[key].append(piece)
+      r["readers"] = [threading.Thread(target=read, args=(p.stdout, "out"), daemon=True), threading.Thread(target=read, args=(p.stderr, "err"), daemon=True)]
+      for t in r["readers"]:
+          t.start()
+      RUNNING[len(RUNNING) + 1] = r
+      return float(len(RUNNING))
+  def running_program(n):
+      if n not in RUNNING:
+          raise RunError(0, "there is no program " + text(n) + " (start one with 'start the program').")
+      return RUNNING[n]
+  def new_output(n, key):
+      r = running_program(n)
+      with r["lock"]:
+          got, r[key] = b"".join(r[key]), []
+      return got.decode("utf-8", errors="replace").replace("\r", "")
+  def type_into(n, words):
+      r = running_program(n)
+      try:
+          r["p"].stdin.write((words + "\n").encode("utf-8"))
+          r["p"].stdin.flush()
+      except OSError:
+          pass
+  def program_running(n):
+      r = running_program(n)
+      return r["p"].poll() is None or any(t.is_alive() for t in r["readers"])
+  def exit_code(n):
+      code = running_program(n)["p"].poll()
+      return -1.0 if code is None else float(code)
+  def stop_program(n):
+      p = running_program(n)["p"]
+      subprocess.call(["taskkill", "/T", "/F", "/PID", str(p.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+to start the program, given command (text) and folder (text), returning a number = stellanova_computer::start_program({command}, {folder}, {line})
+  runs: start_program({command}, {folder})
+to latest output of the program, given program (a number), returning text = stellanova_computer::new_output({program}, false, {line})
+  runs: new_output({program}, "out")
+to latest errors of the program, given program (a number), returning text = stellanova_computer::new_output({program}, true, {line})
+  runs: new_output({program}, "err")
+to type into the program, given program (a number) and words (text) = stellanova_computer::type_into({program}, {words}, {line})
+  runs: type_into({program}, {words})
+to the program is running, given program (a number), returning yes or no = stellanova_computer::is_running({program}, {line})
+  runs: program_running({program})
+to exit code of the program, given program (a number), returning a number = stellanova_computer::exit_code({program}, {line})
+  runs: exit_code({program})
+to stop the program, given program (a number) = stellanova_computer::stop_program({program}, {line})
+  runs: stop_program({program})
+
 javascript:
   const stellanova_computer = {
     node: typeof process !== "undefined" && !!(process.versions && process.versions.node),

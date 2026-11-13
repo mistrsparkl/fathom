@@ -24,6 +24,8 @@ and the universe said i love you
 
 Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.
 
+**Stellanova Studio** (`editor/studio`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studio`.
+
 Checking Stellanova itself: `py -3 test_stellanova.py` runs every test program both ways (directly and built) and checks they print exactly the same.
 
 `stellanova build game.stella` makes machine code: Stellanova writes LLVM code for the program and LLVM's clang

@@ -127,6 +127,9 @@ declare ptr @cn_something(ptr, ptr, i32, i32)
 declare ptr @cn_able(ptr, ptr, ptr, i32)
 declare i1 @cn_is_kind(ptr, ptr)
 declare void @cn_field_put(ptr, i32, ptr)
+declare void @cn_field_shape(ptr, i32, ptr)
+declare void @cn_shape_item(ptr, ptr)
+declare void @cn_shape_entry(ptr, ptr)
 declare void @cn_replace(ptr, ptr)
 declare ptr @cn_sorted_by(ptr, i32, i32)
 declare ptr @cn_saved_text(ptr, ptr, i32)
@@ -312,24 +315,28 @@ class Fn:
             if into is not None:
                 self.lines, self.ended = saved, ended
 
-    def shape(self, kind):
-        """What 'load X from' fills: an empty value of the kind, a list's or table's one item showing its items' kind."""
+    def shape(self, kind, made=None):
+        """What 'load X from' fills: an empty value of the kind, a list's or table's one item showing its items' kind.
+        A kind holding a list of its own kind (a spot with a list of spots) shares its shape: made has the ones being made."""
+        made = {} if made is None else made
+        if kind in made:
+            return made[kind]
         if kind.startswith("list of "):
             out = self.op("call ptr @cn_list_new()")
-            self.put(f"call void @cn_list_add(ptr {out}, ptr {self.shape(kind[8:])})")
+            self.put(f"call void @cn_shape_item(ptr {out}, ptr {self.shape(kind[8:], made)})")
             return out
         if kind.startswith("table of "):
             out = self.op("call ptr @cn_table_new()")
-            self.put(f"call void @cn_entry_put(ptr {out}, ptr {self.text_const('')}, ptr {self.shape(kind[9:])})")
+            self.put(f"call void @cn_shape_entry(ptr {out}, ptr {self.shape(kind[9:], made)})")
             return out
         if kind.startswith("command("):
             raise Unsupported(kind)
         if kind in ABLE:  # just the ability: the kinds it may be are kept by the library (see finish)
             return self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
         if kind in THINGS:
-            thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
+            thing = made[kind] = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
             for k, (_, _, part_kind) in enumerate(THINGS[kind]):
-                self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {self.shape(part_kind)})")
+                self.put(f"call void @cn_field_shape(ptr {thing}, i32 {k}, ptr {self.shape(part_kind, made)})")
             return thing
         return self.box(self.zero(kind), kind)
 

@@ -1,0 +1,14 @@
+{
+  "name": "stellanova-studio",
+  "productName": "Stellanova Studio",
+  "version": "0.1.0",
+  "description": "A place to write, check and run Stellanova programs.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.2.2"
+  }
+}

@@ -543,6 +543,23 @@ def program_checks():
     out = both('genesis:\n  scrawl the size of the words given\n  scrawl the output of the command "echo hello there"\n'
                '  scrawl environment value of "OS"\n  scrawl the size of current folder exceeds 2\n  end the program with 3\n  scrawl "never"\n' + END)
     assert (out.stdout, out.returncode) == ("0\nhello there\n\nWindows_NT\nyes\n", 3), repr((out.stdout, out.returncode))
+    # Programs running alongside: what they print and their errors as they go, their exit number, stopping them.
+    out = both('use: computer\ngenesis:\n  set p to start the program with ("cmd /c echo hello& echo oops 1>&2& exit 3", "")\n'
+               '  set said to ""\n  set problems to ""\n  as long as the program is running p:\n'
+               '    set said to said plus latest output of the program p\n    set problems to problems plus latest errors of the program p\n'
+               '  set said to said plus latest output of the program p\n  set problems to problems plus latest errors of the program p\n'
+               '  scrawl trimmed said, " ", trimmed problems, " ", exit code of the program p\n'
+               '  set q to start the program with ("ping -n 30 127.0.0.1", "")\n  stop the program q\n'
+               '  as long as the program is running q:\n    set problems to ""\n  scrawl "stopped"\n  scrawl latest output of the program 9\n' + END)
+    assert out.stdout == "hello oops 3\nstopped\n", repr(out.stdout)
+    assert out.stderr == "Line 17: there is no program 9 (start one with 'start the program').\n", repr(out.stderr)
+
+    # A kind holding a list of its own kind loads and saves (its shape holds itself).
+    tree = '[{"name": "a", "inside": [{"name": "b", "inside": [{}]}]}]'
+    out = both('a spot has:\n  name (text)\n  inside (a list of spots)\n' + END + 'genesis:\n  set tree to a list of spots\n'
+               '  load tree from file "tree.json"\n'
+               '  scrawl the name of item 1 of (the inside of item 1 of tree), " ", tree as saved text\n' + END, others={"tree.json": tree})
+    assert out.stdout == 'b [{"name": "a", "inside": [{"name": "b", "inside": [{"name": "", "inside": []}]}]}]\n', repr(out.stdout + out.stderr)
     out = both('genesis:\n  scrawl logarithm of 1000, " ", natural logarithm of e, " ", logarithm of -1\n'
                '  scrawl arc sine of 0.5 rounded to 6 decimal places, " ", arc cosine of 0, " ", arc tangent of 1, " ", arc sine of 2\n'
                '  scrawl whole part of -3.7, " ", whole part of 3.7\n' + END)
