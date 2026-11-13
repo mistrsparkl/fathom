@@ -287,6 +287,18 @@ def program_checks():
     assert perr('genesis:\n  invoke 5\n' + END)[1] == "'invoke' needs a command, like 'invoke the command double with 4', not a number."
     assert perr('genesis:\n  set f to the command nothing\n' + END)[1] == "'the command' needs the name of a command after it, like 'the command double'."
 
+    # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
+    out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
+               'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'
+               '  add n to the scores of p\n  return p\nand the universe said i love you\n\n'
+               'genesis:\n  set pets to a list of pets\n  set names to a table of text values\n  set total to 0\n'
+               '  for each n from 1 to 70000:\n    set scratch to a list containing (n, n plus 1, n plus 2)\n    set p to make a pet with n\n'
+               '    add the sum of scratch to total\n    if the remainder of (n, 7000) is 0:\n      add p to pets\n'
+               '      set the entry "k" plus n of names to the name of p\n'
+               '  scrawl total, " ", the size of pets, " ", the name of the item at 10 in pets, " ", the scores of the item at 3 in pets\n'
+               '  scrawl the entry "k70000" of names\nand the universe said i love you\n')
+    assert out.stdout == "7350315000 10 pet 70000 21000\npet 70000\n", repr(out.stdout)
+
     # meanwhile: commands going alongside the rest, each with its own copy of the names; a problem in one stops everything.
     out = both('to count up, given name (text) and delay (a number):\n  wait delay\n  inscribe name plus " done" into file name plus ".txt"\nand the universe said i love you\n\nto fail later:\n  wait 0.2 seconds\n  raise an error with "the helper broke"\nand the universe said i love you\n\ngenesis:\n  set started to seconds since the start\n  set names to a list of ("a", "b", "c")\n  for each who in names: meanwhile count up with who, 0.5\n  set names to a list of text\n  wait for the others\n  scrawl contents of file "a.txt", " ", contents of file "b.txt", " ", contents of file "c.txt"\n  scrawl seconds since the start minus started falls below 1.4\n  meanwhile count up with "d", 0.3\n  scrawl "main goes on"\n  meanwhile fail later\n  wait 1 seconds\n  scrawl "never"\nand the universe said i love you\n')
     assert (out.stdout, out.stderr) == ('a done b done c done\nyes\nmain goes on\n', 'Line 8: the helper broke\n'), repr((out.stdout, out.stderr))

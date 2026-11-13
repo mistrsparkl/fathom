@@ -129,7 +129,9 @@ declare ptr @cn_saved_text(ptr, i32)
 declare void @cn_save_file(ptr, ptr, i32)
 declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
-declare void @cn_meanwhile(ptr, ptr)
+declare void @cn_meanwhile(ptr, ptr, i64)
+declare void @cn_statement()
+declare void @cn_root(ptr, i64)
 declare void @cn_wait_for_others()
 declare ptr @malloc(i64)
 """
@@ -164,6 +166,7 @@ class Module:
         for cpp, kind in self.shared.items():
             self.constants.append(f"@g.{cpp} = internal global {ll_type(kind)} {zero_const(kind)}")
             start.put(f"store {ll_type(kind)} {start.zero(kind)}, ptr @g.{cpp}")
+            start.put(f"call void @cn_root(ptr @g.{cpp}, i64 8)")
         main = ["define i32 @main(i32 %count, ptr %given) {", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
         for name in files:
             const, _ = self.text(name)
@@ -447,6 +450,7 @@ def loop(f, test, body, step=None):
     """A loop: test() writes the yes-or-no to keep going; step runs after each round."""
     top, inside, nxt, out = f.label("loop"), f.label("body"), f.label("next"), f.label("out")
     f.place(top)
+    f.put("call void @cn_statement()")  # each round: what the last round made may be freed
     cond = test()
     f.branch(cond, inside, out)
     f.place(inside)
@@ -537,6 +541,7 @@ def by_command(f, seq, command, item, gives, keep, line):
     k = counter(f, "m")
     top, inside, out_label = f.label("each"), f.label("doing"), f.label("done")
     f.place(top)
+    f.put("call void @cn_statement()")
     now = f.op(f"load i64, ptr {k}")
     f.branch(f.op(f"icmp slt i64 {now}, {size}"), inside, out_label)
     f.place(inside)
@@ -576,7 +581,7 @@ def meanwhile(f, piece):
         value = g.tmp()
         g.entry += [f"  {value} = load {ll_type(kind)}, ptr {at}", f"  store {ll_type(kind)} {value}, ptr {where}"]
     g.done()
-    f.put(f"call void @cn_meanwhile(ptr @cn_user_{g.name}, ptr {block})")
+    f.put(f"call void @cn_meanwhile(ptr @cn_user_{g.name}, ptr {block}, i64 {8 * max(1, len(used))})")
 
 
 def attempt(f, tried, problem_cpp, fixed):
@@ -632,7 +637,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
         result = f"return static_cast<{ret}>({body});"
     fallback = {"double": "0.0", "bool": "false", "V*": "cn_box_number(0)"}.get(ret, "")
     code = (f'extern "C" {ret} {name}({", ".join(params + ["int line"])})\n'
-            f"{{\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n}}\n")
+            f"{{\n\tCnParked parked;\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n}}\n")
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"
     f.module.declare(f"declare {ll_ret} @{name}({', '.join([ll_type(a.kind) for a in args] + ['i32'])})")
@@ -640,11 +645,14 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
     return f.call(ll_ret, name, *values, checked=True)
 
 
+WRAPPER_FORM = "2: parked"  # change it when wrap() writes its C functions differently, so old ones are made again
+
+
 def unit_file(unit, head, wrappers):
     """runtime/built/w_<unit>.cpp, holding every wrapper any program has needed so far (rewritten only when one is new)."""
     import hashlib
     path = HERE / "runtime" / "built" / f"w_{re.sub(r'[^a-z0-9]+', '_', unit)}.cpp"
-    mark = "// head " + hashlib.sha1(head.encode("utf-8")).hexdigest()
+    mark = "// head " + hashlib.sha1((head + WRAPPER_FORM).encode("utf-8")).hexdigest()
     have = {}
     if path.exists():
         old = path.read_text(encoding="utf-8")

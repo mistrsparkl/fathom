@@ -6,12 +6,278 @@
 #include "stellanova.h"
 #include "machine.h"
 
-// shortcut: values are never freed; upgrade to reference counting before long-running programs make values in loops.
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <winsock2.h>
+#include <windows.h>
+#include <atomic>
+#include <condition_variable>
+
+// ---------------------------------------------------------------- freeing values
+// Now and then, while values are being made, the values nobody can reach any more are freed (a collector).
+// Reachable: what any thread holds on its stack or in its registers, the world's shared names (cn_root), the values
+// made since a thread's current line began (cn_statement), and everything inside those.
+// A thread stops for the collector only at safe points (making a value, starting a line). A thread inside a library
+// word (waiting, reading the web...) is 'parked' with its registers kept, so the collector never waits for it.
+namespace gc
+{
+	struct Thread
+	{
+		char* top = nullptr;  // where its stack starts (its highest address)
+		CONTEXT regs{};
+		char* sp = nullptr;
+		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
+		std::vector<V*> young;  // made since its current line began
+	};
+	static std::mutex lock;  // every value, the roots, and each thread's young values
+	static std::mutex stop_lock;  // the threads and their states
+	static std::condition_variable stop_cv;
+	static std::vector<Thread*> threads;
+	static std::vector<V*> all;
+	static std::vector<V*> spare;  // freed values, ready to be used again
+	static std::vector<std::pair<const char*, size_t>> roots;
+	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 18;  // set it to test the collector hard
+	static size_t made_since = 0, limit = least;
+	static std::mutex collecting;
+	static std::atomic<bool> stopping{false};
+
+	struct Mine
+	{
+		Thread* t = nullptr;
+		~Mine()  // the thread is ending
+		{
+			if (!t)
+				return;
+			{
+				std::lock_guard<std::mutex> hold(stop_lock);
+				threads.erase(std::find(threads.begin(), threads.end(), t));
+				delete t;
+			}
+			stop_cv.notify_all();
+		}
+	};
+	static thread_local Mine mine;
+
+	static Thread* me()
+	{
+		if (!mine.t)
+		{
+			Thread* t = new Thread;
+			ULONG_PTR low, high;
+			GetCurrentThreadStackLimits(&low, &high);
+			t->top = reinterpret_cast<char*>(high);
+			std::lock_guard<std::mutex> hold(stop_lock);
+			threads.push_back(t);
+			mine.t = t;
+		}
+		return mine.t;
+	}
+
+	static void keep_registers(Thread* t)
+	{
+		RtlCaptureContext(&t->regs);
+		t->sp = reinterpret_cast<char*>(t->regs.Rsp);
+	}
+
+	static void stop_here(Thread* t)
+	{
+		keep_registers(t);
+		std::unique_lock<std::mutex> hold(stop_lock);
+		t->state = 1;
+		stop_cv.notify_all();
+		stop_cv.wait(hold, [] { return !stopping.load(); });
+		t->state = 0;
+	}
+
+	static void mark_and_sweep()
+	{
+		std::sort(all.begin(), all.end());
+		std::vector<V*> work;
+		auto reach = [&](V* c) {
+			if (c && !c->marked)
+			{
+				c->marked = true;
+				work.push_back(c);
+			}
+		};
+		auto look = [&](const char* from, const char* to) {  // any word here that is a value's address
+			const char* p = reinterpret_cast<const char*>((reinterpret_cast<uintptr_t>(from) + 7) & ~uintptr_t(7));
+			for (; p + sizeof(V*) <= to; p += sizeof(V*))
+			{
+				V* c;
+				std::memcpy(&c, p, sizeof c);
+				auto it = std::lower_bound(all.begin(), all.end(), c);
+				if (it != all.end() && *it == c)
+					reach(c);
+			}
+		};
+		for (Thread* x : threads)
+		{
+			look(reinterpret_cast<const char*>(&x->regs), reinterpret_cast<const char*>(&x->regs + 1));
+			look(x->sp, x->top);
+			for (V* v : x->young)
+				reach(v);
+		}
+		for (const auto& [from, size] : roots)
+			look(from, from + size);
+		while (!work.empty())
+		{
+			V* v = work.back();
+			work.pop_back();
+			for (V* x : v->items)
+				reach(x);
+			for (const auto& [key, x] : v->table)
+				reach(x);
+		}
+		size_t kept = 0;
+		for (V* v : all)
+			if (v->marked)
+			{
+				v->marked = false;
+				all[kept++] = v;
+			}
+			else if (spare.size() < (1 << 20))
+			{
+				v->d = v->x = v->y = v->z = 0;
+				if (v->s.capacity() > 4096)
+					std::string().swap(v->s);
+				v->s.clear();
+				if (v->items.capacity() > 1024)
+					std::vector<V*>().swap(v->items);
+				v->items.clear();
+				v->table.clear();
+				v->kind = nullptr;
+				v->command = nullptr;
+				spare.push_back(v);
+			}
+			else
+				delete v;
+		all.resize(kept);
+		made_since = 0;
+		limit = std::getenv("STELLANOVA_COLLECT_OFTEN") ? least : std::max(least, kept);
+	}
+
+	static void collect(Thread* self)
+	{
+		std::unique_lock<std::mutex> one(collecting, std::try_to_lock);
+		if (!one)  // another thread is collecting
+		{
+			if (stopping)
+				stop_here(self);
+			return;
+		}
+		keep_registers(self);
+		std::unique_lock<std::mutex> hold(stop_lock);
+		stopping = true;
+		self->state = 1;
+		stop_cv.wait(hold, [self] {
+			for (Thread* x : threads)
+				if (x != self && x->state == 0)
+					return false;
+			return true;
+		});
+		{
+			std::lock_guard<std::mutex> heap(lock);
+			mark_and_sweep();
+		}
+		self->state = 0;
+		stopping = false;
+		hold.unlock();
+		stop_cv.notify_all();
+	}
+
+	static V* track(char tag)  // a new value (a freed one used again when there is one)
+	{
+		Thread* t = me();
+		if (t->state == 0 && stopping)
+			stop_here(t);
+		bool full;
+		V* v;
+		{
+			std::lock_guard<std::mutex> hold(lock);
+			if (spare.empty())
+				v = new V;
+			else
+			{
+				v = spare.back();
+				spare.pop_back();
+			}
+			v->tag = tag;
+			all.push_back(v);
+			t->young.push_back(v);
+			full = ++made_since > limit;
+		}
+		if (full && t->state == 0)
+			collect(t);
+		return v;
+	}
+}
+
+extern "C"
+{
+	void cn_statement()  // a line begins: values made for the line before are now only kept if something holds them
+	{
+		gc::Thread* t = gc::me();
+		if (gc::stopping)
+			gc::stop_here(t);
+		t->young.clear();
+	}
+	void cn_park()  // going into a library word that may wait: the collector needn't wait for this thread
+	{
+		gc::Thread* t = gc::me();
+		gc::keep_registers(t);
+		t->state = 2;
+		if (gc::stopping)  // a collector may be waiting for this thread
+		{
+			std::lock_guard<std::mutex> hold(gc::stop_lock);
+			gc::stop_cv.notify_all();
+		}
+	}
+	void cn_unpark()
+	{
+		gc::Thread* t = gc::me();
+		t->state = 0;
+		if (!gc::stopping)  // (both are seq_cst: a collector starting now sees this thread running and waits for it)
+			return;
+		std::unique_lock<std::mutex> hold(gc::stop_lock);
+		t->state = 2;  // not yet: wait until the collector is done
+		gc::stop_cv.notify_all();
+		gc::stop_cv.wait(hold, [] { return !gc::stopping.load(); });
+		t->state = 0;
+	}
+	void cn_root(const char* from, long long size)  // the world's shared names: always kept
+	{
+		std::lock_guard<std::mutex> hold(gc::lock);
+		gc::roots.push_back({from, static_cast<size_t>(size)});
+	}
+	void cn_hold_push(V* list, V* x)  // a library word filling a list (it may be parked while the collector looks)
+	{
+		std::lock_guard<std::mutex> hold(gc::lock);
+		list->items.push_back(x);
+	}
+	void cn_hold_put(V* table, const char* key, V* x)
+	{
+		std::lock_guard<std::mutex> hold(gc::lock);
+		table->table[key] = x;
+	}
+}
+
+static void unroot(const char* from)
+{
+	std::lock_guard<std::mutex> hold(gc::lock);
+	auto& r = gc::roots;
+	r.erase(std::find_if(r.begin(), r.end(), [from](const auto& x) { return x.first == from; }));
+}
+
+struct Parked  // around anything in here that may wait
+{
+	Parked() { cn_park(); }
+	~Parked() { cn_unpark(); }
+};
+
 static V* fresh(char tag)
 {
-	V* v = new V;
-	v->tag = tag;
-	return v;
+	return gc::track(tag);
 }
 V* cn_make_text(std::string s)
 {
@@ -129,7 +395,9 @@ static V* copy_of(const V* v)
 {
 	if (v->tag == 'n' || v->tag == 'y' || v->tag == 't' || v->tag == 'c')
 		return const_cast<V*>(v);  // these never change, so they can be shared
-	V* out = new V(*v);
+	V* out = fresh(v->tag);
+	*out = *v;
+	out->marked = false;
 	for (auto& x : out->items)
 		x = copy_of(x);
 	for (auto& [key, x] : out->table)
@@ -262,7 +530,10 @@ extern "C"
 	int cn_end()
 	{
 		if (!failed)
+		{
+			Parked waiting;
 			stellanova::wait_for_others();
+		}
 		std::cout << std::flush;
 		if (!failed)
 			return 0;
@@ -270,15 +541,19 @@ extern "C"
 		std::cerr << std::flush;
 		std::_Exit(1);  // commands still going alongside stop too
 	}
-	void cn_meanwhile(void (*command)(void*), void* names)  // 'meanwhile ...': names holds its own copy of every name it uses
+	void cn_meanwhile(void (*command)(void*), void* names, long long size)  // 'meanwhile ...': names holds its own copy of every name it uses
 	{
+		cn_root(static_cast<const char*>(names), size);  // kept until the command is done with them
 		stellanova::meanwhile([command, names] {
+			gc::me();
 			command(names);
+			unroot(static_cast<const char*>(names));
+			std::free(names);
 			if (failed)
 				throw stellanova::Problem(pending);
 		});
 	}
-	void cn_wait_for_others() { stellanova::wait_for_others(); }
+	void cn_wait_for_others() { Parked waiting; stellanova::wait_for_others(); }
 
 	bool cn_failed() { return failed; }
 	void cn_raise(int line, V* message) { cn_set_problem({line, message->s}); }
@@ -296,9 +571,17 @@ extern "C"
 	V* cn_join(V* a, V* b) { return cn_make_text(a->s + b->s); }
 	bool cn_same_text(V* a, V* b) { return a->s == b->s; }
 	void cn_say(V* t) { stellanova::say({t->s}); }
-	V* cn_ask_text(V* question) { return cn_make_text(stellanova::ask_text(question->s)); }
-	double cn_ask_number(V* question) { return stellanova::ask_number(question->s); }
-	bool cn_ask_yes_no(V* question) { return stellanova::ask_yes_no(question->s); }
+	V* cn_ask_text(V* question)
+	{
+		std::string answer;
+		{
+			Parked waiting;
+			answer = stellanova::ask_text(question->s);
+		}
+		return cn_make_text(answer);
+	}
+	double cn_ask_number(V* question) { Parked waiting; return stellanova::ask_number(question->s); }
+	bool cn_ask_yes_no(V* question) { Parked waiting; return stellanova::ask_yes_no(question->s); }
 	double cn_letters(V* t) { return stellanova::letters(t->s); }
 	double cn_to_number(V* t, int line) { GUARDED(0.0, return stellanova::to_number(t->s, line);) }
 

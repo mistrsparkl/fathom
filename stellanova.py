@@ -2912,6 +2912,7 @@ def block(runs):
 
     def write(f):
         for r in runs:
+            f.put("call void @cn_statement()")  # what the line before made may be freed
             machine.emit(f, r)
     return with_ir(run, write)
 

@@ -22,6 +22,7 @@ struct V
 	std::map<std::string, V*> table;
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
+	bool marked = false;  // the collector reached it
 };
 
 V* cn_make_text(std::string s);
@@ -36,7 +37,16 @@ extern "C"
 	V* cn_table_new();
 	V* cn_place(double x, double y, double z);
 	V* cn_flat(double x, double y);
+	void cn_park();
+	void cn_unpark();
+	void cn_hold_push(V* list, V* x);
+	void cn_hold_put(V* table, const char* key, V* x);
 }
+struct CnParked  // around a library word's own C++: it may wait, so the collector needn't wait for it
+{
+	CnParked() { cn_park(); }
+	~CnParked() { cn_unpark(); }
+};
 
 // ---------------------------------------------------------------- for library words
 // A library word's own C++ takes C++ values (std::string, std::vector<double>, FVector, ...): these turn machine
@@ -93,7 +103,7 @@ V* cn_from_cpp(const std::vector<T>& items)
 {
 	V* out = cn_list_new();
 	for (const T& x : items)
-		out->items.push_back(cn_from_cpp(x));
+		cn_hold_push(out, cn_from_cpp(x));
 	return out;
 }
 template <typename T>
@@ -101,7 +111,7 @@ V* cn_from_cpp(const std::map<std::string, T>& table)
 {
 	V* out = cn_table_new();
 	for (const auto& [key, x] : table)
-		out->table[key] = cn_from_cpp(x);
+		cn_hold_put(out, key.c_str(), cn_from_cpp(x));
 	return out;
 }
 
@@ -127,6 +137,8 @@ struct cn_is_function<std::function<R(A...)>> : std::true_type
 		using Gives = std::conditional_t<std::is_void_v<R>, void, typename cn_machine<std::conditional_t<std::is_void_v<R>, double, R>>::type>;
 		auto target = reinterpret_cast<Gives (*)(typename cn_machine<A>::type...)>(v->command);
 		return [target](A... a) -> R {
+			cn_unpark();  // machine code runs again: the collector waits for it as usual
+			struct Again { ~Again() { cn_park(); } } again;
 			cn_command_or_fail(reinterpret_cast<void*>(target), 0);
 			cn_rethrow();
 			if constexpr (std::is_void_v<R>)
