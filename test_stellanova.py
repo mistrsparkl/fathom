@@ -92,7 +92,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, database, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -383,6 +383,17 @@ def program_checks():
                'plus "a, b" plus a quotation mark plus new line)\n  for each row in rows:\n    scrawl join row with " | "\n'
                '  add a list containing ("Bo", "x") to rows\n  scrawl the spreadsheet of rows\nand the universe said i love you\n')
     assert out.stdout == 'name | note\nAnn | a, b\nname,note\nAnn,"a, b"\nBo,x\n\n', repr(out.stdout)
+
+    # the database library: SQLite, with ? for values
+    out = both('use: database\n\ngenesis:\n  change the database ("shop.db", "create table if not exists items (name text, price real); delete from items")\n'
+               '  change the database with values ("shop.db", "insert into items values (?, ?)", a list containing ("Bob' + "'" + 's cake", "12"))\n'
+               '  change the database with values ("shop.db", "insert into items values (?, ?)", a list containing ("tea", "3.5"))\n'
+               '  for each row in rows from the database ("shop.db", "select name, price from items order by price"):\n'
+               '    scrawl join row with " costs "\n'
+               '  scrawl item 1 of item 1 of rows from the database with values ("shop.db", "select count(*) from items where price > ?", a list containing "5")\n'
+               '  try:\n    change the database ("shop.db", "select * from nowhere")\n  if that went wrong:\n    scrawl the wound\n'
+               'and the universe said i love you\n')
+    assert out.stdout == "tea costs 3.5\nBob's cake costs 12\n1\nthe database said: no such table: nowhere.\n", repr(out.stdout)
 
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'

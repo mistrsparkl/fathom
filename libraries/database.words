@@ -1,0 +1,118 @@
+note: Words for databases (SQLite files, which many programs can read). Use them in a program with:  use: database
+note: Write a ? where a value goes and give the values as a list of text, so text from people can't change the command.
+note: Answers come back as text, one list per row ("" for an empty cell).
+note: shortcut: each word opens and closes the file, fine for small programs; keep it open between words if they need to be faster.
+note: Not on the web yet: browsers have no SQLite.
+
+include: <winsqlite/winsqlite3.h>
+link: winsqlite3
+
+code:
+  namespace stellanova_database
+  {
+  	inline std::vector<std::vector<std::string>> run(const std::string& file, const std::string& command,
+  		const std::vector<std::string>& values, int line)
+  	{
+  		sqlite3* db = nullptr;
+  		if (sqlite3_open(file.c_str(), &db) != SQLITE_OK)
+  		{
+  			std::string why = db ? sqlite3_errmsg(db) : "no memory";
+  			sqlite3_close(db);
+  			stellanova::fail(line, "I couldn't open the database \"" + file + "\": " + why + ".");
+  		}
+  		std::vector<std::vector<std::string>> rows;
+  		const char* rest = command.c_str();
+  		size_t used = 0;
+  		while (*rest)
+  		{
+  			sqlite3_stmt* step = nullptr;
+  			const char* next = nullptr;
+  			if (sqlite3_prepare_v2(db, rest, -1, &step, &next) != SQLITE_OK)
+  			{
+  				std::string why = sqlite3_errmsg(db);
+  				sqlite3_close(db);
+  				stellanova::fail(line, "the database said: " + why + ".");
+  			}
+  			rest = next;
+  			if (!step)
+  				continue;  // only spaces or a note
+  			int holes = sqlite3_bind_parameter_count(step);
+  			for (int k = 1; k <= holes; ++k, ++used)
+  				if (used < values.size())
+  					sqlite3_bind_text(step, k, values[used].c_str(), -1, SQLITE_TRANSIENT);
+  			int status;
+  			while ((status = sqlite3_step(step)) == SQLITE_ROW)
+  			{
+  				std::vector<std::string> row;
+  				for (int c = 0; c < sqlite3_column_count(step); ++c)
+  				{
+  					int type = sqlite3_column_type(step, c);
+  					const unsigned char* cell = sqlite3_column_text(step, c);
+  					if (type == SQLITE_INTEGER || type == SQLITE_FLOAT)  // numbers written as Stellanova writes them
+  						row.push_back(stellanova::text(sqlite3_column_double(step, c)));
+  					else
+  						row.push_back(cell ? reinterpret_cast<const char*>(cell) : "");
+  				}
+  				rows.push_back(row);
+  			}
+  			sqlite3_finalize(step);
+  			if (status != SQLITE_DONE)
+  			{
+  				std::string why = sqlite3_errmsg(db);
+  				sqlite3_close(db);
+  				stellanova::fail(line, "the database said: " + why + ".");
+  			}
+  		}
+  		sqlite3_close(db);
+  		if (used != values.size())
+  			stellanova::fail(line, "the command has " + std::to_string(used) + " ?, but there are " + std::to_string(values.size()) + " values.");
+  		return rows;
+  	}
+  }
+
+python:
+  import sqlite3
+  def database(file, command, values):
+      try:
+          db = sqlite3.connect(file, isolation_level=None)
+      except sqlite3.Error as why:
+          raise RunError(0, "I couldn't open the database \"" + file + "\": " + str(why) + ".")
+      rows, used = [], 0
+      try:
+          for part in split_commands(command):
+              holes = part.count("?")
+              cur = db.execute(part, values[used:used + holes])
+              used += holes
+              rows += [["" if c is None else text(float(c)) if isinstance(c, (int, float)) and not isinstance(c, bool) else str(c) for c in row]
+                       for row in cur.fetchall()]
+      except sqlite3.Error as why:
+          raise RunError(0, "the database said: " + str(why) + ".")
+      except (IndexError, sqlite3.ProgrammingError):
+          raise RunError(0, "the command has " + str(command.count("?")) + " ?, but there are " + str(len(values)) + " values.")
+      finally:
+          db.close()
+      if used != len(values):
+          raise RunError(0, "the command has " + str(used) + " ?, but there are " + str(len(values)) + " values.")
+      return rows
+  def split_commands(command):
+      parts, now = [], ""
+      for piece in command.split(";"):
+          now += piece
+          if sqlite3.complete_statement(now + ";"):
+              if now.strip():
+                  parts.append(now)
+              now = ""
+          else:
+              now += ";"
+      if now.strip():
+          parts.append(now)
+      return parts
+
+to change the database, given file (text) and command (text) = stellanova_database::run({file}, {command}, {}, {line})
+  runs: database({file}, {command}, [])
+to change the database with values, given file (text) and command (text) and values (a list of text) = stellanova_database::run({file}, {command}, {values}, {line})
+  runs: database({file}, {command}, {values})
+to rows from the database, given file (text) and question (text), returning a list of lists of text = stellanova_database::run({file}, {question}, {}, {line})
+  runs: database({file}, {question}, [])
+to rows from the database with values, given file (text) and question (text) and values (a list of text), returning a list of lists of text = stellanova_database::run({file}, {question}, {values}, {line})
+  runs: database({file}, {question}, {values})
