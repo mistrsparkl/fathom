@@ -16,7 +16,7 @@ and the universe said i love you
 ```
 
 - `stellanova game.stella` runs a program. Nothing else is needed but Python 3.
-- `stellanova build game.stella` makes it into a fast `.exe` (needs Visual Studio's C++ compiler).
+- `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
 - `stellanova` on its own lets you try lines out one at a time.
 - `stellanova check game.stella` looks for mistakes without running it.
 
@@ -26,4 +26,5 @@ Checking Stellanova itself: `py -3 test_stellanova.py` runs every test program b
 
 `stellanova build game.stella` makes machine code: Stellanova writes LLVM code for the program and LLVM's clang
 turns it into an .exe (install LLVM: `winget install LLVM.LLVM`). What every program needs is in `runtime/machine.cpp`,
-compiled once. Programs that use parts `machine.py` can't make yet are still built through C++ for now.
+compiled once, and it frees values a program no longer uses. A library word's own C++ is compiled into a small
+function the machine code calls; the program's own code never becomes C++.

@@ -94,12 +94,15 @@ def program_checks():
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
     assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, folders, letters, maths, page, patterns, screen, server, sound, time, web, window")
 
-    # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
+    # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
     import subprocess
-    compiler = None if os.environ.get("STELLANOVA_NO_CPP") else translate.find_vcvars()
+    try:
+        compiler = None if os.environ.get("STELLANOVA_NO_BUILD") else translate.machine.find_clang()
+    except RuntimeError:
+        compiler = None
     if not compiler:
-        print("(only running directly: no C++ compiler found)")
+        print("(only running directly: no LLVM found)")
     node = shutil.which("node") if not os.environ.get("STELLANOVA_NO_WEB") else None
     web_skipped, web_runs = [], [0]
 
@@ -632,10 +635,6 @@ def program_checks():
     assert perr('genesis:\n  scrawl body\n' + END)[1] == \
         "I don't know 'body'. If it is a name, set it before this line (like 'set body to 0') or list it as an input of the command."
     assert perr('genesis:\n  set word to "x"\n  add 1 to word\n' + END)[1] == "'add ... to' needs a list or a number, but this is text."
-    made = translate.BUILT_THROUGH
-    print(f"(built: {made.count('machine')} programs straight into machine code, {len(made) - made.count('machine')} through C++ for now)")
-    if os.environ.get("STELLANOVA_SHOW_SKIPPED"):
-        print("\n".join(sorted(set(m.split(": ", 1)[1] for m in made if m != "machine"))))
     if node:
         print(f"(made for the web too: {web_runs[0]} programs; {len(web_skipped)} use words the web doesn't have yet)")
         if os.environ.get("STELLANOVA_SHOW_SKIPPED"):

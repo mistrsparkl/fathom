@@ -10,7 +10,7 @@ Stellanova is a programming language written in plain English words. Scripts end
 
   Stellanova reads the script and does what it says, line by line. Nothing is translated and no compiler is needed. (`stellanova` is `stellanova.bat` in this folder, short for `py -3 stellanova.py`.)
 
-  To make a program into an `.exe` that runs fast and on its own, build it. This turns it into C++ and needs Visual Studio's C++ compiler:
+  To make a program into an `.exe` that runs fast and on its own, build it. This turns it straight into machine code and needs LLVM (`winget install LLVM.LLVM`):
 
   ```
   stellanova build examples/guess.stella

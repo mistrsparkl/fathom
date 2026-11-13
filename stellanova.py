@@ -1,7 +1,7 @@
 """Stellanova: a programming language written in plain English words.
 
 Run a program:         py -3 stellanova.py run <script.stella>      (or: stellanova <script.stella>)
-Build it as an .exe:   py -3 stellanova.py build <script.stella>    (needs Visual Studio's C++ compiler)
+Build it as an .exe:   py -3 stellanova.py build <script.stella>    (needs LLVM: winget install LLVM.LLVM)
 Unreal parts:          py -3 stellanova.py <scripts folder> <output folder>
 
 How it works: this file reads a script once, checks it, and turns every piece into two things at the same time:
@@ -3680,19 +3680,7 @@ def run_program(script):
     return result["code"]
 
 
-def find_vcvars():
-    """The Visual Studio script that sets up the C++ compiler, or None."""
-    vswhere = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
-    if not vswhere.exists():
-        return None
-    found = subprocess.run([str(vswhere), "-latest", "-products", "*", "-property", "installationPath"],
-                           capture_output=True, text=True).stdout.strip()
-    bat = Path(found) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat" if found else None
-    return bat if bat and bat.exists() else None
-
-
 MACHINE_UNITS = {}  # the built-in and library words the program being built uses (see machine.wrap)
-BUILT_THROUGH = []  # for each build: "machine", or the script and what kept it from being made into machine code
 
 
 def machine_code(program):
@@ -3725,28 +3713,11 @@ def build(script, exe):
         MAKING_CPP = False
     if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
-    if not os.environ.get("STELLANOVA_NO_MACHINE"):
-        try:
-            ll = machine_code(program)
-        except machine.Unsupported as missing:
-            BUILT_THROUGH.append(f"{script.name}: {missing}")  # shortcut: the C++ way stays until every part is in machine.py
-        else:
-            BUILT_THROUGH.append("machine")
-            return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS)
-    vcvars = find_vcvars()
-    if not vcvars:
-        return "I can't find the C++ compiler. Install Visual Studio with 'Desktop development with C++'."
-    work = Path(tempfile.mkdtemp(prefix="stellanova_"))
-    cpp = work / f"{script.stem}.stella.cpp"
-    cpp.write_text(cpp_out, encoding="utf-8")
-    bat = work / "build.bat"
-    bat.write_text(f'@call "{vcvars}" >nul 2>&1\r\n@cl /nologo /utf-8 /EHsc /std:c++20 /O2 /W0 /I"{HERE / "runtime"}" '
-                   f'"{cpp}" /Fe"{exe}" /Fo"{work}\\\\" >"{work / "compile.log"}" 2>&1\r\n', encoding="utf-8")
-    result = subprocess.run(["cmd", "/c", str(bat)])
-    if result.returncode != 0:
-        log = (work / "compile.log").read_text(errors="replace")
-        return f"Stellanova wrote C++ the compiler didn't accept. That is a bug in Stellanova (or a library), not in your script.\n{log}"
-    return None
+    try:
+        ll = machine_code(program)
+    except machine.Unsupported as missing:
+        return f"{script.name} can't be built into an .exe yet: {missing} isn't in machine code. It still runs directly (stellanova {script.name})."
+    return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS)
 
 
 def web(script, folder=None):
@@ -3892,7 +3863,7 @@ def try_it(read=input, show=print):
 USAGE = """Use:
   stellanova <script.stella>                     run a program
   stellanova run <script.stella>                 the same
-  stellanova build <script.stella>               make it into an .exe (needs Visual Studio's C++ compiler)
+  stellanova build <script.stella>               make it into an .exe (needs LLVM: winget install LLVM.LLVM)
   stellanova check <script.stella>               look for mistakes without running it
   stellanova unreal <script.stella>              run it inside Unreal Engine: the 3D words become a real lit world
   stellanova web <script.stella> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
