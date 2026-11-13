@@ -471,6 +471,18 @@ load high scores from file "scores.json"
 
 `scores as saved text` gives the same JSON as text, without a file, and `load scores from the text reply` reads it back, so a program can talk to websites and other programs that use JSON (`load` fails with `the text doesn't hold a list of numbers.` if it doesn't fit). The file is JSON, which other programs can read too.
 
+**Nothing.** A name for a kind of thing can hold nothing: `set best to no enemy`. `if best is nothing` and `if best is something` ask which. Asking for a part of nothing (`the health of best`) stops with `this enemy is nothing, so it has no health.` Nothing shows as `nothing` and saves as `null`. It is handy for a command that may not find anything:
+
+```
+to the weakest, given enemies (a list of enemys), returning an enemy:
+  set best to no enemy
+  for each e in enemies:
+    if best is nothing or the health of e falls below the health of best:
+      set best to e
+  return best
+and the universe said i love you
+```
+
 **Web services.** Most websites that give data back (weather, prices, maps) answer in JSON. Describe the parts you want as a kind of thing, and load the answer into one:
 
 ```

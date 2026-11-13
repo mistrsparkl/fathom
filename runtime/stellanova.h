@@ -1043,7 +1043,7 @@ namespace stellanova
 	}
 
 	template <typename T, typename Part>
-	std::vector<T> sorted_by(std::vector<T> items, Part part)
+	std::vector<T> sorted_by(std::vector<T> items, Part part, int = 0)
 	{
 		std::stable_sort(items.begin(), items.end(), [&](const T& a, const T& b) { return part(a) < part(b); });
 		return items;

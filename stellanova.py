@@ -468,6 +468,8 @@ def text(v):
         return ", ".join(f"{k}: {part_text(v[k])}" for k in sorted(v)) if v else "(nothing)"
     if isinstance(v, Place):
         return " ".join(f"{text(x)} {w}" for x, w in zip(v.parts(), ("horizontal", "vertical", "depth")))
+    if v is None:
+        return "nothing"
     if isinstance(v, Thing):
         return f"a {v.name} (" + ", ".join(f"{' '.join(w)}: {text(v.fields[snake(w)])}" for w, _ in v.spec) + ")"
     if callable(v):
@@ -606,6 +608,8 @@ def saved(v, kind, line):
         return "[" + ", ".join(saved(x, element(kind), line) for x in v) + "]"
     if is_table(kind):
         return "{" + ", ".join(f"{json.dumps(k, ensure_ascii=False)}: {saved(v[k], entry_kind(kind), line)}" for k in sorted(v)) + "}"
+    if v is None:
+        return "null"
     return "{" + ", ".join(f'"{" ".join(w)}": {saved(v.fields[snake(w)], k, line)}' for w, k in v.spec) + "}"
 
 
@@ -628,6 +632,8 @@ def from_saved(d, kind, things):
         return [from_saved(x, element(kind), things) for x in d]
     if is_table(kind) and isinstance(d, dict):
         return {k: from_saved(x, entry_kind(kind), things) for k, x in d.items()}
+    if is_thing(kind) and d is None:
+        return None
     if is_thing(kind) and isinstance(d, dict):
         t = Thing(kind[6:], things)
         loose = {loose_key(key): x for key, x in d.items()}  # a web service's "windSpeed" or "wind_speed" is 'wind speed'
@@ -641,6 +647,19 @@ def from_saved(d, kind, things):
 
 def loose_key(key):
     return re.sub(r"[ _-]", "", key).translate(ASCII_DOWN)
+
+
+def something(thing, kind, part, line):
+    """A thing whose part is wanted: an error if it is nothing."""
+    if thing is None:
+        raise RunError(line, f"this {kind[6:]} is nothing, so it has no {part}.")
+    return thing
+
+
+def no_nothing(items, line):
+    if None in items:
+        raise RunError(line, "a list sorted by a part can't hold nothing.")
+    return items
 
 
 def no_constant(name):
@@ -1378,7 +1397,7 @@ class Expr:
             for part in ("existence", "radius"):
                 if v.kind not in FIELDS.get((part,), {}):
                     raise ScriptError(self.line, f"'touches' needs {kind_name(v.kind)} to have {'a birth' if part == 'existence' else 'a radius'}.")
-            at, size = part_of(v, ("existence",)), part_of(v, ("radius",))
+            at, size = part_of(v, ("existence",), self.line), part_of(v, ("radius",), self.line)
         elif v.kind in (PLACE, FLAT):
             at, size = v, (self.names.value(("radius",)) if self.names.known.get(("radius",), (None, None))[1] == NUMBER
                            else with_ir(Value("0", NUMBER, lambda env: 0), lambda f: machine.number(0.0)))
@@ -1419,7 +1438,7 @@ class Expr:
                 edge = (size, "of", "the", "world")
                 if edge not in self.names.known:
                     raise ScriptError(self.line, f"I don't know '{' '.join(words)}'." + library_hint(list(edge)))
-                at = part_of(v, (part,))
+                at = part_of(v, (part,), self.line)
                 r = self.names.value(("radius",))
                 far = self.names.value(edge)
                 a, b, c = at.run, r.run, far.run
@@ -1449,6 +1468,12 @@ class Expr:
             gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
             return with_ir(Value(f"stellanova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env)),
                            lambda f: within_ir(f, v, r, reach))
+        if is_thing(v.kind) and (self.at("is", "nothing") or self.at("is", "something")):  # 'if target is nothing'
+            there = self.peek(1) == "something"
+            self.i += 2
+            a = v.run
+            return with_ir(Value(f"({v.cpp} {'!==' if there else '==='} undefined)", YESNO, lambda env: (a(env) is not None) == there),
+                           lambda f: f.op(f"icmp {'ne' if there else 'eq'} ptr {machine.emit(f, v)}, null"))
         if self.at("is", "one", "of") or self.at("is", "not", "one", "of"):  # 'answer is one of ("yes", "y")'
             negated = self.at("is", "not")
             self.i += 4 if negated else 3
@@ -1575,7 +1600,7 @@ class Expr:
             if not key:
                 break
             self.i += 1 + len(key)
-            v = part_of(v, key)
+            v = part_of(v, key, self.line)
         if getattr(self, "bare", 0):
             return v
         if self.at("as", "a", "number") or self.at("as", "number"):
@@ -1729,7 +1754,7 @@ class Expr:
                         self.i = back
                         break
                     raise ScriptError(line, f"{kind_name(owner.kind).capitalize()} has no '{' '.join(key)}'.")
-                return part_of(owner, key)
+                return part_of(owner, key, self.line)
         if tok == "item" and self.peek(1) not in ITEM_NOT_INDEX:
             self.i += 1
             index = self.need(self.sum(), NUMBER, "item")
@@ -1866,6 +1891,14 @@ class Expr:
                 raise ScriptError(line, f"'{' '.join(key)}' doesn't return anything, so it can't be used as a value.")
             cpp, run = call(key, args, self.names, line)
             return with_ir(Value(cpp, command.gives, run), getattr(run, "ir", None))
+        if tok == "no" and self.peek(1) is not None:  # 'no enemy': a thing that isn't there
+            for n in range(min(6, len(self.t) - self.i - 1), 0, -1):
+                name = " ".join(self.t[self.i + 1:self.i + 1 + n])
+                if name in THINGS:
+                    if UNREAL:
+                        raise ScriptError(line, f"'no {name}' can't be used in Unreal parts yet.")
+                    self.i += 1 + n
+                    return with_ir(Value("undefined" if JS else "nullptr", "thing " + name, lambda env: None), lambda f: "null")
         if tok in ("yes", "no"):
             self.i += 1
             b = tok == "yes"
@@ -1985,9 +2018,9 @@ class Expr:
                         a = v.run
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
                         k = field_index(thing, member)
-                        return with_ir(Value(f"stellanova::sorted_by({v.cpp}, {by})", v.kind,
-                                             lambda env: [dup(x) for x in sorted(a(env), key=lambda t: t.fields[member])]),
-                                       lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k})"))
+                        return with_ir(Value(f"stellanova::sorted_by({v.cpp}, {by}, {line})", v.kind,
+                                             lambda env: [dup(x) for x in sorted(no_nothing(a(env), line), key=lambda t: t.fields[member])]),
+                                       lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k}, i32 {line})"))
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
         for word in ("sorted", "reversed"):
@@ -2194,20 +2227,27 @@ def place_part(kind, key):
     return kind in (PLACE, FLAT) and key in PLACE_PARTS and not (kind == FLAT and key == ("depth",))
 
 
-def part_of(owner, key):
+def part_of(owner, key, line=0):
     """One part of a thing ('name of rex') or of a place ('existence of horizontal')."""
     member, kind = (PLACE_PARTS[key], NUMBER) if place_part(owner.kind, key) else FIELDS[key][owner.kind]
-    get = owner.run
+    get, cpp = owner.run, f"({owner.cpp}).{member}"
+    if is_thing(owner.kind):  # it may be nothing
+        whose, part, plain = owner.kind, " ".join(key), owner.run
+        get = lambda env: something(plain(env), whose, part, line)
+        if JS:
+            cpp = f"stellanova::something({strip_parens(owner.cpp)}, {json.dumps(whose[6:])}, {json.dumps(part)}, {line}).{member}"
 
     def put(env, x):
         get(env).fields[member] = dup(x)
-    v = Value(f"({owner.cpp}).{member}", kind, lambda env: get(env).fields[member], put if owner.writable else None)
+    v = Value(cpp, kind, lambda env: get(env).fields[member], put if owner.writable else None)
     if owner.kind in (PLACE, FLAT):
         k = "XYZ".index(member)
         v.ir = lambda f: f.op(f"call double @cn_part(ptr {machine.emit(f, owner)}, i32 {k})")
         v.ir_store = lambda f, x: f.put(f"call void @cn_part_put(ptr {machine.emit(f, owner)}, i32 {k}, double {x})")
     else:
-        v.ir, v.ir_store = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, member, kind)
+        k = field_index(owner.kind, member)
+        v.ir, v.ir_store = thing_part_ir(lambda f: f.op(f"call ptr @cn_something(ptr {machine.emit(f, owner)}, ptr {f.spec(owner.kind)}, "
+                                                        f"i32 {k}, i32 {line})"), owner.kind, member, kind)
     if not owner.writable:
         v.ir_store = None
     if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:
@@ -2902,6 +2942,8 @@ def fit(v, kind):
 
 
 def as_kind(thing, name, things):
+    if thing is None:
+        return None
     new = Thing.__new__(Thing)
     new.name, new.spec = name, things[name]
     new.fields = {snake(w): dup(thing.fields[snake(w)]) for w, _ in new.spec}

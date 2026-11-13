@@ -331,11 +331,13 @@ static std::string thing_name(const V* v);
 static std::string show(const V* v);
 static std::string part(const V* v)
 {
-	bool group = (v->tag == 'l' && !full(v)->items.empty()) || (v->tag == 'm' && !full(v)->table.empty());
+	bool group = v && ((v->tag == 'l' && !full(v)->items.empty()) || (v->tag == 'm' && !full(v)->table.empty()));
 	return group ? "(" + show(v) + ")" : show(v);
 }
 static std::string show(const V* v)
 {
+	if (!v)
+		return "nothing";  // a thing that isn't there ('no enemy')
 	switch (v->tag)
 	{
 	case 'n': return stellanova::text(v->d);
@@ -375,6 +377,8 @@ static std::string show(const V* v)
 
 static bool same(const V* a, const V* b)
 {
+	if (!a || !b)
+		return a == b;
 	if (a->tag != b->tag)
 		return false;
 	switch (a->tag)
@@ -409,6 +413,8 @@ static bool same(const V* a, const V* b)
 
 static V* copy_of(const V* v)
 {
+	if (!v)
+		return nullptr;
 	if (v->tag == 'n' || v->tag == 'y' || v->tag == 't' || v->tag == 'c')
 		return const_cast<V*>(v);  // these never change, so they can be shared
 	V* out = fresh(v->tag);
@@ -425,6 +431,8 @@ static V* copy_of(const V* v)
 static std::string saved_of(const V* v, int line)
 {
 	std::string out;
+	if (!v)
+		return "null";
 	switch (v->tag)
 	{
 	case 'n': stellanova::save(out, v->d, line); break;
@@ -518,6 +526,11 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 		}
 		return true;
 	case 'k':
+		if (d.type == D::Nothing)
+		{
+			out = nullptr;  // null: nothing
+			return true;
+		}
 		if (d.type != D::Table)
 			return false;
 		out = empty_like(shape);  // a part the data doesn't have stays empty
@@ -781,9 +794,12 @@ extern "C"
 	}
 	V* cn_saved_text(V* v, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, line));) }
 	void cn_save_file(V* v, V* path, int line) { GUARDED(, stellanova::write_file(full(path)->s, saved_of(v, line) + "\n", line);) }
-	V* cn_sorted_by(V* list, int k)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
+	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
 	{
 		V* out = copy_of(list);
+		for (const V* x : full(out)->items)
+			if (!x)
+				{ GUARDED(out, stellanova::fail(line, "a list sorted by a part can't hold nothing.");) }
 		std::stable_sort(full(out)->items.begin(), full(out)->items.end(), [k](const V* a, const V* b) {
 			const V* x = full(a)->items[static_cast<size_t>(k)];
 			const V* y = full(b)->items[static_cast<size_t>(k)];
@@ -793,12 +809,25 @@ extern "C"
 	}
 	V* cn_as_kind(V* thing, const char* spec)  // a dog given where a pet is wanted: a copy with just a pet's parts
 	{
+		if (!thing)
+			return nullptr;
 		V* v = cn_thing(spec);
 		for (size_t k = 0; k < full(v)->kind->fields.size(); k++)
 			for (size_t j = 0; j < full(thing)->kind->fields.size(); j++)
 				if (full(thing)->kind->fields[j] == full(v)->kind->fields[k])
 					full(v)->items[k] = copy_of(full(thing)->items[j]);
 		return v;
+	}
+	V* cn_something(V* thing, const char* spec, int k, int line)  // a thing whose part is wanted: an error if it is nothing
+	{
+		if (thing)
+			return thing;
+		std::vector<std::string> words;
+		std::stringstream in(spec);
+		for (std::string w; std::getline(in, w, '\x01');)
+			words.push_back(w);
+		GUARDED(nullptr, stellanova::fail(line, "this " + words[0] + " is nothing, so it has no " + words[static_cast<size_t>(k) + 1] + ".");)
+		return nullptr;
 	}
 	V* cn_field(V* thing, int k) { return full(thing)->items[static_cast<size_t>(k)]; }
 	void cn_field_put(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = copy_of(x); }

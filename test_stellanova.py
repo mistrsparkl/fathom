@@ -417,6 +417,12 @@ def program_checks():
     assert (tested.stdout, tested.returncode) == ("\u2713 test doubling\n\u2717 test names: line 11: this check failed: the size of names is 3\n"
                                                   "2 tests: 1 passed, 1 failed.\n", 1), (tested.stdout, tested.returncode)
 
+    # nothing: a thing that isn't there ('no enemy', 'is nothing', 'is something')
+    out = both('an enemy has:\n  name (text)\n  health (a number)\nand the universe said i love you\n\nto the weakest, given enemies (a list of enemys), returning an enemy:\n  set best to no enemy\n  for each e in enemies:\n    if best is nothing or the health of e falls below the health of best:\n      set best to e\n  return best\nand the universe said i love you\n\ngenesis:\n  set foes to a list of enemys\n  scrawl the weakest with foes\n  scrawl (the weakest with foes) is nothing\n  conjure an enemy as orc\n  set the name of orc to "orc"\n  set the health of orc to 5\n  add orc to foes\n  set target to the weakest with foes\n  scrawl target is something, " ", the name of target\n  add no enemy to foes\n  scrawl foes\n  scrawl foes as saved text\n  set back to a list of enemys\n  load back from the text (foes as saved text)\n  scrawl back, " ", back is foes\n  set target to no enemy\n  try:\n    scrawl the health of target\n  if that went wrong:\n    scrawl the wound\n  set the health of target to 3\nand the universe said i love you\n')
+    assert out.stdout == ("nothing\nyes\nyes orc\na enemy (name: orc, health: 5), nothing\n[{\"name\": \"orc\", \"health\": 5}, null]\n"
+                          "a enemy (name: orc, health: 5), nothing yes\nthis enemy is nothing, so it has no health.\n"), repr(out.stdout)
+    assert out.stderr == "Line 35: this enemy is nothing, so it has no health.\n", repr(out.stderr)
+
     # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'

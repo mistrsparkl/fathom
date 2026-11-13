@@ -66,6 +66,7 @@
   const partText = (v) => (isGroup(v) && count(v) ? "(" + text(v) + ")" : text(v));
   function text(v) {
     if (typeof v === "string") return v;
+    if (v === undefined) return "nothing";  // a thing that isn't there ('no enemy')
     if (typeof v === "number") return numberText(v);
     if (typeof v === "boolean") return v ? "yes" : "no";
     if (Array.isArray(v)) return v.length ? v.map(partText).join(", ") : "(nothing)";
@@ -193,6 +194,7 @@
   }
   function saved(v, line) {
     if (typeof v === "number") return saved_number(v, line);
+    if (v === undefined) return "null";
     if (typeof v === "boolean") return v ? "true" : "false";
     if (typeof v === "string") return saved_string(v);
     if (v === null || typeof v === "function") fail(line, "I can't save a command in a file.");
@@ -212,6 +214,7 @@
       return kind === "place" ? new Place3(d[0], d[1], d[2]) : new Place2(d[0], d[1]);
     if (kind.startsWith("list of ") && isList) return d.map((x) => from_saved(x, kind.slice(8)));
     if (kind.startsWith("table of ") && isTable) return new Map(Object.keys(d).map((k) => [k, from_saved(d[k], kind.slice(9))]));
+    if (kind.startsWith("thing ") && d === null) return undefined;
     if (kind.startsWith("thing ") && isTable) {
       const Kind = kinds[kind.slice(6)], made = new Kind();
       const loose = (key) => key.replace(/[ _-]/g, "").replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -264,6 +267,7 @@
       kinds[title] = Kind;
     },
     as_kind(v, Kind) {
+      if (v === undefined) return undefined;
       const made = new Kind();
       for (const [, member] of Kind.spec) made[member] = dup(v[member]);
       return made;
@@ -342,7 +346,14 @@
       return items[items.length - 1];
     },
     sorted: (items) => [...items].sort(order),
-    sorted_by: (items, part) => dup(items).sort((a, b) => order(part(a), part(b))),
+    sorted_by(items, part, line) {
+      if (items.includes(undefined)) fail(line, "a list sorted by a part can't hold nothing.");
+      return dup(items).sort((a, b) => order(part(a), part(b)));
+    },
+    something(thing, kind, part, line) {
+      if (thing === undefined) fail(line, `this ${kind} is nothing, so it has no ${part}.`);
+      return thing;
+    },
     reversed: (items) => dup(items).reverse(),
     items_from(items, first, last, line) {
       if (Math.floor(first) !== first || Math.floor(last) !== last || first < 1 || last > items.length || first > last + 1)

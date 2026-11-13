@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
-            "cn_saved_text", "cn_save_file", "cn_load"}
+            "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by"}
 
 
 class Unsupported(Exception):
@@ -122,9 +122,10 @@ declare double @cn_place_size(ptr)
 declare ptr @cn_thing(ptr)
 declare ptr @cn_as_kind(ptr, ptr)
 declare ptr @cn_field(ptr, i32)
+declare ptr @cn_something(ptr, ptr, i32, i32)
 declare void @cn_field_put(ptr, i32, ptr)
 declare void @cn_replace(ptr, ptr)
-declare ptr @cn_sorted_by(ptr, i32)
+declare ptr @cn_sorted_by(ptr, i32, i32)
 declare ptr @cn_saved_text(ptr, i32)
 declare void @cn_save_file(ptr, ptr, i32)
 declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
