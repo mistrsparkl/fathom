@@ -3034,7 +3034,8 @@ def statement(n, text_, inner, names, declared, depth):
         with_ir(run, lambda f: f.finish_with("ret void"))
         return [f"{tab}return;"], run, None
     if tokens == ["wait", "for", "the", "others"]:
-        return [f"{tab}{'await ' if JS else ''}stellanova::wait_for_others();"], lambda env: wait_for_others(), None
+        run = with_ir(lambda env: wait_for_others(), lambda f: f.put("call void @cn_wait_for_others()"))
+        return [f"{tab}{'await ' if JS else ''}stellanova::wait_for_others();"], run, None
     if tokens[0] == "meanwhile":  # 'meanwhile download with ...': the command goes on alongside the lines after this one
         rest = tokens[1 + (tokens[1:2] == [","]):]
         key, size = match_command(names, rest)
@@ -3057,7 +3058,9 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'." + library_hint(rest))
         if JS:  # shortcut: it sees the names as they are when it runs, not a copy made when it started
             return [f"{tab}stellanova::meanwhile(async () => {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
-        return [f"{tab}stellanova::meanwhile([=]() {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
+        piece = v if rest[:1] == ["invoke"] else run
+        return ([f"{tab}stellanova::meanwhile([=]() {{ {cpp}; }});"],
+                with_ir(lambda env: meanwhile(run, env), lambda f: machine.meanwhile(f, piece)), None)
     if tokens[0] == "invoke":
         e = Expr(tokens, names, n)
         e.allow_nothing = True

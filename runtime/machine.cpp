@@ -23,14 +23,23 @@ V* cn_make_text(std::string s)
 // ---------------------------------------------------------------- problems
 // A problem doesn't jump anywhere: it is kept here, and the machine code checks cn_failed() after each step that may fail,
 // then goes to the 'if that went wrong:' lines, or leaves the command (and so on, up to the program, which reports it).
-static bool failed = false;
-static stellanova::Problem pending;
+static thread_local bool failed = false;  // each command going alongside ('meanwhile') has its own
+static thread_local stellanova::Problem pending;
 
 void cn_set_problem(const stellanova::Problem& p)
 {
 	if (!failed)
 		pending = p;
 	failed = true;
+}
+
+void cn_rethrow()
+{
+	if (failed)
+	{
+		failed = false;
+		throw stellanova::Problem(pending);
+	}
 }
 
 #define GUARDED(fallback, body) try { body } catch (const stellanova::Problem& problem) { cn_set_problem(problem); return fallback; }
@@ -252,12 +261,24 @@ extern "C"
 	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
 	int cn_end()
 	{
+		if (!failed)
+			stellanova::wait_for_others();
 		std::cout << std::flush;
 		if (!failed)
 			return 0;
 		stellanova::report(pending);
-		return 1;
+		std::cerr << std::flush;
+		std::_Exit(1);  // commands still going alongside stop too
 	}
+	void cn_meanwhile(void (*command)(void*), void* names)  // 'meanwhile ...': names holds its own copy of every name it uses
+	{
+		stellanova::meanwhile([command, names] {
+			command(names);
+			if (failed)
+				throw stellanova::Problem(pending);
+		});
+	}
+	void cn_wait_for_others() { stellanova::wait_for_others(); }
 
 	bool cn_failed() { return failed; }
 	void cn_raise(int line, V* message) { cn_set_problem({line, message->s}); }
@@ -429,6 +450,8 @@ extern "C"
 	V* cn_thing(const char* spec)
 	{
 		static std::map<const char*, ThingKind*> kinds;
+		static std::mutex kinds_lock;
+		std::lock_guard<std::mutex> hold(kinds_lock);
 		ThingKind*& kind = kinds[spec];
 		if (!kind)
 		{

@@ -1,6 +1,7 @@
 // The one kind of value machine code passes around for everything that isn't a number or yes/no (see machine.cpp).
 // Library words made into machine code (machine.py's library wrappers) turn these into C++ values and back.
 #pragma once
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -46,6 +47,8 @@ template <typename T> struct cn_is_vector<std::vector<T>> : std::true_type { usi
 template <typename T> struct cn_is_table : std::false_type {};
 template <typename T> struct cn_is_table<std::map<std::string, T>> : std::true_type { using item = T; };
 
+template <typename T> struct cn_is_function : std::false_type {};
+
 template <typename T>
 T cn_to_cpp(V* v)
 {
@@ -73,6 +76,8 @@ T cn_to_cpp(V* v)
 			out[key] = cn_to_cpp<typename cn_is_table<T>::item>(x);
 		return out;
 	}
+	else if constexpr (cn_is_function<T>::value)
+		return cn_is_function<T>::make(v);
 	else
 		static_assert(sizeof(T) == 0, "this kind can't be given to a library word in machine code yet");
 }
@@ -99,4 +104,46 @@ V* cn_from_cpp(const std::map<std::string, T>& table)
 		out->table[key] = cn_from_cpp(x);
 	return out;
 }
+
+// A command given to a library word (like 'serve the web with (8080, the command answer)'): C++ calls its machine code.
+extern "C" void* cn_command_or_fail(void* command, int line);
+void cn_rethrow();  // a problem in the command: thrown again, as a C++ problem
+template <typename T> struct cn_machine { using type = V*; };
+template <> struct cn_machine<double> { using type = double; };
+template <> struct cn_machine<bool> { using type = bool; };
+template <typename T>
+typename cn_machine<T>::type cn_to_machine(const T& x)
+{
+	if constexpr (std::is_same_v<T, double> || std::is_same_v<T, bool>)
+		return x;
+	else
+		return cn_from_cpp(x);
+}
+template <typename R, typename... A>
+struct cn_is_function<std::function<R(A...)>> : std::true_type
+{
+	static std::function<R(A...)> make(V* v)
+	{
+		using Gives = std::conditional_t<std::is_void_v<R>, void, typename cn_machine<std::conditional_t<std::is_void_v<R>, double, R>>::type>;
+		auto target = reinterpret_cast<Gives (*)(typename cn_machine<A>::type...)>(v->command);
+		return [target](A... a) -> R {
+			cn_command_or_fail(reinterpret_cast<void*>(target), 0);
+			cn_rethrow();
+			if constexpr (std::is_void_v<R>)
+			{
+				target(cn_to_machine(a)...);
+				cn_rethrow();
+			}
+			else
+			{
+				auto out = target(cn_to_machine(a)...);
+				cn_rethrow();
+				if constexpr (std::is_same_v<R, double> || std::is_same_v<R, bool>)
+					return out;
+				else
+					return cn_to_cpp<R>(out);
+			}
+		};
+	}
+};
 #endif

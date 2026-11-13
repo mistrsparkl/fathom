@@ -129,6 +129,9 @@ declare ptr @cn_saved_text(ptr, i32)
 declare void @cn_save_file(ptr, ptr, i32)
 declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
+declare void @cn_meanwhile(ptr, ptr)
+declare void @cn_wait_for_others()
+declare ptr @malloc(i64)
 """
 
 
@@ -556,6 +559,26 @@ def by_command(f, seq, command, item, gives, keep, line):
     return holder
 
 
+def meanwhile(f, piece):
+    """'meanwhile count up with 5': piece goes in a function of its own, run alongside, with copies of the names it uses."""
+    module = f.module
+    module.alongside = getattr(module, "alongside", 0) + 1
+    g = Fn(module, f"meanwhile_{module.alongside}", [("names", TEXT)], None)
+    g.owner = None
+    emit(g, piece)
+    used = list(g.slots.items())  # (C++ name, (its place, kind)): only names the piece itself needed
+    block = f.op(f"call ptr @malloc(i64 {8 * max(1, len(used))})")
+    for k, (cpp, (where, kind)) in enumerate(used):
+        at = f.op(f"getelementptr i8, ptr {block}, i64 {8 * k}")
+        f.put(f"store {ll_type(kind)} {f.copied(f.load(cpp, kind), kind)}, ptr {at}")
+        at = g.tmp()
+        g.entry += [f"  {at} = getelementptr i8, ptr %p.names, i64 {8 * k}"]
+        value = g.tmp()
+        g.entry += [f"  {value} = load {ll_type(kind)}, ptr {at}", f"  store {ll_type(kind)} {value}, ptr {where}"]
+    g.done()
+    f.put(f"call void @cn_meanwhile(ptr @cn_user_{g.name}, ptr {block})")
+
+
 def attempt(f, tried, problem_cpp, fixed):
     """try: ... if that went wrong: ...   (problem_cpp: the name 'the problem' is kept in)"""
     handler, end = f.label("wrong"), f.label("tried")
@@ -613,7 +636,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"
     f.module.declare(f"declare {ll_ret} @{name}({', '.join([ll_type(a.kind) for a in args] + ['i32'])})")
-    values = [(ll_type(a.kind), emit(f, a)) for a in args] + [("i32", str(line))]
+    values = [(ll_type(a.kind), f.box(emit(f, a), a.kind) if a.kind.startswith("command(") else emit(f, a)) for a in args] + [("i32", str(line))]
     return f.call(ll_ret, name, *values, checked=True)
 
 
