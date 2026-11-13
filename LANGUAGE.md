@@ -1,39 +1,39 @@
-# Cosmonova
+# Stellanova
 
-Cosmonova is a programming language written in plain English words. Scripts end in `.cosmos`. There are two sorts of script:
+Stellanova is a programming language written in plain English words. Scripts end in `.stella`. There are two sorts of script:
 
 - **A program** stands on its own and begins at its `genesis:` command. Run it with:
 
   ```
-  cosmonova examples/guess.cosmos
+  stellanova examples/guess.stella
   ```
 
-  Cosmonova reads the script and does what it says, line by line. Nothing is translated and no compiler is needed. (`cosmonova` is `cosmonova.bat` in this folder, short for `py -3 cosmonova.py`.)
+  Stellanova reads the script and does what it says, line by line. Nothing is translated and no compiler is needed. (`stellanova` is `stellanova.bat` in this folder, short for `py -3 stellanova.py`.)
 
   To make a program into an `.exe` that runs fast and on its own, build it. This turns it into C++ and needs Visual Studio's C++ compiler:
 
   ```
-  cosmonova build examples/guess.cosmos
+  stellanova build examples/guess.stella
   ```
 
   A program does exactly the same thing either way. The self-check runs its test programs both ways and compares what they print.
-- **A program for a web page** is made into JavaScript instead: `cosmonova web examples/pets.cosmos site` writes `site/pets.js` and Cosmonova's runtime `site/cosmonova.js`. Load both in a page (`<script src="cosmonova.js"></script><script src="pets.js"></script>`), or run the program with `node pets.js`. It does the same as the other two ways (the self-check runs its programs with node too). See *Programs for web pages* below.
-- **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a the folder of these into C++ (`<name>.cosmos.cpp`, which you never edit) with:
+- **A program for a web page** is made into JavaScript instead: `stellanova web examples/pets.stella site` writes `site/pets.js` and Stellanova's runtime `site/stellanova.js`. Load both in a page (`<script src="stellanova.js"></script><script src="pets.js"></script>`), or run the program with `node pets.js`. It does the same as the other two ways (the self-check runs its programs with node too). See *Programs for web pages* below.
+- **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a the folder of these into C++ (`<name>.stella.cpp`, which you never edit) with:
 
   ```
-  py -3 cosmonova.py <scripts folder> <output folder>
+  py -3 stellanova.py <scripts folder> <output folder>
   ```
 
-- **Checking for mistakes** without running: `cosmonova check examples/guess.cosmos`.
-- **Trying things out:** type just `cosmonova` for a prompt. Each line you type is done straight away, and names are kept from line to line. Type a value on its own (`5 plus 3`) to see it. A line ending in `:` takes the indented lines after it, finished with an empty line. `bye` finishes.
+- **Checking for mistakes** without running: `stellanova check examples/guess.stella`.
+- **Trying things out:** type just `stellanova` for a prompt. Each line you type is done straight away, and names are kept from line to line. Type a value on its own (`5 plus 3`) to see it. A line ending in `:` takes the indented lines after it, finished with an empty line. `bye` finishes.
 
 A mistake stops with a plain message, such as:
 
 ```
-follow.cosmos line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
+follow.stella line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Working examples: `examples/guess.cosmos` (a guessing game), `examples/pets.cosmos` (lists, kinds of things, commands that return answers), `examples/clock.cosmos` (libraries), `examples/dodge.cosmos` (a game in a window) and `examples/follow.cosmos` (how a deer follows the player, part of a creature).
+Working examples: `examples/guess.stella` (a guessing game), `examples/pets.stella` (lists, kinds of things, commands that return answers), `examples/clock.stella` (libraries), `examples/dodge.stella` (a game in a window) and `examples/follow.stella` (how a deer follows the player, part of a creature).
 
 ## A program, top to bottom
 
@@ -292,10 +292,10 @@ They start empty (0, no, "", an empty list), and any command can read and set th
 A program can use another script's commands and kinds of things:
 
 ```
-use: shapes.cosmos
+use: shapes.stella
 ```
 
-The other script is looked for next to this one. It can have its own `genesis:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.cosmos line 13: ...`.
+The other script is looked for next to this one. It can have its own `genesis:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.stella line 13: ...`.
 
 ## Libraries
 
@@ -318,7 +318,7 @@ and the universe said i love you
 | `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (returns the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, returns the answer) |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
-| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `the output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `cosmonova game.cosmos easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `the output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `stellanova game.stella easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number) |
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `there is a folder "saves"`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"`, `the bytes of the file "cat.png"` (the file as a list of numbers from 0 to 255, for files that aren't text), `fill the file with ("out.bin", numbers)` (the other way) |
 | `letters` | `code of the letter "A"` (65: the number behind a letter), `the letter with code 233` ("é") |
 | `patterns` | Finding text by its shape (`"[0-9]+"` is one or more digits, `"."` any letter, `"(...)"` a piece to keep): `the pattern fits with ("[0-9]+", line)` (yes or no), `matches of the pattern with ("[0-9]+", line)` (every match, as a list of text), `pieces of the pattern with ("([a-z]+)=([0-9]+)", line)` (the bracketed pieces of the first match), `replace the pattern with ("[0-9]+", line, "#")` |
@@ -384,7 +384,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `start keeping the shapes as "house"` … `stop keeping the shapes` | The 3D shapes etched in between aren't drawn now: they are kept under that name. `etch the kept shapes "house"` then draws them all at once, every frame, far faster than etching each one again, so worlds of many thousands of blocks stay smooth. Keeping under the same name again replaces them, and `forget the kept shapes "house"` lets them go. |
 | `screen place of 3 horizontal 1 vertical 5 depth` | Where a place shows on the window, as a flat place (`not a number` when it is behind the eye). |
 
-3D shapes are drawn just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. They are drawn by the **graphics card** (OpenGL, which every Windows has): things hide behind each other properly and balls are smoothly lit. Running directly, this also needs Pillow (`py -3 -m pip install pillow`). Without them, the same shapes are drawn far ones first instead, which looks a little plainer. `the graphics card draws` is yes or no (once a world is open), and setting the environment value `COSMONOVA_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.cosmos` is a small 3D game. `examples/driftstone.cosmos` is a bigger one: an island of blocks to dig, build on and craft with, with day and night (left button digs, right button places, 1 to 9 or the wheel choose, C opens the workbench, K keeps the island).
+3D shapes are drawn just before anything flat is etched or the frame is revealed, so words etched after them (a score) stay on top. They are drawn by the **graphics card** (OpenGL, which every Windows has): things hide behind each other properly and balls are smoothly lit. Running directly, this also needs Pillow (`py -3 -m pip install pillow`). Without them, the same shapes are drawn far ones first instead, which looks a little plainer. `the graphics card draws` is yes or no (once a world is open), and setting the environment value `STELLANOVA_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` makes a sky. `examples/walk3d.stella` is a small 3D game. `examples/driftstone.stella` is a bigger one: an island of blocks to dig, build on and craft with, with day and night (left button digs, right button places, 1 to 9 or the wheel choose, C opens the workbench, K keeps the island).
 
 Colours are names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"` (red, green and blue, each from 00 to ff).
 
@@ -403,7 +403,7 @@ For programs made for the web, a word gets an indented `web:` line too: what it 
 
 ## Programs for web pages
 
-`cosmonova web` makes a program into JavaScript, so it can be the inside of a web page or an app made with Electron. The `page` library gives it the page:
+`stellanova web` makes a program into JavaScript, so it can be the inside of a web page or an app made with Electron. The `page` library gives it the page:
 
 ```
 use: page
@@ -438,7 +438,7 @@ Every the element of the page is a number (0 means there isn't one), so elements
 | `start drawing on with (canvas, 1)`, `drawing width`, `drawing height`, `clear the drawing`, `begin a shape`, `shape point with (x, y)`, `fill the shape`, `fill the shape fading`, `trace the shape`, `fill a dot`, `fill a box`, `fill the drawing fading`, `fill the drawing glowing` | Drawing on a canvas element (the second input of `start drawing on` is how sharp: 1 is every dot of the screen). |
 | `play the media`, `pause the media`, `the media is playing`, `media time of`, `media length of`, `set the media time`, `set the media loudness`, `local copy of address`, `loudness bands of with (el, 24)` | Sound and video elements: `local copy of` fetches a whole file into the page, and `loudness bands of` says how loud each band of pitches is (0 to 1), for a visualiser. |
 
-The `web`, `time`, `maths`, `letters`, `patterns`, `computer` and `server` words that make sense in a page work there too (`web page` fetches, `wait` waits without stopping the page). Tidal OS (in its own folder, `..\TidalOS`) has screens written this way: its desktop, windows and apps are all Cosmonova.
+The `web`, `time`, `maths`, `letters`, `patterns`, `computer` and `server` words that make sense in a page work there too (`web page` fetches, `wait` waits without stopping the page). Tidal OS (in its own folder, `..\TidalOS`) has screens written this way: its desktop, windows and apps are all Stellanova.
 
 ## Saving and loading
 
@@ -471,7 +471,7 @@ if that went wrong:
 
 The lines under `try:` stop at the first problem, even one deep inside a command they use.
 
-Checking the translator itself: `py -3 test_cosmonova.py`.
+Checking the translator itself: `py -3 test_stellanova.py`.
 
 ## Reading like English
 

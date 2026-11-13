@@ -1,6 +1,6 @@
-#include "CosmonovaStage.h"
-#include "CosmonovaBridge.h"
-#include "cosmonova.h"
+#include "StellanovaStage.h"
+#include "StellanovaBridge.h"
+#include "stellanova.h"
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -22,13 +22,13 @@
 #include "Widgets/SWindow.h"
 #include <thread>
 
-int CosmonovaMain();  // the program, from Generated/Program.cosmos.cpp
+int StellanovaMain();  // the program, from Generated/Program.stella.cpp
 
 namespace
 {
-	cosmonova_unreal::Frame Shown;  // the frame on the screen now (game thread only)
+	stellanova_unreal::Frame Shown;  // the frame on the screen now (game thread only)
 
-	// Cosmonova's metres (across, up, away) to Unreal's centimetres (forward, right, up).
+	// Stellanova's metres (across, up, away) to Unreal's centimetres (forward, right, up).
 	FVector ToUnreal(double Across, double Up, double Away) { return FVector(Away * 100.0, Across * 100.0, Up * 100.0); }
 
 	const TPair<const char*, FKey> Keys[] = {
@@ -38,7 +38,7 @@ namespace
 	const TCHAR* Digits[] = {TEXT("Zero"), TEXT("One"), TEXT("Two"), TEXT("Three"), TEXT("Four"), TEXT("Five"), TEXT("Six"), TEXT("Seven"), TEXT("Eight"), TEXT("Nine")};
 }
 
-ACosmonovaEye::ACosmonovaEye()
+AStellanovaEye::AStellanovaEye()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PrePhysics;
@@ -55,7 +55,7 @@ ACosmonovaEye::ACosmonovaEye()
 	Paint = BasicPaint.Object;
 }
 
-void ACosmonovaEye::BeginPlay()
+void AStellanovaEye::BeginPlay()
 {
 	Super::BeginPlay();
 	if (APlayerController* Player = GetWorld()->GetFirstPlayerController())
@@ -63,25 +63,25 @@ void ACosmonovaEye::BeginPlay()
 		Player->bShowMouseCursor = true;
 		Player->SetInputMode(FInputModeGameOnly());
 	}
-	cosmonova::show_hook = [](const std::string& Text, bool Problem)
+	stellanova::show_hook = [](const std::string& Text, bool Problem)
 	{
-		auto& B = cosmonova_unreal::bridge();
+		auto& B = stellanova_unreal::bridge();
 		std::lock_guard<std::mutex> Hold(B.lock);
 		B.messages.push_back({Text, Problem});
 	};
 	std::thread([]
 	{
-		CosmonovaMain();
-		auto& B = cosmonova_unreal::bridge();
+		StellanovaMain();
+		auto& B = stellanova_unreal::bridge();
 		std::lock_guard<std::mutex> Hold(B.lock);
 		if (B.opened)  // a game that opened a world ends when its program does; otherwise its words stay on the screen
 			B.end_asked = true;
 	}).detach();  // the program runs on its own; 'reveal the frame' waits for Unreal
 }
 
-void ACosmonovaEye::EndPlay(const EEndPlayReason::Type Reason)
+void AStellanovaEye::EndPlay(const EEndPlayReason::Type Reason)
 {
-	auto& B = cosmonova_unreal::bridge();
+	auto& B = stellanova_unreal::bridge();
 	{
 		std::lock_guard<std::mutex> Hold(B.lock);
 		B.lives = false;  // 'the world lives' becomes no, and a waiting 'reveal the frame' goes on
@@ -90,7 +90,7 @@ void ACosmonovaEye::EndPlay(const EEndPlayReason::Type Reason)
 	Super::EndPlay(Reason);
 }
 
-UInstancedStaticMeshComponent* ACosmonovaEye::MeshFor(UStaticMesh* Mesh, const FLinearColor& Colour)
+UInstancedStaticMeshComponent* AStellanovaEye::MeshFor(UStaticMesh* Mesh, const FLinearColor& Colour)
 {
 	FString Key = Mesh->GetName() + Colour.ToString();
 	if (TObjectPtr<UInstancedStaticMeshComponent>* Found = Meshes.Find(Key))
@@ -111,9 +111,9 @@ UInstancedStaticMeshComponent* ACosmonovaEye::MeshFor(UStaticMesh* Mesh, const F
 	return Made;
 }
 
-void ACosmonovaEye::ReadInput()  // with the bridge locked
+void AStellanovaEye::ReadInput()  // with the bridge locked
 {
-	auto& B = cosmonova_unreal::bridge();
+	auto& B = stellanova_unreal::bridge();
 	APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	if (!Player)
 		return;
@@ -152,10 +152,10 @@ void ACosmonovaEye::ReadInput()  // with the bridge locked
 	}
 }
 
-void ACosmonovaEye::Tick(float DeltaSeconds)
+void AStellanovaEye::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	auto& B = cosmonova_unreal::bridge();
+	auto& B = stellanova_unreal::bridge();
 	bool Got = false, Open = false, End = false;
 	std::string Title;
 	int Width = 0, Height = 0;
@@ -185,7 +185,7 @@ void ACosmonovaEye::Tick(float DeltaSeconds)
 	for (const auto& [Text, Problem] : Messages)
 	{
 		FString Line = UTF8_TO_TCHAR(Text.c_str());
-		UE_LOG(LogTemp, Display, TEXT("Cosmonova: %s"), *Line);
+		UE_LOG(LogTemp, Display, TEXT("Stellanova: %s"), *Line);
 		if (GEngine)
 			GEngine->AddOnScreenDebugMessage(-1, Problem ? 600.f : 10.f, Problem ? FColor::Red : FColor::White, Line);
 	}
@@ -208,7 +208,7 @@ void ACosmonovaEye::Tick(float DeltaSeconds)
 	if (!Got)
 		return;
 
-	// The eye: Cosmonova's turn is Unreal's yaw and its tilt is the pitch; 60 degrees from the top of the picture to the bottom.
+	// The eye: Stellanova's turn is Unreal's yaw and its tilt is the pitch; 60 degrees from the top of the picture to the bottom.
 	const double* E = Shown.eye;
 	SetActorLocationAndRotation(ToUnreal(E[0], E[1], E[2]), FRotator(E[4], E[3], 0));
 	double Aspect = B.width_now / FMath::Max(1.0, B.height_now);
@@ -217,7 +217,7 @@ void ACosmonovaEye::Tick(float DeltaSeconds)
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Wanted;
 	for (const auto& Pair : Meshes)
 		Wanted.Add(Pair.Value.Get());
-	for (const cosmonova_unreal::Shape& S : Shown.shapes)
+	for (const stellanova_unreal::Shape& S : Shown.shapes)
 	{
 		FVector At = ToUnreal(S.at.X, S.at.Y, S.at.Z);
 		FVector Scale = S.kind == 0 ? FVector(S.size.Z, S.size.X, S.size.Y) : FVector(2.0 * S.size.X);  // the meshes are 1 m across
@@ -249,13 +249,13 @@ void ACosmonovaEye::Tick(float DeltaSeconds)
 	}
 }
 
-void ACosmonovaHUD::DrawHUD()
+void AStellanovaHUD::DrawHUD()
 {
 	Super::DrawHUD();
 	if (Shown.shapes.empty() && !Shown.ground)  // a flat game: the background is the colour the window was consumed with
 		DrawRect(Shown.sky, 0, 0, Canvas->SizeX, Canvas->SizeY);
 	UFont* Font = GEngine ? GEngine->GetLargeFont() : nullptr;
-	for (const cosmonova_unreal::Flat& F : Shown.flats)
+	for (const stellanova_unreal::Flat& F : Shown.flats)
 	{
 		switch (F.kind)
 		{
@@ -275,13 +275,13 @@ void ACosmonovaHUD::DrawHUD()
 	}
 }
 
-ACosmonovaGameMode::ACosmonovaGameMode()
+AStellanovaGameMode::AStellanovaGameMode()
 {
-	DefaultPawnClass = ACosmonovaEye::StaticClass();
-	HUDClass = ACosmonovaHUD::StaticClass();
+	DefaultPawnClass = AStellanovaEye::StaticClass();
+	HUDClass = AStellanovaHUD::StaticClass();
 }
 
-void ACosmonovaGameMode::BeginPlay()
+void AStellanovaGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	UWorld* World = GetWorld();

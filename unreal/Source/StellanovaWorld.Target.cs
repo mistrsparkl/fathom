@@ -1,12 +1,12 @@
 using UnrealBuildTool;
 
-public class CosmonovaWorldTarget : TargetRules
+public class StellanovaWorldTarget : TargetRules
 {
-	public CosmonovaWorldTarget(TargetInfo Target) : base(Target)
+	public StellanovaWorldTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.Add("CosmonovaWorld");
+		ExtraModuleNames.Add("StellanovaWorld");
 	}
 }

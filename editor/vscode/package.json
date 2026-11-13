@@ -1,7 +1,7 @@
 {
-  "name": "cosmonova",
-  "displayName": "Cosmonova",
-  "description": "Colours, indenting and shortcuts for the Cosmonova language (.cosmos files).",
+  "name": "stellanova",
+  "displayName": "Stellanova",
+  "description": "Colours, indenting and shortcuts for the Stellanova language (.stella files).",
   "version": "0.3.0",
   "publisher": "speda",
   "engines": {
@@ -14,31 +14,31 @@
   "contributes": {
     "languages": [
       {
-        "id": "cosmonova",
+        "id": "stellanova",
         "aliases": [
-          "Cosmonova"
+          "Stellanova"
         ],
         "extensions": [
-          ".cosmos"
+          ".stella"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "cosmonova",
-        "scopeName": "source.cosmonova",
-        "path": "./syntaxes/cosmonova.tmLanguage.json"
+        "language": "stellanova",
+        "scopeName": "source.stellanova",
+        "path": "./syntaxes/stellanova.tmLanguage.json"
       }
     ],
     "snippets": [
       {
-        "language": "cosmonova",
+        "language": "stellanova",
         "path": "./snippets.json"
       }
     ],
     "configurationDefaults": {
-      "[cosmonova]": {
+      "[stellanova]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
         "editor.detectIndentation": false

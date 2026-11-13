@@ -4,8 +4,8 @@ note: Use them in a program with:  use: screen   (Windows, running directly; it 
 note: Sizes and places are in dots, counted from the top left. On a screen set to show things bigger (like 150%),
 note: a dot is bigger too, so a program looks the same everywhere and text stays sharp.
 note: Colours are "#rrggbb", or "#rrggbbaa" to see through them (aa: 00 is clear, ff is solid). 'colour of hue' makes them from a hue.
-note: For checking a program without anyone there, set COSMONOVA_SCREEN_PLAY to a file of steps (see LANGUAGE.md),
-note: COSMONOVA_SCREEN_SIZE to a size like 1600x900, and COSMONOVA_SCREEN_HIDDEN to 1.
+note: For checking a program without anyone there, set STELLANOVA_SCREEN_PLAY to a file of steps (see LANGUAGE.md),
+note: STELLANOVA_SCREEN_SIZE to a size like 1600x900, and STELLANOVA_SCREEN_HIDDEN to 1.
 
 runs only
 
@@ -70,8 +70,8 @@ python:
       root = tkinter.Tk()
       root.title(title)
       root.configure(bg="#000000")
-      size = os.environ.get("COSMONOVA_SCREEN_SIZE", "")
-      hidden = os.environ.get("COSMONOVA_SCREEN_HIDDEN", "") == "1"
+      size = os.environ.get("STELLANOVA_SCREEN_SIZE", "")
+      hidden = os.environ.get("STELLANOVA_SCREEN_HIDDEN", "") == "1"
       if size:
           w, h = (int(v) for v in size.lower().split("x"))
           root.overrideredirect(True)
@@ -87,7 +87,7 @@ python:
           dpi = ctypes.windll.user32.GetDpiForSystem()
       except Exception:
           dpi = 96
-      k = float(os.environ.get("COSMONOVA_SCREEN_SCALE", "0") or 0) or max(1.0, dpi / 96)
+      k = float(os.environ.get("STELLANOVA_SCREEN_SCALE", "0") or 0) or max(1.0, dpi / 96)
       SCREEN.update(open=True, root=root, frame=frame, w=w, h=h, k=k, hidden=hidden, lives=True, asked_close=False,
                     mx=0.0, my=0.0, held=set(), down=set(), up=set(), double=False, wheel=0.0, keys=[], typed="",
                     ctrl=False, shift=False, alt=False, last=time.perf_counter(), dt=1 / 60, began=time.perf_counter(),
@@ -151,7 +151,7 @@ python:
       if not hidden:
           root.focus_force()
       SCREEN["hwnd"] = frame.winfo_id()
-      play = os.environ.get("COSMONOVA_SCREEN_PLAY", "")
+      play = os.environ.get("STELLANOVA_SCREEN_PLAY", "")
       if play:
           with open(play, encoding="utf-8") as f:
               SCREEN["play"] = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]

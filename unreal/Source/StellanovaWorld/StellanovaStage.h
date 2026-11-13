@@ -1,10 +1,10 @@
-// The Unreal side of a Cosmonova program: the eye (camera) that shows each frame, the flat drawing on top, and the game mode.
+// The Unreal side of a Stellanova program: the eye (camera) that shows each frame, the flat drawing on top, and the game mode.
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/Pawn.h"
-#include "CosmonovaStage.generated.h"
+#include "StellanovaStage.generated.h"
 
 class UCameraComponent;
 class UInstancedStaticMeshComponent;
@@ -12,12 +12,12 @@ class UMaterialInterface;
 class UStaticMesh;
 
 UCLASS()
-class ACosmonovaEye : public APawn
+class AStellanovaEye : public APawn
 {
 	GENERATED_BODY()
 
 public:
-	ACosmonovaEye();
+	AStellanovaEye();
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -46,7 +46,7 @@ private:
 };
 
 UCLASS()
-class ACosmonovaHUD : public AHUD
+class AStellanovaHUD : public AHUD
 {
 	GENERATED_BODY()
 
@@ -55,11 +55,11 @@ public:
 };
 
 UCLASS()
-class ACosmonovaGameMode : public AGameModeBase
+class AStellanovaGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	ACosmonovaGameMode();
+	AStellanovaGameMode();
 	virtual void BeginPlay() override;
 };

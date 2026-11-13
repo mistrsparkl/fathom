@@ -1,4 +1,4 @@
-// What every Cosmonova program can use. Included by the C++ that cosmonova.py writes.
+// What every Stellanova program can use. Included by the C++ that stellanova.py writes.
 #pragma once
 #include <algorithm>
 #include <cmath>
@@ -19,7 +19,7 @@
 #include <thread>
 #include <vector>
 
-#ifdef COSMONOVA_IN_UNREAL
+#ifdef STELLANOVA_IN_UNREAL
 #include "CoreMinimal.h"  // Unreal's own FVector, FVector2D and FMath
 #pragma warning(disable: 4702)  // Unreal treats warnings as mistakes; a command's last 'return' can be one nobody reaches
 #else
@@ -80,7 +80,7 @@ extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
 extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
 #endif
 
-namespace cosmonova
+namespace stellanova
 {
 	inline std::vector<std::string> files;  // the program's script, then each script it uses
 
@@ -93,7 +93,7 @@ namespace cosmonova
 		files = scripts;
 		for (int k = 1; k < count; ++k)
 			arguments.push_back(given[k]);
-#ifndef COSMONOVA_IN_UNREAL
+#ifndef STELLANOVA_IN_UNREAL
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
 #endif

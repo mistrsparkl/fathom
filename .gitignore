@@ -1,7 +1,7 @@
 generated/
 __pycache__/
 *.exe
-mygame.cosmos
+mygame.stella
 *.json
 !editor/vscode/**/*.json
 *.vsix

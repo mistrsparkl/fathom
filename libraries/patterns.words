@@ -5,7 +5,7 @@ note: "." any letter, "a*" any number of a's, "^" the start and "$" the end, "(.
 include: <regex>
 
 code:
-  namespace cosmonova_patterns
+  namespace stellanova_patterns
   {
   	inline std::regex make(const std::string& pattern, int line)
   	{
@@ -15,7 +15,7 @@ code:
   		}
   		catch (const std::regex_error&)
   		{
-  			cosmonova::fail(line, "the pattern \"" + pattern + "\" isn't a pattern I understand.");
+  			stellanova::fail(line, "the pattern \"" + pattern + "\" isn't a pattern I understand.");
   		}
   	}
   	inline bool fits(const std::string& pattern, const std::string& text, int line)
@@ -67,32 +67,32 @@ python:
       m = make(pattern).search(text)
       return [g or "" for g in m.groups()] if m else []
 
-to the pattern fits, given pattern (text) and text (text), returning yes or no = cosmonova_patterns::fits({pattern}, {text}, {line})
+to the pattern fits, given pattern (text) and text (text), returning yes or no = stellanova_patterns::fits({pattern}, {text}, {line})
   runs: make({pattern}).search({text}) is not None
-  web: cosmonova_patterns::make({pattern}, "", {line}).test({text})
-to matches of the pattern, given pattern (text) and text (text), returning a list of text = cosmonova_patterns::matches({pattern}, {text}, {line})
+  web: stellanova_patterns::make({pattern}, "", {line}).test({text})
+to matches of the pattern, given pattern (text) and text (text), returning a list of text = stellanova_patterns::matches({pattern}, {text}, {line})
   runs: matches({pattern}, {text})
-  web: cosmonova_patterns::matches({pattern}, {text}, {line})
-to pieces of the pattern, given pattern (text) and text (text), returning a list of text = cosmonova_patterns::pieces({pattern}, {text}, {line})
+  web: stellanova_patterns::matches({pattern}, {text}, {line})
+to pieces of the pattern, given pattern (text) and text (text), returning a list of text = stellanova_patterns::pieces({pattern}, {text}, {line})
   runs: pieces({pattern}, {text})
-  web: cosmonova_patterns::pieces({pattern}, {text}, {line})
-to replace the pattern, given pattern (text) and text (text) and with (text), returning text = cosmonova_patterns::replace({pattern}, {text}, {with}, {line})
+  web: stellanova_patterns::pieces({pattern}, {text}, {line})
+to replace the pattern, given pattern (text) and text (text) and with (text), returning text = stellanova_patterns::replace({pattern}, {text}, {with}, {line})
   runs: make({pattern}).sub(lambda m: {with}, {text})
-  web: cosmonova_patterns::replace({pattern}, {text}, {with}, {line})
+  web: stellanova_patterns::replace({pattern}, {text}, {with}, {line})
 
 javascript:
-  const cosmonova_patterns = {
+  const stellanova_patterns = {
     make(pattern, flags, line) {
       try {
         return new RegExp(pattern, flags);
       } catch {
-        cosmonova.fail(line, 'the pattern "' + pattern + "\" isn't a pattern I understand.");
+        stellanova.fail(line, 'the pattern "' + pattern + "\" isn't a pattern I understand.");
       }
     },
-    matches: (pattern, text, line) => [...text.matchAll(cosmonova_patterns.make(pattern, "g", line))].map((m) => m[0]),
+    matches: (pattern, text, line) => [...text.matchAll(stellanova_patterns.make(pattern, "g", line))].map((m) => m[0]),
     pieces(pattern, text, line) {
-      const m = cosmonova_patterns.make(pattern, "", line).exec(text);
+      const m = stellanova_patterns.make(pattern, "", line).exec(text);
       return m ? m.slice(1).map((g) => g || "") : [];
     },
-    replace: (pattern, text, by, line) => text.replace(cosmonova_patterns.make(pattern, "g", line), () => by),  // the new text as it is: no $ codes
+    replace: (pattern, text, by, line) => text.replace(stellanova_patterns.make(pattern, "g", line), () => by),  // the new text as it is: no $ codes
   };

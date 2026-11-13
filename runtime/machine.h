@@ -24,8 +24,8 @@ struct V
 };
 
 V* cn_make_text(std::string s);
-namespace cosmonova { struct Problem; }
-void cn_set_problem(const cosmonova::Problem& p);
+namespace stellanova { struct Problem; }
+void cn_set_problem(const stellanova::Problem& p);
 
 extern "C"
 {
@@ -39,8 +39,8 @@ extern "C"
 
 // ---------------------------------------------------------------- for library words
 // A library word's own C++ takes C++ values (std::string, std::vector<double>, FVector, ...): these turn machine
-// values into them and back. Only used where cosmonova.h is included first.
-#ifdef COSMONOVA_CONVERSIONS
+// values into them and back. Only used where stellanova.h is included first.
+#ifdef STELLANOVA_CONVERSIONS
 template <typename T> struct cn_is_vector : std::false_type {};
 template <typename T> struct cn_is_vector<std::vector<T>> : std::true_type { using item = T; };
 template <typename T> struct cn_is_table : std::false_type {};

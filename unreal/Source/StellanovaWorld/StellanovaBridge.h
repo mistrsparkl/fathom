@@ -1,4 +1,4 @@
-// What a Cosmonova program (on its own thread) and Unreal (on the game thread) share.
+// What a Stellanova program (on its own thread) and Unreal (on the game thread) share.
 #pragma once
 #include "CoreMinimal.h"
 #include <condition_variable>
@@ -8,9 +8,9 @@
 #include <utility>
 #include <vector>
 
-namespace cosmonova_unreal
+namespace stellanova_unreal
 {
-	struct Shape  // a 3D shape, in Cosmonova's metres: across, up, away
+	struct Shape  // a 3D shape, in Stellanova's metres: across, up, away
 	{
 		int kind;  // 0 a block, 1 a ball
 		FVector at;

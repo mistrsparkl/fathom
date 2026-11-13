@@ -10,7 +10,7 @@ link: urlmon
 link: wininet
 
 code:
-  namespace cosmonova_web
+  namespace stellanova_web
   {
   	inline std::string get(const std::string& address, int line)
   	{
@@ -23,7 +23,7 @@ code:
   		if (URLDownloadToFileW(nullptr, w.c_str(), file, 0, nullptr) != S_OK)
   		{
   			DeleteFileW(file);
-  			cosmonova::fail(line, "I couldn't get the web page \"" + address + "\".");
+  			stellanova::fail(line, "I couldn't get the web page \"" + address + "\".");
   		}
   		std::ifstream in(file, std::ios::binary);
   		std::ostringstream all;
@@ -43,7 +43,7 @@ code:
   		std::wstring w = wide(address);
   		DeleteUrlCacheEntryW(w.c_str());
   		if (URLDownloadToFileW(nullptr, w.c_str(), wide(name).c_str(), 0, nullptr) != S_OK)
-  			cosmonova::fail(line, "I couldn't download \"" + address + "\".");
+  			stellanova::fail(line, "I couldn't download \"" + address + "\".");
   	}
   	inline std::string send(const std::string& address, const std::string& body, int line)
   	{
@@ -58,7 +58,7 @@ code:
   		bool ok = false;
   		if (InternetCrackUrlW(w.c_str(), 0, 0, &parts))
   		{
-  			HINTERNET net = InternetOpenW(L"Cosmonova", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+  			HINTERNET net = InternetOpenW(L"Stellanova", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
   			HINTERNET site = net ? InternetConnectW(net, host, parts.nPort, nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0) : nullptr;
   			DWORD flags = INTERNET_FLAG_RELOAD | (parts.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0);
   			HINTERNET ask = site ? HttpOpenRequestW(site, L"POST", path, nullptr, nullptr, nullptr, flags, 0) : nullptr;
@@ -77,7 +77,7 @@ code:
   					InternetCloseHandle(h);
   		}
   		if (!ok)
-  			cosmonova::fail(line, "I couldn't send to the web page \"" + address + "\".");
+  			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
   		return all;
   	}
   }
@@ -86,14 +86,14 @@ python:
   import urllib.request
   def get(address):
       try:
-          request = urllib.request.Request(address, headers={"User-Agent": "Cosmonova"})
+          request = urllib.request.Request(address, headers={"User-Agent": "Stellanova"})
           with urllib.request.urlopen(request, timeout=30) as reply:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t get the web page "{address}".')
   def download(address, name):
       try:
-          request = urllib.request.Request(address, headers={"User-Agent": "Cosmonova"})
+          request = urllib.request.Request(address, headers={"User-Agent": "Stellanova"})
           with urllib.request.urlopen(request, timeout=60) as reply, open(name, "wb") as out:
               out.write(reply.read())
       except Exception:
@@ -101,45 +101,45 @@ python:
   def send(address, message):
       try:
           request = urllib.request.Request(address, data=message.encode("utf-8"), method="POST",
-                                           headers={"User-Agent": "Cosmonova", "Content-Type": "text/plain; charset=utf-8"})
+                                           headers={"User-Agent": "Stellanova", "Content-Type": "text/plain; charset=utf-8"})
           with urllib.request.urlopen(request, timeout=30) as reply:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t send to the web page "{address}".')
 
-to web page, given address (text), returning text = cosmonova_web::get({address}, {line})
+to web page, given address (text), returning text = stellanova_web::get({address}, {line})
   runs: get({address})
-  web: (await cosmonova_web::get({address}, {line}))
-to download, given address (text) and file (text) = cosmonova_web::download({address}, {file}, {line})
+  web: (await stellanova_web::get({address}, {line}))
+to download, given address (text) and file (text) = stellanova_web::download({address}, {file}, {line})
   runs: download({address}, {file})
-  web: (await cosmonova_web::download({address}, {file}, {line}))
-to send to the web page, given address (text) and message (text), returning text = cosmonova_web::send({address}, {message}, {line})
+  web: (await stellanova_web::download({address}, {file}, {line}))
+to send to the web page, given address (text) and message (text), returning text = stellanova_web::send({address}, {message}, {line})
   runs: send({address}, {message})
-  web: (await cosmonova_web::send({address}, {message}, {line}))
+  web: (await stellanova_web::send({address}, {message}, {line}))
 
 javascript:
-  const cosmonova_web = {
+  const stellanova_web = {
     async fetched(address, options, line, problem) {
       try {
         const reply = await fetch(address, options);
         if (!reply.ok) throw new Error(String(reply.status));
         return reply;
       } catch {
-        cosmonova.fail(line, problem);
+        stellanova.fail(line, problem);
       }
     },
-    get: async (address, line) => (await cosmonova_web.fetched(address, {}, line, `I couldn't get the web page "${address}".`)).text(),
+    get: async (address, line) => (await stellanova_web.fetched(address, {}, line, `I couldn't get the web page "${address}".`)).text(),
     async send(address, message, line) {
       const options = { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8" }, body: message };
-      return (await cosmonova_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
+      return (await stellanova_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
     },
     async download(address, file, line) {
       const problem = `I couldn't download "${address}".`;
-      const bytes = new Uint8Array(await (await cosmonova_web.fetched(address, {}, line, problem)).arrayBuffer());
+      const bytes = new Uint8Array(await (await stellanova_web.fetched(address, {}, line, problem)).arrayBuffer());
       try {
         require("fs").writeFileSync(file, bytes);
       } catch {
-        cosmonova.fail(line, problem);
+        stellanova.fail(line, problem);
       }
     },
   };

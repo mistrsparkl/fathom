@@ -1,4 +1,4 @@
-"""Cosmonova's machine-code builder: turns a program into LLVM code, which clang makes into an .exe.
+"""Stellanova's machine-code builder: turns a program into LLVM code, which clang makes into an .exe.
 
 Each piece of a program (a number, a sum, an 'if' line) carries an 'ir' function next to its Python and C++:
 ir(f) writes that piece's LLVM instructions into the function being made, f, and returns where the answer is.
@@ -16,7 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 NUMBER, YESNO, TEXT, PLACE, FLAT = "number", "yes or no", "text", "place", "flat"
-THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set by cosmonova.py before writing
+THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set by stellanova.py before writing
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
@@ -37,7 +37,7 @@ def emit(f, x, what="a part of the language"):
         x = getattr(x, "inner", x)
         made_by = getattr(x, "__qualname__", "")  # a statement's run: which reader made it ('say.<locals>.run')
         if hasattr(x, "__code__"):
-            made_by += f", cosmonova.py line {x.__code__.co_firstlineno}"
+            made_by += f", stellanova.py line {x.__code__.co_firstlineno}"
         raise Unsupported(f"{what}: {code[:60]}" if code else f"{what} ({made_by})" if made_by else what)
     return write(f)
 
@@ -556,7 +556,7 @@ def give_up(f):
 
 
 # ---------------------------------------------------------------- built-in words and library words
-# A built-in like 'trimmed x' or a library word like 'square root of' is one of Cosmonova's own C++ functions.
+# A built-in like 'trimmed x' or a library word like 'square root of' is one of Stellanova's own C++ functions.
 # Each becomes a small C function in the prebuilt library (made the first time a program needs it, kept after),
 # so a program calls it like any other library function: the program's own code still never becomes C++.
 
@@ -589,7 +589,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
         result = f"return static_cast<{ret}>({body});"
     fallback = {"double": "0.0", "bool": "false", "V*": "cn_box_number(0)"}.get(ret, "")
     code = (f'extern "C" {ret} {name}({", ".join(params + ["int line"])})\n'
-            f"{{\n\ttry {{ {result} }}\n\tcatch (const cosmonova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n}}\n")
+            f"{{\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n}}\n")
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"
     f.module.declare(f"declare {ll_ret} @{name}({', '.join([ll_type(a.kind) for a in args] + ['i32'])})")
@@ -611,8 +611,8 @@ def unit_file(unit, head, wrappers):
     if all(n in have for n in wrappers):
         return path
     have.update(wrappers)
-    top = [mark, "// Made by machine.py: Cosmonova's own words as C functions for machine code. Not a program's code.",
-           '#include "cosmonova.h"', head, "#define COSMONOVA_CONVERSIONS", '#include "machine.h"', ""]
+    top = [mark, "// Made by machine.py: Stellanova's own words as C functions for machine code. Not a program's code.",
+           '#include "stellanova.h"', head, "#define STELLANOVA_CONVERSIONS", '#include "machine.h"', ""]
     path.parent.mkdir(exist_ok=True)
     path.write_text("\n".join(top) + "".join(f"// wrapper {n}\n{c}// end\n" for n, c in sorted(have.items())), encoding="utf-8")
     return path
@@ -621,7 +621,7 @@ def unit_file(unit, head, wrappers):
 # ---------------------------------------------------------------- making the .exe
 
 def find_clang():
-    for place in [os.environ.get("COSMONOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe"]:
+    for place in [os.environ.get("STELLANOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe"]:
         if place and Path(place).exists():
             return place
     raise RuntimeError("I can't find LLVM's clang. Install LLVM (winget install LLVM.LLVM).")
@@ -634,15 +634,15 @@ def compile_once(src, out, newer_than):
         done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-fms-extensions", "-Wno-everything",
                                "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True)
         if done.returncode:
-            raise RuntimeError(f"Cosmonova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
+            raise RuntimeError(f"Stellanova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
     return out
 
 
 def runtime_object():
-    """runtime/machine.cpp compiled once (again only when it or cosmonova.h changes)."""
+    """runtime/machine.cpp compiled once (again only when it or stellanova.h changes)."""
     runtime = HERE / "runtime"
-    return compile_once(runtime / "machine.cpp", runtime / "built" / "cosmonova_machine.obj",
-                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "cosmonova.h"])
+    return compile_once(runtime / "machine.cpp", runtime / "built" / "stellanova_machine.obj",
+                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h"])
 
 
 def make_exe(ll_text_, exe, work, units=None):
@@ -654,13 +654,13 @@ def make_exe(ll_text_, exe, work, units=None):
         runtime = HERE / "runtime"
         for unit, (head, wrappers) in sorted((units or {}).items()):
             src = unit_file(unit, head, wrappers)
-            objects.append(str(compile_once(src, src.with_suffix(".obj"), [src, runtime / "machine.h", runtime / "cosmonova.h"])))
+            objects.append(str(compile_once(src, src.with_suffix(".obj"), [src, runtime / "machine.h", runtime / "stellanova.h"])))
         clang = find_clang()
     except RuntimeError as err:
         return str(err)
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, "-o", str(exe)],
                           capture_output=True, text=True)
     if done.returncode:
-        return ("Cosmonova wrote machine code LLVM didn't accept. That is a bug in Cosmonova, not in your script.\n"
+        return ("Stellanova wrote machine code LLVM didn't accept. That is a bug in Stellanova, not in your script.\n"
                 + done.stderr + f"\n(the LLVM code is in {ll})")
     return None

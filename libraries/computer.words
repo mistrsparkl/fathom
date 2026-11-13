@@ -9,7 +9,7 @@ include: <cstdlib>
 link: shell32
 
 code:
-  namespace cosmonova_computer
+  namespace stellanova_computer
   {
   	inline std::string user_name()
   	{
@@ -38,22 +38,22 @@ to run the command, given command (text), returning a number = (double)std::syst
 to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
   runs: open_thing({thing})
 
-user name = cosmonova_computer::user_name(), text, read only
+user name = stellanova_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME", "")
-  web: cosmonova_computer::environment("USERNAME")
+  web: stellanova_computer::environment("USERNAME")
 
 include: <cstdio>
 include: <filesystem>
 
 code:
-  namespace cosmonova_computer
+  namespace stellanova_computer
   {
   	inline std::string output_of(const std::string& command, int line)
   	{
   		std::fflush(stdout);
   		FILE* pipe = _popen(command.c_str(), "rb");
   		if (!pipe)
-  			cosmonova::fail(line, "I couldn't run the command \"" + command + "\".");
+  			stellanova::fail(line, "I couldn't run the command \"" + command + "\".");
   		std::string all;
   		char chunk[4096];
   		for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, pipe)) > 0;)
@@ -91,25 +91,25 @@ python:
       sys.stderr.flush()
       os._exit(int(code))
 
-the words given = cosmonova::arguments, a list of text, read only
+the words given = stellanova::arguments, a list of text, read only
   runs: list(ARGUMENTS)
-  web: cosmonova_computer::words_given()
+  web: stellanova_computer::words_given()
 current folder = std::filesystem::current_path().string(), text, read only
   runs: os.getcwd()
-  web: cosmonova_computer::folder()
-to output of the command, given command (text), returning text = cosmonova_computer::output_of({command}, {line})
+  web: stellanova_computer::folder()
+to output of the command, given command (text), returning text = stellanova_computer::output_of({command}, {line})
   runs: output_of({command})
-to environment value of, given name (text), returning text = cosmonova_computer::environment({name})
+to environment value of, given name (text), returning text = stellanova_computer::environment({name})
   runs: os.environ.get({name}, "")
-  web: cosmonova_computer::environment({name})
-to end the program, given code (a number) = cosmonova_computer::end_program({code})
+  web: stellanova_computer::environment({name})
+to end the program, given code (a number) = stellanova_computer::end_program({code})
   runs: end_program({code})
-  web: cosmonova::leave({code})
+  web: stellanova::leave({code})
 
 javascript:
-  const cosmonova_computer = {
+  const stellanova_computer = {
     node: typeof process !== "undefined" && !!(process.versions && process.versions.node),
-    environment: (name) => (cosmonova_computer.node ? process.env[name] || "" : ""),
-    words_given: () => (cosmonova_computer.node ? process.argv.slice(2) : []),
-    folder: () => (cosmonova_computer.node ? process.cwd() : ""),
+    environment: (name) => (stellanova_computer.node ? process.env[name] || "" : ""),
+    words_given: () => (stellanova_computer.node ? process.argv.slice(2) : []),
+    folder: () => (stellanova_computer.node ? process.cwd() : ""),
   };

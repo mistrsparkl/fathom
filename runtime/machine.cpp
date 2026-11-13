@@ -1,9 +1,9 @@
-// What a program made into machine code (by machine.py) calls: plain C functions over cosmonova.h.
-// Compiled once into runtime/built/cosmonova_machine.obj; a program's own code never becomes C++.
+// What a program made into machine code (by machine.py) calls: plain C functions over stellanova.h.
+// Compiled once into runtime/built/stellanova_machine.obj; a program's own code never becomes C++.
 //
 // Numbers are doubles and yes/no is a bool. Everything else (text, lists, tables, places, things) is a V*:
 // made here, copied when stored (as Python and C++ copy), and shown and compared the way Python does.
-#include "cosmonova.h"
+#include "stellanova.h"
 #include "machine.h"
 
 // shortcut: values are never freed; upgrade to reference counting before long-running programs make values in loops.
@@ -24,16 +24,16 @@ V* cn_make_text(std::string s)
 // A problem doesn't jump anywhere: it is kept here, and the machine code checks cn_failed() after each step that may fail,
 // then goes to the 'if that went wrong:' lines, or leaves the command (and so on, up to the program, which reports it).
 static bool failed = false;
-static cosmonova::Problem pending;
+static stellanova::Problem pending;
 
-void cn_set_problem(const cosmonova::Problem& p)
+void cn_set_problem(const stellanova::Problem& p)
 {
 	if (!failed)
 		pending = p;
 	failed = true;
 }
 
-#define GUARDED(fallback, body) try { body } catch (const cosmonova::Problem& problem) { cn_set_problem(problem); return fallback; }
+#define GUARDED(fallback, body) try { body } catch (const stellanova::Problem& problem) { cn_set_problem(problem); return fallback; }
 
 static std::string thing_name(const V* v);
 
@@ -47,11 +47,11 @@ static std::string show(const V* v)
 {
 	switch (v->tag)
 	{
-	case 'n': return cosmonova::text(v->d);
+	case 'n': return stellanova::text(v->d);
 	case 'y': return v->d != 0 ? "yes" : "no";
 	case 't': return v->s;
-	case 'p': return cosmonova::text(v->x) + " horizontal " + cosmonova::text(v->y) + " vertical " + cosmonova::text(v->z) + " depth";
-	case 'f': return cosmonova::text(v->x) + " horizontal " + cosmonova::text(v->y) + " vertical";
+	case 'p': return stellanova::text(v->x) + " horizontal " + stellanova::text(v->y) + " vertical " + stellanova::text(v->z) + " depth";
+	case 'f': return stellanova::text(v->x) + " horizontal " + stellanova::text(v->y) + " vertical";
 	case 'l':
 	{
 		if (v->items.empty())
@@ -127,18 +127,18 @@ static V* copy_of(const V* v)
 	return out;
 }
 
-// A value written out as JSON, as cosmonova.h's save() writes it (a thing's parts by their names, in order).
+// A value written out as JSON, as stellanova.h's save() writes it (a thing's parts by their names, in order).
 static std::string saved_of(const V* v, int line)
 {
 	std::string out;
 	switch (v->tag)
 	{
-	case 'n': cosmonova::save(out, v->d, line); break;
-	case 'y': cosmonova::save(out, v->d != 0, line); break;
-	case 't': cosmonova::save(out, v->s, line); break;
-	case 'p': cosmonova::save(out, FVector(v->x, v->y, v->z), line); break;
-	case 'f': cosmonova::save(out, FVector2D(v->x, v->y), line); break;
-	case 'c': cosmonova::fail(line, "I can't save a command in a file."); break;
+	case 'n': stellanova::save(out, v->d, line); break;
+	case 'y': stellanova::save(out, v->d != 0, line); break;
+	case 't': stellanova::save(out, v->s, line); break;
+	case 'p': stellanova::save(out, FVector(v->x, v->y, v->z), line); break;
+	case 'f': stellanova::save(out, FVector2D(v->x, v->y), line); break;
+	case 'c': stellanova::fail(line, "I can't save a command in a file."); break;
 	case 'l':
 		out += "[";
 		for (size_t k = 0; k < v->items.size(); ++k)
@@ -152,7 +152,7 @@ static std::string saved_of(const V* v, int line)
 		auto part = [&](const std::string& key, const V* x) {
 			out += first ? "" : ", ";
 			first = false;
-			cosmonova::save(out, key, line);
+			stellanova::save(out, key, line);
 			out += ": " + saved_of(x, line);
 		};
 		if (v->tag == 'm')
@@ -171,21 +171,21 @@ static std::string saved_of(const V* v, int line)
 static size_t index_of(const V* list, double number, int line)
 {
 	if (number != std::floor(number) || number < 1 || number > static_cast<double>(list->items.size()))
-		cosmonova::fail(line, "there is no item " + cosmonova::text(number) + " in a list of " + cosmonova::text(static_cast<double>(list->items.size()))
+		stellanova::fail(line, "there is no item " + stellanova::text(number) + " in a list of " + stellanova::text(static_cast<double>(list->items.size()))
 			+ " item" + (list->items.size() == 1 ? "" : "s") + ". Items are counted from 1.");
 	return static_cast<size_t>(number) - 1;
 }
 
 extern "C"
 {
-	void cn_begin(int count, char** given) { cosmonova::begin({}, count, given); }
-	void cn_add_file(const char* name) { cosmonova::files.push_back(name); }
+	void cn_begin(int count, char** given) { stellanova::begin({}, count, given); }
+	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
 	int cn_end()
 	{
 		std::cout << std::flush;
 		if (!failed)
 			return 0;
-		cosmonova::report(pending);
+		stellanova::report(pending);
 		return 1;
 	}
 
@@ -199,23 +199,23 @@ extern "C"
 
 	// text
 	V* cn_text(const char* bytes, long long size) { return cn_make_text(std::string(bytes, static_cast<size_t>(size))); }
-	V* cn_text_number(double d) { return cn_make_text(cosmonova::text(d)); }
+	V* cn_text_number(double d) { return cn_make_text(stellanova::text(d)); }
 	V* cn_text_yesno(bool b) { return cn_make_text(b ? "yes" : "no"); }
 	V* cn_show(V* v) { return cn_make_text(show(v)); }
 	V* cn_join(V* a, V* b) { return cn_make_text(a->s + b->s); }
 	bool cn_same_text(V* a, V* b) { return a->s == b->s; }
-	void cn_say(V* t) { cosmonova::say({t->s}); }
-	V* cn_ask_text(V* question) { return cn_make_text(cosmonova::ask_text(question->s)); }
-	double cn_ask_number(V* question) { return cosmonova::ask_number(question->s); }
-	bool cn_ask_yes_no(V* question) { return cosmonova::ask_yes_no(question->s); }
-	double cn_letters(V* t) { return cosmonova::letters(t->s); }
-	double cn_to_number(V* t, int line) { GUARDED(0.0, return cosmonova::to_number(t->s, line);) }
+	void cn_say(V* t) { stellanova::say({t->s}); }
+	V* cn_ask_text(V* question) { return cn_make_text(stellanova::ask_text(question->s)); }
+	double cn_ask_number(V* question) { return stellanova::ask_number(question->s); }
+	bool cn_ask_yes_no(V* question) { return stellanova::ask_yes_no(question->s); }
+	double cn_letters(V* t) { return stellanova::letters(t->s); }
+	double cn_to_number(V* t, int line) { GUARDED(0.0, return stellanova::to_number(t->s, line);) }
 
 	// numbers
 	long long cn_repeats(double count) { return std::isfinite(count) ? static_cast<long long>(count) : 0; }
-	double cn_random(double lo, double hi, int line) { GUARDED(0.0, return cosmonova::random(lo, hi, line);) }
-	double cn_random_fraction() { return cosmonova::random_fraction(); }
-	double cn_rounded(double x, double places, int line) { GUARDED(0.0, return cosmonova::rounded(x, places, line);) }
+	double cn_random(double lo, double hi, int line) { GUARDED(0.0, return stellanova::random(lo, hi, line);) }
+	double cn_random_fraction() { return stellanova::random_fraction(); }
+	double cn_rounded(double x, double places, int line) { GUARDED(0.0, return stellanova::rounded(x, places, line);) }
 
 	// any value
 	V* cn_box_number(double d)
@@ -280,14 +280,14 @@ extern "C"
 	{
 		GUARDED(cn_box_number(0),
 			if (list->items.empty())
-				cosmonova::fail(line, "the list is empty, so I can't pick a random item.");
-			return list->items[static_cast<size_t>(cosmonova::random(1, static_cast<double>(list->items.size()), line)) - 1];)
+				stellanova::fail(line, "the list is empty, so I can't pick a random item.");
+			return list->items[static_cast<size_t>(stellanova::random(1, static_cast<double>(list->items.size()), line)) - 1];)
 	}
 	V* cn_list_last(V* list, int line)
 	{
 		GUARDED(cn_box_number(0),
 			if (list->items.empty())
-				cosmonova::fail(line, "the list is empty, so it has no last item.");
+				stellanova::fail(line, "the list is empty, so it has no last item.");
 			return list->items.back();)
 	}
 	double cn_list_stat(int which, V* list, int line)  // 0 sum, 1 average, 2 biggest, 3 smallest
@@ -295,7 +295,7 @@ extern "C"
 		static const char* names[] = {"sum", "average", "biggest", "smallest"};
 		GUARDED(0.0,
 			if (list->items.empty() && which != 0)
-				cosmonova::fail(line, std::string("the list is empty, so it has no ") + names[which] + ".");
+				stellanova::fail(line, std::string("the list is empty, so it has no ") + names[which] + ".");
 			double out = which == 2 ? -INFINITY : which == 3 ? INFINITY : 0;
 			for (V* x : list->items)  // one at a time, in order, as Python does
 				out = which == 2 ? std::max(out, x->d) : which == 3 ? std::min(out, x->d) : out + x->d;
@@ -306,7 +306,7 @@ extern "C"
 		GUARDED(cn_box_number(0),
 			auto it = table->table.find(key->s);
 			if (it == table->table.end())
-				cosmonova::fail(line, "there is no entry \"" + key->s + "\" in the table.");
+				stellanova::fail(line, "there is no entry \"" + key->s + "\" in the table.");
 			return it->second;)
 	}
 	void cn_entry_put(V* table, V* key, V* x) { table->table[key->s] = copy_of(x); }
@@ -314,7 +314,7 @@ extern "C"
 	{
 		GUARDED(,
 			if (!table->table.erase(key->s))
-				cosmonova::fail(line, "there is no entry \"" + key->s + "\" in the table to remove.");)
+				stellanova::fail(line, "there is no entry \"" + key->s + "\" in the table to remove.");)
 	}
 	V* cn_keys(V* table)
 	{
@@ -375,7 +375,7 @@ extern "C"
 		return v;
 	}
 	V* cn_saved_text(V* v, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, line));) }
-	void cn_save_file(V* v, V* path, int line) { GUARDED(, cosmonova::write_file(path->s, saved_of(v, line) + "\n", line);) }
+	void cn_save_file(V* v, V* path, int line) { GUARDED(, stellanova::write_file(path->s, saved_of(v, line) + "\n", line);) }
 	V* cn_sorted_by(V* list, int k)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
 	{
 		V* out = copy_of(list);

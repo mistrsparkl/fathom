@@ -1,5 +1,5 @@
-// What every Cosmonova program made for the web uses: the same words as cosmonova.h, in JavaScript.
-// cosmonova.py writes programs that call these ('cosmonova web game.cosmos'); they run in a web page
+// What every Stellanova program made for the web uses: the same words as stellanova.h, in JavaScript.
+// stellanova.py writes programs that call these ('stellanova web game.stella'); they run in a web page
 // (load this file first) or with node. Messages and the way values are shown match the other two ways exactly.
 "use strict";
 (function () {
@@ -115,16 +115,16 @@
   function problem_text(e) {
     if (e instanceof Problem) return e.message;
     if (e instanceof RangeError && /call stack/i.test(e.message)) return "commands called each other too many times in a row (they may never stop).";
-    return "something went wrong inside Cosmonova: " + (e && e.message ? e.message : String(e));
+    return "something went wrong inside Stellanova: " + (e && e.message ? e.message : String(e));
   }
   function report(e) {
     const shown = `${where(e instanceof Problem ? e.line : 0)}: ${problem_text(e)}`;
-    if (cosmonova.on_problem) cosmonova.on_problem(shown);
+    if (stellanova.on_problem) stellanova.on_problem(shown);
     if (inNode) fs.writeSync(2, shown + "\n");
     else console.error(shown);
   }
   function out(s) {
-    if (cosmonova.on_say) cosmonova.on_say(s);
+    if (stellanova.on_say) stellanova.on_say(s);
     else if (inNode) fs.writeSync(1, s + "\n");
     else console.log(s);
   }
@@ -249,7 +249,7 @@
   const letters_in = (s) => Array.from(s);
   const ascii = (s, from, to) => s.replace(from, (c) => String.fromCharCode(c.charCodeAt(0) + to));
 
-  const cosmonova = {
+  const stellanova = {
     Problem, fail, text, dup, same, count, kinds, problem_text, report,
     on_say: null, on_problem: null,
     table: () => new Map(),
@@ -283,7 +283,7 @@
       files = scripts;
       try {
         await start();
-        await cosmonova.wait_for_others();
+        await stellanova.wait_for_others();
       } catch (e) {
         report(e);
         if (inNode) process.exitCode = 1;
@@ -306,12 +306,12 @@
     },
     async changed_by(items, f, line) {
       const made = [];
-      for (const x of items) made.push(dup(await cosmonova.invoke(f, line, x)));
+      for (const x of items) made.push(dup(await stellanova.invoke(f, line, x)));
       return made;
     },
     async kept_by(items, f, line) {
       const made = [];
-      for (const x of items) if (await cosmonova.invoke(f, line, x)) made.push(dup(x));
+      for (const x of items) if (await stellanova.invoke(f, line, x)) made.push(dup(x));
       return made;
     },
 
@@ -346,7 +346,7 @@
     },
     average_of(items, line) {
       if (!items.length) fail(line, "the list is empty, so it has no average.");
-      return cosmonova.sum_of(items) / items.length;
+      return stellanova.sum_of(items) / items.length;
     },
     biggest_of(items, line) {
       if (!items.length) fail(line, "the list is empty, so it has no biggest.");
@@ -416,7 +416,7 @@
     ask_text,
     ask_yes_no(question) {
       for (;;) {
-        const answer = cosmonova.lower(ask_text(question).trim());
+        const answer = stellanova.lower(ask_text(question).trim());
         if (answer === "yes" || answer === "y") return true;
         if (answer === "no" || answer === "n") return false;
         out("Please type yes or no.");
@@ -441,7 +441,7 @@
       if (v === NotSaved) fail(line, `the file "${path}" doesn't hold ${kindName}.`);
       return v;
     },
-    save_file(v, path, line) { cosmonova.write_file(path, saved(v, line) + "\n", line); },
+    save_file(v, path, line) { stellanova.write_file(path, saved(v, line) + "\n", line); },
     file_exists(path) {
       try {
         return !!fs && fs.statSync(path).isFile();
@@ -470,7 +470,7 @@
     leave,
   };
 
-  const runtime = { cosmonova, FMath, FVector, FVector2D };
-  globalThis.cosmonova = runtime;
+  const runtime = { stellanova, FMath, FVector, FVector2D };
+  globalThis.stellanova = runtime;
   if (typeof module !== "undefined") module.exports = runtime;
 })();

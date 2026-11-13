@@ -2,10 +2,10 @@
   "FileVersion": 3,
   "EngineAssociation": "5.8",
   "Category": "Games",
-  "Description": "Cosmonova programs, running in Unreal",
+  "Description": "Stellanova programs, running in Unreal",
   "Modules": [
     {
-      "Name": "CosmonovaWorld",
+      "Name": "StellanovaWorld",
       "Type": "Runtime",
       "LoadingPhase": "Default"
     }

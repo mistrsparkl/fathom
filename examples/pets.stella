@@ -1,5 +1,5 @@
 whisper: A small pet shelter: kinds of things, lists, and commands that give back answers.
-whisper: Run it with: py -3 cosmonova.py run examples/pets.cosmos
+whisper: Run it with: py -3 stellanova.py run examples/pets.stella
 
 a pet has:
   name (text)

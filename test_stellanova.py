@@ -1,4 +1,4 @@
-"""Self-check for cosmonova.py. Run: py -3 test_cosmonova.py"""
+"""Self-check for stellanova.py. Run: py -3 test_stellanova.py"""
 import os
 import shutil
 import sys
@@ -7,7 +7,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import cosmonova as translate
+import stellanova as translate
 translate.LOGIC = Path(__file__).resolve().parent / "examples"
 
 
@@ -16,7 +16,7 @@ END = "and the universe said i love you\n"
 
 def run(body, part_of="this is part of: creature body\n\n"):
     with tempfile.TemporaryDirectory() as d:
-        p = Path(d) / "probe.cosmos"
+        p = Path(d) / "probe.stella"
         p.write_text(part_of + body, encoding="utf-8")
         return translate.translate(p)
 
@@ -40,13 +40,13 @@ def tutorial_checks():
         if CLOSING_LINE not in body:
             continue
         with tempfile.TemporaryDirectory() as d:
-            script = Path(d) / "tutorial.cosmos"
+            script = Path(d) / "tutorial.stella"
             script.write_text(body, encoding="utf-8")
             translate.LOGIC = Path(d)
             translate.read_script(script)  # raises on any mistake
-            if fence == "cosmonova":
+            if fence == "stellanova":
                 assert blocks[k + 1][0] == "output", f"a program in TUTORIAL.md has no output block after it:\n{body}"
-                out = subprocess.run([sys.executable, str(HERE / "cosmonova.py"), "run", str(script)],
+                out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script)],
                                      capture_output=True, text=True, encoding="utf-8", cwd=d)
                 assert out.stdout == blocks[k + 1][1] and not out.stderr, f"TUTORIAL.md:\n{body}\nprinted:\n{out.stdout}{out.stderr}"
                 ran += 1
@@ -64,7 +64,7 @@ def program_checks():
     cpp = prog('genesis:\n  ask "Name? " into name\n  repeat 3 times:\n    greet with name, 2\nand the universe said i love you\n\n'
                'to greet, given who (text) and times (a number):\n  scrawl "Hi " plus who, "! x", times\n' + END)
     assert "void Greet(const std::string& who, double times);" in cpp, cpp
-    assert 'name = cosmonova::ask_text(std::string("Name? "));' in cpp, cpp
+    assert 'name = stellanova::ask_text(std::string("Name? "));' in cpp, cpp
     assert "Greet(name, 2.0);" in cpp, cpp
     assert "int main(int count, char** given)" in cpp, cpp
     pass
@@ -97,22 +97,22 @@ def program_checks():
     # Run real programs both ways: directly, and built with the C++ compiler (if there is one).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
     import subprocess
-    compiler = None if os.environ.get("COSMONOVA_NO_CPP") else translate.find_vcvars()
+    compiler = None if os.environ.get("STELLANOVA_NO_CPP") else translate.find_vcvars()
     if not compiler:
         print("(only running directly: no C++ compiler found)")
-    node = shutil.which("node") if not os.environ.get("COSMONOVA_NO_WEB") else None
+    node = shutil.which("node") if not os.environ.get("STELLANOVA_NO_WEB") else None
     web_skipped, web_runs = [], [0]
 
     def both(source, typed="", others=None):
         with tempfile.TemporaryDirectory() as d:
-            script = Path(d) / "probe.cosmos"
+            script = Path(d) / "probe.stella"
             script.write_text(source, encoding="utf-8")
             for name, other in (others or {}).items():
                 if isinstance(other, bytes):
                     (Path(d) / name).write_bytes(other)
                 else:
                     (Path(d) / name).write_text(other, encoding="utf-8")
-            direct = subprocess.run([sys.executable, str(HERE / "cosmonova.py"), "run", str(script)],
+            direct = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script)],
                                     input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
             if compiler:
                 exe = Path(d) / "probe.exe"
@@ -293,8 +293,8 @@ def program_checks():
     assert perr('genesis:\n  meanwhile 5\n' + END)[1] == "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'."
 
     # The server library: a web server whose pages come from a command (with the computer and web libraries in the same program).
-    out = both('to answer, given address (text), returning text:\n  if address is "/hello": return "Hello from Cosmonova!"\n  return "You asked for " plus address\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8765, the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8765/hello"\n  scrawl web page "http://127.0.0.1:8765/scores?top=3"\n  end the program with 0\nand the universe said i love you\n'.replace('genesis:\n', 'genesis:\n  scrawl the size of user name exceeds 0\n'))
-    assert out.stdout == 'yes\nHello from Cosmonova!\nYou asked for /scores?top=3\n', repr(out.stdout)
+    out = both('to answer, given address (text), returning text:\n  if address is "/hello": return "Hello from Stellanova!"\n  return "You asked for " plus address\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8765, the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8765/hello"\n  scrawl web page "http://127.0.0.1:8765/scores?top=3"\n  end the program with 0\nand the universe said i love you\n'.replace('genesis:\n', 'genesis:\n  scrawl the size of user name exceeds 0\n'))
+    assert out.stdout == 'yes\nHello from Stellanova!\nYou asked for /scores?top=3\n', repr(out.stdout)
     # Files from a folder, what was sent with a request, and text inside addresses.
     out = both('to answer, given address (text), returning text:\n  if address begins with "/echo": return "got " plus the web message\n  if address is "/f": answer with the file "site/index.html"\n  return "page " plus web decoded (letters 2 to the size of address of address)\nand the universe said i love you\n\ngenesis:\n  make the folder "site"\n  inscribe "body {}" into file "site/look.css"\n  inscribe "<p>home</p>" into file "site/index.html"\n  meanwhile serve the web from the folder with (8766, "site", the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8766/look.css"\n  scrawl web page "http://127.0.0.1:8766/"\n  scrawl web page "http://127.0.0.1:8766/a%20b+c"\n  scrawl web page "http://127.0.0.1:8766/f"\n  scrawl send to the web page with ("http://127.0.0.1:8766/echo", "héllo there")\n  scrawl web encoded "a b/é", " ", web decoded (web encoded "a b/é")\n  end the program with 0\nand the universe said i love you\n')
     assert out.stdout == 'body {}\n<p>home</p>\npage a b c\n<p>home</p>\ngot héllo there\na%20b%2F%C3%A9 a b/é\n', repr(out.stdout)
@@ -524,25 +524,25 @@ def program_checks():
 
     # Programs made of several scripts: used scripts bring their kinds and commands (not their start),
     # are read once even when used twice, and errors name the script they are in.
-    shapes = ('use: maths\nuse: helpers.cosmos\na square has:\n  side (a number)\n' + END +
+    shapes = ('use: maths\nuse: helpers.stella\na square has:\n  side (a number)\n' + END +
               'genesis:\n  scrawl "shapes on its own"\n' + END +
               'to area of, given s (a square), returning a number:\n  return power of (the side of s, 2)\n' + END +
               'to check, given s (a square):\n  if the side of s falls below 0: scrawl item 5 of a list of (1)\n' + END)
-    helpers = 'use: shapes.cosmos\nto shout, given words (text):\n  scrawl upper case of words plus "!"\n' + END
-    out = both('use: shapes.cosmos\nuse: helpers.cosmos\ngenesis:\n  set s to conjure a square\n  set the side of s to 3\n'
+    helpers = 'use: shapes.stella\nto shout, given words (text):\n  scrawl upper case of words plus "!"\n' + END
+    out = both('use: shapes.stella\nuse: helpers.stella\ngenesis:\n  set s to conjure a square\n  set the side of s to 3\n'
                '  scrawl area of s\n  shout with "hi"\n  check with s\n  set the side of s to -1\n  check with s\n' + END,
-               others={"shapes.cosmos": shapes, "helpers.cosmos": helpers})
+               others={"shapes.stella": shapes, "helpers.stella": helpers})
     assert out.stdout == "9\nHI!\n", repr(out.stdout)
-    assert out.stderr == "shapes.cosmos line 13: there is no item 5 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
+    assert out.stderr == "shapes.stella line 13: there is no item 5 in a list of 1 item. Items are counted from 1.\n", repr(out.stderr)
     with tempfile.TemporaryDirectory() as d:
-        (Path(d) / "bad.cosmos").write_text("to oops:\n  scrawl nothing here\n" + END, encoding="utf-8")
-        (Path(d) / "main.cosmos").write_text("use: bad.cosmos\ngenesis:\n  oops\n" + END, encoding="utf-8")
+        (Path(d) / "bad.stella").write_text("to oops:\n  scrawl nothing here\n" + END, encoding="utf-8")
+        (Path(d) / "main.stella").write_text("use: bad.stella\ngenesis:\n  oops\n" + END, encoding="utf-8")
         try:
-            translate.read_script(Path(d) / "main.cosmos")
+            translate.read_script(Path(d) / "main.stella")
             raise AssertionError("expected a script error")
         except translate.ScriptError as e:
-            assert translate.where(e.line) == "bad.cosmos line 2", translate.where(e.line)
-    assert perr('use: missing.cosmos\ngenesis:\n  cease\n' + END)[1] == "There is no script called 'missing.cosmos' next to probe.cosmos."
+            assert translate.where(e.line) == "bad.stella line 2", translate.where(e.line)
+    assert perr('use: missing.stella\ngenesis:\n  cease\n' + END)[1] == "There is no script called 'missing.stella' next to probe.stella."
 
     # Sound: a short silent .wav plays (and waits) the same both ways; a missing file is a plain error.
     import io
@@ -615,23 +615,23 @@ def program_checks():
     assert perr('genesis:\n  set word to "x"\n  add 1 to word\n' + END)[1] == "'add ... to' needs a list or a number, but this is text."
     made = translate.BUILT_THROUGH
     print(f"(built: {made.count('machine')} programs straight into machine code, {len(made) - made.count('machine')} through C++ for now)")
-    if os.environ.get("COSMONOVA_SHOW_SKIPPED"):
+    if os.environ.get("STELLANOVA_SHOW_SKIPPED"):
         print("\n".join(sorted(set(m.split(": ", 1)[1] for m in made if m != "machine"))))
     if node:
         print(f"(made for the web too: {web_runs[0]} programs; {len(web_skipped)} use words the web doesn't have yet)")
-        if os.environ.get("COSMONOVA_SHOW_SKIPPED"):
+        if os.environ.get("STELLANOVA_SHOW_SKIPPED"):
             print("\n".join(sorted(set(web_skipped))))
 
 
 def main():
-    for path in sorted(translate.LOGIC.glob("*.cosmos")):
+    for path in sorted(translate.LOGIC.glob("*.stella")):
         translate.translate(path)
 
     cpp = run("settings:\n  limit: 30 degrees\n\nto check, given goal (a place):\n  set gap to flat (goal minus centre of mass)\n"
               '  if the size of gap exceeds limit: cease\n  move turn rate toward 10 by at most 2 times frame time\n' + END)
     assert "constexpr double limit = 30.0;" in cpp, cpp
     assert "void ATerranovaCreatureBody::Check(const FVector& goal)" in cpp, cpp
-    assert "if ((gap).Size() > Cosmonova_probe::limit)" in cpp, cpp
+    assert "if ((gap).Size() > Stellanova_probe::limit)" in cpp, cpp
     assert "TurnRateDegS = FMath::Clamp(10.0, TurnRateDegS - " in cpp, cpp
 
     assert error("to check:\n  set turn rate to walk sped\n" + END) == (4, "I don't know 'walk sped'. Did you mean 'walk speed'?")
@@ -665,7 +665,7 @@ def main():
     translate.THINGS = {}
     tutorial_checks()
     program_checks()
-    print("cosmonova.py self-check passed")
+    print("stellanova.py self-check passed")
 
 
 if __name__ == "__main__":
