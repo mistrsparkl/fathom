@@ -7,13 +7,21 @@ include: <thread>
 code:
   namespace stellanova_time
   {
+  	inline void local(std::tm& parts, std::time_t now)  // the clock's parts here (Windows and WebAssembly say it differently)
+  	{
+  #ifdef _WIN32
+  		localtime_s(&parts, &now);
+  #else
+  		localtime_r(&now, &parts);
+  #endif
+  	}
   	inline const auto started = std::chrono::steady_clock::now();
   	inline double since_start() { return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(); }
   	inline double part_of_today(int which)
   	{
   		std::time_t now = std::time(nullptr);
   		std::tm parts{};
-  		localtime_s(&parts, &now);
+  		local(parts, now);
   		int values[] = {parts.tm_hour, parts.tm_min, parts.tm_sec, parts.tm_mday, parts.tm_mon + 1, parts.tm_year + 1900};
   		return values[which];
   	}
@@ -58,7 +66,7 @@ code:
   	{
   		std::time_t now = std::time(nullptr);
   		std::tm parts{};
-  		localtime_s(&parts, &now);
+  		local(parts, now);
   		char out[64];
   		std::strftime(out, sizeof out, shape, &parts);
   		return out;
@@ -67,7 +75,7 @@ code:
   	{
   		std::time_t now = std::time(nullptr);
   		std::tm parts{};
-  		localtime_s(&parts, &now);
+  		local(parts, now);
   		const char* names[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
   		return names[parts.tm_wday];
   	}

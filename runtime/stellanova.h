@@ -76,8 +76,10 @@ struct FVector2D
 };
 inline const FVector2D FVector2D::ZeroVector{};
 
+#ifndef __wasm__
 extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
 extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
+#endif
 #endif
 
 namespace stellanova
@@ -93,7 +95,7 @@ namespace stellanova
 		files = scripts;
 		for (int k = 1; k < count; ++k)
 			arguments.push_back(given[k]);
-#ifndef STELLANOVA_IN_UNREAL
+#if !defined(STELLANOVA_IN_UNREAL) && !defined(__wasm__)
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
 #endif
@@ -1157,6 +1159,8 @@ namespace stellanova
 		std::string line;
 		if (!std::getline(std::cin, line))
 			std::exit(0);  // nobody is left to answer (input closed)
+		if (!line.empty() && line.back() == '\r')  // (typed on Windows, read where nothing takes it away: WebAssembly)
+			line.pop_back();
 		return line;
 	}
 

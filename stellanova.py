@@ -3854,7 +3854,7 @@ def holding(n, which, inner, names, declared, depth):
             body(env)
 
     def write(f):
-        name = machine.emit(f, lock)
+        name = f.hold(machine.emit(f, lock))
         f.put(f"call void @cn_lock(ptr {name})")
         let_go, end = f.label("letgo"), f.label("held")
         f.handlers.append(let_go)
@@ -5102,8 +5102,22 @@ def build(script, exe):
     try:
         ll = machine_code(program)
     except machine.Unsupported as missing:
-        return f"{script.name} can't be built into an .exe yet: {missing} isn't in machine code. It still runs directly (stellanova {script.name})."
+        made = "WebAssembly" if machine.TARGET == "wasm" else "an .exe"
+        return f"{script.name} can't be built into {made} yet: {missing} isn't in machine code. It still runs directly (stellanova {script.name})."
     return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS)
+
+
+def wasm(script):
+    """Builds the program into WebAssembly (WASI): <name>.wasm, and <name>.mjs to run it with node. Returns an error message, or None."""
+    machine.TARGET = "wasm"
+    try:
+        problem = build(script, script.with_suffix(".wasm"))
+    finally:
+        machine.TARGET = "windows"
+    if not problem:
+        runner = (HERE / "runtime" / "wasi.mjs").read_text(encoding="utf-8").replace("PROGRAM", script.stem)
+        script.with_suffix(".mjs").write_text(runner, encoding="utf-8")
+    return problem
 
 
 def web(script, folder=None):
@@ -5325,6 +5339,7 @@ USAGE = """Use:
   stellanova <script.stella>                     run a program
   stellanova run <script.stella>                 the same
   stellanova build <script.stella>               make it into an .exe (needs LLVM: winget install LLVM.LLVM)
+  stellanova wasm <script.stella>                make it into WebAssembly: <script>.wasm (run it: node <script>.mjs)
   stellanova check <script.stella>               look for mistakes without running it
   stellanova unreal <script.stella>              run it inside Unreal Engine: the 3D words become a real lit world
   stellanova test <script.stella>                run each command called 'to test ...:' and show which checks failed
@@ -5408,6 +5423,17 @@ def main(argv):
             print(problem)
             return 1
         print(f"Built {WORLD}" + ("" if os.environ.get("STELLANOVA_NO_LAUNCH") else " and started it."))
+        return 0
+    if len(args) == 2 and args[0] == "wasm":
+        script = Path(args[1])
+        if not script.exists():
+            print(f"There is no script called {script}.")
+            return 2
+        problem = wasm(script)
+        if problem:
+            print(problem)
+            return 1
+        print(f"Built {script.with_suffix('.wasm')} (run it: node {script.with_suffix('.mjs').name})")
         return 0
     if len(args) == 2 and args[0] in ("run", "build"):
         script = Path(args[1])

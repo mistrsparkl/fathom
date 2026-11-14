@@ -6,10 +6,15 @@
 #include "stellanova.h"
 #include "machine.h"
 
+#ifndef __wasm__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <winsock2.h>
 #include <windows.h>
+#endif
+#ifdef __wasm__
+extern "C" char __stack_high;  // where WebAssembly's stack starts (set by the linker)
+#endif
 #include <atomic>
 #include <condition_variable>
 
@@ -27,7 +32,12 @@ namespace gc
 	struct Thread
 	{
 		char* top = nullptr;  // where its stack starts (its highest address)
+#ifdef __wasm__
+		struct { char none; } regs{};  // WebAssembly's registers can't be looked at: see marks
+		std::vector<size_t> marks;  // where each command now running began in young (cn_enter)
+#else
 		CONTEXT regs{};
+#endif
 		char* sp = nullptr;
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
@@ -68,9 +78,13 @@ namespace gc
 		if (!mine.t)
 		{
 			Thread* t = new Thread;
+#ifdef __wasm__
+			t->top = &__stack_high;
+#else
 			ULONG_PTR low, high;
 			GetCurrentThreadStackLimits(&low, &high);
 			t->top = reinterpret_cast<char*>(high);
+#endif
 			t->sp = t->top;  // nothing to look at until its registers are kept
 			std::lock_guard<std::mutex> hold(stop_lock);
 			threads.push_back(t);
@@ -79,11 +93,21 @@ namespace gc
 		return mine.t;
 	}
 
+#ifdef __wasm__
+	// Only names a command keeps in memory (cn_slot) are on this stack; values only in WebAssembly's own locals can't
+	// be seen, so the values each command running now made stay young until it gives back (cn_enter, cn_leave).
+	[[clang::noinline]] static void keep_registers(Thread* t)
+	{
+		volatile char here = 0;
+		t->sp = const_cast<char*>(&here);
+	}
+#else
 	static void keep_registers(Thread* t)
 	{
 		RtlCaptureContext(&t->regs);
 		t->sp = reinterpret_cast<char*>(t->regs.Rsp);
 	}
+#endif
 
 	static void stop_here(Thread* t)
 	{
@@ -107,7 +131,7 @@ namespace gc
 			}
 		};
 		auto look = [&](const char* from, const char* to) {  // any word here that is a value's address
-			const char* p = reinterpret_cast<const char*>((reinterpret_cast<uintptr_t>(from) + 7) & ~uintptr_t(7));
+			const char* p = reinterpret_cast<const char*>((reinterpret_cast<uintptr_t>(from) + sizeof(V*) - 1) & ~uintptr_t(sizeof(V*) - 1));
 			for (; p + sizeof(V*) <= to; p += sizeof(V*))
 			{
 				V* c;
@@ -244,8 +268,28 @@ extern "C"
 		gc::Thread* t = gc::me();
 		if (gc::stopping)
 			gc::stop_here(t);
+#ifdef __wasm__
+		t->young.resize(t->marks.empty() ? 0 : std::min(t->marks.back(), t->young.size()));
+#else
 		t->young.clear();
+#endif
 	}
+#ifdef __wasm__
+	void cn_enter()  // a command begins: what its caller's line made stays young until that line ends
+	{
+		gc::Thread* t = gc::me();
+		t->marks.push_back(t->young.size());
+	}
+	void cn_leave(V* given)  // a command gives back: only what it gives back stays young, for the caller's line
+	{
+		gc::Thread* t = gc::me();
+		t->young.resize(std::min(t->marks.back(), t->young.size()));
+		t->marks.pop_back();
+		if (given)
+			t->young.push_back(given);
+	}
+	void cn_slot(void*) {}  // a name's place: given here, it stays in memory, where the collector looks
+#endif
 	void cn_park()  // going into a library word that may wait: the collector needn't wait for this thread
 	{
 		gc::Thread* t = gc::me();
@@ -610,6 +654,11 @@ extern "C"
 	}
 	void cn_meanwhile(void (*command)(void*), void* names, long long size)  // 'meanwhile ...': names holds its own copy of every name it uses
 	{
+#ifdef __wasm__
+		std::cout << std::flush;
+		std::cerr << "'meanwhile' can't be used in a WebAssembly program yet (it has only one thread).\n" << std::flush;
+		std::_Exit(1);
+#endif
 		cn_root(static_cast<const char*>(names), size);  // kept until the command is done with them
 		stellanova::meanwhile([command, names] {
 			gc::me();

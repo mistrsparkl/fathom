@@ -169,3 +169,9 @@ struct cn_is_function<std::function<R(A...)>> : std::true_type
 	}
 };
 #endif
+
+#ifdef __wasm__
+#include <system_error>
+// a library word starting threads of its own, in WebAssembly (where std::thread can't start one)
+#define ONE_THREAD "this word starts threads of its own, and a WebAssembly program has only one thread."
+#endif

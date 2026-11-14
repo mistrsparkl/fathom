@@ -17,6 +17,7 @@ and the universe said i love you
 
 - `stellanova game.stella` runs a program. Nothing else is needed but Python 3.
 - `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
+- `stellanova wasm game.stella` makes the same machine code as WebAssembly: `node game.mjs` runs it (see LANGUAGE.md).
 - `stellanova` on its own lets you try lines out one at a time.
 - `stellanova check game.stella` looks for mistakes without running it.
 - `stellanova test game.stella` runs its `to test ...:` commands and shows which `check` lines failed.

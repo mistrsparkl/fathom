@@ -30,6 +30,10 @@ class Unsupported(Exception):
     """This part of the language can't be made into machine code yet."""
 
 
+TARGET = "windows"  # or "wasm": WebAssembly (WASI), for 'stellanova wasm'
+WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
+
+
 def emit(f, x, what="a part of the language"):
     """Writes x's LLVM code into f (x is a Value or a statement's run); returns where its answer is."""
     write = getattr(x, "ir", None)
@@ -149,6 +153,9 @@ declare void @cn_statement()
 declare void @cn_root(ptr, i64)
 declare void @cn_wait_for_others()
 declare ptr @malloc(i64)
+declare void @cn_enter()
+declare void @cn_leave(ptr)
+declare void @cn_slot(ptr)
 """
 
 
@@ -185,7 +192,8 @@ class Module:
         for able, kinds in ABLE.items():  # each kind a saved speaker may be loaded as
             for kind in kinds:
                 start.put(f"call void @cn_able_kind(ptr {start.spec(able)}, ptr {start.shape(kind)})")
-        main = ["define i32 @main(i32 %count, ptr %given) {", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
+        entry_name = "__main_argc_argv" if TARGET == "wasm" else "main"  # (what WASI's start calls)
+        main = [f"define i32 @{entry_name}(i32 %count, ptr %given) {{", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
         for name in files:
             const, _ = self.text(name)
             main.append(f"  call void @cn_add_file(ptr {const})")
@@ -241,6 +249,14 @@ class Fn:
         m = re.search(r"@(cn_\w+)\(", line)
         if m and m.group(1) in FALLIBLE:
             self.check()
+
+    def hold(self, value):
+        """value is used across the lines inside a loop or a lock: in WebAssembly it must be in memory, where the collector looks."""
+        if TARGET == "wasm":
+            self.n += 1
+            self.entry.append(f"  %held{self.n} = alloca ptr")
+            self.put(f"store ptr {value}, ptr %held{self.n}")
+        return value
 
     def op(self, text):
         r = self.tmp()
@@ -418,6 +434,11 @@ class Fn:
             self.place(self.leave)
             self.finish_with(f"ret {gives} {zero_const(self.gives)}" if self.gives else "ret void")
         body = ["entry:"] + self.entry + ["  br label %start", "start:"] + self.lines
+        if TARGET == "wasm":  # see cn_enter in runtime/machine.cpp: what the collector can't see in WebAssembly's locals
+            slots = [l.split(" = ")[0].strip() for l in self.entry if l.endswith("= alloca ptr")]
+            body[1 + len(self.entry):1 + len(self.entry)] = ["  call void @cn_enter()"] + [f"  call void @cn_slot(ptr {s})" for s in slots]
+            body = [f"  call void @cn_leave(ptr {l.split()[2] if l.startswith('  ret ptr ') else 'null'})\n{l}" if l.startswith("  ret ") else l
+                    for l in body]
         self.module.functions.append(f"define {gives} @cn_user_{self.name}({params}) {{\n" + "\n".join(body) + "\n}\n")
 
 
@@ -528,7 +549,7 @@ def count_from(f, cpp, lo, hi, body, by=None):
 
 def each_in(f, cpp, kind, seq, body):
     """'for each score in scores:' goes through a copy, so changing the list inside doesn't change the rounds."""
-    items = f.op(f"call ptr @cn_dup(ptr {emit(f, seq)})")
+    items = f.hold(f.op(f"call ptr @cn_dup(ptr {emit(f, seq)})"))
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
     k = counter(f, "i")
 
@@ -567,8 +588,9 @@ def invoke(f, command, args, ins, gives, line):
 
 def by_command(f, seq, command, item, gives, keep, line):
     """'scores kept by is big' / 'scores changed by doubled': a new list, made by doing the command to each item."""
-    holder = f.op("call ptr @cn_list_new()")  # a pointer: the same in every block below
-    items = f.op(f"call ptr @cn_dup(ptr {seq})")
+    holder = f.hold(f.op("call ptr @cn_list_new()"))  # a pointer: the same in every block below
+    items = f.hold(f.op(f"call ptr @cn_dup(ptr {seq})"))
+    f.hold(command)  # (made on this line, perhaps: each round below starts a new one)
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
     k = counter(f, "m")
     top, inside, out_label = f.label("each"), f.label("doing"), f.label("done")
@@ -629,6 +651,8 @@ def closure(f, name, inputs, gives, body):
 
 def meanwhile(f, piece):
     """'meanwhile count up with 5': piece goes in a function of its own, run alongside, with copies of the names it uses."""
+    if TARGET == "wasm":
+        raise Unsupported("'meanwhile' (a WebAssembly program has only one thread)")
     module = f.module
     module.alongside = getattr(module, "alongside", 0) + 1
     g = Fn(module, f"meanwhile_{module.alongside}", [("names", TEXT)], None)
@@ -711,7 +735,8 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
         result = f"return static_cast<{ret}>({body});"
     fallback = {"double": "0.0", "bool": "false", "V*": "cn_box_number(0)"}.get(ret, "")
     code = (f'extern "C" {ret} {name}({", ".join(params + ["int line"])})\n'
-            f"{{\n\tCnParked parked;\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n}}\n")
+            f"{{\n\tCnParked parked;\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n"
+            f"#ifdef __wasm__\n\tcatch (const std::system_error&) {{ cn_set_problem({{line, ONE_THREAD}}); return {fallback}; }}\n#endif\n}}\n")
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"
     f.module.declare(f"declare {ll_ret} @{name}({', '.join([ll_type(a.kind) for a in args] + ['i32'])})")
@@ -719,7 +744,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
     return f.call(ll_ret, name, *values, checked=True)
 
 
-WRAPPER_FORM = "2: parked"  # change it when wrap() writes its C functions differently, so old ones are made again
+WRAPPER_FORM = "3: one thread"  # change it when wrap() writes its C functions differently, so old ones are made again
 
 
 def unit_file(unit, head, wrappers):
@@ -756,17 +781,37 @@ def compile_once(src, out, newer_than):
     """src compiled into out, again only when one of newer_than changed."""
     if not out.exists() or out.stat().st_mtime < max(p.stat().st_mtime for p in newer_than):
         out.parent.mkdir(exist_ok=True)
-        done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-fms-extensions", "-Wno-everything",
+        done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-Wno-everything", *target_flags(),
                                "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True)
         if done.returncode:
             raise RuntimeError(f"Stellanova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
     return out
 
 
+def sysroot():
+    root = WASI / "wasi-sysroot-34.0"
+    if not root.exists():
+        raise RuntimeError(f"WebAssembly needs the WASI sysroot: unpack wasi-sysroot-34.0.tar.gz and libclang_rt-34.0.tar.gz "
+                           f"(from github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-34) into {WASI}.")
+    return root
+
+
+def target_flags():
+    if TARGET != "wasm":
+        return ["-fms-extensions"]
+    root = sysroot()
+    return ["--target=wasm32-wasip1", f"--sysroot={root}", "-isystem", str(root / "include" / "wasm32-wasip1" / "eh"),
+            "-fwasm-exceptions", "-mllvm", "-wasm-use-legacy-eh=false"]
+
+
+def object_suffix():
+    return ".wasm.o" if TARGET == "wasm" else ".obj"
+
+
 def runtime_object():
     """runtime/machine.cpp compiled once (again only when it or stellanova.h changes)."""
     runtime = HERE / "runtime"
-    return compile_once(runtime / "machine.cpp", runtime / "built" / "stellanova_machine.obj",
+    return compile_once(runtime / "machine.cpp", runtime / "built" / f"stellanova_machine{object_suffix()}",
                         [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h"])
 
 
@@ -779,11 +824,24 @@ def make_exe(ll_text_, exe, work, units=None):
         runtime = HERE / "runtime"
         for unit, (head, wrappers) in sorted((units or {}).items()):
             src = unit_file(unit, head, wrappers)
-            objects.append(str(compile_once(src, src.with_suffix(".obj"), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+            if TARGET == "wasm":
+                if unit.startswith("c library"):
+                    return f"C libraries ({unit[len('c library'):].strip()}) can't be used in a WebAssembly program."
+                try:
+                    objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+                except RuntimeError:
+                    return f"The {unit} words can't be used in a WebAssembly program yet."
+                continue
+            objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
         clang = find_clang()
     except RuntimeError as err:
         return str(err)
-    done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, "-o", str(exe)],
+    link = []
+    if TARGET == "wasm":
+        root = sysroot()
+        link = [f for f in target_flags() if "include" not in f and f != "-isystem"] + ["-nodefaultlibs", f"-L{root / 'lib' / 'wasm32-wasip1' / 'eh'}", "-lc++", "-lc++abi", "-lunwind", "-lc",
+                str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608"]
+    done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True)
     if done.returncode:
         return ("Stellanova wrote machine code LLVM didn't accept. That is a bug in Stellanova, not in your script.\n"

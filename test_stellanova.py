@@ -208,6 +208,7 @@ def program_checks():
         print("(only running directly: no LLVM found)")
     node = shutil.which("node") if not os.environ.get("STELLANOVA_NO_WEB") else None
     web_skipped, web_runs = [], [0]
+    wasm_skipped, wasm_runs = [], [0]
 
     def both(source, typed="", others=None):
         with tempfile.TemporaryDirectory() as d:
@@ -227,6 +228,20 @@ def program_checks():
                 built = subprocess.run([str(exe)], input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d)
                 assert (built.stdout, built.stderr, built.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
                     f"built: {built.stdout!r} {built.stderr!r} {built.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}"
+            if node and os.environ.get("STELLANOVA_TEST_WASM"):  # as WebAssembly, the collector working hard
+                problem = translate.wasm(script)
+                if problem is None:
+                    wasm_runs[0] += 1
+                    made = subprocess.run([node, "probe.mjs"], input=typed, capture_output=True, text=True, encoding="utf-8", cwd=d,
+                                          env=dict(os.environ, STELLANOVA_COLLECT_OFTEN="1"))
+                    if "a WebAssembly program has only one thread" in made.stderr:
+                        wasm_skipped.append(made.stderr.strip())
+                    else:
+                        assert (made.stdout, made.stderr, made.returncode) == (direct.stdout, direct.stderr, direct.returncode), \
+                            f"wasm: {made.stdout!r} {made.stderr!r} {made.returncode}\ndirect: {direct.stdout!r} {direct.stderr!r} {direct.returncode}\n" + source
+                else:
+                    assert "WebAssembly" in problem, problem
+                    wasm_skipped.append(problem)
             if node:  # and made for the web: the same again, run by node
                 problem = translate.web(script)
                 if problem is None:
@@ -1008,6 +1023,34 @@ def program_checks():
     assert shown[:4] == ["9045050", "9045050", "", "Where the time went (the 20 slowest lines, by their own time):"], shown
     runs = {int(l.split()[0]): int(l.split()[1]) for l in shown[5:]}
     assert runs == {2: 2, 3: 2, 4: 600, 5: 2, 9: 1, 10: 1}, runs
+    # stellanova wasm: WebAssembly, run by node's WASI, the same as running directly (the collector working hard)
+    if node and (translate.machine.WASI / "wasi-sysroot-34.0").exists():
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "w.stella").write_text(
+                'use: time\nuse: folders\n\na pet has:\n  name (text)\n  tricks (a list of text)\nand the universe said i love you\n\n'
+                'to greet, given who (text), returning text:\n  return "Hello, [who]!"\nand the universe said i love you\n\n'
+                'genesis:\n  ask "Name? " into name\n  scrawl greet with name\n  set k to 3\n'
+                '  scrawl a list of (4, 9, 15) changed by each n becomes n times k\n'
+                '  scrawl a list of (4, 9, 15) kept by each n becomes n exceeds 5\n'
+                '  set pets to a list of pets\n  repeat 3 times:\n    conjure a pet as p\n    set the name of p to "Rex"\n    add p to pets\n'
+                '  for each q in pets: scrawl the name of q, " knows: ", the tricks of q\n'
+                '  make the folder "box/inner"\n  inscribe "hi" into file "box/a.txt"\n'
+                '  scrawl files in the folder "box", " / ", folders in the folder "box"\n  erase the folder "box"\n'
+                '  scrawl weekday of "2026-12-25"\n  scrawl item 9 of pets\nand the universe said i love you\n', encoding="utf-8")
+            direct = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "w.stella"], input="Sam\n", capture_output=True,
+                                    text=True, encoding="utf-8", cwd=d)
+            problem = translate.wasm(Path(d) / "w.stella")
+            assert problem is None, problem
+            made = subprocess.run([node, "w.mjs"], input="Sam\n", capture_output=True, text=True, encoding="utf-8", cwd=d,
+                                  env=dict(os.environ, STELLANOVA_COLLECT_OFTEN="1"))
+        assert direct.stdout.startswith("Name? Hello, Sam!\n12, 27, 45\n9, 15\nRex knows: (nothing)\n"), direct.stdout
+        assert (made.stdout, made.stderr, made.returncode) == (direct.stdout, direct.stderr, direct.returncode), (made, direct)
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "m.stella").write_text('to count:\n  scrawl 1\nand the universe said i love you\n\ngenesis:\n  meanwhile count\n'
+                                              'and the universe said i love you\n', encoding="utf-8")
+            assert translate.wasm(Path(d) / "m.stella") == ("m.stella can't be built into WebAssembly yet: 'meanwhile' (a WebAssembly "
+                                                            "program has only one thread) isn't in machine code. It still runs directly (stellanova m.stella).")
+
     # an if line counts every time it is tried, not only when its test is yes
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "p.stella").write_text('genesis:\n  for each k from 1 to 10:\n    if k exceeds 8: scrawl k\nand the universe said i love you\n', encoding="utf-8")
@@ -1497,6 +1540,10 @@ def program_checks():
     assert perr('genesis:\n  set word to "x"\n  add 1 to word\n' + END)[1] == "'add ... to' needs a list or a number, but this is text."
     if node:
         print(f"(made for the web too: {web_runs[0]} programs; {len(web_skipped)} use words the web doesn't have yet)")
+        if os.environ.get("STELLANOVA_TEST_WASM"):
+            print(f"(made into WebAssembly too: {wasm_runs[0]} programs; {len(wasm_skipped)} use words it doesn't have yet)")
+            if os.environ.get("STELLANOVA_SHOW_SKIPPED"):
+                print("\n".join(sorted(set(wasm_skipped))))
         if os.environ.get("STELLANOVA_SHOW_SKIPPED"):
             print("\n".join(sorted(set(web_skipped))))
 

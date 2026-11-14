@@ -33,4 +33,5 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 ## 4. Tools
 - [x] Debugger: stop at a line, step, look at names (studio): `stellanova debug`, and Debug in the studio
 - [x] Profiler: which lines take the time (`stellanova profile`)
-- [ ] WebAssembly output; building for other systems
+- [x] WebAssembly output (`stellanova wasm`: WASI, run by node or wasmtime; the libraries that use Windows itself, and `meanwhile`, not yet)
+- [ ] Building for other systems (Linux, macOS): needs their sysroots, and a computer running them to test on
