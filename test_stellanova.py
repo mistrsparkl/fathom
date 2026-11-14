@@ -194,7 +194,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, folders, forms, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -559,6 +559,33 @@ def program_checks():
     assert out.stdout == 'sent\na mail server is its address and port, like "smtp.gmail.com:587", not "localhost".\n', repr(out.stdout + out.stderr)
     assert out.stderr.startswith('Line 10: "nobody" isn\'t an email address.'), repr(out.stderr)
     assert len(mail) in (2, 3) and all("Subject: Hello" in m and "first line\n..dotted line" in m for m in mail), mail
+
+    # Desktop forms, acting by themselves from a script.
+    form_script = Path(tempfile.mkdtemp()) / "form.script"
+    form_script.write_text("type name Rex\nclick add\ntype name Tom\nclick add\nchoose pets Tom\ntick loud\nclick done\n", encoding="utf-8")
+    os.environ["STELLANOVA_FORM_SCRIPT"] = str(form_script)
+    out = both(''.join([
+               'use: forms\n'
+               '\n'
+               'genesis:\n'
+               '  open a form with ("Pets", 320, 240)\n'
+               '  add a label with ("ask", "Name:", 10, 10, 60, 22)\n'
+               '  add a field with ("name", "", 70, 10, 150, 22)\n'
+               '  add a button with ("add", "Add", 230, 10, 80, 24)\n'
+               '  add a list box with ("pets", 10, 44, 300, 120)\n'
+               '  add a tick box with ("loud", "Shout it", 10, 174, 120, 22)\n'
+               '  add a button with ("done", "Done", 230, 200, 80, 24)\n'
+               '  set click to wait for a click\n'
+               '  as long as click is "add":\n'
+               '    put in the list with ("pets", the words in "name")\n'
+               '    set the words in with ("name", "")\n'
+               '    set click to wait for a click\n'
+               '  scrawl "clicked ", click, ", chose ", the words in "pets", ", loud: ", is ticked "loud"\n'
+               '  close the form\n'
+               '  scrawl "[", wait for a click, "]"\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == 'clicked done, chose Tom, loud: yes\n[]\n', repr(out.stdout + out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([

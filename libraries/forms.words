@@ -1,0 +1,323 @@
+note: Words for desktop forms: a window with buttons, fields to type in, labels, lists and tick boxes.
+note: Use them in a program with:  use: forms
+note: Each part has a name of your own. 'wait for a click' waits until a button is clicked and gives its name
+note: ("" once the form is closed). Places and sizes are in dots, from the form's top left corner.
+note: For tests and demos, the environment value STELLANOVA_FORM_SCRIPT can name a file of lines that act by themselves,
+note: one for each wait: "type <part> <text>", "choose <part> <item>", "tick <part>", "click <part>" or "close".
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <map>
+include: <fstream>
+link: user32
+link: gdi32
+
+code:
+  namespace stellanova_forms
+  {
+  	inline HWND form = nullptr;
+  	inline std::map<std::string, HWND> parts;
+  	inline std::map<std::string, std::string> kinds;
+  	inline std::string clicked;
+  	inline bool closed = false;
+  	inline std::vector<std::string> script;
+  	inline size_t script_at = 0;
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size());
+  		return out;
+  	}
+  	inline std::string narrow(const std::wstring& s)
+  	{
+  		std::string out(WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0, nullptr, nullptr), '\0');
+  		WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size(), nullptr, nullptr);
+  		return out;
+  	}
+  	inline LRESULT CALLBACK proc(HWND w, UINT m, WPARAM wp, LPARAM lp)
+  	{
+  		if (m == WM_COMMAND && HIWORD(wp) == BN_CLICKED)
+  			for (auto& [name, h] : parts)
+  				if (h == (HWND)lp && kinds[name] == "button")
+  					clicked = name;
+  		if (m == WM_CLOSE)
+  		{
+  			closed = true;
+  			DestroyWindow(w);
+  			form = nullptr;
+  			return 0;
+  		}
+  		if (m == WM_CTLCOLORSTATIC)
+  			return (LRESULT)GetSysColorBrush(COLOR_WINDOW);
+  		return DefWindowProcW(w, m, wp, lp);
+  	}
+  	inline void need(int line)
+  	{
+  		if (!form)
+  			stellanova::fail(line, closed ? "the form was closed." : "there is no form yet. Open one first, like: open a form with (\"Hello\", 400, 300)");
+  	}
+  	inline void open(const std::string& title, double w, double h, int line)
+  	{
+  		if (form)
+  			stellanova::fail(line, "a form is already open.");
+  		static bool made = [] {
+  			WNDCLASSW c{};
+  			c.lpfnWndProc = proc;
+  			c.hInstance = GetModuleHandleW(nullptr);
+  			c.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  			c.hbrBackground = GetSysColorBrush(COLOR_WINDOW);
+  			c.lpszClassName = L"StellanovaForm";
+  			return RegisterClassW(&c) != 0;
+  		}();
+  		(void)made;
+  		RECT r{0, 0, (LONG)w, (LONG)h};
+  		AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+  		form = CreateWindowW(L"StellanovaForm", wide(title).c_str(), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
+  		                     CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+  		closed = false;
+  		parts.clear(), kinds.clear();
+  		char file[MAX_PATH];
+  		if (GetEnvironmentVariableA("STELLANOVA_FORM_SCRIPT", file, sizeof file))
+  		{
+  			std::ifstream in(file);
+  			for (std::string l; std::getline(in, l);)
+  				if (!l.empty())
+  					script.push_back(l);
+  		}
+  	}
+  	inline void add(const std::string& kind, const std::string& name, const std::string& text, double x, double y, double w, double h, int line)
+  	{
+  		need(line);
+  		if (parts.count(name))
+  			stellanova::fail(line, "the form already has a part called \"" + name + "\".");
+  		const wchar_t* cls = kind == "field" ? L"EDIT" : kind == "label" ? L"STATIC" : kind == "list" ? L"LISTBOX" : L"BUTTON";
+  		DWORD style = WS_CHILD | WS_VISIBLE | WS_TABSTOP;
+  		if (kind == "field") style |= ES_AUTOHSCROLL;
+  		if (kind == "list") style |= LBS_NOTIFY | WS_VSCROLL;
+  		if (kind == "tick box") style |= BS_AUTOCHECKBOX;
+  		HWND c = CreateWindowExW(kind == "field" || kind == "list" ? WS_EX_CLIENTEDGE : 0, cls, wide(text).c_str(), style,
+  		                         (int)x, (int)y, (int)w, (int)h, form, nullptr, GetModuleHandleW(nullptr), nullptr);
+  		SendMessageW(c, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+  		parts[name] = c, kinds[name] = kind;
+  	}
+  	inline HWND part(const std::string& name, int line)
+  	{
+  		need(line);
+  		auto at = parts.find(name);
+  		if (at == parts.end())
+  			stellanova::fail(line, "the form has no part called \"" + name + "\".");
+  		return at->second;
+  	}
+  	inline std::string text_of(const std::string& name, int line)
+  	{
+  		HWND c = part(name, line);
+  		if (kinds[name] == "list")
+  		{
+  			LRESULT k = SendMessageW(c, LB_GETCURSEL, 0, 0);
+  			if (k == LB_ERR)
+  				return "";
+  			std::wstring s((size_t)SendMessageW(c, LB_GETTEXTLEN, (WPARAM)k, 0), L'\0');
+  			SendMessageW(c, LB_GETTEXT, (WPARAM)k, (LPARAM)s.data());
+  			return narrow(s);
+  		}
+  		std::wstring s((size_t)GetWindowTextLengthW(c), L'\0');
+  		GetWindowTextW(c, s.data(), (int)s.size() + 1);
+  		return narrow(s);
+  	}
+  	inline void set_text(const std::string& name, const std::string& text, int line) { SetWindowTextW(part(name, line), wide(text).c_str()); }
+  	inline void add_item(const std::string& name, const std::string& item, int line)
+  	{
+  		HWND c = part(name, line);
+  		if (kinds[name] != "list")
+  			stellanova::fail(line, "\"" + name + "\" isn't a list.");
+  		SendMessageW(c, LB_ADDSTRING, 0, (LPARAM)wide(item).c_str());
+  	}
+  	inline void clear(const std::string& name, int line)
+  	{
+  		HWND c = part(name, line);
+  		if (kinds[name] != "list")
+  			stellanova::fail(line, "\"" + name + "\" isn't a list.");
+  		SendMessageW(c, LB_RESETCONTENT, 0, 0);
+  	}
+  	inline bool ticked(const std::string& name, int line)
+  	{
+  		HWND c = part(name, line);
+  		if (kinds[name] != "tick box")
+  			stellanova::fail(line, "\"" + name + "\" isn't a tick box.");
+  		return SendMessageW(c, BM_GETCHECK, 0, 0) == BST_CHECKED;
+  	}
+  	inline std::string wait(int line)
+  	{
+  		if (!form && closed)
+  			return "";
+  		need(line);
+  		clicked.clear();
+  		while (script_at < script.size())  // acting by itself: each line until a click (or close)
+  		{
+  			std::string l = script[script_at++], word = l.substr(0, l.find(' ')), rest = l.find(' ') == std::string::npos ? "" : l.substr(l.find(' ') + 1);
+  			std::string name = rest.substr(0, rest.find(' ')), value = rest.find(' ') == std::string::npos ? "" : rest.substr(rest.find(' ') + 1);
+  			if (word == "type") set_text(name, value, line);
+  			else if (word == "tick") SendMessageW(part(name, line), BM_SETCHECK, BST_CHECKED, 0);
+  			else if (word == "choose") SendMessageW(part(name, line), LB_SELECTSTRING, (WPARAM)-1, (LPARAM)wide(value).c_str());
+  			else if (word == "click") { part(rest, line); return rest; }
+  			else if (word == "close") { SendMessageW(form, WM_CLOSE, 0, 0); return ""; }
+  		}
+  		MSG m;
+  		while (clicked.empty() && form && GetMessageW(&m, nullptr, 0, 0) > 0)
+  		{
+  			if (!IsDialogMessageW(form, &m))
+  			{
+  				TranslateMessage(&m);
+  				DispatchMessageW(&m);
+  			}
+  		}
+  		return form ? clicked : "";
+  	}
+  	inline void close()
+  	{
+  		if (form)
+  			SendMessageW(form, WM_CLOSE, 0, 0);
+  	}
+  }
+
+python:
+  import tkinter as _tk
+  FORM = {"root": None, "parts": {}, "kinds": {}, "clicked": None, "closed": False, "script": [], "at": 0, "lists": {}}
+  def _need():
+      if FORM["root"] is None:
+          raise RunError(0, "the form was closed." if FORM["closed"] else 'there is no form yet. Open one first, like: open a form with ("Hello", 400, 300)')
+  def form_open(title, w, h):
+      if FORM["root"] is not None:
+          raise RunError(0, "a form is already open.")
+      root = _tk.Tk()
+      root.title(title)
+      root.geometry("%dx%d" % (int(w), int(h)))
+      root.resizable(False, False)
+      def gone():
+          FORM["closed"] = True
+          root.destroy()
+          FORM["root"] = None
+      root.protocol("WM_DELETE_WINDOW", gone)
+      FORM.update(root=root, parts={}, kinds={}, closed=False, gone=gone)
+      path = os.environ.get("STELLANOVA_FORM_SCRIPT")
+      if path:
+          FORM["script"] = [l for l in open(path, encoding="utf-8").read().splitlines() if l]
+      root.update()
+  def form_add(kind, name, text_, x, y, w, h):
+      _need()
+      if name in FORM["parts"]:
+          raise RunError(0, 'the form already has a part called "' + name + '".')
+      root = FORM["root"]
+      if kind == "button":
+          c = _tk.Button(root, text=text_, command=lambda: FORM.__setitem__("clicked", name))
+      elif kind == "field":
+          c = _tk.Entry(root)
+          c.insert(0, text_)
+      elif kind == "label":
+          c = _tk.Label(root, text=text_, anchor="w")
+      elif kind == "list":
+          c = _tk.Listbox(root, exportselection=False)
+      else:
+          var = _tk.IntVar(root)
+          c = _tk.Checkbutton(root, text=text_, variable=var, anchor="w")
+          c.var = var
+      c.place(x=int(x), y=int(y), width=int(w), height=int(h))
+      FORM["parts"][name], FORM["kinds"][name] = c, kind
+      root.update()
+  def _part(name):
+      _need()
+      if name not in FORM["parts"]:
+          raise RunError(0, 'the form has no part called "' + name + '".')
+      return FORM["parts"][name]
+  def form_text(name):
+      c, kind = _part(name), FORM["kinds"].get(name)
+      if kind == "list":
+          k = c.curselection()
+          return c.get(k[0]) if k else ""
+      if kind == "field":
+          return c.get()
+      return c.cget("text")
+  def form_set(name, text_):
+      c, kind = _part(name), FORM["kinds"].get(name)
+      if kind == "field":
+          c.delete(0, "end")
+          c.insert(0, text_)
+      elif kind != "list":
+          c.config(text=text_)
+  def form_add_item(name, item):
+      c = _part(name)
+      if FORM["kinds"][name] != "list":
+          raise RunError(0, '"' + name + '" isn\'t a list.')
+      c.insert("end", item)
+  def form_clear(name):
+      c = _part(name)
+      if FORM["kinds"][name] != "list":
+          raise RunError(0, '"' + name + '" isn\'t a list.')
+      c.delete(0, "end")
+  def form_ticked(name):
+      c = _part(name)
+      if FORM["kinds"][name] != "tick box":
+          raise RunError(0, '"' + name + '" isn\'t a tick box.')
+      return bool(c.var.get())
+  def form_wait():
+      if FORM["root"] is None and FORM["closed"]:
+          return ""
+      _need()
+      FORM["clicked"] = None
+      while FORM["at"] < len(FORM["script"]):
+          l = FORM["script"][FORM["at"]]
+          FORM["at"] += 1
+          word, _, rest = l.partition(" ")
+          name, _, value = rest.partition(" ")
+          if word == "type":
+              form_set(name, value)
+          elif word == "tick":
+              _part(name).var.set(1)
+          elif word == "choose":
+              c = _part(name)
+              items = list(c.get(0, "end"))
+              if value in items:
+                  c.selection_clear(0, "end")
+                  c.selection_set(items.index(value))
+          elif word == "click":
+              _part(rest)
+              return rest
+          elif word == "close":
+              FORM["gone"]()
+              return ""
+      while FORM["clicked"] is None and FORM["root"] is not None:
+          FORM["root"].update()
+          time.sleep(0.01)
+      return FORM["clicked"] or ""
+  def form_close():
+      if FORM["root"] is not None:
+          FORM["gone"]()
+
+to open a form, given title (text) and width (a number) and height (a number) = stellanova_forms::open({title}, {width}, {height}, {line})
+  runs: form_open({title}, {width}, {height})
+to add a button, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("button", {name}, {words}, {x}, {y}, {width}, {height}, {line})
+  runs: form_add("button", {name}, {words}, {x}, {y}, {width}, {height})
+to add a field, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("field", {name}, {words}, {x}, {y}, {width}, {height}, {line})
+  runs: form_add("field", {name}, {words}, {x}, {y}, {width}, {height})
+to add a label, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("label", {name}, {words}, {x}, {y}, {width}, {height}, {line})
+  runs: form_add("label", {name}, {words}, {x}, {y}, {width}, {height})
+to add a tick box, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("tick box", {name}, {words}, {x}, {y}, {width}, {height}, {line})
+  runs: form_add("tick box", {name}, {words}, {x}, {y}, {width}, {height})
+to add a list box, given name (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("list", {name}, "", {x}, {y}, {width}, {height}, {line})
+  runs: form_add("list", {name}, "", {x}, {y}, {width}, {height})
+to the words in, given name (text), returning text = stellanova_forms::text_of({name}, {line})
+  runs: form_text({name})
+to set the words in, given name (text) and words (text) = stellanova_forms::set_text({name}, {words}, {line})
+  runs: form_set({name}, {words})
+to put in the list, given name (text) and item (text) = stellanova_forms::add_item({name}, {item}, {line})
+  runs: form_add_item({name}, {item})
+to empty the list, given name (text) = stellanova_forms::clear({name}, {line})
+  runs: form_clear({name})
+to is ticked, given name (text), returning yes or no = stellanova_forms::ticked({name}, {line})
+  runs: form_ticked({name})
+to wait for a click, returning text = stellanova_forms::wait({line})
+  runs: form_wait()
+to close the form = stellanova_forms::close()
+  runs: form_close()

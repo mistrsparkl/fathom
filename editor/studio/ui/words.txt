@@ -144,3 +144,6 @@ the json changed at with|JSON with one part changed (library json): the json cha
 pack the zip with|Packs files and folders into a .zip (library zip): pack the zip with (a list of ("saves", "a.txt"), "backup.zip").
 unpack the zip with|Unpacks a .zip into a folder (library zip): unpack the zip with ("backup.zip", "restored").
 send an email with|Sends email (library email): send an email with ("smtp.gmail.com:587", user, password, to, subject, message).
+open a form with|Opens a desktop form (library forms): open a form with ("Pets", 320, 240).
+add a button with|A button on the form (library forms): add a button with (name, words, x, y, width, height).
+wait for a click|Waits for a button on the form; gives its name (library forms).
