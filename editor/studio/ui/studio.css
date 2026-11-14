@@ -47,7 +47,8 @@ main { flex: 1; display: flex; min-height: 0; }
 
 #code, #measure { font: 14px/var(--row) Consolas, "Cascadia Code", monospace; }
 #code { flex: 1; position: relative; overflow: auto; outline: none; cursor: text; }
-#rows { position: relative; min-width: 100%; width: max-content; padding-bottom: 40vh; }
+#rows { position: relative; min-width: 100%; box-sizing: content-box; padding-bottom: 40vh; }
+.shown { position: absolute; left: 0; right: 0; }
 .row { height: var(--row); white-space: pre; display: flex; }
 .row .num { width: var(--gutter); flex: none; text-align: right; padding-right: 12px; color: #6e7681; user-select: none; position: sticky; left: 0; background: var(--bg); z-index: 2; }
 .row.here .num { color: var(--text); }

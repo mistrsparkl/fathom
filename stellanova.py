@@ -2743,7 +2743,7 @@ def read_one(path, auto):
             raise ScriptError(1, "Only programs of their own (with 'genesis:') can be made for the web.")
         files = json.dumps(FILES, ensure_ascii=False)
         ns = [f"const Stellanova_{snake(path.stem.split())} = {{"] + settings + ["};", ""] if settings else []
-        body = js_dots("\n".join(structs + ns + out + [""] + functions))
+        body = js_dots("\n".join(structs + ns + out + [""] + only_waiting_async(functions)))
         top = [f"// Generated from {path.name} by stellanova.py. Edit the .stella file, not this one.",
                "(async () => {",
                'const { stellanova, FMath, FVector, FVector2D } = globalThis.stellanova || require("./stellanova.js");', ""]
@@ -3073,6 +3073,25 @@ def function(head, line, body, names, info, command=None):
                          + hoisted + code + end + ["}"]) + "\n"
     return "\n".join([f"{cpp_type(gives) if gives else 'void'} {owner}{name}({params(name, inputs)})", "{"]
                      + hoisted + code + end + ["}"]) + "\n"
+
+
+def only_waiting_async(functions):
+    """Web commands are made async so they can wait (for a web page, a timer, the person). Async calls cost time,
+    so a command stays async only if it waits itself or calls one that does; the rest become plain functions."""
+    titles = {re.match(r"async function (\w+)\(", f).group(1): f for f in functions}
+    call = re.compile(r"await (\w+)\(")
+    waits = {name for name, f in titles.items() if "await" in call.sub(lambda m: "" if m.group(1) in titles else m.group(0), f)}
+    grew = True
+    while grew:
+        grew = False
+        for name, f in titles.items():
+            if name not in waits and any(m.group(1) in waits for m in call.finditer(f)):
+                waits.add(name)
+                grew = True
+
+    def plain(m):
+        return m.group(0) if m.group(1) in waits or m.group(1) not in titles else f"{m.group(1)}("
+    return [call.sub(plain, f if name in waits else f.replace("async function", "function", 1)) for name, f in titles.items()]
 
 
 # ---------------------------------------------------------------- lines inside a command

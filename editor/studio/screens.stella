@@ -28,9 +28,13 @@ a library word has:
 and the universe said i love you
 
 a snapshot has:
-  state (text)
-  snap row (a number)
-  snap column (a number)
+  changed row (a number)
+  old lines (a list of text)
+  new lines (a list of text)
+  back row (a number)
+  back column (a number)
+  forth row (a number)
+  forth column (a number)
 and the universe said i love you
 
 a sheet has:
@@ -40,10 +44,12 @@ a sheet has:
   caret column (a number)
   anchor row (a number)
   anchor column (a number)
-  saved (text)
+  windows endings (yes or no)
   back (a list of snapshots)
   ahead (a list of snapshots)
   warned (yes or no)
+  edit count (a number)
+  saved count (a number)
 and the universe said i love you
 
 a memory has:
@@ -66,6 +72,8 @@ the world remembers:
   goal column (a number)
   back (a list of snapshots)
   ahead (a list of snapshots)
+  edits (a number)
+  widest (a number)
   typing run (yes or no)
   dragging (yes or no)
   glyph width (a number)
@@ -273,38 +281,58 @@ and the universe said i love you
 
 whisper: ---------------------------------------------------------------- changing the text (every change goes through 'put words')
 
-to remember the moment:
-  conjure a snapshot as moment
-  set the state of moment to whole text
-  set the snap row of moment to row
-  set the snap column of moment to column
-  add moment to back
-  if the size of back exceeds 300: remove item 1 from back
-  set ahead to a list of snapshots
+to swap lines, given top row (a number) and taking (a number) and putting (a list of text):
+  whisper: the lines from top row on (taking of them) become putting
+  set made to items 1 to (top row minus 1) of body
+  for each line in putting:
+    add line to made
+  for each r from (top row plus taking) to (the size of body):
+    add item r of body to made
+  set body to made
 and the universe said i love you
 
 to put words, given what (text):
   set fresh to replace (the letter with code 9) with "  " in (replace (the letter with code 13) with "" in what)
   set single to the size of fresh is 1 and fresh is not " " and not selecting
-  if not (single and typing run): remember the moment
-  set typing run to single
+  set was row to row
+  set was column to column
   set opening to start row
   set closing to end row
   set before to letters 1 to (start column minus 1) of item opening of body
   set behind to letters (end column) to (the size of item closing of body) of item closing of body
   set pieces to fresh split by new line
-  set made to items 1 to (opening minus 1) of body
+  set fitted to a list of text
   for each k from 1 to the size of pieces:
     set piece to item k of pieces
     if k is 1: set piece to before plus piece
     if k is the size of pieces:
-      set row to (the size of made) plus 1
+      set row to opening plus k minus 1
       set column to (the size of piece) plus 1
       set piece to piece plus behind
-    add piece to made
-  for each r from (closing plus 1) to (the size of body):
-    add item r of body to made
-  set body to made
+    add piece to fitted
+  whisper: undo keeps only the lines that changed; letters typed one after another on a line are one step
+  set merged to no
+  if single and typing run and opening is closing and the size of back exceeds 0:
+    set last one to the size of back
+    if the changed row of item last one of back is opening and the size of the new lines of item last one of back is 1:
+      set the new lines of item last one of back to fitted
+      set the forth row of item last one of back to row
+      set the forth column of item last one of back to column
+      set merged to yes
+  if not merged:
+    conjure a snapshot as moment
+    set the changed row of moment to opening
+    set the old lines of moment to items opening to closing of body
+    set the new lines of moment to fitted
+    set the back row of moment to was row
+    set the back column of moment to was column
+    set the forth row of moment to row
+    set the forth column of moment to column
+    add moment to back
+    if the size of back exceeds 1000: remove item 1 from back
+  set ahead to a list of snapshots
+  set typing run to single
+  swap lines with (opening, closing minus opening plus 1, fitted)
   drop the mark
   set goal column to column
   something changed
@@ -313,40 +341,50 @@ and the universe said i love you
 to something changed:
   set calm to 0
   set needs look to yes
+  set edits to edits plus 1
+  measure the widest
   show
 and the universe said i love you
 
-to bring back, given moment (a snapshot):
-  set body to (the state of moment) split by new line
-  set row to clamp (the snap row of moment) between 1 and (the size of body)
-  set column to clamp (the snap column of moment) between 1 and ((the size of item row of body) plus 1)
+to measure the widest:
+  set widest to 0
+  for each line in body:
+    if the size of line exceeds widest: set widest to the size of line
+  set the style with (rows box, "width", ((64 plus (widest plus 6) times glyph width) as text) plus "px")
+  set the style with (rows box, "height", (((the size of body) times 20) as text) plus "px")
+and the universe said i love you
+
+to step, given moment (a snapshot) and undoing (yes or no):
+  if undoing:
+    swap lines with (the changed row of moment, the size of the new lines of moment, the old lines of moment)
+    set row to the back row of moment
+    set column to the back column of moment
+  otherwise:
+    swap lines with (the changed row of moment, the size of the old lines of moment, the new lines of moment)
+    set row to the forth row of moment
+    set column to the forth column of moment
+  set row to clamp row between 1 and (the size of body)
+  set column to clamp column between 1 and ((the size of item row of body) plus 1)
   drop the mark
+  set goal column to column
   set typing run to no
   something changed
 and the universe said i love you
 
 to undo:
   if the size of back is 0: cease
-  conjure a snapshot as now
-  set the state of now to whole text
-  set the snap row of now to row
-  set the snap column of now to column
-  add now to ahead
   set moment to last item of back
   remove item (the size of back) from back
-  bring back with moment
+  add moment to ahead
+  step with (moment, yes)
 and the universe said i love you
 
 to redo:
   if the size of ahead is 0: cease
-  conjure a snapshot as now
-  set the state of now to whole text
-  set the snap row of now to row
-  set the snap column of now to column
-  add now to back
   set moment to last item of ahead
   remove item (the size of ahead) from ahead
-  bring back with moment
+  add moment to back
+  step with (moment, no)
 and the universe said i love you
 
 whisper: ---------------------------------------------------------------- moving the caret
@@ -412,13 +450,6 @@ whisper: ---------------------------------------------------------------- drawin
 
 to show:
   if current is 0: cease
-  set made to ""
-  for each r from 1 to the size of body:
-    set look to "row"
-    if r is row: set look to look plus " here"
-    if mistake rows contains r: set look to look plus " bad"
-    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus "><span class=" plus a quotation mark plus "num" plus a quotation mark plus ">" plus r plus "</span><span class=" plus a quotation mark plus "txt" plus a quotation mark plus ">" plus coloured with (item r of body) plus "</span></div>"
-  set the markup with (rows box, made)
   set left to 64 plus (column minus 1) times glyph width
   set top to (row minus 1) times 20
   set the style with (caret box, "left", (left as text) plus "px")
@@ -432,11 +463,31 @@ to show:
   otherwise:
     set the value with (catcher, "")
   scroll into view caret box
+  paint the rows
   set the text with (where box, "Line " plus row plus ", Column " plus column)
   set the text with (mistake box, "")
   for each k from 1 to the size of mistake rows:
     if item k of mistake rows is row: set the text with (mistake box, item k of mistake notes)
   show the tabs
+and the universe said i love you
+
+to paint the rows:
+  whisper: only the rows in sight (and a few around them) are drawn, so long files stay quick
+  if current is 0: cease
+  set scrolled to (the top edge of code box) minus (the top edge of rows box)
+  set shown start to larger of 1 and ((round down (scrolled divided by 20)) minus 4)
+  set shown end to smaller of (the size of body) and (shown start plus (round down ((the height of code box) divided by 20)) plus 9)
+  set made to ""
+  for each r from shown start to shown end:
+    set look to "row"
+    if r is row: set look to look plus " here"
+    if mistake rows contains r: set look to look plus " bad"
+    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus "><span class=" plus a quotation mark plus "num" plus a quotation mark plus ">" plus r plus "</span><span class=" plus a quotation mark plus "txt" plus a quotation mark plus ">" plus coloured with (item r of body) plus "</span></div>"
+  set the markup with (rows box, "<div class=" plus a quotation mark plus "shown" plus a quotation mark plus " style=" plus a quotation mark plus "top:" plus ((shown start minus 1) times 20) plus "px" plus a quotation mark plus ">" plus made plus "</div>")
+and the universe said i love you
+
+to on scroll, given event (a number):
+  paint the rows
 and the universe said i love you
 
 to show the marks:
@@ -833,6 +884,7 @@ to keep the sheet:
   set the anchor column of item current of sheets to mark column
   set the back of item current of sheets to back
   set the ahead of item current of sheets to ahead
+  set the edit count of item current of sheets to edits
 and the universe said i love you
 
 to bring up the sheet, given n (a number):
@@ -860,6 +912,8 @@ to bring up the sheet, given n (a number):
   set mark column to the anchor column of one
   set back to the back of one
   set ahead to the ahead of one
+  set edits to the edit count of one
+  measure the widest
   set goal column to column
   set typing run to no
   set needs look to yes
@@ -880,11 +934,12 @@ to open the sheet, given path (text):
   if that went wrong:
     set the text with (status box, "I couldn't open " plus path plus ".")
     cease
-  set words to replace (the letter with code 13) with "" in words
+  set ending to the letter with code 13 plus new line
   conjure a sheet as one
+  set the windows endings of one to words contains ending
+  set words to replace (the letter with code 13) with "" in words
   set the path of one to path
   set the body of one to words split by new line
-  set the saved of one to words
   set the caret row of one to 1
   set the caret column of one to 1
   set the anchor row of one to 1
@@ -895,8 +950,8 @@ to open the sheet, given path (text):
 and the universe said i love you
 
 to sheet changed, given n (a number), returning yes or no:
-  if n is current: return whole text is not the saved of item n of sheets
-  return (join (the body of item n of sheets) with new line) is not the saved of item n of sheets
+  if n is current: return edits is not the saved count of item n of sheets
+  return the edit count of item n of sheets is not the saved count of item n of sheets
 and the universe said i love you
 
 to show the tabs:
@@ -937,12 +992,13 @@ and the universe said i love you
 to save the sheet:
   if current is 0: cease
   set words to whole text
+  if the windows endings of item current of sheets: set words to join body with (the letter with code 13 plus new line)
   try:
     set ignored to tell the system with ("/api/write?path=" plus web encoded (the path of item current of sheets), words)
   if that went wrong:
     set the text with (status box, "I couldn't save " plus the path of item current of sheets plus ".")
     cease
-  set the saved of item current of sheets to words
+  set the saved count of item current of sheets to edits
   set the warned of item current of sheets to no
   set the text with (status box, "Saved " plus short name of (the path of item current of sheets))
   show the tabs
@@ -1217,6 +1273,7 @@ genesis:
   listen for an event with (catcher, "blur", the command on sleep)
   listen for an event with (code box, "mousedown", the command on press)
   listen for an event with (code box, "dblclick", the command on double press)
+  listen for an event with (code box, "scroll", the command on scroll)
   listen for an event with (the whole window, "mousemove", the command on pointer move)
   listen for an event with (the whole window, "mouseup", the command on let go)
   listen for an event with (the whole window, "keydown", the command on window key)
