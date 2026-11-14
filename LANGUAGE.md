@@ -138,6 +138,8 @@ and the universe said i love you
 
 After the `=` is the function's name in the package (`linalg.norm` for one inside a part of it). Inputs go to Python as they are (lists as lists, tables as dictionaries), and the answer is made into the kind the word returns. A package that isn't installed says how to install it. These words don't work built or on the web.
 
+**Getting libraries.** `stellanova get <address>` gets a library someone else made and keeps it, so any program can `use:` it: the address is a `.words` file (on the internet or this computer), a `.zip` holding `.words` files, or a GitHub project written `user/project`. `stellanova got` shows the libraries got so far and where each came from, and `stellanova drop <name>` lets one go. A library can run any code on the computer, so only get ones from people you trust.
+
 **C functions from any library.** A program can call the functions in any C library (a `.dll` on Windows, `.so` elsewhere), with a word for each:
 
 ```

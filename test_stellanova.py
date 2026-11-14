@@ -12,6 +12,7 @@ translate.LOGIC = Path(__file__).resolve().parent / "examples"
 
 
 END = "and the universe said i love you\n"
+os.environ["STELLANOVA_GOT"] = tempfile.mkdtemp()  # libraries got while testing (none of the real ones)
 
 
 def websocket_echo(port):
@@ -336,6 +337,26 @@ def program_checks():
                'and the universe said i love you\n'
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
+
+    # Getting libraries: a .words file or a .zip of them, kept for every program; dropping one.
+    with tempfile.TemporaryDirectory() as d:
+        import zipfile
+        words = 'to greeting for, given who (text), returning text = std::string("hello, ") + {who}\n  runs: "hello, " + {who}\n  web: "hello, " + {who}\n'
+        (Path(d) / "greet.words").write_text(words, encoding="utf-8")
+        with zipfile.ZipFile(Path(d) / "more.zip", "w") as z:
+            z.writestr("project-main/libs/shout.words", words.replace("greeting for", "shout for"))
+            z.writestr("../away.words", words.replace("greeting for", "away for"))
+        say = lambda *a: subprocess.run([sys.executable, str(HERE / "stellanova.py"), *a], capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
+        assert "Got the library 'greet'" in say("get", "greet.words")
+        assert "Got the library 'shout'" in say("get", "more.zip")
+        assert sorted(p.name for p in Path(os.environ["STELLANOVA_GOT"]).glob("*.words")) == ["away.words", "greet.words", "shout.words"]
+        assert "greet  (from file:" in say("got")
+        (Path(d) / "greet.words").unlink()
+        (Path(d) / "g.stella").write_text("use: greet\nuse: shout\ngenesis:\n  scrawl greeting for \"you\", \" \", shout for \"me\"\n" + END, encoding="utf-8")
+        out = both((Path(d) / "g.stella").read_text(encoding="utf-8"))
+        assert out.stdout == "hello, you hello, me\n", repr(out.stdout + out.stderr)
+        assert "Dropped the library 'greet'" in say("drop", "greet")
+        assert "There is no library called 'greet'" in say("check", "g.stella")
 
     # Commands going alongside share the world's names, taking turns with a lock (a problem inside lets it go).
     out = both(''.join([

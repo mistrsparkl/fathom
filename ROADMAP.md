@@ -18,7 +18,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Call any Python package when running directly (`use python: numpy`)
 - [x] Sockets: TCP, UDP, WebSockets (`use: network`)
 - [x] Threads that share things, with locks (`holding the lock "x":`)
-- [ ] A package manager: `stellanova get <library>`
+- [x] A package manager: `stellanova get <library>`
 
 ## 3. Libraries
 - [ ] Animation: easing, tweens, sprite sheets

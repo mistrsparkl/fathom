@@ -2658,10 +2658,11 @@ def load_library(name, line, names, rows=None):
     """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file.
     rows: the library's lines, when they are in the program itself ('use the library "user32.dll":')."""
     if rows is None:
-        places = [LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else []) + [HERE / "libraries" / f"{name}.words"]
+        places = ([LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else [])
+                  + [HERE / "libraries" / f"{name}.words", got_folder() / f"{name}.words"])
         path = next((p for p in places if p.exists()), None)
         if not path:
-            have = sorted(p.stem for p in (HERE / "libraries").glob("*.words"))
+            have = sorted({p.stem for p in (HERE / "libraries").glob("*.words")} | {p.stem for p in got_folder().glob("*.words")})
             raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
         rows = path.read_text(encoding="utf-8").splitlines()
     else:
@@ -5100,6 +5101,81 @@ def try_it(read=input, show=print):
             show("That only works inside a loop.")
 
 
+def got_folder():
+    """Where 'stellanova get' keeps the libraries it gets ('use:' looks there too)."""
+    return Path(os.environ.get("STELLANOVA_GOT") or HERE / "libraries" / "got")
+
+
+def get_package(where):
+    """'stellanova get <address>': a library from the internet (or a file), kept so any program can 'use:' it.
+    The address is a .words file, a .zip holding .words files, or a GitHub project written user/project."""
+    import io
+    import urllib.request
+    import zipfile
+    if re.fullmatch(r"[\w.-]+/[\w.-]+", where) and not Path(where).exists():
+        where = f"https://codeload.github.com/{where}/zip/HEAD"
+    elif Path(where).exists():
+        where = Path(where).resolve().as_uri()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(where, headers={"User-Agent": "stellanova-get"}), timeout=60) as answer:
+            data = answer.read()
+    except Exception as err:
+        print(f"I couldn't get {where}: {getattr(err, 'reason', err)}.")
+        return 1
+    found = {}  # name -> its words
+    if data[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            for item in z.namelist():
+                if item.lower().endswith(".words") and "/unreal/" not in item.lower():
+                    found[Path(item).stem] = z.read(item)  # only the file's own name: nothing lands outside the folder
+    elif where.lower().split("?")[0].endswith(".words"):
+        found[Path(where.split("?")[0]).stem.replace("%20", " ")] = data
+    if not found:
+        print(f"There is no library (.words file) at {where}.")
+        return 1
+    folder = got_folder()
+    folder.mkdir(parents=True, exist_ok=True)
+    sources = folder / "sources.txt"
+    kept = dict(line.split("\t", 1) for line in sources.read_text(encoding="utf-8").splitlines() if "\t" in line) if sources.exists() else {}
+    for name, words in sorted(found.items()):
+        name = re.sub(r"[^\w .-]", "", name).strip().lower()
+        if not name or (HERE / "libraries" / f"{name}.words").exists():
+            print(f"Skipped '{name}': Stellanova has its own library called that.")
+            continue
+        (folder / f"{name}.words").write_bytes(words)
+        kept[name] = where
+        print(f"Got the library '{name}': use it with  use: {name}")
+    sources.write_text("".join(f"{n}\t{w}\n" for n, w in sorted(kept.items())), encoding="utf-8")
+    print("A library can run any code on this computer: only use ones from people you trust.")
+    return 0
+
+
+def got_packages():
+    """'stellanova got': the libraries 'stellanova get' has kept, and where each came from."""
+    sources = got_folder() / "sources.txt"
+    kept = dict(line.split("\t", 1) for line in sources.read_text(encoding="utf-8").splitlines() if "\t" in line) if sources.exists() else {}
+    names = sorted(p.stem for p in got_folder().glob("*.words"))
+    if not names:
+        print("No libraries got yet. Get one with:  stellanova get <address>")
+    for name in names:
+        print(f"{name}  (from {kept.get(name, 'somewhere')})")
+    return 0
+
+
+def drop_package(name):
+    """'stellanova drop <name>': lets a got library go."""
+    path = got_folder() / f"{name.lower()}.words"
+    if not path.exists():
+        print(f"There is no got library called '{name}'.")
+        return 1
+    path.unlink()
+    sources = got_folder() / "sources.txt"
+    if sources.exists():
+        sources.write_text("".join(l + "\n" for l in sources.read_text(encoding="utf-8").splitlines() if not l.startswith(name.lower() + "\t")), encoding="utf-8")
+    print(f"Dropped the library '{name}'.")
+    return 0
+
+
 USAGE = """Use:
   stellanova <script.stella>                     run a program
   stellanova run <script.stella>                 the same
@@ -5109,6 +5185,9 @@ USAGE = """Use:
   stellanova test <script.stella>                run each command called 'to test ...:' and show which checks failed
   stellanova watch <script.stella>               run it, showing each line as it runs and the names it changes
   stellanova web <script.stella> [folder]        make it into JavaScript, for a web page (or: node <script>.js)
+  stellanova get <address>                        get a library: a .words file, a .zip of them, or a GitHub user/project
+  stellanova got                                  show the libraries got so far
+  stellanova drop <name>                          let a got library go
   stellanova                                      try lines out, one at a time
   stellanova <scripts folder> <output folder>     turn 'this is part of:' scripts into C++ (for Unreal)
 (stellanova is short for: py -3 stellanova.py)"""
@@ -5126,6 +5205,12 @@ def main(argv):
         args = args[:2]
     if len(args) == 2 and args[0] == "test":
         return run_program(Path(args[1]), tests=True)
+    if len(args) == 2 and args[0] == "get":
+        return get_package(args[1])
+    if args == ["got"]:
+        return got_packages()
+    if len(args) == 2 and args[0] == "drop":
+        return drop_package(args[1])
     if len(args) == 2 and args[0] == "watch":  # runs it directly, showing each line and the names it changes
         global WATCHING
         WATCHING = True

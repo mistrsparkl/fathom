@@ -17,3 +17,6 @@ editor/studio/ui/stellanova.js
 # the tutorial film: everything made while filming
 tutorial/out/
 tutorial/__pycache__/
+
+# libraries 'stellanova get' got
+libraries/got/
