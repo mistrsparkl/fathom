@@ -584,7 +584,9 @@ async function filmGame(lesson, file, keysFile) {
   const source = path.join(lesson.folder, "files", file);
   const folder = path.join(games, name);
   fs.mkdirSync(folder, { recursive: true });
-  fs.copyFileSync(source, path.join(folder, path.basename(file)));
+  // the game and the scripts it uses; and no saves from an earlier filming, so it plays as a first game
+  for (const f of fs.readdirSync(path.dirname(source)).filter((f) => f.endsWith(".stella"))) fs.copyFileSync(path.join(path.dirname(source), f), path.join(folder, f));
+  for (const f of fs.readdirSync(folder).filter((f) => f.endsWith(".save") || f.endsWith(".zip"))) fs.rmSync(path.join(folder, f));
   const exe = path.join(folder, name + ".exe");
   py(path.join(home, "stellanova.py"), "build", path.join(folder, path.basename(file)));
   const raw = path.join(folder, "frames.raw");

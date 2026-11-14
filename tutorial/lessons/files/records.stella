@@ -1,0 +1,66 @@
+whisper: Hop!'s records: the best time, and every point ever won, kept secret in a file, with a zipped copy.
+
+use: encryption
+use: hashing
+use: json
+use: big numbers
+use: patterns
+use: zip
+use: time
+use: folders
+
+the world remembers:
+  best time (a number)
+  points ever (text)
+  level print (text)
+and the universe said i love you
+
+to fingerprint the level, given level (text):
+  set level print to the hash of with ("sha256", level)
+and the universe said i love you
+
+to load the record:
+  set points ever to "0"
+  if not file "hop.save" exists: cease
+  try:
+    set record to decrypted with (contents of file "hop.save", "hop hop hooray")
+    if the json at with (record, "level") is not level print: raise a save problem with "was for a different level"
+    set kept points to the json at with (record, "points")
+    if not the pattern fits with ("^[0-9]+$", kept points): raise a save problem with "has broken points"
+    set best time to the json number at with (record, "best")
+    set points ever to kept points
+  if that went wrong with a save problem:
+    scrawl "Starting fresh: the record ", the wound
+  if that went wrong:
+    scrawl "Starting fresh: the record couldn't be read (", the wound, ")"
+and the universe said i love you
+
+to save the record, given seconds (a number) and points (a number):
+  holding the lock "record":
+    if best time is 0 or seconds falls below best time: set best time to seconds
+    if points ever is "": set points ever to "0"
+    set points ever to big plus with (points ever, "[points]")
+    set record to the json changed at with ("{}", "best", "[best time]")
+    set record to the json changed at with (record, "points", as json text points ever)
+    set record to the json changed at with (record, "level", as json text level print)
+    set record to the json changed at with (record, "day", as json text today)
+    inscribe encrypted with (record, "hop hop hooray") into file "hop.save"
+    pack the zip with (a list containing "hop.save", "hop backup.zip")
+and the universe said i love you
+
+to test the record:
+  fingerprint the level with "a test level"
+  save the record with (12.5, 900)
+  set best time to 0
+  load the record
+  check best time is 12.5
+  check points ever is "900"
+  check the files in the zip "hop backup.zip" is a list containing "hop.save"
+  erase the file "hop.save"
+  erase the file "hop backup.zip"
+and the universe said i love you
+
+genesis:
+  load the record
+  scrawl "Best time: ", best time, " seconds. Points ever: ", points ever
+and the universe said i love you

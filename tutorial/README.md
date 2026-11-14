@@ -16,7 +16,7 @@ cd ../../tutorial
 py -3 join.py                                     # out/Stellanova Tutorial.mp4, a chapter per lesson
 ```
 
-`py -3 make_hop_lesson.py` writes `lessons/12-platformer.lesson` from the game itself, so its line numbers stay right
+`py -3 make_hop_lesson.py` writes `lessons/16-platformer.lesson` from the game itself (and the `records.stella` script it uses), so its line numbers stay right
 when the game changes. Games are filmed by the game itself: the window library's demo mode (`STELLANOVA_DEMO_FRAMES`,
 `STELLANOVA_DEMO_KEYS`) writes every frame and presses keys from a list like `lessons/files/hop.keys`.
 
@@ -38,6 +38,7 @@ indented two spaces; a block starting with an empty line starts a new line first
 | `zoom: lines 2-6`, `zoom: output`, `zoom: out` | Move the camera onto lines or an element, or back. |
 | `spot: line 3`, `spot: lines 3-4`, `spot: off` | A frame around lines, to point at them. |
 | `point: #run`, `click: #run`, `hide cursor` | Move the pointer there, click there, hide it. |
-| `run`, `watch`, `test`, `build`, `web` | Press that button and wait until it finishes (`run: and keep going` doesn't wait; anything else after the colon is a note). |
+| `run`, `watch`, `test`, `build`, `web`, `profile`, `debug` | Press that button and wait until it finishes, or (debugging) pauses (`run: and keep going` doesn't wait; anything else after the colon is a note). |
+| `stop at: 4`, `until paused` | Click beside a line's number to put a stop there (or take it away), and wait until the program pauses or ends. |
 | `answer: Sam`, `until finished`, `focus` | Type an answer for `ask`, wait for the program to finish, give the code back the keys. |
 | `game: hop.stella \| hop.keys \| Hop!` | Play the game (filmed ahead with those keys) in a window over the studio; the lesson goes on meanwhile, and `until game ends` waits for it. |

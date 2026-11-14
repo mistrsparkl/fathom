@@ -1,0 +1,835 @@
+title: Making a platform game
+files: records.stella
+card: Chapter 16 | Making a game | Hop! A platform game that uses everything
+say:
+  Now let's put it all together, and make a real game: a platform game called Hop.
+  A little blue block runs and jumps across floating platforms, picks up every coin, dodges spikes and bees, and reaches the flag at the end.
+  It uses every part of the language we've seen. We'll write it piece by piece, and look closely at how each piece works.
+uncard
+open: records.stella
+say:
+  The game keeps its best time in a second script, records dot stella. It was written earlier. Let's read it first.
+line: 16
+zoom: lines 1-16
+spot: lines 3-10
+say:
+  It uses seven libraries: encryption, hashing, json, big numbers, patterns, zip, time, and folders.
+spot: lines 13-15
+say:
+  It remembers the best time, every point ever won, and a fingerprint of the level. Points ever is text, because it's a big number: it can grow without limit.
+spot: off
+line: 36
+zoom: lines 18-36
+spot: line 19
+say:
+  Fingerprint the level keeps a hash of the level. If the level ever changes, so does its fingerprint, and an old record won't be used for it.
+spot: line 24
+say:
+  Load the record does nothing if there's no save file yet.
+spot: line 26
+say:
+  The save file is encrypted, so nobody can change their best time by editing it. Decrypted with gives back the JSON text inside.
+spot: line 27
+say:
+  A record for a different level raises a save problem, a kind of problem of our own.
+spot: line 29
+say:
+  The pattern checks the points are only digits, as a big number must be.
+spot: lines 32-35
+say:
+  A save problem says why the record was skipped. Any other problem, like a wrong password, is caught by the plain if that went wrong. Either way, the game starts fresh.
+spot: off
+line: 49
+zoom: lines 38-49
+spot: line 39
+say:
+  Save the record will run alongside the game, with meanwhile. Holding the lock makes sure two saves never mix.
+spot: line 42
+say:
+  Big plus adds the new points to every point ever won.
+spot: lines 43-46
+say:
+  The json changed at builds the record, one part at a time. Today, from the time library, is the date it was set.
+spot: lines 47-48
+say:
+  Then it's encrypted into hop dot save, and a copy is packed into a zip file, as a backup.
+spot: off
+line: 61
+zoom: lines 51-61
+spot: lines 51-61
+say:
+  And a test: save a record, forget the best time, load it back, and check it's all there. Then the files are erased.
+spot: off
+zoom: out
+test
+zoom: output
+say:
+  The test passes. Now, the game.
+wait
+zoom: out
+new: hop.stella
+paste:
+  whisper: Hop! A small platformer. Left and right run, space jumps.
+  whisper: Pick up every coin, keep away from the spikes and the bees, then touch the flag at the far end.
+
+  use: window
+  use: maths
+  use: records.stella
+
+  a platform has:
+    x (a number)
+    y (a number)
+    width (a number)
+    height (a number)
+  and the universe said i love you
+
+  a coin has:
+    birth (a flat place)
+  and the universe said i love you
+
+  a spike has:
+    x (a number)
+    width (a number)
+  and the universe said i love you
+
+  a bee has:
+    birth (a flat place)
+    reach (a number)
+  and the universe said i love you
+
+  a queen bee is a kind of bee that has:
+    crown (text)
+  and the universe said i love you
+
+  a danger is anything that can hurt and appear.
+
+  a trail of anything has:
+    items (a list of anything)
+  and the universe said i love you
+  
+line: 17
+zoom: lines 1-17
+spot: lines 1-2
+say:
+  The top of the game says what it is, in whispers.
+spot: lines 4-6
+say:
+  Use window, for the window to draw in. Maths, for sine. And use records dot stella brings in the other script.
+spot: lines 8-13
+say:
+  A platform is a box: where its top left corner is, x across and y down, and how wide and high it is. Every floor, ledge and pillar in the level is one of these.
+spot: lines 15-17
+say:
+  A coin has a birth, which is where it floats, and so it has an existence too.
+spot: off
+keys: ctrl+end
+line: 37
+zoom: lines 19-37
+spot: lines 19-22
+say:
+  A spike is a row of sharp points on the ground: where it starts, and how wide it is.
+spot: lines 24-27
+say:
+  A bee has a birth, where its flight is centred, and a reach: how far it flies to each side.
+spot: lines 29-31
+say:
+  A queen bee is a kind of bee, with a crown as well.
+spot: line 33
+say:
+  A danger is anything that can hurt and appear. Spikes and bees are different kinds of things, but both will be dangers.
+spot: lines 35-37
+say:
+  And a trail of anything keeps the last few of anything. The player will leave a trail of dust.
+spot: off
+keys: ctrl+end
+paste:
+
+  the world remembers:
+    player x (a number)
+    player y (a number)
+    speed x (a number)
+    speed y (a number)
+    on ground (yes or no)
+    facing (a number)
+    platforms (a list of platforms)
+    coins (a list of coins)
+    coins taken (a number)
+    spikes (a list of spikes)
+    bees (a list of bees)
+    queen (a queen bee)
+    dust (a trail of flat places)
+    palette (a table of text)
+    score (a number)
+    lives (a number)
+    camera (a number)
+    ticks (a number)
+    seconds (a number)
+    points (a number)
+    won (yes or no)
+    blink (yes or no)
+  and the universe said i love you
+  
+line: 62
+zoom: lines 39-62
+spot: lines 40-43
+say:
+  The world remembers everything about the game while it runs. Player x and y are where the player's top left corner is. Speed x and speed y are how far it moves each frame: across, and down. These are the heart of the game.
+spot: lines 44-45
+say:
+  On ground says whether the player is standing on something. Facing is one for right, minus one for left, so the eyes look the right way.
+spot: line 48
+say:
+  Coins taken is one number. Each of its bits says whether one coin has been taken.
+spot: lines 52-53
+say:
+  Dust is a trail of flat places. And the palette is a table of colours, looked up by name.
+spot: lines 54-61
+say:
+  And the score, lives, the camera, the time, the points, whether the game is won, and whether the flag is blinking.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- making the level
+
+  to platform at, given x (a number) and y (a number) and width (a number) and height (a number), returning a platform:
+    conjure a platform as made
+    set the x of made to x
+    set the y of made to y
+    set the width of made to width
+    set the height of made to height
+    return made
+  and the universe said i love you
+
+  to coin at, given x (a number) and y (a number), returning a coin:
+    conjure a coin as made
+    set the birth of made to x horizontal y vertical
+    return made
+  and the universe said i love you
+
+  to spike at, given x (a number) and width (a number), returning a spike:
+    conjure a spike as made
+    set the x of made to x
+    set the width of made to width
+    return made
+  and the universe said i love you
+
+  to build the level:
+    add platform at with (0, 460, 760, 80) to platforms
+    add platform at with (880, 460, 720, 80) to platforms
+    add platform at with (1720, 460, 300, 80) to platforms
+    add platform at with (2160, 460, 1040, 80) to platforms
+    add platform at with (330, 360, 160, 24) to platforms
+    add platform at with (1180, 340, 140, 24) to platforms
+    add platform at with (1400, 250, 140, 24) to platforms
+    add platform at with (1840, 330, 120, 24) to platforms
+    add platform at with (2400, 380, 60, 80) to platforms
+    add platform at with (2640, 330, 60, 130) to platforms
+    add coin at with (410, 320) to coins
+    add coin at with (820, 380) to coins
+    add coin at with (1250, 300) to coins
+    add coin at with (1470, 210) to coins
+    add coin at with (1900, 290) to coins
+    add coin at with (2430, 340) to coins
+    add coin at with (2670, 290) to coins
+    add spike at with (1490, 72) to spikes
+    add spike at with (1990, 24) to spikes
+    conjure a bee as worker
+    set the birth of worker to 1600 horizontal 120 vertical
+    set the reach of worker to 60
+    add worker to bees
+    set the birth of queen to 2920 horizontal 190 vertical
+    set the reach of queen to 70
+    set the crown of queen to "#ffd54f"
+  and the universe said i love you
+
+  to choose the colours:
+    set the entry "sky" of palette to "#8fd3ff"
+    set the entry "hills" of palette to "#7fc8a9"
+    set the entry "earth" of palette to "#8a5a33"
+    set the entry "grass" of palette to "#4caf50"
+    set the entry "gold" of palette to "#ffc107"
+    set the entry "ink" of palette to "#1b2a49"
+  and the universe said i love you
+  
+line: 86
+zoom: lines 66-86
+spot: lines 66-73
+say:
+  Platform at is a small helper. It conjures a platform, sets its four parts, and returns it. Coin at and spike at do the same.
+spot: off
+keys: ctrl+end
+line: 115
+zoom: lines 88-115
+spot: lines 89-92
+say:
+  Build the level adds every platform. These four are the ground, with gaps between them to fall into. The level is over three thousand dots wide, much wider than the window.
+spot: lines 99-105
+say:
+  Seven coins, each where the player will have to jump to reach it.
+spot: lines 106-107
+say:
+  Two rows of spikes.
+spot: lines 108-111
+say:
+  A bee, added to the list of bees.
+spot: lines 112-114
+say:
+  And the queen. She's kept on her own: put into a list of bees, she'd become a plain bee, without her crown.
+spot: off
+keys: ctrl+end
+line: 124
+zoom: lines 117-124
+spot: lines 118-123
+say:
+  Choose the colours fills the palette table. Set the entry sky of palette, to a blue.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- moving the player: speed changes the place, gravity changes the speed
+
+  
+type fast:
+  to run and jump:
+    if key held "left":
+      set speed x to speed x minus 0.8
+      set facing to -1
+    otherwise if key held "right":
+      set speed x to speed x plus 0.8
+      set facing to 1
+    otherwise:
+      set speed x to speed x times 0.8
+    set speed x to clamp speed x between -6 and 6
+    if key pressed "space" and on ground:
+      set speed y to -13
+    set speed y to smaller of (speed y plus 0.6) and 14
+  and the universe said i love you
+keys: enter
+say:
+  This is the most important part of the game. Let's go through it slowly.
+line: 141
+zoom: lines 128-141
+spot: lines 129-131
+say:
+  If the left key is held, speed x goes down by point eight each frame, so the player speeds up toward the left. Not all at once, but a little more every frame. That's what makes running feel smooth.
+spot: lines 132-134
+say:
+  The right key does the same toward the right.
+spot: lines 135-136
+say:
+  With neither key held, speed x is multiplied by point eight every frame. So the player slows down, and glides to a stop, like friction.
+spot: line 137
+say:
+  Clamp keeps speed x between minus six and six, so the player can't run faster than six dots a frame.
+spot: lines 138-139
+say:
+  Jumping. Key pressed is yes for only one frame per press. And only on the ground: no jumping in mid air. A jump sets speed y to minus thirteen. On a screen, up is less, so minus thirteen means thirteen dots up, every frame.
+spot: line 140
+say:
+  And this one line is gravity. Every frame, speed y grows by point six. So a jump starts fast upward, slows, stops at the top, and comes back down faster and faster, in a smooth curve. Smaller of keeps the fall from getting faster than fourteen.
+spot: off
+keys: ctrl+end
+paste:
+
+  to overlaps, given p (a platform), returning yes or no:
+    return player x plus 30 exceeds the x of p and player x falls below the x of p plus the width of p and player y plus 40 exceeds the y of p and player y falls below the y of p plus the height of p
+  and the universe said i love you
+
+  to test overlapping:
+    set player x to 100
+    set player y to 430
+    check overlaps with platform at with (0, 460, 760, 80)
+    set player y to 380
+    check not overlaps with platform at with (0, 460, 760, 80)
+  and the universe said i love you
+  
+line: 153
+zoom: lines 143-153
+spot: lines 143-144
+say:
+  Overlaps asks whether the player's box and a platform's box overlap. The player is thirty dots wide and forty high. Two boxes overlap when each one's left edge is left of the other's right edge, and each one's top is above the other's bottom. All four must be true.
+spot: lines 147-153
+say:
+  And a test for it: standing in the ground overlaps it, and fifty dots higher doesn't. The test button runs it.
+spot: off
+keys: ctrl+end
+paste:
+
+  to move across:
+    set player x to player x plus speed x
+    for each p in platforms:
+      if overlaps with p:
+        if speed x exceeds 0: set player x to the x of p minus 30
+        otherwise: set player x to the x of p plus the width of p
+        set speed x to 0
+    set player x to clamp player x between 0 and 3170
+  and the universe said i love you
+
+  to move up and down:
+    set on ground to no
+    set player y to player y plus speed y
+    for each p in platforms:
+      if overlaps with p:
+        if speed y exceeds 0:
+          set player y to the y of p minus 40
+          set on ground to yes
+        otherwise:
+          set player y to the y of p plus the height of p
+        set speed y to 0
+  and the universe said i love you
+  
+line: 163
+zoom: lines 155-163
+spot: line 156
+say:
+  Now the moving itself. The trick is to move across and down separately, one after the other. First across: add speed x to player x.
+spot: lines 157-161
+say:
+  Then, if that put the player inside a platform, push it back out. Moving right, the player's right side goes against the platform's left edge. Moving left, its left side goes against the platform's right edge. And speed x becomes zero: we hit a wall.
+spot: line 162
+say:
+  And clamp keeps the player inside the level, from its left end to its right end.
+spot: off
+keys: ctrl+end
+line: 175
+zoom: lines 165-175
+spot: lines 166-167
+say:
+  Then up and down, the same way. On ground starts as no, and speed y moves the player.
+spot: lines 170-172
+say:
+  If the player was falling into a platform, its feet are put on the platform's top, and now, on ground is yes. That's the only place on ground ever becomes yes, so jumping only works after landing.
+spot: lines 173-174
+say:
+  And if it was going up, it bumped its head: it's put just under the platform.
+spot: line 175
+say:
+  Either way, speed y becomes zero.
+say:
+  Why separately? If we moved both at once, and ended up inside a corner of a platform, we couldn't tell whether we hit a wall or landed on a floor. One direction at a time, the answer is always clear.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- coins: which ones are taken is kept in the bits of one number
+
+  to is taken, given n (a number), returning yes or no:
+    return ((coins taken shifted right by (n minus 1)) bitwise and 1) is 1
+  and the universe said i love you
+
+  to pick up coins:
+    set middle to (player x plus 15) horizontal (player y plus 20) vertical
+    for each n from 1 to the size of coins:
+      if not is taken with n and the existence of item n of coins is within 30 of middle:
+        set coins taken to coins taken bitwise or (1 shifted left by (n minus 1))
+        set score to score plus 1
+  and the universe said i love you
+  
+line: 190
+zoom: lines 180-190
+spot: line 181
+say:
+  Is taken looks at one bit of coins taken. Shifted right moves bit n to the end, and bitwise and one keeps only that bit.
+spot: line 185
+say:
+  Picking up coins. Middle is the middle of the player: fifteen across and twenty down from its corner.
+spot: lines 187-189
+say:
+  Any coin not taken yet, within thirty dots of the middle, is taken: bitwise or sets its bit, and the score goes up.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- dangers: spikes and bees are different kinds of things, but both can hurt and appear
+
+  to hurt, for a spike, returning yes or no:
+    return player x plus 30 exceeds x and player x falls below x plus width and player y plus 40 exceeds 440
+  and the universe said i love you
+
+  to appear, for a spike:
+    set left to x minus camera
+    for each k from 0 to width divided by 12 minus 1:
+      etch a box with left plus k times 12 plus 3, 446, 6, 14, "#90a4ae"
+      etch a box with left plus k times 12 plus 5, 440, 2, 6, "#cfd8dc"
+  and the universe said i love you
+
+  to hurt, for a bee, returning yes or no:
+    return existence is within 26 of (player x plus 15) horizontal (player y plus 20) vertical
+  and the universe said i love you
+
+  to appear, for a bee:
+    set spot to existence minus camera horizontal 0 vertical
+    etch a circle with spot of horizontal, spot of vertical, 12, "#fdd835"
+    etch a box with spot of horizontal minus 4, spot of vertical minus 12, 3, 24, "#212121"
+    etch a box with spot of horizontal plus 3, spot of vertical minus 12, 3, 24, "#212121"
+    set flap to 4 plus 3 times sine of (ticks times 2000)
+    etch a circle with spot of horizontal, spot of vertical minus 12 minus flap, 7, "#e3f2fd"
+  and the universe said i love you
+
+  to appear, for a queen bee:
+    set spot to existence minus camera horizontal 0 vertical
+    etch a circle with spot of horizontal, spot of vertical, 16, "#fbc02d"
+    etch a box with spot of horizontal minus 5, spot of vertical minus 16, 4, 32, "#212121"
+    etch a box with spot of horizontal plus 3, spot of vertical minus 16, 4, 32, "#212121"
+    etch a box with spot of horizontal minus 9, spot of vertical minus 30, 18, 8, crown
+  and the universe said i love you
+
+  to fly, for a bee, given t (a number):
+    set existence to birth plus (sine of (t times 90) times reach) horizontal (sine of (t times 240) times 10) vertical
+  and the universe said i love you
+
+  to the dangers, returning a list of dangers:
+    set all to a list of dangers
+    for each s in spikes: add s to all
+    for each b in bees: add b to all
+    add queen to all
+    return all
+  and the universe said i love you
+
+  to the danger touching, returning a danger:
+    for each d in the dangers:
+      if hurt d: return d
+    return no danger
+  and the universe said i love you
+  
+line: 203
+zoom: lines 194-203
+spot: lines 194-196
+say:
+  Hurt, for a spike: is the player's box touching it? A spike's own commands use its parts by their names: x and width.
+spot: lines 198-203
+say:
+  Appear draws it: one grey point every twelve dots.
+spot: off
+keys: ctrl+end
+line: 216
+zoom: lines 205-216
+spot: lines 205-207
+say:
+  A bee hurts when its existence is within twenty six dots of the player's middle.
+spot: lines 209-216
+say:
+  And appears as a yellow circle with stripes, and a wing that flaps with sine.
+spot: off
+keys: ctrl+end
+line: 228
+zoom: lines 218-228
+spot: lines 218-224
+say:
+  A queen bee is a kind of bee, so she hurts the way bees do. But she has her own appear: bigger, and with her crown.
+spot: lines 226-228
+say:
+  Fly moves a bee: existence is its birth, plus sine of the time across, times its reach, and a little up and down.
+spot: off
+keys: ctrl+end
+line: 242
+zoom: lines 230-242
+spot: lines 230-236
+say:
+  The dangers puts every spike, every bee, and the queen into one list of dangers. It can hold them all, because each can hurt and appear.
+spot: lines 238-242
+say:
+  The danger touching gives back the first danger that hurts. Hurt d does it the way that kind of thing does. And if none do, it gives back no danger: nothing.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- starting again, and losing a life
+
+  to start again:
+    set player x to 60
+    set player y to 400
+    set speed x to 0
+    set speed y to 0
+  and the universe said i love you
+
+  to lose a life:
+    set lives to lives minus 1
+    if lives is 0:
+      set lives to 3
+      set score to 0
+      set coins taken to 0
+      set seconds to 0
+    start again
+  and the universe said i love you
+
+  whisper: ---- the dust the player kicks up: a trail keeps the last few places
+
+  to leave, for a trail of anything, given x (anything):
+    add x to items
+    if the size of items exceeds 10: remove item 1 from items
+  and the universe said i love you
+  
+line: 268
+zoom: lines 246-268
+spot: lines 246-251
+say:
+  Start again puts the player back at the beginning, standing still.
+spot: lines 254-259
+say:
+  Losing a life takes one away. At none, the game starts over: three lives, and no coins. Coins taken back to zero clears every bit at once.
+spot: lines 265-268
+say:
+  And leave, for a trail of anything, adds a place to the trail, and lets go of the oldest after ten.
+spot: off
+keys: ctrl+end
+paste:
+
+  whisper: ---- drawing: the camera follows the player, and everything is etched where the camera sees it
+
+  to etch the sky:
+    consume the window with the entry "sky" of palette
+    for each n from 0 to 6:
+      set hill x to n times 520 minus remainder of (camera times 0.3, 520)
+      etch a circle with hill x, 560, 260, the entry "hills" of palette
+    for each n from 0 to 8:
+      set cloud x to n times 400 minus remainder of (camera times 0.15, 400)
+      etch a circle with cloud x, 90 plus (remainder of (n, 3)) times 25, 26, "white"
+      etch a circle with cloud x plus 30, 80 plus (remainder of (n, 3)) times 25, 32, "white"
+      etch a circle with cloud x plus 62, 92 plus (remainder of (n, 3)) times 25, 24, "white"
+  and the universe said i love you
+  
+line: 282
+zoom: lines 272-282
+spot: line 273
+say:
+  Now the drawing. Every frame, the whole picture is drawn again from the back to the front. First, the sky, in the palette's sky colour.
+spot: lines 274-276
+say:
+  Then hills. Here's the camera's first trick. The hills move at only point three of the camera's speed, so they seem far away. Remainder of wraps them around, so they never run out.
+spot: lines 277-281
+say:
+  Clouds move even slower, so they seem further still. Things further away moving slower is called parallax, and it makes a flat game look deep.
+spot: off
+keys: ctrl+end
+paste:
+
+  to etch the level:
+    for each p in platforms:
+      set left to the x of p minus camera
+      etch a box with left, the y of p, the width of p, the height of p, the entry "earth" of palette
+      etch a box with left, the y of p, the width of p, 10, the entry "grass" of palette
+    for each n from 1 to the size of coins:
+      if not is taken with n:
+        set c to item n of coins
+        set bob to sine of (ticks times 4 plus (the existence of c of horizontal)) times 4
+        etch a circle with (the existence of c of horizontal) minus camera, (the existence of c of vertical) plus bob, 11, the entry "gold" of palette
+        etch a circle with (the existence of c of horizontal) minus camera minus 3, (the existence of c of vertical) plus bob minus 3, 4, "#fff3c4"
+    etch a box with 3060 minus camera, 300, 6, 160, "#5d4037"
+    set flag colour to "#e53935"
+    if score is the size of coins:
+      set flag colour to "#43a047"
+      if blink: set flag colour to "#a5d6a7"
+    etch a box with 3066 minus camera, 300, 46, 30, flag colour
+  and the universe said i love you
+
+  to etch the dangers:
+    for each d in the dangers: appear d
+  and the universe said i love you
+  
+line: 301
+zoom: lines 284-301
+spot: lines 286-288
+say:
+  Here's the camera's main trick. Every platform is drawn at its x minus camera. As the player runs right, the camera grows, and everything slides left. The level never moves: only the view of it does.
+spot: lines 290-294
+say:
+  Coins not yet taken are gold circles with a shine, bobbing gently with sine.
+spot: lines 297-299
+say:
+  And once every coin is taken, the flag turns green, and blinks.
+spot: off
+keys: ctrl+end
+line: 305
+zoom: lines 303-305
+spot: line 304
+say:
+  Etch the dangers asks each one to appear, in its own way.
+spot: off
+keys: ctrl+end
+paste:
+
+  to etch the player:
+    for each spot in the items of dust:
+      etch a circle with spot of horizontal minus camera, spot of vertical, 3, "#d7ccc8"
+    set left to player x minus camera
+    set squash to 0
+    if not on ground: set squash to 4
+    depending on lives:
+      3: set body colour to "#3f51b5"
+      2: set body colour to "#7e57c2"
+      anything else: set body colour to "#e53935"
+    etch a box with left, player y plus squash, 30, 40 minus squash, body colour
+    set eye x to left plus 15 plus facing times 6
+    etch a circle with eye x minus 5, player y plus 14, 4, "white"
+    etch a circle with eye x plus 5, player y plus 14, 4, "white"
+    etch a circle with eye x minus 5 plus facing, player y plus 14, 2, "black"
+    etch a circle with eye x plus 5 plus facing, player y plus 14, 2, "black"
+  and the universe said i love you
+  
+line: 323
+zoom: lines 307-323
+spot: lines 308-309
+say:
+  The dust trail first, behind the player.
+spot: lines 313-316
+say:
+  Depending on lives chooses its colour: blue with three, purple with two, red with one.
+spot: lines 318-321
+say:
+  And two eyes, moved toward the way it's facing. Small things like this give a block a personality.
+spot: off
+keys: ctrl+end
+paste:
+
+  to etch a heart, given x (a number) and y (a number) and size (a number, usually 9):
+    etch a circle with x minus size divided by 2, y, size divided by 2 plus 1, "#e53935"
+    etch a circle with x plus size divided by 2, y, size divided by 2 plus 1, "#e53935"
+    etch a box with x minus size, y, size times 2, size divided by 2, "#e53935"
+    etch a circle with x, y plus size, size divided by 2, "#e53935"
+  and the universe said i love you
+
+  to etch the score:
+    set the text size to 26
+    etch words with "Coins: [score] of [the size of coins]   Time: [seconds rounded to 1 decimal place]", 22, 18, the entry "ink" of palette
+    set heart x to 900
+    repeat lives times:
+      etch a heart with heart x, 34
+      set heart x to heart x minus 30
+    if best time exceeds 0:
+      set the text size to 18
+      etch words with "Best: [best time rounded to 1 decimal place]   Points ever: [points ever]", 22, 52, the entry "ink" of palette
+    if won:
+      set the text size to 64
+      etch words with "You win!", 340, 160, the entry "ink" of palette
+      set the text size to 26
+      etch words with "[points] points", 400, 240, the entry "ink" of palette
+  and the universe said i love you
+  
+line: 347
+zoom: lines 325-347
+spot: line 325
+say:
+  Etch a heart draws a heart from circles and a box. Its size is usually nine, so it can be left out.
+spot: line 334
+say:
+  The score and the time, rounded to one decimal place, filled in from the square brackets.
+spot: lines 336-338
+say:
+  Repeat lives times draws a heart for each life.
+spot: lines 339-341
+say:
+  The best time and points ever come from the records script.
+spot: lines 342-346
+say:
+  And once it's won, it says so, in big letters, with the points.
+spot: off
+keys: ctrl+end
+paste:
+
+  genesis:
+    open a world with "Hop!", 960, 540
+    choose the colours
+    build the level
+    fingerprint the level with platforms as saved text
+    load the record
+    start again
+    set facing to 1
+    set lives to 3
+    set flying to the command fly
+    set layers to a list containing (the command etch the sky, the command etch the level, the command etch the dangers, the command etch the player, the command etch the score)
+    every frame:
+      if not won:
+        run and jump
+        move across
+        move up and down
+        pick up coins
+        if player y exceeds 700 or the danger touching is something: lose a life
+        if score is the size of coins and player x exceeds 3030: set won to yes
+        set seconds to seconds plus frame time
+      if on ground and (speed x exceeds 3 or speed x falls below -3): leave with (dust, (player x plus 15) horizontal (player y plus 38) vertical)
+      otherwise if the size of the items of dust exceeds 0: remove item 1 from the items of dust
+      for each n from 1 to the size of bees:
+        set item n of bees to invoke flying with (item n of bees, ticks)
+      fly with (queen, ticks)
+      set camera to clamp (player x minus 360) between 0 and 2240
+      set ticks to ticks plus frame time
+      for each layer in layers: invoke layer
+    whenever won:
+      set points to round (3000 times 0.97 to the power seconds) plus score times 100
+      meanwhile save the record with (seconds, points)
+    every 0.5 seconds:
+      set blink to not blink
+  and the universe said i love you
+line: 359
+zoom: lines 349-359
+spot: lines 350-352
+say:
+  Last, genesis. It opens a window nine hundred and sixty by five hundred and forty, and builds the level.
+spot: lines 353-354
+say:
+  As saved text writes the platforms as JSON, and their fingerprint picks out this level's record. Then load the record.
+spot: line 358
+say:
+  Flying keeps the command fly, for a bee.
+spot: line 359
+say:
+  And layers is a list of commands: the drawing, from the back to the front.
+spot: off
+keys: ctrl+end
+line: 381
+zoom: lines 360-381
+spot: line 360
+say:
+  Every frame repeats once a frame, sixty times a second, until the window is closed.
+spot: lines 361-365
+say:
+  While the game isn't won: read the keys, move across, move up and down, and pick up coins. In that order, every frame.
+spot: line 366
+say:
+  Fall below the screen, or touch a danger, and a life is lost.
+spot: line 367
+say:
+  Every coin, and past the flag: you've won.
+spot: lines 369-370
+say:
+  Running fast on the ground leaves dust. Otherwise the trail fades, one dot each frame.
+spot: lines 371-373
+say:
+  Invoke flying moves each bee in the list, and gives back the moved bee. The queen flies too.
+spot: line 374
+say:
+  The camera follows the player, three hundred and sixty dots from the left of the window, and stops at the level's two ends.
+spot: line 376
+say:
+  And each layer is invoked, back to front.
+spot: lines 377-379
+say:
+  Whenever won becomes yes: the points. Point nine seven to the power of the seconds shrinks the bonus the longer you take. Then meanwhile saves the record alongside, so the game doesn't stop to wait.
+spot: lines 380-381
+say:
+  And every half a second, the flag's blink turns on or off.
+spot: off
+keys: ctrl+end
+zoom: out
+test
+zoom: output
+say:
+  Both scripts' tests pass.
+wait
+zoom: out
+say:
+  That's the whole game. It's built into a program of its own, so it runs fast. Let's play it.
+game: hop.stella | hop.keys | Hop!
+say:
+  Running right, faster each frame. Jumping: up fast, slowing, and falling, as gravity adds point six every frame.
+say:
+  Over the spikes, under the bees, and every coin. The flag turns green, and blinks. We win, and the record is saved.
+until game ends
+say:
+  And that's how a platform game works: speed changes the place, gravity changes the speed, one direction at a time, and a camera that the whole world is drawn around.
+card: Thank you | That's Stellanova | Every word is in the list on the left of the studio, and in LANGUAGE.md. Now go and make something of your own.
+say:
+  That's every part of Stellanova. Every word is listed in the studio, and in the language guide. Now it's your turn: go and make something of your own.
+pause: 2
