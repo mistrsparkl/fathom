@@ -119,6 +119,16 @@ and the universe said i love you
 
 **Commands for a kind of thing, as values.** `set older to the command grow` keeps a command for a pet (`to grow, for a pet, given years (a number):`) as a value too. Kept this way it is `a command given a pet and a number returning a pet`: it changes a copy of the pet it is given and gives the changed copy back, so `set tom to invoke older with (tom, 3)` keeps the change. A command that returns something (`to summary, for a pet, returning text:`) gives that back instead.
 
+**C functions from any library.** A program can call the functions in any C library (a `.dll` on Windows, `.so` elsewhere), with a word for each:
+
+```
+use the library "user32.dll":
+  to message box, given owner (a number) and message (text) and title (text) and style (a number), returning a number = int MessageBoxA(pointer, text, text, int)
+and the universe said i love you
+```
+
+After the `=` is the C function: what it gives back, its name, and the C type of each input. C types: `int`, `unsigned`, `long long`, `unsigned long long`, `double`, `float` and `pointer` (numbers in Stellanova), `text` (UTF-8 `char*`), `wide text` (`wchar_t*`, for Windows' `...W` functions), `yes or no` (`bool`), and `void` for no answer. It works running directly and built, not on the web. A library of your own (`mine.words`, next to the script) can have the same words after a `c library: user32.dll` line, each written `... = c: int MessageBoxA(pointer, text, text, int)`.
+
 **Kinds for any kind.** A kind of thing can be described once for every kind it may hold, with `anything` standing for that kind:
 
 ```

@@ -2462,17 +2462,168 @@ def similar_words(tokens, names):
     return f" Words that start with '{tokens[0]}': " + ", ".join(found) + "."
 
 
-def load_library(name, line, names):
-    """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file."""
-    places = [LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else []) + [HERE / "libraries" / f"{name}.words"]
-    path = next((p for p in places if p.exists()), None)
-    if not path:
-        have = sorted(p.stem for p in (HERE / "libraries").glob("*.words"))
-        raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
+# C functions from a library (.dll, .so): the kinds a word's C line may use, as
+# (C type, Stellanova kind, ctypes type name, C++ for an input {x}, C++ for an answer {x})
+C_TYPES = {
+    "int": ("int", NUMBER, "c_int", "(int)({x})", "(double)({x})"),
+    "unsigned": ("unsigned", NUMBER, "c_uint", "(unsigned)({x})", "(double)({x})"),
+    "long long": ("long long", NUMBER, "c_longlong", "(long long)({x})", "(double)({x})"),
+    "unsigned long long": ("unsigned long long", NUMBER, "c_ulonglong", "(unsigned long long)({x})", "(double)({x})"),
+    "double": ("double", NUMBER, "c_double", "({x})", "({x})"),
+    "float": ("float", NUMBER, "c_float", "(float)({x})", "(double)({x})"),
+    "pointer": ("void*", NUMBER, "c_void_p", "(void*)(intptr_t)({x})", "(double)(intptr_t)({x})"),
+    "text": ("const char*", TEXT, "c_char_p", "({x}).c_str()", "stellanova_c::from({x})"),
+    "wide text": ("const wchar_t*", TEXT, "c_wchar_p", "stellanova_c::wide({x}).c_str()", "stellanova_c::narrow({x})"),
+    "yes or no": ("bool", YESNO, "c_bool", "({x})", "({x})"),
+}
+C_LINE = re.compile(r"(void|[a-z][a-z ]*?)\s+([A-Za-z_]\w*)\s*\(([a-z ,]*)\)")
+C_HEAD = r"""#ifndef STELLANOVA_C_CALLS
+#define STELLANOVA_C_CALLS
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+#include <cstdint>
+#include <map>
+#include <mutex>
+namespace stellanova_c
+{
+	inline void* find(const std::string& library, const std::string& name, int line)  // kept after the first time
+	{
+		static std::mutex lock;
+		static std::map<std::string, void*> found;
+		std::lock_guard<std::mutex> hold(lock);
+		auto& at = found[library + "|" + name];
+		if (at)
+			return at;
+#ifdef _WIN32
+		HMODULE lib = LoadLibraryA(library.c_str());
+		if (!lib)
+			stellanova::fail(line, "I couldn't find the library \"" + library + "\".");
+		at = reinterpret_cast<void*>(GetProcAddress(lib, name.c_str()));
+#else
+		void* lib = dlopen(library.c_str(), RTLD_NOW);
+		if (!lib)
+			stellanova::fail(line, "I couldn't find the library \"" + library + "\".");
+		at = dlsym(lib, name.c_str());
+#endif
+		if (!at)
+			stellanova::fail(line, "the library \"" + library + "\" has no function called " + name + ".");
+		return at;
+	}
+	inline std::string from(const char* s) { return s ? std::string(s) : std::string(); }
+	inline std::wstring wide(const std::string& s)
+	{
+#ifdef _WIN32
+		int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), nullptr, 0);
+		std::wstring out((size_t)n, L'\0');
+		MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.size(), out.data(), n);
+		return out;
+#else
+		return std::wstring(s.begin(), s.end());
+#endif
+	}
+	inline std::string narrow(const wchar_t* s)
+	{
+		if (!s)
+			return std::string();
+#ifdef _WIN32
+		int n = WideCharToMultiByte(CP_UTF8, 0, s, -1, nullptr, 0, nullptr, nullptr);
+		std::string out((size_t)(n > 0 ? n - 1 : 0), '\0');
+		WideCharToMultiByte(CP_UTF8, 0, s, -1, out.data(), n, nullptr, nullptr);
+		return out;
+#else
+		std::wstring w(s);
+		return std::string(w.begin(), w.end());
+#endif
+	}
+}
+#endif"""
+
+
+def c_call_python(library, function, ins, gives, line):
+    """When running directly, a C function is called through ctypes."""
+    import ctypes
+
+    def run(*args):
+        try:
+            lib = C_LOADED.get(library) or C_LOADED.setdefault(library, ctypes.CDLL(library))
+        except OSError:
+            raise RunError(0, f'I couldn\'t find the library "{library}".')
+        try:
+            fn = getattr(lib, function)
+        except AttributeError:
+            raise RunError(0, f'the library "{library}" has no function called {function}.')
+        fn.argtypes = [getattr(ctypes, C_TYPES[c][2]) for c in ins]
+        fn.restype = getattr(ctypes, C_TYPES[gives][2]) if gives != "void" else None
+        given = [a.encode("utf-8") if c == "text" else int(a) if C_TYPES[c][2] not in ("c_double", "c_float", "c_bool", "c_wchar_p") else a
+                 for a, c in zip(args, ins)]
+        out = fn(*given)
+        if gives == "void":
+            return None
+        if gives == "text":
+            return out.decode("utf-8", "replace") if out else ""
+        if gives == "wide text":
+            return out or ""
+        if gives == "yes or no":
+            return bool(out)
+        return float(out or 0)
+    return run
+
+
+C_LOADED = {}
+
+
+def c_word(command, word, library, spec, where, line, out):
+    """'to beep, given pitch (a number) and length (a number), returning yes or no = c: bool Beep(unsigned, unsigned)'"""
+    m = C_LINE.fullmatch(spec.strip())
+    if not library:
+        raise ScriptError(line, where + "say which library the C functions are in first, with a line like: c library: user32.dll")
+    if not m:
+        raise ScriptError(line, where + "a C function looks like 'c: int MessageBoxA(pointer, text, text, int)'.")
+    gives, function = " ".join(m.group(1).split()), m.group(2)
+    ins = [" ".join(x.split()) for x in m.group(3).split(",")] if m.group(3).strip() else []
+    for c in ins + ([gives] if gives != "void" else []):
+        if c not in C_TYPES:
+            raise ScriptError(line, where + f"I don't know the C type '{c}'. C types are: {', '.join(C_TYPES)} (and void for no answer).")
+    if len(ins) != len(command.kinds):
+        raise ScriptError(line, where + f"'{word}' is given {len(command.kinds)} input{'s' if len(command.kinds) != 1 else ''}, but {function} takes {len(ins)}.")
+    for k, (c, kind) in enumerate(zip(ins, command.kinds), 1):
+        if C_TYPES[c][1] != kind:
+            raise ScriptError(line, where + f"input {k} of '{word}' must be {kind_name(C_TYPES[c][1])} to go to C as {c}.")
+    if (C_TYPES[gives][1] if gives != "void" else None) != command.gives:
+        raise ScriptError(line, where + (f"'{word}' must return {kind_name(C_TYPES[gives][1])}, as {function} gives {gives}." if gives != "void"
+                                         else f"{function} gives nothing back, so '{word}' can't return anything."))
+    pointer = f"{C_TYPES[gives][0] if gives != 'void' else 'void'}(*)({', '.join(C_TYPES[c][0] for c in ins)})"
+    called = (f"(({pointer})stellanova_c::find({json.dumps(library)}, {json.dumps(function)}, {{line}}))"
+              f"({', '.join(C_TYPES[c][3].replace('{x}', '{' + n + '}') for c, n in zip(ins, command.inputs))})")
+    command.cpp = C_TYPES[gives][4].replace("{x}", called) if gives != "void" else called
+    command.runner = c_call_python(library, function, ins, gives, line)
+    if JS:
+        command.unusable = f"'{word}' calls the C library \"{library}\", so it can't be used in a web program."
+    if C_HEAD not in out:
+        out.append(C_HEAD)
+
+
+def load_library(name, line, names, rows=None):
+    """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file.
+    rows: the library's lines, when they are in the program itself ('use the library "user32.dll":')."""
+    if rows is None:
+        places = [LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else []) + [HERE / "libraries" / f"{name}.words"]
+        path = next((p for p in places if p.exists()), None)
+        if not path:
+            have = sorted(p.stem for p in (HERE / "libraries").glob("*.words"))
+            raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
+        rows = path.read_text(encoding="utf-8").splitlines()
+    else:
+        path = Path(name)
+    c_library = None  # 'c library: user32.dll': where the words' C functions are
     out = [f"// From the library '{name}'"]
     space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
              "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place}
-    rows = path.read_text(encoding="utf-8").splitlines()
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
     web = None  # the word whose 'web:' line may come next: (where, input names, set its JavaScript)
     web_only = False  # 'web only': the library's words have no C++, only 'web:' lines
@@ -2516,6 +2667,8 @@ def load_library(name, line, names):
             web_only = True
         elif stripped == "runs only":
             runs_only = True
+        elif stripped.startswith("c library:"):
+            c_library = stripped[10:].strip()
         elif stripped.startswith("include:"):
             if not JS:
                 out.append(f"#include {stripped[8:].strip()}")
@@ -2542,12 +2695,16 @@ def load_library(name, line, names):
             except ScriptError as err:
                 raise ScriptError(line, where + err.message)
             in_names = [" ".join(w) for w, _ in inputs]
-            for in_name in in_names if not (web_only or runs_only) else []:
+            for in_name in in_names if not (web_only or runs_only or cpp.strip().startswith("c:")) else []:
                 if "{" + in_name + "}" not in cpp:
                     raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
             command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
             command.library = name
             word = " ".join(words)
+            if cpp.strip().startswith("c:"):
+                c_word(command, word, c_library, cpp.strip()[2:], where, line, out)
+                names.commands[tuple(words)] = command
+                continue
 
             def missing(*args, word=word):
                 raise RunError(0, f"'{word}' (from the library '{name}') only works when the program is built into C++.")
@@ -2883,6 +3040,24 @@ def read_one(path, auto):
                 raise ScriptError(numbers[i] if i < len(lines) else numbers[-1],
                                   f"The command '{'genesis' if text_ == 'to start:' else text_[:-1]}' must end with the line '{CLOSING}', unindented, after its last indented line.")
             i += 1
+            continue
+        m = re.fullmatch(r'use the library "([^"]+)":', text_, re.IGNORECASE)
+        if m:  # C functions from a library, one word for each: 'to beep, given ... = bool Beep(unsigned, unsigned)'
+            rows = ["c library: " + m.group(1)]
+            while i < len(lines) and lines[i][:1].isspace():
+                word = lines[i].strip()
+                if word and not word.startswith("note:"):
+                    head, eq, spec = word.partition(" = ")
+                    rows.append(f"{head} = c: {spec}" if eq and not spec.startswith("c:") else word)
+                i += 1
+            if i >= len(lines) or not is_closing(lines[i]):
+                raise ScriptError(n, f"'use the library' must end with the line '{CLOSING}', unindented, after its words.")
+            i += 1
+            lib = "c library " + m.group(1)
+            if lib in used:
+                raise ScriptError(n, f"The library \"{m.group(1)}\" is already used above.")
+            used.add(lib)
+            libs += load_library(lib, n, names, rows)
             continue
         if text_.lower().startswith("use:"):  # a library ('use: x.stella' lines were already replaced by gather)
             lib = " ".join(text_[4:].split()).lower()

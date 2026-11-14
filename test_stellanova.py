@@ -279,6 +279,33 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # C functions from any library (.dll): a word for each.
+    if os.name == "nt":
+        out = both(''.join([
+                   'use the library "msvcrt.dll":\n'
+                   '  to c square root, given x (a number), returning a number = double sqrt(double)\n'
+                   '  to c length, given s (text), returning a number = unsigned long long strlen(text)\n'
+                   '  to c number in, given s (text), returning a number = int atoi(text)\n'
+                   '  to c find, given s (text) and letter (a number), returning text = text strchr(text, int)\n'
+                   'and the universe said i love you\n'
+                   '\n'
+                   'use the library "kernel32.dll":\n'
+                   '  to wide length, given s (text), returning a number = int lstrlenW(wide text)\n'
+                   '  to the process number, returning a number = unsigned GetCurrentProcessId()\n'
+                   'and the universe said i love you\n'
+                   '\n'
+                   'genesis:\n'
+                   '  scrawl c square root with 2\n'
+                   '  scrawl c length "héllo", " ", wide length "héllo"\n'
+                   '  scrawl c number in "42abc" plus 1\n'
+                   '  scrawl c find with ("hello world", 119)\n'
+                   '  scrawl the process number exceeds 0\n'
+                   'and the universe said i love you\n'
+                   ]))
+        assert out.stdout == "1.4142135623731\n6 5\n43\nworld\nyes\n", repr(out.stdout)
+        out = both('use the library "kernel32.dll":\n  to nothing here, returning a number = int NoSuchFunction()\nand the universe said i love you\ngenesis:\n  scrawl nothing here\n' + END)
+        assert out.stderr == 'Line 5: the library "kernel32.dll" has no function called NoSuchFunction.\n', repr(out.stderr)
+
     # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
     out = both(''.join([
                'a stack of anything has:\n'

@@ -14,7 +14,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Commands for a kind of thing kept as values
 
 ## 2. Reaching everything else
-- [ ] Call any C library / DLL from a program (`use the library "user32.dll"` and a word for each function)
+- [x] Call any C library / DLL from a program (`use the library "user32.dll"` and a word for each function)
 - [ ] Call any Python package when running directly (`use python: numpy`)
 - [ ] Sockets: TCP, UDP, WebSockets
 - [ ] Threads that share things, with locks
