@@ -2577,6 +2577,46 @@ def c_call_python(library, function, ins, gives, line):
 C_LOADED = {}
 
 
+def from_python(x, kind):
+    """A Python package's answer, as the kind its word returns."""
+    try:
+        if kind == NUMBER:
+            return float(x)
+        if kind == YESNO:
+            return bool(x)
+        if kind == TEXT:
+            return x if isinstance(x, str) else str(x)
+        if is_list(kind):
+            return [from_python(v, element(kind)) for v in (x.tolist() if hasattr(x, "tolist") else x)]
+        if is_table(kind):
+            return {str(k): from_python(v, entry_kind(kind)) for k, v in dict(x).items()}
+    except RunError:
+        raise
+    except Exception:
+        raise RunError(0, f"the Python answer ({str(x)[:60]}) isn't {kind_name(kind)}.")
+    return x
+
+
+def py_call(module, path, gives, *args):
+    """'use python "statistics":' words, when running directly: the package's function, given Stellanova's values."""
+    import importlib
+    try:
+        fn = importlib.import_module(module)
+    except ImportError:
+        raise RunError(0, f"the Python package '{module}' isn't installed (install it with: py -m pip install {module}).")
+    for part in path.split("."):
+        if not hasattr(fn, part):
+            raise RunError(0, f"the Python package '{module}' has nothing called '{path}'.")
+        fn = getattr(fn, part)
+    try:
+        out = fn(*args)
+    except RunError:
+        raise
+    except Exception as err:
+        raise RunError(0, f"{module}.{path} went wrong: {err}")
+    return from_python(out, gives) if gives else None
+
+
 def c_word(command, word, library, spec, where, line, out):
     """'to beep, given pitch (a number) and length (a number), returning yes or no = c: bool Beep(unsigned, unsigned)'"""
     m = C_LINE.fullmatch(spec.strip())
@@ -2623,7 +2663,7 @@ def load_library(name, line, names, rows=None):
     c_library = None  # 'c library: user32.dll': where the words' C functions are
     out = [f"// From the library '{name}'"]
     space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
-             "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place}
+             "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place, "py_call": py_call}
     pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
     web = None  # the word whose 'web:' line may come next: (where, input names, set its JavaScript)
     web_only = False  # 'web only': the library's words have no C++, only 'web:' lines
@@ -3056,6 +3096,31 @@ def read_one(path, auto):
             lib = "c library " + m.group(1)
             if lib in used:
                 raise ScriptError(n, f"The library \"{m.group(1)}\" is already used above.")
+            used.add(lib)
+            libs += load_library(lib, n, names, rows)
+            continue
+        m = re.fullmatch(r'use python "([A-Za-z_][\w.]*)":', text_, re.IGNORECASE)
+        if m:  # a Python package's functions, one word for each: 'to middle of, given xs (a list of numbers), returning a number = median'
+            rows = ["runs only"]
+            while i < len(lines) and lines[i][:1].isspace():
+                word = lines[i].strip()
+                if word and not word.startswith("note:"):
+                    head, eq, path_ = word.partition(" = ")
+                    if not eq or not re.fullmatch(r"[A-Za-z_][\w.]*", path_.strip()):
+                        raise ScriptError(numbers[i], f"Each word looks like 'to middle of, given xs (a list of numbers), returning a number = median', with the package's function after the =.")
+                    try:
+                        _, _, ins_, gives_ = command_head(head + ":", numbers[i])
+                    except ScriptError as err:
+                        raise ScriptError(numbers[i], err.message)
+                    given = "".join(", {" + " ".join(w) + "}" for w, _ in ins_)
+                    rows += [head, f"  runs: py_call({m.group(1)!r}, {path_.strip()!r}, {gives_!r}{given})"]
+                i += 1
+            if i >= len(lines) or not is_closing(lines[i]):
+                raise ScriptError(n, f"'use python' must end with the line '{CLOSING}', unindented, after its words.")
+            i += 1
+            lib = "python " + m.group(1)
+            if lib in used:
+                raise ScriptError(n, f"The Python package '{m.group(1)}' is already used above.")
             used.add(lib)
             libs += load_library(lib, n, names, rows)
             continue

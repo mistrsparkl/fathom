@@ -119,6 +119,16 @@ and the universe said i love you
 
 **Commands for a kind of thing, as values.** `set older to the command grow` keeps a command for a pet (`to grow, for a pet, given years (a number):`) as a value too. Kept this way it is `a command given a pet and a number returning a pet`: it changes a copy of the pet it is given and gives the changed copy back, so `set tom to invoke older with (tom, 3)` keeps the change. A command that returns something (`to summary, for a pet, returning text:`) gives that back instead.
 
+**Python packages.** When a program runs directly (`stellanova program.stella`), it can use any Python package, with a word for each function:
+
+```
+use python "statistics":
+  to middle of, given xs (a list of numbers), returning a number = median
+and the universe said i love you
+```
+
+After the `=` is the function's name in the package (`linalg.norm` for one inside a part of it). Inputs go to Python as they are (lists as lists, tables as dictionaries), and the answer is made into the kind the word returns. A package that isn't installed says how to install it. These words don't work built or on the web.
+
 **C functions from any library.** A program can call the functions in any C library (a `.dll` on Windows, `.so` elsewhere), with a word for each:
 
 ```

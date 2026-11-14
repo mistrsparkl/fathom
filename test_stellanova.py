@@ -279,6 +279,17 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Python packages, when running directly: a word for each function.
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "probe.stella"
+        script.write_text('use python "statistics":\n  to middle of, given xs (a list of numbers), returning a number = median\n  to spread of, given xs (a list of numbers), returning a number = pstdev\nand the universe said i love you\n\nuse python "textwrap":\n  to wrapped, given words (text) and width (a number), returning a list of text = wrap\nand the universe said i love you\n\ngenesis:\n  scrawl middle of a list of (3, 1, 9, 4)\n  scrawl spread of a list of (2, 4, 4, 4, 5, 5, 7, 9)\n  scrawl wrapped with ("the quick brown fox jumps", 10)\nand the universe said i love you\n', encoding="utf-8")
+        out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script)], capture_output=True, text=True, encoding="utf-8")
+        assert out.stdout == "3.5\n2\nthe quick, brown fox, jumps\n", repr(out.stdout + out.stderr)
+        script.write_text('use python "no_such_package_here":\n  to nothing, returning a number = x\n' + END + 'genesis:\n  scrawl nothing\n' + END, encoding="utf-8")
+        out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script)], capture_output=True, text=True, encoding="utf-8")
+        assert "Line 5: the Python package 'no_such_package_here' isn't installed" in out.stderr, repr(out.stderr)
+        assert "only works when the program runs directly" in translate.build(script, Path(d) / "probe.exe")
+
     # C functions from any library (.dll): a word for each.
     if os.name == "nt":
         out = both(''.join([

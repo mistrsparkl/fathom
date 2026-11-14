@@ -107,3 +107,4 @@ the bytes of the text|Text as UTF-8 bytes, numbers from 0 to 255 (library letter
 raise a|A kind of problem of your own: raise a fuel problem with "empty"; caught by if that went wrong with a fuel problem:
 if that went wrong with|After try: takes one kind of problem only: if that went wrong with a fuel problem:
 use the library|C functions from any .dll: use the library "user32.dll": then lines like to beep, given ... = bool Beep(unsigned, unsigned)
+use python|A Python package's functions (running directly): use python "statistics": then lines like to middle of, given xs (a list of numbers), returning a number = median
