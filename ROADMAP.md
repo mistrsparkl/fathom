@@ -32,5 +32,5 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 
 ## 4. Tools
 - [x] Debugger: stop at a line, step, look at names (studio): `stellanova debug`, and Debug in the studio
-- [ ] Profiler: which lines take the time
+- [x] Profiler: which lines take the time (`stellanova profile`)
 - [ ] WebAssembly output; building for other systems

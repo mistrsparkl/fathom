@@ -4071,6 +4071,41 @@ def debug_pause(env, n):
                 break
 
 
+PROFILE = None  # 'stellanova profile': line -> [times run, seconds with what it runs, its own seconds]
+PROFILE_INSIDE = threading.local()  # the seconds spent in the lines inside the line running now
+
+
+def profiled(run, n):
+    def go(env):
+        outer = getattr(PROFILE_INSIDE, "seconds", 0.0)
+        PROFILE_INSIDE.seconds = 0.0
+        began = time.perf_counter()
+        try:
+            return run(env)
+        finally:
+            took = time.perf_counter() - began
+            row = PROFILE.setdefault(n, [0, 0.0, 0.0])
+            row[0] += 1
+            row[1] += took
+            row[2] += took - PROFILE_INSIDE.seconds
+            PROFILE_INSIDE.seconds = outer + took
+    return go
+
+
+def profile_report():
+    """The lines that took the most time, after a 'stellanova profile' run."""
+    rows = sorted(PROFILE.items(), key=lambda kv: -kv[1][2])[:20]
+    if not rows:
+        return
+    total = sum(r[2] for _, r in PROFILE.items()) or 1e-12
+    print("\nWhere the time went (the 20 slowest lines, by their own time):", flush=True)
+    print(f"{'line':>12}  {'runs':>9}  {'own time':>10}  {'share':>5}  {'with inside':>11}  the line", flush=True)
+    for n, (count, inclusive, own) in rows:
+        where_ = f"{n}" if n < PER_FILE else where(n)
+        source = SOURCE.get(n, "?")
+        print(f"{where_:>12}  {count:>9}  {own:>9.3f}s  {own / total:>5.0%}  {inclusive:>10.3f}s  {source if len(source) <= 60 else source[:57] + '...'}", flush=True)
+
+
 def debugged(run, n):
     def go(env):
         debug_pause(env, n)
@@ -4086,6 +4121,9 @@ def guard(run, n):
     if DEBUG is not None and not getattr(run, "debugged", False):
         run = debugged(run, n)
         run.debugged = True
+    if PROFILE is not None and not getattr(run, "profiled", False):
+        run = profiled(run, n)
+        run.profiled = True
 
     def guarded(env):
         try:
@@ -5321,6 +5359,10 @@ def main(argv):
         if not studio:
             print(DEBUG_HELP)
         args = ["run", rest[0]]
+    if len(args) == 2 and args[0] == "profile":  # runs it directly, then shows which lines took the time
+        global PROFILE
+        PROFILE = {}
+        args = ["run", args[1]]
     if len(args) == 2 and args[0] == "watch":  # runs it directly, showing each line and the names it changes
         global WATCHING
         WATCHING = True
@@ -5366,6 +5408,9 @@ def main(argv):
             return 2
         if args[0] == "run":
             code = run_program(script)
+            if PROFILE is not None:
+                sys.stdout.flush()
+                profile_report()
             sys.stdout.flush()
             sys.stderr.flush()
             # Exit straight away: a library's leftovers (like a closed window) must not be tidied up from the wrong thread.

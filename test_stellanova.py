@@ -998,6 +998,17 @@ def program_checks():
         assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked
         assert shown.splitlines()[-1] == "12", shown
 
+    # stellanova profile: the program runs, then the lines that took the time, with how often each ran
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "p.stella").write_text('to slow sum, given n (a number), returning a number:\n  set total to 0\n  for each k from 1 to n:\n'
+                                          '    set total to total plus k times k\n  return total\nand the universe said i love you\n\n'
+                                          'genesis:\n  scrawl slow sum with 300\n  scrawl slow sum with 300\nand the universe said i love you\n', encoding="utf-8")
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "profile", "p.stella"], capture_output=True, text=True,
+                               encoding="utf-8", cwd=d).stdout.splitlines()
+    assert shown[:4] == ["9045050", "9045050", "", "Where the time went (the 20 slowest lines, by their own time):"], shown
+    runs = {int(l.split()[0]): int(l.split()[1]) for l in shown[5:]}
+    assert runs == {2: 2, 3: 2, 4: 600, 5: 2, 9: 1, 10: 1}, runs
+
     # is one of
     out = both('genesis:\n  set answer to "y"\n  set sizes to a list containing (1, 2, 3)\n'
                '  scrawl answer is one of ("yes", "y", "sure"), " ", 2 is one of sizes, " ", 5 is not one of sizes, " ", answer is not one of ("y", "n")\n'
