@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, sound making, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -360,6 +360,29 @@ def program_checks():
                ]))
     assert out.stdout == "122 280 yes\nno\n", repr(out.stdout + out.stderr)
     assert translate.plural_word("body") == "bodies" and translate.plural_word("box") == "boxes" and translate.plural_word("day") == "days"
+
+    # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
+    out = both(''.join([
+               'use: sound making\n'
+               '\n'
+               'genesis:\n'
+               '  scrawl round the pitch of the note "A4", " ", (the pitch of the note "C4") rounded to 2 decimal places, " ", (the pitch of the note "C#5") rounded to 2 decimal places\n'
+               '  set beep to a tone with ("sine", 441, 0.01, 0.5)\n'
+               '  scrawl the size of beep, " ", (item 26 of beep) rounded to 4 decimal places\n'
+               '  set sq to a tone with ("square", 100, 0.02, 1)\n'
+               '  scrawl item 1 of sq, " ", item 300 of sq\n'
+               '  set both to mixed with (beep, sq)\n'
+               '  scrawl the size of both, " ", the size of (followed by with (beep, sq))\n'
+               '  scrawl (item 100 of faded with (sq, 0.01, 0)) rounded to 3 decimal places, " ", item 1 of louder with (sq, 0.5)\n'
+               '  scrawl the size of echoed with (beep, 0.001, 0.5)\n'
+               '  save the sound with (faded with (sq, 0.005, 0.005), "out.wav")\n'
+               '  set back to the sound in the file "out.wav"\n'
+               '  scrawl the size of back, " ", (item 441 of back) rounded to 3 decimal places\n'
+               '  scrawl a tone with ("wobble", 1, 1, 1)\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "440 261.63 554.37\n441 0.5\n1 -1\n882 1323\n0.224 0.5\n617\n882 -1\n", repr(out.stdout)
+    assert out.stderr.startswith('Line 16: there is no tone shape called "wobble".'), repr(out.stderr)
 
     # Animation: easing, tweens, waves, sprite sheet frames.
     out = both(''.join([

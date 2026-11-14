@@ -121,3 +121,6 @@ sheet frame with|Which sprite sheet frame to show now (library animation): sheet
 etch the sheet frame|One frame of a sprite sheet: etch the sheet frame with ("walk.png", frame, across, down, x, y).
 step the physics with|Moves every body on (use: physics.stella): step the physics with (world, 1 divided by 60).
 include the body with|Adds a body to a physics world: include the body with (w, a box at with (x, y, width, height)).
+a tone with|A sound wave (library sound making): a tone with ("sine", 440, seconds, loudness).
+save the sound with|Writes a sound to a .wav file (library sound making): save the sound with (sound, "beep.wav").
+record the sound|Records from the microphone (library sound making): record the sound 3 (seconds).
