@@ -125,6 +125,7 @@ V* cn_from_cpp(const std::map<std::string, T>& table)
 
 // A command given to a library word (like 'serve the web with (8080, the command answer)'): C++ calls its machine code.
 extern "C" void* cn_command_or_fail(void* command, int line);
+extern "C" void cn_keep(V* v);  // held by C++ from now on: the collector keeps it
 void cn_rethrow();  // a problem in the command: thrown again, as a C++ problem
 template <typename T> struct cn_machine { using type = V*; };
 template <> struct cn_machine<double> { using type = double; };
@@ -143,11 +144,12 @@ struct cn_is_function<std::function<R(A...)>> : std::true_type
 	static std::function<R(A...)> make(V* v)
 	{
 		using Gives = std::conditional_t<std::is_void_v<R>, void, typename cn_machine<std::conditional_t<std::is_void_v<R>, double, R>>::type>;
-		auto target = reinterpret_cast<Gives (*)(typename cn_machine<A>::type...)>(full(v)->command);
-		return [target](A... a) -> R {
+		using Code = Gives (*)(typename cn_machine<A>::type...);
+		cn_keep(v);
+		return [v](A... a) -> R {
 			cn_unpark();  // machine code runs again: the collector waits for it as usual
 			struct Again { ~Again() { cn_park(); } } again;
-			cn_command_or_fail(reinterpret_cast<void*>(target), 0);
+			auto target = reinterpret_cast<Code>(cn_command_or_fail(v, 0));  // each time: it says which names it keeps
 			cn_rethrow();
 			if constexpr (std::is_void_v<R>)
 			{

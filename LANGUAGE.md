@@ -91,6 +91,8 @@ genesis:
 and the universe said i love you
 ```
 
+**Commands written where they are used.** `each x becomes x times 2` is a command too, written right where it is needed: its inputs before `becomes` (joined with `and`), and the answer it gives back after. Each input says its kind in brackets, unless the place it goes already says: `scores changed by each s becomes s times 2`, `scores kept by each s becomes s exceeds 10`. Anywhere else: `set add tax to each price (a number) becomes price times 1.2`, `each left (text) and right (text) becomes left plus right`. It keeps a copy of each name it uses, as it is when the command is made, so `set k to 3`, `set add k to each x (a number) becomes x plus k`, `set k to 100` still adds 3.
+
 The kind says what the command takes and returns: `a command` (nothing either way), `a command given text`, `a command given a number and text returning yes or no`. Library words work too (`the command round`). Commands for a kind of thing can't be kept this way, and commands can't be compared or saved.
 
 **At the same time.** `meanwhile download with ("https://example.com/a.png", "a.png")` starts a command going on its own, and the next line carries on straight away. `wait for the others` waits until every command started with `meanwhile` has finished (a program also waits for them before it ends). Each one gets its own copy of every name as it was when it started, so they can't spoil each other's values; they can share files and the screen. A problem in any of them stops the whole program. `meanwhile invoke f` works too.
@@ -206,6 +208,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `for each n from 1 to 10:` | The same for each whole number from 1 to 10. |
 | `for each n from 0 to 100 by 5:` | Counting in steps: 0, 5, 10 ... 100. A step below 0 counts down (`from 10 to 1 by -1`). |
 | `add 5 to scores` | Put an item at the end of a list. |
+| `insert 5 at 2 in scores` | Put an item in a list at that place, moving the ones after it along (`at` the size plus 1 puts it at the end). |
 | `remove item 2 from scores` / `remove 5 from scores` | Take out the second item / the first 5. |
 | `set item 2 of scores to 9` | Change one item. Items are counted from 1. |
 | `set entry "Rex" of ages to 3` | Put a value in a table under a name (replacing what was there). |

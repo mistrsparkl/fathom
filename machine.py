@@ -21,7 +21,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
-            "cn_list_remove_item", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
+            "cn_list_remove_item", "cn_list_insert", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
 
@@ -88,8 +88,8 @@ declare ptr @cn_box_number(double)
 declare ptr @cn_box_yesno(i1)
 declare double @cn_unbox_number(ptr)
 declare i1 @cn_unbox_yesno(ptr)
-declare ptr @cn_box_command(ptr)
-declare ptr @cn_unbox_command(ptr)
+declare ptr @cn_command_make(ptr)
+declare ptr @cn_closure_env()
 declare ptr @cn_command_or_fail(ptr, i32)
 declare ptr @cn_dup(ptr)
 declare i1 @cn_equal(ptr, ptr)
@@ -100,6 +100,7 @@ declare ptr @cn_list_at(ptr, double, i32)
 declare ptr @cn_list_item(ptr, i64)
 declare void @cn_list_put(ptr, double, ptr, i32)
 declare void @cn_list_remove_item(ptr, double, i32)
+declare void @cn_list_insert(ptr, double, ptr, i32)
 declare void @cn_list_remove_value(ptr, ptr)
 declare double @cn_count(ptr)
 declare i64 @cn_count_whole(ptr)
@@ -350,17 +351,13 @@ class Fn:
             return self.op(f"call ptr @cn_box_number(double {value})")
         if kind == YESNO:
             return self.op(f"call ptr @cn_box_yesno(i1 {value})")
-        if kind.startswith("command("):
-            return self.op(f"call ptr @cn_box_command(ptr {value})")
-        return value
+        return value  # a command is already a value: its machine code, and the names it keeps
 
     def unbox(self, value, kind):
         if kind == NUMBER:
             return self.op(f"call double @cn_unbox_number(ptr {value})")
         if kind == YESNO:
             return self.op(f"call i1 @cn_unbox_yesno(ptr {value})")
-        if kind.startswith("command("):
-            return self.op(f"call ptr @cn_unbox_command(ptr {value})")
         return value
 
     def copied(self, value, kind):
@@ -565,7 +562,6 @@ def invoke(f, command, args, ins, gives, line):
 def by_command(f, seq, command, item, gives, keep, line):
     """'scores kept by is big' / 'scores changed by doubled': a new list, made by doing the command to each item."""
     holder = f.op("call ptr @cn_list_new()")  # a pointer: the same in every block below
-    target = f.call("ptr", "cn_command_or_fail", ("ptr", command), ("i32", line))
     items = f.op(f"call ptr @cn_dup(ptr {seq})")
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
     k = counter(f, "m")
@@ -577,6 +573,7 @@ def by_command(f, seq, command, item, gives, keep, line):
     f.place(inside)
     boxed = f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})")
     x = f.unbox(boxed, item)
+    target = f.call("ptr", "cn_command_or_fail", ("ptr", command), ("i32", line))  # each time: it says which names it keeps
     answer = f.op(f"call {ll_type(gives)} {target}({ll_type(item)} {f.copied(x, item)})")
     f.check()
     if keep:
@@ -592,6 +589,36 @@ def by_command(f, seq, command, item, gives, keep, line):
     f.jump(top)
     f.place(out_label)
     return holder
+
+
+def closure(f, name, inputs, gives, body):
+    """'each x becomes x times k': a function of its own, and a command value holding it and copies of the names it uses
+    (here k). When it is invoked, cn_command_or_fail says which value it was, and the function takes its names from there."""
+    g = Fn(f.module, name, inputs, gives)
+    g.owner = None
+    for cpp, kind in inputs:
+        g.slots[cpp] = (f"%n.{cpp}", kind)
+    if gives:
+        g.finish_with(f"ret {ll_type(gives)} {g.copied(emit(g, body), gives)}")
+    else:
+        emit(g, body)
+    given = {cpp for cpp, _ in inputs}
+    used = [(cpp, where, kind) for cpp, (where, kind) in g.slots.items() if cpp not in given]
+    keeps = g.tmp()
+    g.entry.append(f"  {keeps} = call ptr @cn_closure_env()")
+    for k, (cpp, where, kind) in enumerate(used):
+        item = g.tmp()
+        g.entry.append(f"  {item} = call ptr @cn_list_item(ptr {keeps}, i64 {k})")
+        if kind in (NUMBER, YESNO):
+            plain = g.tmp()
+            g.entry.append(f"  {plain} = call {ll_type(kind)} @cn_unbox_{'number' if kind == NUMBER else 'yesno'}(ptr {item})")
+            item = plain
+        g.entry.append(f"  store {ll_type(kind)} {item}, ptr {where}")
+    g.done()
+    made = f.op(f"call ptr @cn_command_make(ptr @cn_user_{g.name})")
+    for cpp, _, kind in used:
+        f.put(f"call void @cn_list_add(ptr {made}, ptr {f.box(f.load(cpp, kind), kind)})")
+    return made
 
 
 def meanwhile(f, piece):

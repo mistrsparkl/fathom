@@ -529,6 +529,14 @@ def index_of(items, number, line):
     return int(number) - 1
 
 
+def insert_at(items, number, x, line):
+    """'insert x at 3 in xs': any place from the first to just after the last"""
+    if number == len(items) + 1:
+        items.append(x)
+    else:
+        items.insert(index_of(items, number, line), x)
+
+
 def lines_of(s):
     if not s:
         return []
@@ -1333,6 +1341,9 @@ def cpp_text(token):
 COMPARE_RUN = {">": operator.gt, "<": operator.lt, ">=": operator.ge, "<=": operator.le, "!=": operator.ne, "==": operator.eq}
 
 
+INLINE_COUNT = [0]  # commands written where they are used, numbered for their machine code
+
+
 class Expr:
     """Reads one expression from a token list (recursive descent, lowest precedence first)."""
 
@@ -1628,8 +1639,8 @@ class Expr:
                 self.i += 2
                 if not is_list(v.kind):
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs a list, but this is {kind_name(v.kind)}.")
-                f = self.unary()
                 item = element(v.kind)
+                f = self.inline_command([item]) if self.at("each") else self.unary()
                 ins, gives = SIGNATURES.get(f.kind, (None, None))
                 if ins != [item] or (words[0] == "kept" and gives != YESNO) or not gives:
                     want = f"a command given {kind_name(item)} returning " + ("yes or no" if words[0] == "kept" else "something")
@@ -1695,6 +1706,88 @@ class Expr:
             a, b, line = v.run, by.run, self.line
             return builtin("stellanova::split({a0}, {a1}, {line})", "list of text", lambda env: split(a(env), b(env), line), [v, by], line)
         return v
+
+    def inline_command(self, given=None):
+        """'each x becomes x times 2': a command written where it is used, with its inputs before 'becomes' (joined
+        with 'and', each with its kind in brackets unless the place it goes says, like 'changed by') and its answer after.
+        It keeps copies of the names it uses, as they are when it is made."""
+        line = self.line
+        self.take("each")
+        try:
+            stop = self.t.index("becomes", self.i)
+        except ValueError:
+            raise ScriptError(line, "Write 'each <name> becomes <what it gives back>', like: each x becomes x times 2.")
+        pieces, now = [], []
+        for tok in self.t[self.i:stop]:
+            if tok == "and" and now.count("(") == now.count(")"):
+                pieces.append(now)
+                now = []
+            else:
+                now.append(tok)
+        pieces.append(now)
+        inputs = []
+        for k, piece in enumerate(pieces):
+            if "(" in piece:
+                cut = piece.index("(")
+                words, kind = piece[:cut], parse_kind(" ".join(piece[cut + 1:-1]))
+                if piece[-1] != ")" or not kind:
+                    raise ScriptError(line, f"I don't know the kind '{' '.join(piece[cut + 1:-1])}'.")
+            else:
+                words, kind = piece, given[k] if given and k < len(given) else None
+            if not words or not kind:
+                shown = " ".join(words) or "x"
+                raise ScriptError(line, f"Say what kind '{shown}' is, like: each {shown} (a number) becomes ...")
+            inputs.append((tuple(words), kind))
+        if given is not None and [k for _, k in inputs] != list(given):
+            raise ScriptError(line, f"This command is given {' and '.join(kind_name(k) for k in given)}.")
+        self.i = stop + 1
+        local = Names()
+        local.__dict__.update(self.names.__dict__)
+        local.known = dict(self.names.known)
+        outer = {entry[0] for entry in self.names.known.values() if entry[3] is None}
+        ins, used = set(), []
+        base_value = local.value
+
+        def value(key):
+            v = base_value(key)
+            if key not in ins and v.cpp in outer and v.cpp not in used:
+                used.append(v.cpp)
+            return v
+        local.value = value
+        for words, kind in inputs:
+            local.add(words, snake(words), kind, read_only=True)
+            ins.add(words)
+        sub = Expr(self.t, local, line)
+        sub.i = self.i
+        body = sub.full()
+        self.i = sub.i
+        gives = body.kind
+        kind = command_kind([k for _, k in inputs], gives)
+        in_cpp = [snake(w) for w, _ in inputs]
+        kinds = {entry[0]: entry[1] for entry in self.names.known.values()}  # C++ name -> kind, for the names it keeps
+        run = body.run
+
+        def make(env):
+            kept = dict(env)
+            for cpp in used:
+                kept[cpp] = dup(kept[cpp])
+
+            def command(*args):
+                e = dict(kept)
+                e.update(zip(in_cpp, args))
+                return run(e)
+            return command
+        if JS:
+            outer_used = [c for c in used if c not in in_cpp]
+            cpp = (f"((({', '.join(outer_used)}) => (async ({', '.join(in_cpp)}) => {body.cpp}))"
+                   f"({', '.join(js_copy(c, kinds[c]) for c in outer_used)}))")
+        else:
+            ins_cpp = ", ".join(f"{cpp_type(k)} {c}" for c, (_, k) in zip(in_cpp, inputs))
+            cpp = f"{cpp_type(kind)}([=]({ins_cpp}) {{ return {strip_parens(body.cpp)}; }})"
+        INLINE_COUNT[0] += 1
+        name = f"each_{INLINE_COUNT[0]}"
+        return with_ir(Value(cpp, kind, make),
+                       lambda f: machine.closure(f, name, list(zip(in_cpp, (k for _, k in inputs))), gives, body))
 
     def primary(self):
         tok, line = self.peek(), self.line
@@ -1837,6 +1930,8 @@ class Expr:
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
             return builtin("stellanova::keys({a0})", "list of text", lambda env: sorted(get(env)), [table])
+        if self.at("each"):  # a command written where it is used: 'each x (a number) becomes x times 2'
+            return self.inline_command()
         if self.at("the", "command"):  # a command kept as a value: 'set f to the command double'
             self.i += 2
             return command_value(self.names, self.t, self, line)
@@ -3618,6 +3713,26 @@ def statement(n, text_, inner, names, declared, depth):
         if JS:
             return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None
         return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], added, None
+    if tokens[0] == "insert" and "at" in tokens and "in" in tokens:
+        cut = len(tokens) - 1 - tokens[::-1].index("in")
+        if "at" not in tokens[:cut]:
+            raise ScriptError(n, "Write 'insert ... at <number> in <list>', like: insert \"tea\" at 2 in drinks.")
+        at_cut = cut - 1 - tokens[:cut][::-1].index("at")
+        target = writable_list(tokens[cut + 1:], names, n, "insert in")
+        raw = expr_to_end(tokens[:at_cut], 1, names, n)
+        v = fit(raw, element(target.kind)) or raw
+        if v.kind != element(target.kind):
+            raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't put {kind_name(v.kind)} in it.")
+        index = expr_to_end(tokens[:cut], at_cut + 1, names, n)
+        if index.kind != NUMBER:
+            raise ScriptError(n, f"'insert ... at' needs a number for the place, but this is {kind_name(index.kind)}.")
+        seq, get, at = target.run, v.run, index.run
+        inserted = with_ir(lambda env: insert_at(seq(env), at(env), dup(get(env)), n),
+                           lambda f: f.call("void", "cn_list_insert", ("ptr", machine.emit(f, target)), ("double", machine.emit(f, index)),
+                                            ("ptr", f.box(machine.emit(f, v), v.kind)), ("i32", n), checked=True))
+        if JS:
+            return [f"{tab}stellanova.insert_item({target.cpp}, {strip_parens(index.cpp)}, {js_copy(v.cpp, v.kind)}, {n});"], inserted, None
+        return [f"{tab}stellanova::insert_item({target.cpp}, {strip_parens(index.cpp)}, {strip_parens(v.cpp)}, {n});"], inserted, None
     if tokens[:2] == ["remove", "entry"] and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
         table = expr_to_end(tokens, cut + 1, names, n)
@@ -3841,7 +3956,7 @@ def statement(n, text_, inner, names, declared, depth):
     near = similar_words(tokens, names)
     if near:
         raise ScriptError(n, f"I don't know '{' '.join(tokenize(text_, n)[:4])}'." + near)  # as written, with its grammar
-    starts = ["set", "move", "scrawl", "ask", "add", "remove", "inscribe", "if", "otherwise", "repeat", "as long as", "for each",
+    starts = ["set", "move", "scrawl", "ask", "add", "insert", "remove", "inscribe", "if", "otherwise", "repeat", "as long as", "for each",
               "try", "return", "raise an error with", "cease", "whisper", "depending on", "whenever", "every", "meanwhile",
               "invoke", "save", "load", "conjure", "break free", "move on"] + [" ".join(k) for k in names.commands]
     for size in (3, 2, 1):  # a misspelt first word (or words): the nearest way a line can start
@@ -4067,9 +4182,9 @@ def command_value(names, tokens, e, line):
         cpp = f"{cpp_type(kind)}([&]({ins}) {{ {'return ' if c.gives else ''}{body}; }})"
     v = Value(cpp, kind, lambda env: (lambda *args: c.runner(*args)))
     if c.inputs is None:
-        v.ir = lambda f: f"@cn_user_{machine_name(c.cpp, [((), k) for k in c.kinds])}"
+        v.ir = lambda f: f.op(f"call ptr @cn_command_make(ptr @cn_user_{machine_name(c.cpp, [((), k) for k in c.kinds])})")
     elif getattr(c, "library", None):
-        v.ir = lambda f: library_command_ir(f, c, line)
+        v.ir = lambda f: f.op(f"call ptr @cn_command_make(ptr {library_command_ir(f, c, line)})")
     return v
 
 

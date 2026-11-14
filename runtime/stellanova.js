@@ -339,6 +339,7 @@
     at: (items, number, line) => items[index_of(items, number, line)],
     put_at(items, number, line, v) { items[index_of(items, number, line)] = v; },
     remove_item(items, number, line) { items.splice(index_of(items, number, line), 1); },
+    insert_item(items, number, x, line) { if (number === items.length + 1) items.push(x); else items.splice(index_of(items, number, line), 0, x); },
     remove_value(items, v) {
       const k = items.findIndex((x) => same(x, v));
       if (k >= 0) items.splice(k, 1);

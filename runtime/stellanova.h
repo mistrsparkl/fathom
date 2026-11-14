@@ -272,6 +272,12 @@ namespace stellanova
 
 	template <typename T>
 	void remove_item(std::vector<T>& items, double number, int line) { items.erase(items.begin() + index_of(items, number, line)); }
+	template <typename T>
+	void insert_item(std::vector<T>& items, double number, const T& x, int line)
+	{
+		if (number == static_cast<double>(items.size()) + 1) items.push_back(x);
+		else items.insert(items.begin() + index_of(items, number, line), x);
+	}
 
 	template <typename T>
 	void remove_value(std::vector<T>& items, const T& value)

@@ -165,6 +165,21 @@ def program_checks():
     assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
     assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
 
+    # insert, and commands written where they are used (keeping copies of the names they use).
+    out = both('to do twice, given f (a command given a number returning a number) and x (a number), returning a number:\n'
+               '  return invoke f with (invoke f with x)\n' + END +
+               'genesis:\n  set drinks to a list of ("milk", "juice")\n  insert "tea" at 2 in drinks\n  insert "water" at 1 in drinks\n'
+               '  insert "cola" at 5 in drinks\n  scrawl drinks\n  set k to 3\n  set numbers to a list of (4, 9, 15, 30)\n'
+               '  scrawl numbers changed by each n becomes n times k\n  scrawl numbers kept by each n becomes n exceeds 10\n'
+               '  set add k to each x (a number) becomes x plus k\n  set k to 100\n  scrawl invoke add k with 1\n'
+               '  scrawl do twice with (each x (a number) becomes x times x, 3)\n'
+               '  set join to each left (text) and right (text) becomes left plus "-" plus right\n  scrawl invoke join with ("tea", "cake")\n'
+               '  set fs to a list of (each x (a number) becomes x plus 1, add k)\n  for each g in fs: scrawl invoke g with 10\n'
+               '  insert "x" at 9 in drinks\n' + END)
+    assert out.stdout == "water, milk, tea, juice, cola\n12, 27, 45, 90\n15, 30\n4\n81\ntea-cake\n11\n13\n", repr(out.stdout)
+    assert out.stderr == "Line 22: there is no item 9 in a list of 5 items. Items are counted from 1.\n", repr(out.stderr)
+    assert perr('genesis:\n  set f to each x becomes x\n' + END)[1].startswith("Say what kind 'x' is")
+
     # List maths, and sorting things by one of their parts (ties keep their order).
     out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +
                'genesis:\n  set xs to a list of (4, 1.5, 9, 2)\n  set sum to 1\n'

@@ -40,6 +40,7 @@ namespace gc
 	static std::vector<V*> spare;  // freed values, ready to be used again
 	static std::vector<V*> spare_small;  // freed numbers and yes/no values
 	static std::vector<std::pair<const char*, size_t>> roots;
+	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 18;  // set it to test the collector hard
 	static size_t made_since = 0, limit = least;
 	static std::mutex collecting;
@@ -125,6 +126,8 @@ namespace gc
 		}
 		for (const auto& [from, size] : roots)
 			look(from, from + size);
+		for (V* v : kept)
+			reach(v);
 		for (const auto& [able, kinds] : able_kinds)
 			for (const auto& [name, shape] : kinds)
 				reach(shape);
@@ -266,6 +269,11 @@ extern "C"
 		gc::stop_cv.notify_all();
 		gc::stop_cv.wait(hold, [] { return !gc::stopping.load(); });
 		t->state = 0;
+	}
+	void cn_keep(V* v)
+	{
+		std::lock_guard<std::mutex> hold(gc::lock);
+		gc::kept.push_back(v);
 	}
 	void cn_root(const char* from, long long size)  // the world's shared names: always kept
 	{
@@ -665,18 +673,25 @@ extern "C"
 	}
 	double cn_unbox_number(V* v) { return v->d; }
 	bool cn_unbox_yesno(V* v) { return v->d != 0; }
-	V* cn_box_command(void* command)
+	// a command value: its machine code, and in its items, copies of the names it uses ('each x becomes x times k')
+	V* cn_command_make(void* code)
 	{
 		V* v = fresh('c');
-		full(v)->command = command;
+		full(v)->command = code;
 		return v;
 	}
-	void* cn_unbox_command(V* v) { return full(v)->command; }
-	void* cn_command_or_fail(void* command, int line)  // 'invoke f' when f holds no command yet
+	static thread_local V* closure_now = nullptr;
+	V* cn_closure_env() { return closure_now; }  // read first thing by the command's machine code
+	void* cn_command_or_fail(void* command, int line)  // gives the machine code to call ('invoke f' when f holds no command yet: a problem)
 	{
-		if (!command)
+		V* v = static_cast<V*>(command);
+		if (!v)
+		{
 			cn_set_problem({line, "there is no command in it yet: set it to one first, like 'set f to the command double'."});
-		return command;
+			return nullptr;
+		}
+		closure_now = v;
+		return full(v)->command;
 	}
 	V* cn_dup(V* v) { return copy_of(v); }
 	bool cn_equal(V* a, V* b) { return same(a, b); }
@@ -689,6 +704,12 @@ extern "C"
 	V* cn_list_item(V* list, long long k) { return full(list)->items[static_cast<size_t>(k)]; }  // for 'for each': k is always there
 	void cn_list_put(V* list, double number, V* item, int line) { GUARDED(, full(list)->items[index_of(list, number, line)] = copy_of(item);) }
 	void cn_list_remove_item(V* list, double number, int line) { GUARDED(, full(list)->items.erase(full(list)->items.begin() + static_cast<long long>(index_of(list, number, line)));) }
+	void cn_list_insert(V* list, double number, V* item, int line)
+	{
+		auto& items = full(list)->items;
+		if (number == static_cast<double>(items.size()) + 1) { items.push_back(copy_of(item)); return; }
+		GUARDED(, items.insert(items.begin() + static_cast<long long>(index_of(list, number, line)), copy_of(item));)
+	}
 	void cn_list_remove_value(V* list, V* item)
 	{
 		for (size_t k = 0; k < full(list)->items.size(); ++k)
