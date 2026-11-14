@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, sound making, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -360,6 +360,38 @@ def program_checks():
                ]))
     assert out.stdout == "122 280 yes\nno\n", repr(out.stdout + out.stderr)
     assert translate.plural_word("body") == "bodies" and translate.plural_word("box") == "boxes" and translate.plural_word("day") == "days"
+
+    # Pictures: dots read and changed, saved as .png and read back, made from a list of numbers.
+    out = both(''.join([
+               'use: pictures\n'
+               'use: maths\n'
+               '\n'
+               'genesis:\n'
+               '  set p to a blank picture with (4, 3, "#336699")\n'
+               '  scrawl the dots across p, " ", the dots down p, " ", the dot at with (p, 3, 2)\n'
+               '  colour the dot with (p, 1, 1, "red")\n'
+               '  colour the dot with (p, 2, 1, "#00ff0080")\n'
+               '  save the picture with (p, "out.png")\n'
+               '  set back to the picture in the file "out.png"\n'
+               '  scrawl the dot at with (back, 1, 1), " ", the dot at with (back, 2, 1), " ", the dot at with (back, 0, 0)\n'
+               '  set dots to the dots of the picture back\n'
+               '  scrawl the size of dots, " ", item 1 of dots, " ", item 4 of dots\n'
+               '  set grey to a list of numbers\n'
+               '  for each k from 1 to the size of dots:\n'
+               '    if remainder of with (k, 4) is 0:\n'
+               '      add item k of dots to grey\n'
+               '    otherwise:\n'
+               '      add 255 minus item k of dots to grey\n'
+               '  set flipped to a picture from the dots with (4, 3, grey)\n'
+               '  scrawl the dot at with (flipped, 0, 0)\n'
+               '  set c to a copy of the picture flipped\n'
+               '  colour the dot with (c, 0, 0, "black")\n'
+               '  scrawl the dot at with (flipped, 0, 0), " ", the dot at with (c, 0, 0)\n'
+               '  scrawl the dot at with (p, 4, 0)\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "4 3 #336699\n#ff0000 #00ff0080 #336699\n48 51 255\n#cc9966\n#cc9966 #000000\n", repr(out.stdout)
+    assert out.stderr == "Line 25: there is no dot at 4, 0 in a picture 4 by 3 (dots go from 0, 0).\n", repr(out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([

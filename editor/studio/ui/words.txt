@@ -124,3 +124,7 @@ include the body with|Adds a body to a physics world: include the body with (w, 
 a tone with|A sound wave (library sound making): a tone with ("sine", 440, seconds, loudness).
 save the sound with|Writes a sound to a .wav file (library sound making): save the sound with (sound, "beep.wav").
 record the sound|Records from the microphone (library sound making): record the sound 3 (seconds).
+the picture in the file|Reads a picture to change (library pictures): the picture in the file "cat.png" gives its number.
+colour the dot with|Changes one dot (library pictures): colour the dot with (picture, x, y, "#ff8800").
+the dot at with|One dot's colour (library pictures): the dot at with (picture, x, y).
+save the picture with|Writes a .png (library pictures): save the picture with (picture, "out.png").

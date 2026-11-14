@@ -1,0 +1,451 @@
+note: Words for changing pictures: load one, read and change its dots, save it. Use them with:  use: pictures
+note: Each picture is a number. Dots are counted from 0, 0 (the top left), like the window's places.
+note: Colours are "#rrggbb" (or "#rrggbbaa", with how solid: ff is solid, 00 is see-through), or black, white,
+note: red, green, blue, yellow, grey or clear. Pictures are read from and saved to .png files.
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <gdiplus.h>
+include: <array>
+include: <map>
+include: <mutex>
+link: gdiplus
+
+code:
+  namespace stellanova_pictures
+  {
+  	struct Picture
+  	{
+  		int width = 0, height = 0;
+  		std::vector<unsigned char> dots;  // r, g, b, a for each dot, row by row
+  	};
+  	inline std::mutex lock;
+  	inline std::map<int, Picture> all;
+  	inline int next = 0;
+
+  	inline int add(Picture p)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		all[++next] = std::move(p);
+  		return next;
+  	}
+  	inline Picture& get(double n, int line)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		auto at = all.find((int)n);
+  		if (at == all.end())
+  			stellanova::fail(line, "there is no picture " + stellanova::text(n) + ".");
+  		return at->second;
+  	}
+  	inline std::array<unsigned char, 4> colour(const std::string& c, int line)
+  	{
+  		static const std::map<std::string, std::array<unsigned char, 4>> names = {
+  			{"black", {0, 0, 0, 255}}, {"white", {255, 255, 255, 255}}, {"red", {255, 0, 0, 255}}, {"green", {0, 128, 0, 255}},
+  			{"blue", {0, 0, 255, 255}}, {"yellow", {255, 255, 0, 255}}, {"grey", {128, 128, 128, 255}}, {"gray", {128, 128, 128, 255}},
+  			{"clear", {0, 0, 0, 0}}};
+  		auto named = names.find(stellanova::lower(c));
+  		if (named != names.end())
+  			return named->second;
+  		if ((c.size() == 7 || c.size() == 9) && c[0] == '#' && c.find_first_not_of("0123456789abcdefABCDEF", 1) == std::string::npos)
+  		{
+  			std::array<unsigned char, 4> out{0, 0, 0, 255};
+  			for (size_t k = 0; k < (c.size() - 1) / 2; ++k)
+  				out[k] = (unsigned char)std::stoi(c.substr(1 + 2 * k, 2), nullptr, 16);
+  			return out;
+  		}
+  		stellanova::fail(line, "\"" + c + "\" isn't a colour. Write it like \"#ff8800\", or a name: black, white, red, green, blue, yellow, grey, clear.");
+  	}
+  	inline std::string colour_text(const unsigned char* d)
+  	{
+  		static const char* digits = "0123456789abcdef";
+  		std::string out = "#";
+  		for (int k = 0; k < (d[3] == 255 ? 3 : 4); ++k)
+  			out += digits[d[k] >> 4], out += digits[d[k] & 15];
+  		return out;
+  	}
+  	inline void check_size(double w, double h, int line)
+  	{
+  		if (w < 1 || h < 1 || w > 20000 || h > 20000 || w != std::floor(w) || h != std::floor(h))
+  			stellanova::fail(line, "a picture is a whole number of dots across and down (1 to 20000), not " + stellanova::text(w) + " by " + stellanova::text(h) + ".");
+  	}
+  	inline double blank(double w, double h, const std::string& c, int line)
+  	{
+  		check_size(w, h, line);
+  		auto rgba = colour(c, line);
+  		Picture p;
+  		p.width = (int)w, p.height = (int)h;
+  		p.dots.resize((size_t)p.width * p.height * 4);
+  		for (size_t k = 0; k < p.dots.size(); ++k)
+  			p.dots[k] = rgba[k % 4];
+  		return add(std::move(p));
+  	}
+  	inline void gdiplus()
+  	{
+  		static ULONG_PTR token = [] { ULONG_PTR t; Gdiplus::GdiplusStartupInput in; Gdiplus::GdiplusStartup(&t, &in, nullptr); return t; }();
+  		(void)token;
+  	}
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size());
+  		return out;
+  	}
+  	inline double load(const std::string& file, int line)
+  	{
+  		gdiplus();
+  		if (!std::filesystem::exists(std::filesystem::u8path(file)))
+  			stellanova::fail(line, "there is no picture called \"" + file + "\".");
+  		Gdiplus::Bitmap image(wide(file).c_str());
+  		if (image.GetLastStatus() != Gdiplus::Ok)
+  			stellanova::fail(line, "I couldn't read the picture \"" + file + "\".");
+  		Picture p;
+  		p.width = (int)image.GetWidth(), p.height = (int)image.GetHeight();
+  		p.dots.resize((size_t)p.width * p.height * 4);
+  		Gdiplus::Rect all_of_it(0, 0, p.width, p.height);
+  		Gdiplus::BitmapData data;
+  		image.LockBits(&all_of_it, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &data);
+  		for (int y = 0; y < p.height; ++y)
+  			for (int x = 0; x < p.width; ++x)
+  			{
+  				const unsigned char* s = (const unsigned char*)data.Scan0 + y * data.Stride + x * 4;  // b, g, r, a
+  				unsigned char* d = &p.dots[((size_t)y * p.width + x) * 4];
+  				d[0] = s[2], d[1] = s[1], d[2] = s[0], d[3] = s[3];
+  			}
+  		image.UnlockBits(&data);
+  		return add(std::move(p));
+  	}
+  	inline void save(double n, const std::string& file, int line)
+  	{
+  		gdiplus();
+  		Picture& p = get(n, line);
+  		Gdiplus::Bitmap image(p.width, p.height, PixelFormat32bppARGB);
+  		Gdiplus::Rect all_of_it(0, 0, p.width, p.height);
+  		Gdiplus::BitmapData data;
+  		image.LockBits(&all_of_it, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &data);
+  		for (int y = 0; y < p.height; ++y)
+  			for (int x = 0; x < p.width; ++x)
+  			{
+  				unsigned char* d = (unsigned char*)data.Scan0 + y * data.Stride + x * 4;
+  				const unsigned char* s = &p.dots[((size_t)y * p.width + x) * 4];
+  				d[0] = s[2], d[1] = s[1], d[2] = s[0], d[3] = s[3];
+  			}
+  		image.UnlockBits(&data);
+  		const CLSID png = {0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
+  		if (image.Save(wide(file).c_str(), &png, nullptr) != Gdiplus::Ok)
+  			stellanova::fail(line, "I couldn't save the picture \"" + file + "\".");
+  	}
+  	inline unsigned char* dot(Picture& p, double x, double y, int line)
+  	{
+  		if (x < 0 || y < 0 || x >= p.width || y >= p.height || x != std::floor(x) || y != std::floor(y))
+  			stellanova::fail(line, "there is no dot at " + stellanova::text(x) + ", " + stellanova::text(y) + " in a picture " +
+  			                       std::to_string(p.width) + " by " + std::to_string(p.height) + " (dots go from 0, 0).");
+  		return &p.dots[((size_t)y * p.width + (size_t)x) * 4];
+  	}
+  	inline std::string dot_at(double n, double x, double y, int line) { return colour_text(dot(get(n, line), x, y, line)); }
+  	inline void set_dot(double n, double x, double y, const std::string& c, int line)
+  	{
+  		auto rgba = colour(c, line);
+  		unsigned char* d = dot(get(n, line), x, y, line);
+  		for (int k = 0; k < 4; ++k)
+  			d[k] = rgba[k];
+  	}
+  	inline std::vector<double> dots(double n, int line)
+  	{
+  		Picture& p = get(n, line);
+  		return std::vector<double>(p.dots.begin(), p.dots.end());
+  	}
+  	inline double from_dots(double w, double h, const std::vector<double>& dots, int line)
+  	{
+  		check_size(w, h, line);
+  		if (dots.size() != (size_t)(w * h * 4))
+  			stellanova::fail(line, "a picture " + stellanova::text(w) + " by " + stellanova::text(h) + " needs " + stellanova::text(w * h * 4) +
+  			                       " numbers (red, green, blue and how solid, for each dot), not " + std::to_string(dots.size()) + ".");
+  		Picture p;
+  		p.width = (int)w, p.height = (int)h;
+  		for (double x : dots)
+  		{
+  			if (x < 0 || x > 255 || x != std::floor(x))
+  				stellanova::fail(line, "each part of a dot is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  			p.dots.push_back((unsigned char)x);
+  		}
+  		return add(std::move(p));
+  	}
+  	inline double copy(double n, int line) { Picture p = get(n, line); return add(std::move(p)); }
+  }
+
+python:
+  import struct as _struct
+  import zlib as _zlib
+  PICTURES = {}
+  PICTURES_NEXT = [0]
+  _NAMES = {"black": (0, 0, 0, 255), "white": (255, 255, 255, 255), "red": (255, 0, 0, 255), "green": (0, 128, 0, 255),
+            "blue": (0, 0, 255, 255), "yellow": (255, 255, 0, 255), "grey": (128, 128, 128, 255), "gray": (128, 128, 128, 255),
+            "clear": (0, 0, 0, 0)}
+  def _add(p):
+      PICTURES_NEXT[0] += 1
+      PICTURES[PICTURES_NEXT[0]] = p
+      return float(PICTURES_NEXT[0])
+  def _get(n):
+      if int(n) not in PICTURES:
+          raise RunError(0, "there is no picture " + text(n) + ".")
+      return PICTURES[int(n)]
+  def _colour(c):
+      if c.lower() in _NAMES:
+          return _NAMES[c.lower()]
+      if len(c) in (7, 9) and c[0] == "#" and all(ch in "0123456789abcdefABCDEF" for ch in c[1:]):
+          parts = [int(c[1 + 2 * k:3 + 2 * k], 16) for k in range((len(c) - 1) // 2)]
+          return tuple(parts + [255] * (4 - len(parts)))
+      raise RunError(0, '"' + c + '" isn\'t a colour. Write it like "#ff8800", or a name: black, white, red, green, blue, yellow, grey, clear.')
+  def _check_size(w, h):
+      if w < 1 or h < 1 or w > 20000 or h > 20000 or w != int(w) or h != int(h):
+          raise RunError(0, "a picture is a whole number of dots across and down (1 to 20000), not " + text(w) + " by " + text(h) + ".")
+  def picture_blank(w, h, c):
+      _check_size(w, h)
+      return _add([int(w), int(h), bytearray(bytes(_colour(c)) * (int(w) * int(h)))])
+  def picture_load(file):
+      try:
+          with open(file, "rb") as f:
+              data = f.read()
+      except OSError:
+          raise RunError(0, 'there is no picture called "' + file + '".')
+      if data[:8] != b"\x89PNG\r\n\x1a\n":
+          raise RunError(0, 'I couldn\'t read the picture "' + file + '" (when running directly, only .png pictures can be read).')
+      at, chunks, palette, clear = 8, b"", b"", b""
+      while at + 8 <= len(data):
+          size, kind = _struct.unpack(">I4s", data[at:at + 8])
+          body = data[at + 8:at + 8 + size]
+          if kind == b"IHDR":
+              w, h, depth, ctype, _, _, interlace = _struct.unpack(">IIBBBBB", body)
+          elif kind == b"PLTE":
+              palette = body
+          elif kind == b"tRNS":
+              clear = body
+          elif kind == b"IDAT":
+              chunks += body
+          at += 12 + size
+      if depth != 8 or interlace or ctype not in (0, 2, 3, 4, 6):
+          raise RunError(0, 'I couldn\'t read the picture "' + file + '": only 8-bit, not interlaced .png pictures can be read when running directly.')
+      per = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
+      raw, stride = _zlib.decompress(chunks), w * per
+      rows, prev, k = [], bytearray(stride), 0
+      for y in range(h):
+          f, line = raw[k], bytearray(raw[k + 1:k + 1 + stride])
+          k += 1 + stride
+          for i in range(stride):
+              a = line[i - per] if i >= per else 0
+              b, c = prev[i], prev[i - per] if i >= per else 0
+              if f == 1:
+                  line[i] = (line[i] + a) & 255
+              elif f == 2:
+                  line[i] = (line[i] + b) & 255
+              elif f == 3:
+                  line[i] = (line[i] + (a + b) // 2) & 255
+              elif f == 4:
+                  pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                  line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+          rows.append(line)
+          prev = line
+      out = bytearray()
+      for line in rows:
+          for x in range(w):
+              d = line[x * per:x * per + per]
+              if ctype == 0:
+                  out += bytes([d[0], d[0], d[0], 255])
+              elif ctype == 4:
+                  out += bytes([d[0], d[0], d[0], d[1]])
+              elif ctype == 2:
+                  out += bytes(d) + b"\xff"
+              elif ctype == 3:
+                  i = d[0]
+                  out += palette[3 * i:3 * i + 3] + bytes([clear[i] if i < len(clear) else 255])
+              else:
+                  out += bytes(d)
+      return _add([w, h, out])
+  def picture_save(n, file):
+      w, h, dots = _get(n)
+      raw = b"".join(b"\x00" + bytes(dots[y * w * 4:(y + 1) * w * 4]) for y in range(h))
+      def chunk(kind, body):
+          return _struct.pack(">I", len(body)) + kind + body + _struct.pack(">I", _zlib.crc32(kind + body) & 0xFFFFFFFF)
+      png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", _struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + chunk(b"IDAT", _zlib.compress(raw)) + chunk(b"IEND", b"")
+      try:
+          with open(file, "wb") as f:
+              f.write(png)
+      except OSError:
+          raise RunError(0, 'I couldn\'t save the picture "' + file + '".')
+  def _dot(p, x, y):
+      w, h, _ = p
+      if x < 0 or y < 0 or x >= w or y >= h or x != int(x) or y != int(y):
+          raise RunError(0, "there is no dot at " + text(x) + ", " + text(y) + " in a picture " + str(w) + " by " + str(h) + " (dots go from 0, 0).")
+      return (int(y) * w + int(x)) * 4
+  def picture_dot(n, x, y):
+      p = _get(n)
+      d = p[2][_dot(p, x, y):_dot(p, x, y) + 4]
+      return "#" + "".join("%02x" % v for v in (d[:3] if d[3] == 255 else d))
+  def picture_set(n, x, y, c):
+      p = _get(n)
+      rgba = _colour(c)
+      k = _dot(p, x, y)
+      p[2][k:k + 4] = bytes(rgba)
+  def picture_from(w, h, dots):
+      _check_size(w, h)
+      if len(dots) != w * h * 4:
+          raise RunError(0, "a picture " + text(w) + " by " + text(h) + " needs " + text(w * h * 4) + " numbers (red, green, blue and how solid, for each dot), not " + str(len(dots)) + ".")
+      for x in dots:
+          if x < 0 or x > 255 or x != int(x):
+              raise RunError(0, "each part of a dot is a whole number from 0 to 255, not " + text(x) + ".")
+      return _add([int(w), int(h), bytearray(int(x) for x in dots)])
+  def picture_copy(n):
+      w, h, dots = _get(n)
+      return _add([w, h, bytearray(dots)])
+
+to a blank picture, given width (a number) and height (a number) and colour (text), returning a number = stellanova_pictures::blank({width}, {height}, {colour}, {line})
+  runs: picture_blank({width}, {height}, {colour})
+  web: stellanova_pictures.blank({width}, {height}, {colour}, {line})
+to the picture in the file, given file (text), returning a number = stellanova_pictures::load({file}, {line})
+  runs: picture_load({file})
+  web: stellanova_pictures.load({file}, {line})
+to save the picture, given picture (a number) and file (text) = stellanova_pictures::save({picture}, {file}, {line})
+  runs: picture_save({picture}, {file})
+  web: stellanova_pictures.save({picture}, {file}, {line})
+to the dots across, given picture (a number), returning a number = (double)stellanova_pictures::get({picture}, {line}).width
+  runs: float(_get({picture})[0])
+  web: stellanova_pictures.get({picture}, {line}).width
+to the dots down, given picture (a number), returning a number = (double)stellanova_pictures::get({picture}, {line}).height
+  runs: float(_get({picture})[1])
+  web: stellanova_pictures.get({picture}, {line}).height
+to the dot at, given picture (a number) and x (a number) and y (a number), returning text = stellanova_pictures::dot_at({picture}, {x}, {y}, {line})
+  runs: picture_dot({picture}, {x}, {y})
+  web: stellanova_pictures.dotAt({picture}, {x}, {y}, {line})
+to colour the dot, given picture (a number) and x (a number) and y (a number) and colour (text) = stellanova_pictures::set_dot({picture}, {x}, {y}, {colour}, {line})
+  runs: picture_set({picture}, {x}, {y}, {colour})
+  web: stellanova_pictures.setDot({picture}, {x}, {y}, {colour}, {line})
+to the dots of the picture, given picture (a number), returning a list of numbers = stellanova_pictures::dots({picture}, {line})
+  runs: [float(v) for v in _get({picture})[2]]
+  web: Array.from(stellanova_pictures.get({picture}, {line}).dots)
+to a picture from the dots, given width (a number) and height (a number) and dots (a list of numbers), returning a number = stellanova_pictures::from_dots({width}, {height}, {dots}, {line})
+  runs: picture_from({width}, {height}, {dots})
+  web: stellanova_pictures.fromDots({width}, {height}, {dots}, {line})
+to a copy of the picture, given picture (a number), returning a number = stellanova_pictures::copy({picture}, {line})
+  runs: picture_copy({picture})
+  web: stellanova_pictures.copy({picture}, {line})
+
+javascript:
+  const stellanova_pictures = {
+    all: new Map(),
+    next: 0,
+    names: { black: [0, 0, 0, 255], white: [255, 255, 255, 255], red: [255, 0, 0, 255], green: [0, 128, 0, 255], blue: [0, 0, 255, 255],
+             yellow: [255, 255, 0, 255], grey: [128, 128, 128, 255], gray: [128, 128, 128, 255], clear: [0, 0, 0, 0] },
+    add(p) { this.all.set(++this.next, p); return this.next; },
+    get(n, line) {
+      const p = this.all.get(n);
+      if (!p) stellanova.fail(line, `there is no picture ${stellanova.text(n)}.`);
+      return p;
+    },
+    colour(c, line) {
+      if (this.names[c.toLowerCase()]) return this.names[c.toLowerCase()];
+      if (/^#([0-9a-f]{6}|[0-9a-f]{8})$/i.test(c)) {
+        const parts = [];
+        for (let k = 1; k < c.length; k += 2) parts.push(parseInt(c.slice(k, k + 2), 16));
+        while (parts.length < 4) parts.push(255);
+        return parts;
+      }
+      stellanova.fail(line, `"${c}" isn't a colour. Write it like "#ff8800", or a name: black, white, red, green, blue, yellow, grey, clear.`);
+    },
+    checkSize(w, h, line) {
+      if (w < 1 || h < 1 || w > 20000 || h > 20000 || w !== Math.floor(w) || h !== Math.floor(h))
+        stellanova.fail(line, `a picture is a whole number of dots across and down (1 to 20000), not ${stellanova.text(w)} by ${stellanova.text(h)}.`);
+    },
+    blank(w, h, c, line) {
+      this.checkSize(w, h, line);
+      const rgba = this.colour(c, line), dots = new Uint8Array(w * h * 4);
+      for (let k = 0; k < dots.length; k++) dots[k] = rgba[k % 4];
+      return this.add({ width: w, height: h, dots });
+    },
+    node(line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page can't read or save picture files yet.");
+      return { fs: require("fs"), zlib: require("zlib") };
+    },
+    load(file, line) {
+      const { fs, zlib } = this.node(line);
+      let data;
+      try { data = fs.readFileSync(file); } catch { stellanova.fail(line, `there is no picture called "${file}".`); }
+      if (data.toString("latin1", 1, 4) !== "PNG") stellanova.fail(line, `I couldn't read the picture "${file}" (when running directly, only .png pictures can be read).`);
+      let at = 8, w = 0, h = 0, depth = 0, ctype = 0, interlace = 0, palette = Buffer.alloc(0), clear = Buffer.alloc(0);
+      const parts = [];
+      while (at + 8 <= data.length) {
+        const size = data.readUInt32BE(at), kind = data.toString("latin1", at + 4, at + 8), body = data.subarray(at + 8, at + 8 + size);
+        if (kind === "IHDR") { w = body.readUInt32BE(0); h = body.readUInt32BE(4); depth = body[8]; ctype = body[9]; interlace = body[12]; }
+        else if (kind === "PLTE") palette = body;
+        else if (kind === "tRNS") clear = body;
+        else if (kind === "IDAT") parts.push(body);
+        at += 12 + size;
+      }
+      if (depth !== 8 || interlace || ![0, 2, 3, 4, 6].includes(ctype))
+        stellanova.fail(line, `I couldn't read the picture "${file}": only 8-bit, not interlaced .png pictures can be read when running directly.`);
+      const per = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[ctype], stride = w * per, raw = zlib.inflateSync(Buffer.concat(parts));
+      const dots = new Uint8Array(w * h * 4);
+      let prev = new Uint8Array(stride), k = 0;
+      for (let y = 0; y < h; y++) {
+        const f = raw[k], row = Uint8Array.from(raw.subarray(k + 1, k + 1 + stride));
+        k += 1 + stride;
+        for (let i = 0; i < stride; i++) {
+          const a = i >= per ? row[i - per] : 0, b = prev[i], c = i >= per ? prev[i - per] : 0;
+          if (f === 1) row[i] = (row[i] + a) & 255;
+          else if (f === 2) row[i] = (row[i] + b) & 255;
+          else if (f === 3) row[i] = (row[i] + ((a + b) >> 1)) & 255;
+          else if (f === 4) {
+            const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+            row[i] = (row[i] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255;
+          }
+        }
+        for (let x = 0; x < w; x++) {
+          const d = row.subarray(x * per, x * per + per), o = (y * w + x) * 4;
+          if (ctype === 0) dots.set([d[0], d[0], d[0], 255], o);
+          else if (ctype === 4) dots.set([d[0], d[0], d[0], d[1]], o);
+          else if (ctype === 2) dots.set([d[0], d[1], d[2], 255], o);
+          else if (ctype === 3) dots.set([palette[3 * d[0]], palette[3 * d[0] + 1], palette[3 * d[0] + 2], d[0] < clear.length ? clear[d[0]] : 255], o);
+          else dots.set(d, o);
+        }
+        prev = row;
+      }
+      return this.add({ width: w, height: h, dots });
+    },
+    save(n, file, line) {
+      const { fs, zlib } = this.node(line), p = this.get(n, line);
+      const raw = Buffer.alloc(p.height * (p.width * 4 + 1));
+      for (let y = 0; y < p.height; y++) Buffer.from(p.dots.buffer, p.dots.byteOffset + y * p.width * 4, p.width * 4).copy(raw, y * (p.width * 4 + 1) + 1);
+      const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+      const crc = (b) => { let c = 0xffffffff; for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+      const chunk = (kind, body) => {
+        const head = Buffer.alloc(4), tail = Buffer.alloc(4), kb = Buffer.concat([Buffer.from(kind, "latin1"), body]);
+        head.writeUInt32BE(body.length); tail.writeUInt32BE(crc(kb));
+        return Buffer.concat([head, kb, tail]);
+      };
+      const ihdr = Buffer.alloc(13);
+      ihdr.writeUInt32BE(p.width, 0); ihdr.writeUInt32BE(p.height, 4); ihdr[8] = 8; ihdr[9] = 6;
+      const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+      try { fs.writeFileSync(file, png); } catch { stellanova.fail(line, `I couldn't save the picture "${file}".`); }
+    },
+    at(p, x, y, line) {
+      if (x < 0 || y < 0 || x >= p.width || y >= p.height || x !== Math.floor(x) || y !== Math.floor(y))
+        stellanova.fail(line, `there is no dot at ${stellanova.text(x)}, ${stellanova.text(y)} in a picture ${p.width} by ${p.height} (dots go from 0, 0).`);
+      return (y * p.width + x) * 4;
+    },
+    dotAt(n, x, y, line) {
+      const p = this.get(n, line), k = this.at(p, x, y, line), d = p.dots.subarray(k, k + 4);
+      return "#" + Array.from(d[3] === 255 ? d.subarray(0, 3) : d, (v) => v.toString(16).padStart(2, "0")).join("");
+    },
+    setDot(n, x, y, c, line) {
+      const rgba = this.colour(c, line), p = this.get(n, line);
+      p.dots.set(rgba, this.at(p, x, y, line));
+    },
+    fromDots(w, h, dots, line) {
+      this.checkSize(w, h, line);
+      if (dots.length !== w * h * 4) stellanova.fail(line, `a picture ${stellanova.text(w)} by ${stellanova.text(h)} needs ${stellanova.text(w * h * 4)} numbers (red, green, blue and how solid, for each dot), not ${dots.length}.`);
+      for (const x of dots) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `each part of a dot is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
+      return this.add({ width: w, height: h, dots: Uint8Array.from(dots) });
+    },
+    copy(n, line) { const p = this.get(n, line); return this.add({ width: p.width, height: p.height, dots: Uint8Array.from(p.dots) }); },
+  };
