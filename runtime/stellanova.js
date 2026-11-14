@@ -8,12 +8,14 @@
 
   // ---- what went wrong, and on which line
   class Problem extends Error {
-    constructor(line, message) {
+    constructor(line, message, kind = "") {
       super(message);
       this.line = line;
+      this.kind = kind;  // a kind of problem of the program's own ('raise a fuel problem with'), or ""
     }
   }
-  const fail = (line, message) => { throw new Problem(line, message); };
+  const fail = (line, message, kind = "") => { throw new Problem(line, message, kind); };
+  const problem_kind = (e) => (e instanceof Problem ? e.kind : "");
 
   // ---- places, with the same names Unreal uses
   class Place3 {
@@ -270,7 +272,7 @@
   const ascii = (s, from, to) => s.replace(from, (c) => String.fromCharCode(c.charCodeAt(0) + to));
 
   const stellanova = {
-    Problem, fail, text, dup, same, count, kinds, problem_text, report,
+    Problem, fail, text, dup, same, count, kinds, problem_text, problem_kind, report,
     on_say: null, on_problem: null,
     table: () => new Map(),
     kind(Kind, title, spec) {

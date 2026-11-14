@@ -104,3 +104,5 @@ shifted left by|Moves a whole number's bits: 1 shifted left by 4 is 16 (also shi
 big plus|Whole numbers of any size, as text (library big numbers): big plus with ("123", "456"); also big minus, big times, big divided by, big remainder, big power, big compare.
 of anything|Kinds for any kind: a stack of anything has: ... then conjure a stack of numbers.
 the bytes of the text|Text as UTF-8 bytes, numbers from 0 to 255 (library letters); the text of the bytes turns them back.
+raise a|A kind of problem of your own: raise a fuel problem with "empty"; caught by if that went wrong with a fuel problem:
+if that went wrong with|After try: takes one kind of problem only: if that went wrong with a fuel problem:

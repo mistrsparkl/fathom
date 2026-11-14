@@ -233,6 +233,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `remove entry "Rex" from ages` | Take a name and its value out of a table. |
 | `return total` | Leave the command, returning an answer. |
 | `raise an error with "the tank is empty"` | Stop with a problem of your own. `try:` catches it like any other, and `the wound` is its text. |
+| `raise a fuel problem with "the tank is empty"` | A kind of problem, named in your own words. After a `try:`, `if that went wrong with a fuel problem:` takes only those; several can follow one `try:`, and a plain `if that went wrong:` (last) takes the rest. A problem nothing takes goes on, as if there were no `try:`. |
 | `break free` | Leave the `repeat`, `as long as` or `for each` it is inside, and carry on after it. |
 | `move on` | Go straight to the next round of the loop it is inside. |
 | `inscribe "hello" into file "notes.txt"` | Make or replace a file with this text. |

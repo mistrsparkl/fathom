@@ -10,7 +10,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Kinds for any kind (`a pair of (a number, text)`, `a stack of anything`): kinds with a kind as an input
 - [x] Numbers: `to the power`, bitwise `and`/`or`/`exclusive or`/shifts, whole numbers of any size
 - [x] Bytes: lists of numbers from 0 to 255 (`the bytes of the file`, `fill the file`, `the bytes of the text`, `the text of the bytes`)
-- [ ] Kinds of problem: `raise a <kind> with ...`, `if that went wrong with a <kind>:`
+- [x] Kinds of problem: `raise a <kind> with ...`, `if that went wrong with a <kind>:`
 - [ ] Commands for a kind of thing kept as values
 
 ## 2. Reaching everything else

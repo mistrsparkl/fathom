@@ -624,6 +624,8 @@ extern "C"
 
 	bool cn_failed() { return failed; }
 	void cn_raise(int line, V* message) { cn_set_problem({line, full(message)->s}); }
+	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, full(message)->s, full(kind)->s}); }
+	bool cn_problem_is(V* kind) { return pending.kind == full(kind)->s; }
 	V* cn_problem_text()  // what went wrong, inside 'if that went wrong:' (and the problem is dealt with)
 	{
 		failed = false;

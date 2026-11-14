@@ -42,12 +42,13 @@ class ScriptError(Exception):
 
 
 class RunError(Exception):
-    """Something that went wrong while a program ran."""
+    """Something that went wrong while a program ran (kind: a kind of problem of the program's own, or "")."""
 
-    def __init__(self, line, message):
+    def __init__(self, line, message, kind=""):
         super().__init__(message)
         self.line = line
         self.message = message
+        self.kind = kind
 
 
 # ---------------------------------------------------------------- kinds of things
@@ -3379,25 +3380,32 @@ def statements(body, names, declared, depth):
             inner.append(rows[k])
             k += 1
         if raw.strip().lower() == "try:":
-            handler = None
-            if k < len(rows) and rows[k][1].strip().lower() == "if that went wrong:" \
-                    and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) == indent:
+            handlers = []  # (kind of problem or None for any, its lines)
+            while k < len(rows) and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) == indent:
+                m = WENT_WRONG.fullmatch(rows[k][1].strip().lower())
+                if not m:
+                    break
+                if handlers and handlers[-1][0] is None:
+                    raise ScriptError(rows[k][0], "The plain 'if that went wrong:' catches every problem, so it goes last.")
                 hn = rows[k][0]
                 k += 1
                 handler = []
                 while k < len(rows) and len(rows[k][1].expandtabs(4)) - len(rows[k][1].expandtabs(4).lstrip()) > indent:
                     handler.append(rows[k])
                     k += 1
-            if handler is None:
+                if not handler:
+                    raise ScriptError(hn, "Say what to do on the indented lines below the ':'.")
+                handlers.append((m.group(1) and " ".join(m.group(1).split()), handler))
+            if not handlers:
                 raise ScriptError(n, "'try:' needs an 'if that went wrong:' line after its indented lines, at the same indent.")
-            if not inner or not handler:
-                raise ScriptError(n if not inner else hn, "Say what to do on the indented lines below the ':'.")
-            lines, run = attempt(n, inner, handler, names, declared, depth)
+            if not inner:
+                raise ScriptError(n, "Say what to do on the indented lines below the ':'.")
+            lines, run = attempt(n, inner, handlers, names, declared, depth)
             out += lines
             chain = None
             runs.append(run)
             continue
-        if raw.strip().lower() == "if that went wrong:":
+        if WENT_WRONG.fullmatch(raw.strip().lower()):
             raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
         if raw.strip().lower().startswith("depending on ") and raw.strip().endswith(":"):
             start = k - 1 - len(inner)
@@ -3554,8 +3562,13 @@ def watch_rows(rows, indent):
     return out
 
 
-def attempt(n, tried, handler, names, declared, depth):
-    """try: ... if that went wrong: ...  Inside the second part, 'the problem' is what went wrong, as text."""
+WENT_WRONG = re.compile(r"if that went wrong(?: with an? ([a-z][a-z ]*))?:")
+
+
+def attempt(n, tried, handlers, names, declared, depth):
+    """try: ... if that went wrong with a fuel problem: ... if that went wrong: ...
+    Each handler takes its kind of problem (None: any); a problem no handler takes goes on, as if there were no try.
+    Inside a handler, 'the problem' is what went wrong, as text."""
     tab = "\t" * depth
     try_lines, try_run = statements(tried, names, declared, depth + 1)
     key = ("the", "problem")
@@ -3563,8 +3576,11 @@ def attempt(n, tried, handler, names, declared, depth):
         raise ScriptError(n, "There is a 'try:' inside the 'if that went wrong:' of another one. Put it in a command of its own.")
     cpp = f"the_problem_{n}"
     names.add(key, cpp, TEXT, read_only=True)
+    fixes = []  # (kind, lines, run, the kind as a text value)
     try:
-        fix_lines, fix_run = statements(handler, names, declared, depth + 1)
+        for kind, handler in handlers:
+            lines, fix = statements(handler, names, declared, depth + 2)
+            fixes.append((kind, lines, fix, kind and expr_to_end(tokenize(json.dumps(kind), n), 0, names, n)))
     finally:
         del names.known[key]
 
@@ -3572,15 +3588,27 @@ def attempt(n, tried, handler, names, declared, depth):
         try:
             try_run(env)
         except RunError as err:
-            env[cpp] = err.message
-            fix_run(env)
-    with_ir(run, lambda f: machine.attempt(f, try_run, cpp, fix_run))
+            for kind, _, fix, _ in fixes:
+                if kind is None or kind == err.kind:
+                    env[cpp] = err.message
+                    fix(env)
+                    return
+            raise
+    with_ir(run, lambda f: machine.attempt(f, try_run, cpp, [(k, fix, v) for k, _, fix, v in fixes]))
     caught = f"stellanova_problem_{n}"
+    out = [f"{tab}try", tab + "{"] + try_lines + [tab + "}"]
     if JS:
-        return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch ({caught})", tab + "{",
-                 f"{tab}\tconst {cpp} = stellanova::problem_text({caught});"] + fix_lines + [tab + "}"]), run
-    return ([f"{tab}try", tab + "{"] + try_lines + [tab + "}", f"{tab}catch (const stellanova::Problem& {caught})", tab + "{",
-             f"{tab}\tconst std::string {cpp} = {caught}.message;"] + fix_lines + [tab + "}"]), run
+        out += [f"{tab}catch ({caught})", tab + "{", f"{tab}\tconst {cpp} = stellanova::problem_text({caught});"]
+        kind_of = f"stellanova::problem_kind({caught})"
+    else:
+        out += [f"{tab}catch (const stellanova::Problem& {caught})", tab + "{", f"{tab}\tconst std::string {cpp} = {caught}.message;"]
+        kind_of = f"{caught}.kind"
+    for k, (kind, lines, _, _) in enumerate(fixes):
+        test = "if (true)" if kind is None else f"if ({kind_of} == {json.dumps(kind)})"
+        out += [f"{tab}\t{'else ' if k else ''}{test}", tab + "\t{"] + lines + [tab + "\t}"]
+    if fixes[-1][0] is not None:
+        out.append(f"{tab}\telse throw{' ' + caught if JS else ''};")
+    return out + [tab + "}"], run
 
 
 def choose(chain):
@@ -3827,6 +3855,20 @@ def statement(n, text_, inner, names, declared, depth):
             raise RunError(n, get(env))
         with_ir(run, lambda f: (f.put(f"call void @cn_raise(i32 {n}, ptr {machine.emit(f, v)})"), f.check()))
         return [f"{tab}stellanova::fail({n}, {strip_parens(v.cpp)});"], run, None
+    if tokens[0] == "raise" and "with" in tokens[2:]:  # 'raise a fuel problem with "the tank is empty"': a kind of problem
+        cut = tokens.index("with", 2)
+        kind = " ".join(tokens[1:cut])
+        if not re.fullmatch(r"[a-z][a-z ]*", kind):
+            raise ScriptError(n, "Name the kind of problem in plain words, like: raise a fuel problem with \"the tank is empty\"")
+        v = expr_to_end(tokens, cut + 1, names, n)
+        if v.kind != TEXT:
+            raise ScriptError(n, f"'raise a {kind} with' needs text saying what went wrong, not {kind_name(v.kind)}.")
+        get, kind_v = v.run, expr_to_end(tokenize(json.dumps(kind), n), 0, names, n)
+
+        def run(env):
+            raise RunError(n, get(env), kind)
+        with_ir(run, lambda f: (f.put(f"call void @cn_raise_kind(i32 {n}, ptr {machine.emit(f, v)}, ptr {machine.emit(f, kind_v)})"), f.check()))
+        return [f"{tab}stellanova::fail({n}, {strip_parens(v.cpp)}, {json.dumps(kind)});"], run, None
     if tokens[:2] == ["give", "back"]:
         if not names.gives:
             raise ScriptError(n, "'return' only works in a command that says what it returns, like 'to double, given x (a number), returning a number:'.")

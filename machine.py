@@ -85,6 +85,8 @@ declare double @cn_random(double, double, i32)
 declare double @cn_random_fraction()
 declare double @cn_rounded(double, double, i32)
 declare double @cn_power(double, double, i32)
+declare void @cn_raise_kind(i32, ptr, ptr)
+declare i1 @cn_problem_is(ptr)
 declare double @cn_bits(i32, double, double, i32)
 declare ptr @cn_box_number(double)
 declare ptr @cn_box_yesno(i1)
@@ -643,16 +645,27 @@ def meanwhile(f, piece):
     f.put(f"call void @cn_meanwhile(ptr @cn_user_{g.name}, ptr {block}, i64 {8 * max(1, len(used))})")
 
 
-def attempt(f, tried, problem_cpp, fixed):
-    """try: ... if that went wrong: ...   (problem_cpp: the name 'the problem' is kept in)"""
+def attempt(f, tried, problem_cpp, fixes):
+    """try: ... if that went wrong with a fuel problem: ... if that went wrong: ...   (problem_cpp: the name 'the problem'
+    is kept in; fixes: [(kind of problem or None, run, the kind as a text value)]). A problem none takes goes on."""
     handler, end = f.label("wrong"), f.label("tried")
     f.handlers.append(handler)
     emit(f, tried)
     f.handlers.pop()
     f.jump(end)
     f.place(handler)
-    f.store(problem_cpp, TEXT, f.op("call ptr @cn_problem_text()"))
-    emit(f, fixed)
+    for kind, fixed, kind_v in fixes:
+        mine, other = f.label("mine"), f.label("other")
+        if kind is None:
+            f.jump(mine)
+        else:
+            f.branch(f.op(f"call i1 @cn_problem_is(ptr {emit(f, kind_v)})"), mine, other)
+        f.place(mine)
+        f.store(problem_cpp, TEXT, f.op("call ptr @cn_problem_text()"))
+        emit(f, fixed)
+        f.jump(end)
+        f.place(other)
+    f.check()  # still failed: on to the next 'try:' out, or out of the command
     f.jump(end)
     f.place(end)
 

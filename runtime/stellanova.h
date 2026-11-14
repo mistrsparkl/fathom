@@ -170,11 +170,12 @@ namespace stellanova
 	{
 		int line;
 		std::string message;
+		std::string kind;  // a kind of problem of the program's own ('raise a fuel problem with'), or ""
 	};
 
-	[[noreturn]] inline void fail(int line, const std::string& message)
+	[[noreturn]] inline void fail(int line, const std::string& message, const std::string& kind = "")
 	{
-		throw Problem{line, message};
+		throw Problem{line, message, kind};
 	}
 
 	template <typename F, typename... A>

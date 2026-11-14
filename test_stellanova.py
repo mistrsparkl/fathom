@@ -202,6 +202,45 @@ def program_checks():
     assert out.stdout == "104, 105, 33\nhi!!\n", repr(out.stdout)
     assert out.stderr == "Line 7: a byte is a whole number from 0 to 255, not 300.\n", repr(out.stderr)
 
+    # Kinds of problem: each 'if that went wrong with a ...' takes its own; the rest go on.
+    out = both(''.join([
+               'to fill up, given litres (a number):\n'
+               '  if litres exceeds 50:\n'
+               '    raise a fuel problem with "the tank holds 50 litres"\n'
+               '  if litres falls below 0:\n'
+               '    raise a sign problem with "litres can\'t be less than 0"\n'
+               '  scrawl "filled ", litres\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to careful fill, given litres (a number):\n'
+               '  try:\n'
+               '    fill up with litres\n'
+               '  if that went wrong with a fuel problem:\n'
+               '    scrawl "fuel: ", the wound\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  careful fill with 10\n'
+               '  careful fill with 80\n'
+               '  try:\n'
+               '    careful fill with -1\n'
+               '  if that went wrong with a fuel problem:\n'
+               '    scrawl "never"\n'
+               '  if that went wrong with a sign problem:\n'
+               '    scrawl "sign: ", the wound\n'
+               '  try:\n'
+               '    scrawl item 9 of a list of (1)\n'
+               '  if that went wrong with a fuel problem:\n'
+               '    scrawl "never"\n'
+               '  if that went wrong:\n'
+               '    scrawl "other: ", the wound\n'
+               '  careful fill with -2\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == ("filled 10\nfuel: the tank holds 50 litres\nsign: litres can't be less than 0\n"
+                          "other: there is no item 9 in a list of 1 item. Items are counted from 1.\n"), repr(out.stdout)
+    assert out.stderr == "Line 5: litres can't be less than 0\n", repr(out.stderr)
+
     # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
     out = both(''.join([
                'a stack of anything has:\n'
