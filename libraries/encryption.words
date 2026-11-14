@@ -1,0 +1,283 @@
+note: Words for keeping text secret with a password. Use them in a program with:  use: encryption
+note: 'encrypted with (message, password)' gives text that can be kept or sent anywhere; only the same password
+note: turns it back, and any change to it is noticed. (ChaCha20-Poly1305, with a key made from the password by
+note: PBKDF2-SHA256, 100000 rounds, and a fresh random salt each time.) Text encrypted any way (directly, built,
+note: with node) can be decrypted any other way.
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <bcrypt.h>
+include: <cstring>
+link: bcrypt
+
+code:
+  namespace stellanova_encryption
+  {
+  	typedef unsigned char u8;
+  	typedef unsigned long long u64;
+  	inline uint32_t le32(const u8* p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
+  	inline u64 le64(const u8* p) { return (u64)le32(p) | ((u64)le32(p + 4) << 32); }
+  	inline void put64(u8* p, u64 v) { for (int k = 0; k < 8; ++k) p[k] = (u8)(v >> (8 * k)); }
+  	inline void chacha_block(const u8 key[32], uint32_t counter, const u8 nonce[12], u8 out[64])
+  	{
+  		uint32_t s[16] = {0x61707865, 0x3320646e, 0x79622d32, 0x6b206574};
+  		for (int k = 0; k < 8; ++k) s[4 + k] = le32(key + 4 * k);
+  		s[12] = counter;
+  		for (int k = 0; k < 3; ++k) s[13 + k] = le32(nonce + 4 * k);
+  		uint32_t x[16];
+  		std::memcpy(x, s, sizeof x);
+  		auto rot = [](uint32_t v, int n) { return (v << n) | (v >> (32 - n)); };
+  		auto quarter = [&](int a, int b, int c, int d) {
+  			x[a] += x[b]; x[d] = rot(x[d] ^ x[a], 16);
+  			x[c] += x[d]; x[b] = rot(x[b] ^ x[c], 12);
+  			x[a] += x[b]; x[d] = rot(x[d] ^ x[a], 8);
+  			x[c] += x[d]; x[b] = rot(x[b] ^ x[c], 7);
+  		};
+  		for (int k = 0; k < 10; ++k)
+  		{
+  			quarter(0, 4, 8, 12), quarter(1, 5, 9, 13), quarter(2, 6, 10, 14), quarter(3, 7, 11, 15);
+  			quarter(0, 5, 10, 15), quarter(1, 6, 11, 12), quarter(2, 7, 8, 13), quarter(3, 4, 9, 14);
+  		}
+  		for (int k = 0; k < 16; ++k)
+  		{
+  			uint32_t v = x[k] + s[k];
+  			for (int b = 0; b < 4; ++b) out[4 * k + b] = (u8)(v >> (8 * b));
+  		}
+  	}
+  	inline std::string chacha(const u8 key[32], const u8 nonce[12], const std::string& data)  // from counter 1
+  	{
+  		std::string out(data);
+  		u8 block[64];
+  		for (size_t at = 0; at < out.size(); at += 64)
+  		{
+  			chacha_block(key, (uint32_t)(1 + at / 64), nonce, block);
+  			for (size_t k = 0; k < 64 && at + k < out.size(); ++k)
+  				out[at + k] = (char)(out[at + k] ^ block[k]);
+  		}
+  		return out;
+  	}
+  	inline void poly1305(const u8 key[32], const std::string& m, u8 tag[16])  // m is whole 16-byte blocks
+  	{
+  		const u64 m44 = 0xfffffffffff, m42 = 0x3ffffffffff;
+  		u64 t0 = le64(key), t1 = le64(key + 8);
+  		u64 r0 = t0 & 0xffc0fffffff, r1 = ((t0 >> 44) | (t1 << 20)) & 0xfffffc0ffff, r2 = (t1 >> 24) & 0x00ffffffc0f;
+  		u64 s1 = r1 * 20, s2 = r2 * 20, h0 = 0, h1 = 0, h2 = 0, c;
+  		for (size_t at = 0; at + 16 <= m.size(); at += 16)
+  		{
+  			const u8* p = (const u8*)m.data() + at;
+  			t0 = le64(p), t1 = le64(p + 8);
+  			h0 += t0 & m44;
+  			h1 += ((t0 >> 44) | (t1 << 20)) & m44;
+  			h2 += ((t1 >> 24) & m42) | (1ULL << 40);
+  			unsigned __int128 d0 = (unsigned __int128)h0 * r0 + (unsigned __int128)h1 * s2 + (unsigned __int128)h2 * s1;
+  			unsigned __int128 d1 = (unsigned __int128)h0 * r1 + (unsigned __int128)h1 * r0 + (unsigned __int128)h2 * s2;
+  			unsigned __int128 d2 = (unsigned __int128)h0 * r2 + (unsigned __int128)h1 * r1 + (unsigned __int128)h2 * r0;
+  			c = (u64)(d0 >> 44); h0 = (u64)d0 & m44;
+  			d1 += c; c = (u64)(d1 >> 44); h1 = (u64)d1 & m44;
+  			d2 += c; c = (u64)(d2 >> 42); h2 = (u64)d2 & m42;
+  			h0 += c * 5; c = h0 >> 44; h0 &= m44;
+  			h1 += c;
+  		}
+  		c = h1 >> 44; h1 &= m44; h2 += c; c = h2 >> 42; h2 &= m42; h0 += c * 5;
+  		c = h0 >> 44; h0 &= m44; h1 += c; c = h1 >> 44; h1 &= m44; h2 += c; c = h2 >> 42; h2 &= m42; h0 += c * 5;
+  		c = h0 >> 44; h0 &= m44; h1 += c;
+  		u64 g0 = h0 + 5; c = g0 >> 44; g0 &= m44;
+  		u64 g1 = h1 + c; c = g1 >> 44; g1 &= m44;
+  		u64 g2 = h2 + c - (1ULL << 42);
+  		c = (g2 >> 63) - 1;
+  		g0 &= c, g1 &= c, g2 &= c;
+  		c = ~c;
+  		h0 = (h0 & c) | g0, h1 = (h1 & c) | g1, h2 = (h2 & c) | g2;
+  		t0 = le64(key + 16), t1 = le64(key + 24);
+  		h0 += t0 & m44; c = h0 >> 44; h0 &= m44;
+  		h1 += (((t0 >> 44) | (t1 << 20)) & m44) + c; c = h1 >> 44; h1 &= m44;
+  		h2 += ((t1 >> 24) & m42) + c; h2 &= m42;
+  		put64(tag, h0 | (h1 << 44));
+  		put64(tag + 8, (h1 >> 20) | (h2 << 24));
+  	}
+  	inline void tag_of(const u8 key[32], const u8 nonce[12], const std::string& sealed, u8 tag[16])
+  	{
+  		u8 block[64];
+  		chacha_block(key, 0, nonce, block);
+  		std::string m = sealed + std::string((16 - sealed.size() % 16) % 16, '\0');
+  		u8 sizes[16];
+  		put64(sizes, 0), put64(sizes + 8, sealed.size());
+  		m.append((const char*)sizes, 16);
+  		poly1305(block, m, tag);
+  	}
+  	inline void key_of(const std::string& password, const u8 salt[16], u8 key[32])
+  	{
+  		BCRYPT_ALG_HANDLE alg = nullptr;
+  		BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
+  		BCryptDeriveKeyPBKDF2(alg, (PUCHAR)password.data(), (ULONG)password.size(), (PUCHAR)salt, 16, 100000, key, 32, 0);
+  		BCryptCloseAlgorithmProvider(alg, 0);
+  	}
+  	inline std::string base64(const std::string& s)
+  	{
+  		static const char* a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  		std::string out;
+  		for (size_t k = 0; k < s.size(); k += 3)
+  		{
+  			uint32_t v = (u8)s[k] << 16 | (k + 1 < s.size() ? (u8)s[k + 1] << 8 : 0) | (k + 2 < s.size() ? (u8)s[k + 2] : 0);
+  			out += a[v >> 18], out += a[(v >> 12) & 63];
+  			out += k + 1 < s.size() ? a[(v >> 6) & 63] : '=';
+  			out += k + 2 < s.size() ? a[v & 63] : '=';
+  		}
+  		return out;
+  	}
+  	inline bool unbase64(const std::string& s, std::string& out)
+  	{
+  		uint32_t v = 0;
+  		int bits = 0;
+  		for (char ch : s)
+  		{
+  			if (ch == '=')
+  				break;
+  			int d = ch >= 'A' && ch <= 'Z' ? ch - 'A' : ch >= 'a' && ch <= 'z' ? ch - 'a' + 26 : ch >= '0' && ch <= '9' ? ch - '0' + 52 : ch == '+' ? 62 : ch == '/' ? 63 : -1;
+  			if (d < 0)
+  				return false;
+  			v = (v << 6) | (uint32_t)d, bits += 6;
+  			if (bits >= 8)
+  				bits -= 8, out += (char)((v >> bits) & 255);
+  		}
+  		return true;
+  	}
+  	inline std::string encrypt(const std::string& message, const std::string& password)
+  	{
+  		u8 salt[16], nonce[12], key[32], tag[16];
+  		BCryptGenRandom(nullptr, salt, 16, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  		BCryptGenRandom(nullptr, nonce, 12, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  		key_of(password, salt, key);
+  		std::string sealed = chacha(key, nonce, message);
+  		tag_of(key, nonce, sealed, tag);
+  		return base64(std::string((char*)salt, 16) + std::string((char*)nonce, 12) + sealed + std::string((char*)tag, 16));
+  	}
+  	inline std::string decrypt(const std::string& secret, const std::string& password, int line)
+  	{
+  		std::string all;
+  		if (!unbase64(secret, all) || all.size() < 44)
+  			stellanova::fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
+  		u8 key[32], tag[16];
+  		key_of(password, (const u8*)all.data(), key);
+  		const u8* nonce = (const u8*)all.data() + 16;
+  		std::string sealed = all.substr(28, all.size() - 44);
+  		tag_of(key, nonce, sealed, tag);
+  		unsigned diff = 0;
+  		for (int k = 0; k < 16; ++k)
+  			diff |= tag[k] ^ (u8)all[all.size() - 16 + k];
+  		if (diff)
+  			stellanova::fail(line, "the password is wrong, or the encrypted text was changed.");
+  		return chacha(key, nonce, sealed);
+  	}
+  	inline std::string random_code(double n, int line)
+  	{
+  		if (n < 1 || n > 1024 || n != std::floor(n))
+  			stellanova::fail(line, "a random code is 1 to 1024 bytes long, not " + stellanova::text(n) + ".");
+  		std::vector<u8> b((size_t)n);
+  		BCryptGenRandom(nullptr, b.data(), (ULONG)b.size(), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  		static const char* digits = "0123456789abcdef";
+  		std::string out;
+  		for (u8 c : b)
+  			out += digits[c >> 4], out += digits[c & 15];
+  		return out;
+  	}
+  }
+
+python:
+  import base64 as _base64
+  import hashlib as _hashlib
+  import hmac as _hmac
+  import os as _os
+  import struct as _struct
+  def _chacha_block(key, counter, nonce):
+      s = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574] + list(_struct.unpack("<8I", key)) + [counter] + list(_struct.unpack("<3I", nonce))
+      x = list(s)
+      def q(a, b, c, d):
+          x[a] = (x[a] + x[b]) & 0xffffffff; x[d] ^= x[a]; x[d] = ((x[d] << 16) | (x[d] >> 16)) & 0xffffffff
+          x[c] = (x[c] + x[d]) & 0xffffffff; x[b] ^= x[c]; x[b] = ((x[b] << 12) | (x[b] >> 20)) & 0xffffffff
+          x[a] = (x[a] + x[b]) & 0xffffffff; x[d] ^= x[a]; x[d] = ((x[d] << 8) | (x[d] >> 24)) & 0xffffffff
+          x[c] = (x[c] + x[d]) & 0xffffffff; x[b] ^= x[c]; x[b] = ((x[b] << 7) | (x[b] >> 25)) & 0xffffffff
+      for _ in range(10):
+          q(0, 4, 8, 12); q(1, 5, 9, 13); q(2, 6, 10, 14); q(3, 7, 11, 15)
+          q(0, 5, 10, 15); q(1, 6, 11, 12); q(2, 7, 8, 13); q(3, 4, 9, 14)
+      return _struct.pack("<16I", *((a + b) & 0xffffffff for a, b in zip(x, s)))
+  def _chacha(key, nonce, data):
+      out = bytearray(data)
+      for at in range(0, len(out), 64):
+          block = _chacha_block(key, 1 + at // 64, nonce)
+          for k in range(min(64, len(out) - at)):
+              out[at + k] ^= block[k]
+      return bytes(out)
+  def _tag(key, nonce, sealed):
+      pk = _chacha_block(key, 0, nonce)[:32]
+      r = int.from_bytes(pk[:16], "little") & 0x0ffffffc0ffffffc0ffffffc0fffffff
+      s = int.from_bytes(pk[16:32], "little")
+      m = sealed + b"\0" * ((16 - len(sealed) % 16) % 16) + _struct.pack("<QQ", 0, len(sealed))
+      acc, p = 0, (1 << 130) - 5
+      for at in range(0, len(m), 16):
+          acc = (acc + int.from_bytes(m[at:at + 16], "little") + (1 << 128)) * r % p
+      return ((acc + s) & ((1 << 128) - 1)).to_bytes(16, "little")
+  def encrypt(message, password):
+      salt, nonce = _os.urandom(16), _os.urandom(12)
+      key = _hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000, 32)
+      sealed = _chacha(key, nonce, message.encode("utf-8"))
+      return _base64.b64encode(salt + nonce + sealed + _tag(key, nonce, sealed)).decode()
+  def decrypt(secret, password):
+      try:
+          all_ = _base64.b64decode(secret.encode(), validate=True)
+      except Exception:
+          all_ = b""
+      if len(all_) < 44:
+          raise RunError(0, "that isn't encrypted text (it comes from 'encrypted with').")
+      salt, nonce, sealed, tag = all_[:16], all_[16:28], all_[28:-16], all_[-16:]
+      key = _hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000, 32)
+      if not _hmac.compare_digest(_tag(key, nonce, sealed), tag):
+          raise RunError(0, "the password is wrong, or the encrypted text was changed.")
+      return _chacha(key, nonce, sealed).decode("utf-8", "replace")
+  def random_code(n):
+      if n < 1 or n > 1024 or n != int(n):
+          raise RunError(0, "a random code is 1 to 1024 bytes long, not " + text(n) + ".")
+      return _os.urandom(int(n)).hex()
+
+to encrypted with, given message (text) and password (text), returning text = stellanova_encryption::encrypt({message}, {password})
+  runs: encrypt({message}, {password})
+  web: stellanova_encryption.encrypt({message}, {password}, {line})
+to decrypted with, given secret (text) and password (text), returning text = stellanova_encryption::decrypt({secret}, {password}, {line})
+  runs: decrypt({secret}, {password})
+  web: stellanova_encryption.decrypt({secret}, {password}, {line})
+to a random code of, given bytes (a number), returning text = stellanova_encryption::random_code({bytes}, {line})
+  runs: random_code({bytes})
+  web: stellanova_encryption.randomCode({bytes}, {line})
+
+javascript:
+  const stellanova_encryption = {
+    crypto(line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page can't encrypt yet (it works with node).");
+      return require("crypto");
+    },
+    encrypt(message, password, line) {
+      const c = this.crypto(line), salt = c.randomBytes(16), nonce = c.randomBytes(12);
+      const key = c.pbkdf2Sync(password, salt, 100000, 32, "sha256");
+      const cipher = c.createCipheriv("chacha20-poly1305", key, nonce, { authTagLength: 16 });
+      const sealed = Buffer.concat([cipher.update(message, "utf8"), cipher.final()]);
+      return Buffer.concat([salt, nonce, sealed, cipher.getAuthTag()]).toString("base64");
+    },
+    decrypt(secret, password, line) {
+      const c = this.crypto(line), all = Buffer.from(secret, "base64");
+      if (!/^[A-Za-z0-9+/]*=*$/.test(secret) || all.length < 44) stellanova.fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
+      const key = c.pbkdf2Sync(password, all.subarray(0, 16), 100000, 32, "sha256");
+      const d = c.createDecipheriv("chacha20-poly1305", key, all.subarray(16, 28), { authTagLength: 16 });
+      d.setAuthTag(all.subarray(all.length - 16));
+      try {
+        return Buffer.concat([d.update(all.subarray(28, all.length - 16)), d.final()]).toString("utf8");
+      } catch {
+        stellanova.fail(line, "the password is wrong, or the encrypted text was changed.");
+      }
+    },
+    randomCode(n, line) {
+      if (n < 1 || n > 1024 || n !== Math.floor(n)) stellanova.fail(line, `a random code is 1 to 1024 bytes long, not ${stellanova.text(n)}.`);
+      return this.crypto(line).randomBytes(n).toString("hex");
+    },
+  };

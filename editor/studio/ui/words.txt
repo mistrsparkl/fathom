@@ -136,3 +136,6 @@ set the eye view to|How wide the eye sees, in degrees: set the eye view to 90.
 shade the shapes with|A shader: shade the shapes with the command tint (given a place and a colour, returning a colour).
 the hash of with|A fingerprint of text (library hashing): the hash of with ("sha256", "hello").
 the signature of with|An HMAC (library hashing): the signature of with ("sha256", key, message).
+encrypted with|Keeps text secret with a password (library encryption): encrypted with (message, password).
+decrypted with|Gets an encrypted message back (library encryption): decrypted with (secret, password).
+a random code of|Random bytes nobody can guess, as hexadecimal text (library encryption): a random code of 16.

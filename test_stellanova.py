@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, hashing, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -428,6 +428,27 @@ def program_checks():
                ]))
     assert out.stdout == '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n5d41402abc4b2a76b9719d911017c592 da39a3ee5e6b4b0d3255bfef95601890afd80709\n2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\nf7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8\n128\n', repr(out.stdout + out.stderr)
     assert out.stderr.startswith('Line 9: there is no kind of hash called "crc".'), repr(out.stderr)
+
+    # Encryption: each way decrypts its own, and text node encrypted.
+    out = both(''.join([
+               'use: encryption\n'
+               '\n'
+               'genesis:\n'
+               '  set long to "a secret message, long enough to need more than one block of sixty-four bytes: héllo wörld 12345 67890"\n'
+               '  set secret to encrypted with (long, "pässword")\n'
+               '  scrawl decrypted with (secret, "pässword") is long, " ", secret is encrypted with (long, "pässword")\n'
+               '  scrawl decrypted with (encrypted with ("", "k"), "k"), "|"\n'
+               '  scrawl the size of a random code of 16\n'
+               '  scrawl decrypted with ("hN4gCn+f93dP8TSvvzNh9dToaFANdvhaf0Eo9FuuFpkOERglv8qLsqJGKN6Jse9vzFV4SsGoHeA9UVNu/SJ9T9pAYM+u8mLUd/QEJPYAESCkQpojktoWm5f6G4NeoZsmDPPqhxGGGBaOg21rRYgtuADZmrh6GyabObz9tz1UqfFCHVvrdy95AVDeHeKbZdjMORbJ9gTagMVwk9rr/TOvfjmx0xaNThA=", "pässword")\n'
+               '  try:\n'
+               '    scrawl decrypted with (secret, "wrong")\n'
+               '  if that went wrong:\n'
+               '    scrawl the wound\n'
+               '  scrawl decrypted with ("not!secret", "x")\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == 'yes no\n|\n32\na secret message, long enough to need more than one block of sixty-four bytes: héllo wörld 12345 67890 and more more more\nthe password is wrong, or the encrypted text was changed.\n', repr(out.stdout + out.stderr)
+    assert out.stderr.startswith("Line 14: that isn't encrypted text"), repr(out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([
