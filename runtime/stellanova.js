@@ -323,6 +323,7 @@
         report(e);
         if (inNode) process.exitCode = 1;
       }
+      if (inNode) process.exit(process.exitCode || 0);  // open sockets don't keep a finished program going
     },
     meanwhile(f) {
       others.push(Promise.resolve().then(f).catch((e) => { report(e); leave(1); }));
