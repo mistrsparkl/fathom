@@ -2,7 +2,7 @@ note: Words for databases (SQLite files, which many programs can read). Use them
 note: Write a ? where a value goes and give the values as a list of text, so text from people can't change the command.
 note: Answers come back as text, one list per row ("" for an empty cell).
 note: shortcut: each word opens and closes the file, fine for small programs; keep it open between words if they need to be faster.
-note: Not on the web yet: browsers have no SQLite.
+note: On the web this works with node (its own SQLite); a web page has no databases.
 
 include: <winsqlite/winsqlite3.h>
 link: winsqlite3
@@ -110,9 +110,67 @@ python:
 
 to change the database, given file (text) and command (text) = stellanova_database::run({file}, {command}, {}, {line})
   runs: database({file}, {command}, [])
+  web: stellanova_database.run({file}, {command}, [], {line})
 to change the database with values, given file (text) and command (text) and values (a list of text) = stellanova_database::run({file}, {command}, {values}, {line})
   runs: database({file}, {command}, {values})
+  web: stellanova_database.run({file}, {command}, {values}, {line})
 to rows from the database, given file (text) and question (text), returning a list of lists of text = stellanova_database::run({file}, {question}, {}, {line})
   runs: database({file}, {question}, [])
+  web: stellanova_database.run({file}, {question}, [], {line})
 to rows from the database with values, given file (text) and question (text) and values (a list of text), returning a list of lists of text = stellanova_database::run({file}, {question}, {values}, {line})
   runs: database({file}, {question}, {values})
+  web: stellanova_database.run({file}, {question}, {values}, {line})
+
+javascript:
+  const stellanova_database = {
+    split(command) {  // shortcut: splits at ; outside quotes and notes, so a trigger's BEGIN ... END breaks; use exec for those if needed
+      const parts = [];
+      let now = "", quote = null;
+      for (let k = 0; k < command.length; k++) {
+        const c = command[k];
+        if (quote) {
+          now += c;
+          if (quote === "\n" ? c === "\n" : quote === "*/" ? c === "/" && command[k - 1] === "*" : c === quote) quote = null;
+        } else if (c === "'" || c === '"' || c === "`" || c === "[") { quote = c === "[" ? "]" : c; now += c; }
+        else if (c === "-" && command[k + 1] === "-") { quote = "\n"; now += c; }
+        else if (c === "/" && command[k + 1] === "*") { quote = "*/"; now += c + "*"; k++; }
+        else if (c === ";") { if (now.trim()) parts.push(now); now = ""; }
+        else now += c;
+      }
+      if (now.trim() && !/^(\s|--[^\n]*(\n|$)|\/\*[\s\S]*?\*\/)*$/.test(now)) parts.push(now);
+      return parts;
+    },
+    run(file, command, values, line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page has no databases (this works with node).");
+      let db;
+      try {
+        const { DatabaseSync } = require("node:sqlite");
+        db = new DatabaseSync(file);
+      } catch (e) {
+        stellanova.fail(line, `I couldn't open the database "${file}": ${e.message}.`);
+      }
+      const rows = [];
+      let used = 0;
+      try {
+        for (const part of this.split(command)) {
+          let step;
+          try { step = db.prepare(part); } catch (e) { stellanova.fail(line, `the database said: ${e.message}.`); }
+          const holes = (part.match(/\?/g) || []).length;
+          if (used + holes > values.length) stellanova.fail(line, `the command has ${(command.match(/\?/g) || []).length} ?, but there are ${values.length} values.`);
+          const given = values.slice(used, used + holes);
+          used += holes;
+          let got;
+          try {
+            if (step.columns().length) { step.setReturnArrays(true); got = step.all(...given); }
+            else { step.run(...given); got = []; }
+          } catch (e) { stellanova.fail(line, `the database said: ${e.message}.`); }
+          for (const row of got)
+            rows.push(row.map((c) => (c === null ? "" : typeof c === "number" || typeof c === "bigint" ? stellanova.text(Number(c)) : c instanceof Uint8Array ? Buffer.from(c).toString("latin1") : String(c))));
+        }
+      } finally {
+        db.close();
+      }
+      if (used !== values.length) stellanova.fail(line, `the command has ${used} ?, but there are ${values.length} values.`);
+      return rows;
+    },
+  };
