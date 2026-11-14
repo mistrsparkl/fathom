@@ -112,3 +112,4 @@ connect to|TCP (library network): connect to with ("example.com", 80) gives a co
 listen on port|A TCP server (library network): set listener to listen on port 8080, then accept a connection on listener.
 connect a websocket to|A WebSocket (library network): connect a websocket to "ws://localhost:8080"; send on and receive from take whole messages.
 open the udp port|UDP (library network): open the udp port 9000; send udp with (u, host, port, text); receive udp from u.
+holding the lock|Only one command at a time runs the indented lines: holding the lock "total":

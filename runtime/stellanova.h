@@ -173,6 +173,25 @@ namespace stellanova
 		std::string kind;  // a kind of problem of the program's own ('raise a fuel problem with'), or ""
 	};
 
+	inline std::recursive_mutex& named_lock(const std::string& name)  // 'holding the lock "total":'
+	{
+		static std::mutex guard;
+		static std::map<std::string, std::unique_ptr<std::recursive_mutex>> locks;
+		std::lock_guard<std::mutex> hold(guard);
+		auto& at = locks[name];
+		if (!at)
+			at = std::make_unique<std::recursive_mutex>();
+		return *at;
+	}
+
+	struct Held  // holds a named lock until the end of the lines it is for
+	{
+		std::recursive_mutex& m;
+		explicit Held(const std::string& name) : m(named_lock(name)) { m.lock(); }
+		~Held() { m.unlock(); }
+		Held(const Held&) = delete;
+	};
+
 	[[noreturn]] inline void fail(int line, const std::string& message, const std::string& kind = "")
 	{
 		throw Problem{line, message, kind};

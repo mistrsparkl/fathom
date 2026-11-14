@@ -97,6 +97,15 @@ The kind says what the command takes and returns: `a command` (nothing either wa
 
 **At the same time.** `meanwhile download with ("https://example.com/a.png", "a.png")` starts a command going on its own, and the next line carries on straight away. `wait for the others` waits until every command started with `meanwhile` has finished (a program also waits for them before it ends). Each one gets its own copy of every name as it was when it started, so they can't spoil each other's values; they can share files and the screen. A problem in any of them stops the whole program. `meanwhile invoke f` works too.
 
+**Sharing, with locks.** Commands going alongside share the names in `the world remembers:` (only their own names are copies). When several change the same one, they must take turns, or changes get lost:
+
+```
+holding the lock "total":
+  set total to total plus 1
+```
+
+Only one command at a time runs lines holding a lock with that name; the others wait for it. A command can hold the same lock again inside itself (not on the web yet). The lines can't leave partway (`return`, `break free`, `move on`), and a problem inside them lets the lock go.
+
 ## Your own kinds of things
 
 Describe what a kind of thing has, one part per line, then use it as a kind anywhere:

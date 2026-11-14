@@ -337,6 +337,41 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Commands going alongside share the world's names, taking turns with a lock (a problem inside lets it go).
+    out = both(''.join([
+               'the world remembers:\n'
+               '  total (a number)\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to count up, given times (a number):\n'
+               '  repeat times times:\n'
+               '    holding the lock "total":\n'
+               '      set total to total plus 1\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to take the lock:\n'
+               '  holding the lock "total":\n'
+               '    scrawl "the other one has it"\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  try:\n'
+               '    holding the lock "total":\n'
+               '      raise a test problem with "inside the lock"\n'
+               '  if that went wrong:\n'
+               '    scrawl the wound\n'
+               '  meanwhile take the lock\n'
+               '  wait for the others\n'
+               '  meanwhile count up with 20000\n'
+               '  meanwhile count up with 20000\n'
+               '  meanwhile count up with 20000\n'
+               '  wait for the others\n'
+               '  scrawl total\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "inside the lock\nthe other one has it\n60000\n", repr(out.stdout + out.stderr)
+    assert "can't leave it partway" in perr('to f:\n  holding the lock "a":\n    return\n' + END + 'genesis:\n  f\n' + END)[1]
+
     # The network: TCP (with a server going alongside), UDP, and WebSockets.
     out = both(''.join([
                'use: network\n'

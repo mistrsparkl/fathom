@@ -626,6 +626,16 @@ extern "C"
 	void cn_raise(int line, V* message) { cn_set_problem({line, full(message)->s}); }
 	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, full(message)->s, full(kind)->s}); }
 	bool cn_problem_is(V* kind) { return pending.kind == full(kind)->s; }
+	void cn_lock(V* name)  // 'holding the lock "total":' (waiting for it is parked, so the collector can still run)
+	{
+		std::recursive_mutex& m = stellanova::named_lock(full(name)->s);
+		if (!m.try_lock())
+		{
+			Parked waiting;
+			m.lock();
+		}
+	}
+	void cn_unlock(V* name) { stellanova::named_lock(full(name)->s).unlock(); }
 	V* cn_problem_text()  // what went wrong, inside 'if that went wrong:' (and the problem is dealt with)
 	{
 		failed = false;

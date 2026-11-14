@@ -16,6 +16,18 @@
   }
   const fail = (line, message, kind = "") => { throw new Problem(line, message, kind); };
   const problem_kind = (e) => (e instanceof Problem ? e.kind : "");
+  // 'holding the lock "total":' - commands take turns at the lines (they can wait inside them)
+  const locks = new Map();  // name -> the promise the next one waits for
+  async function lock(name) {
+    while (locks.has(name)) await locks.get(name).done;  // shortcut: not re-entrant, so the same lock inside itself waits forever
+    let free;
+    locks.set(name, { done: new Promise((r) => (free = r)), free: () => free() });
+  }
+  function unlock(name) {
+    const l = locks.get(name);
+    locks.delete(name);
+    if (l) l.free();
+  }
 
   // ---- places, with the same names Unreal uses
   class Place3 {
@@ -272,7 +284,7 @@
   const ascii = (s, from, to) => s.replace(from, (c) => String.fromCharCode(c.charCodeAt(0) + to));
 
   const stellanova = {
-    Problem, fail, text, dup, same, count, kinds, problem_text, problem_kind, report,
+    Problem, fail, text, dup, same, count, kinds, problem_text, problem_kind, lock, unlock, report,
     on_say: null, on_problem: null,
     table: () => new Map(),
     kind(Kind, title, spec) {

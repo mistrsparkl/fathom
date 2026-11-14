@@ -379,6 +379,12 @@ def py_zero(kind, things):
 
 OTHERS = []  # commands running alongside the rest ('meanwhile ...'), as threads
 OTHERS_LOCK = threading.Lock()
+NAMED_LOCKS = {}  # 'holding the lock "total":' -> its lock (one command at a time holds each)
+
+
+def named_lock(name):
+    with OTHERS_LOCK:
+        return NAMED_LOCKS.setdefault(name, threading.RLock())
 
 
 def meanwhile(run, env):
@@ -3647,6 +3653,12 @@ def statements(body, names, declared, depth):
             continue
         if WENT_WRONG.fullmatch(raw.strip().lower()):
             raise ScriptError(n, "'if that went wrong:' goes right after the indented lines of a 'try:'.")
+        if raw.strip().lower().startswith("holding the lock ") and raw.strip().endswith(":"):
+            lines, run = holding(n, raw.strip()[len("holding the lock "):-1], inner, names, declared, depth)
+            out += lines
+            chain = None
+            runs.append(run)
+            continue
         if raw.strip().lower().startswith("depending on ") and raw.strip().endswith(":"):
             start = k - 1 - len(inner)
             rows = rows[:start] + depending_rows(n, raw.strip(), inner, indent) + rows[k:]
@@ -3800,6 +3812,47 @@ def watch_rows(rows, indent):
     out += loop
     out.append((first, f"{deep}{'reveal the frame' if framed else 'wait 0.01'}"))
     return out
+
+
+def holding(n, which, inner, names, declared, depth):
+    """'holding the lock "total":' - only one command at a time runs the indented lines (or any others holding that
+    lock): the rest wait their turn. For names commands going alongside ('meanwhile') share."""
+    if not inner:
+        raise ScriptError(n, "Say what to do on the indented lines below the ':'.")
+    for k, raw in inner:
+        if re.match(r"(return|give back|break free|stop the loop|move on|skip to the next)\b", raw.strip().lower()):
+            raise ScriptError(k, "Lines holding a lock can't leave it partway (with return, break free or move on): let them finish.")
+    lock = expr_to_end(tokenize(which, n), 0, names, n)
+    if lock.kind != TEXT:
+        raise ScriptError(n, f"A lock is named with text, like: holding the lock \"total\":")
+    tab = "\t" * depth
+    body_lines, body = statements(inner, names, declared, depth + 1)
+    get = lock.run
+
+    def run(env):
+        with named_lock(get(env)):
+            body(env)
+
+    def write(f):
+        name = machine.emit(f, lock)
+        f.put(f"call void @cn_lock(ptr {name})")
+        let_go, end = f.label("letgo"), f.label("held")
+        f.handlers.append(let_go)
+        machine.emit(f, body)
+        f.handlers.pop()
+        f.put(f"call void @cn_unlock(ptr {name})")
+        f.jump(end)
+        f.place(let_go)  # a problem inside: let the lock go, then on to where problems go
+        f.put(f"call void @cn_unlock(ptr {name})")
+        f.check()
+        f.jump(end)
+        f.place(end)
+    with_ir(run, write)
+    held = f"held_{n}"
+    if JS:
+        return ([f"{tab}const {held} = {strip_parens(lock.cpp)};", f"{tab}await stellanova::lock({held});", f"{tab}try", tab + "{"]
+                + body_lines + [tab + "}", f"{tab}finally", tab + "{", f"{tab}\tstellanova::unlock({held});", tab + "}"]), run
+    return [tab + "{", f"{tab}\tstellanova::Held {held}({strip_parens(lock.cpp)});"] + body_lines + [tab + "}"], run
 
 
 WENT_WRONG = re.compile(r"if that went wrong(?: with an? ([a-z][a-z ]*))?:")
