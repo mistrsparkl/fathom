@@ -134,3 +134,5 @@ etch the picture in space with|A picture laid in 3D, like a texture: etch the pi
 shine the light from|Where the 3D light comes from: shine the light from 1 horizontal 2 vertical -1 depth.
 set the eye view to|How wide the eye sees, in degrees: set the eye view to 90.
 shade the shapes with|A shader: shade the shapes with the command tint (given a place and a colour, returning a colour).
+the hash of with|A fingerprint of text (library hashing): the hash of with ("sha256", "hello").
+the signature of with|An HMAC (library hashing): the signature of with ("sha256", key, message).

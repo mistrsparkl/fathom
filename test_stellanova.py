@@ -151,9 +151,9 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, hashing, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
 
-    # Run real programs both ways: directly, and built into machine code (if LLVM is there).
+    # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
     import subprocess
     try:
@@ -412,6 +412,22 @@ def program_checks():
                ]))
     assert out.stdout == "4 3 #336699\n#ff0000 #00ff0080 #336699\n48 51 255\n#cc9966\n#cc9966 #000000\n", repr(out.stdout)
     assert out.stderr == "Line 25: there is no dot at 4, 0 in a picture 4 by 3 (dots go from 0, 0).\n", repr(out.stderr)
+
+    # Hashes and signatures (HMAC), the same every way.
+    out = both(''.join([
+               'use: hashing\n'
+               '\n'
+               'genesis:\n'
+               '  scrawl the hash of with ("sha256", "hello")\n'
+               '  scrawl the hash of with ("md5", "hello"), " ", the hash of with ("sha1", "")\n'
+               '  scrawl the hash of the bytes with ("sha256", a list of (104, 101, 108, 108, 111))\n'
+               '  scrawl the signature of with ("sha256", "key", "The quick brown fox jumps over the lazy dog")\n'
+               '  scrawl the size of the hash of with ("sha512", "héllo")\n'
+               '  scrawl the hash of with ("crc", "x")\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n5d41402abc4b2a76b9719d911017c592 da39a3ee5e6b4b0d3255bfef95601890afd80709\n2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\nf7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8\n128\n', repr(out.stdout + out.stderr)
+    assert out.stderr.startswith('Line 9: there is no kind of hash called "crc".'), repr(out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([

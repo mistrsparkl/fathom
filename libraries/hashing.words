@@ -1,0 +1,99 @@
+note: Words for hashes: a short fingerprint of text or bytes that changes completely if anything in it changes.
+note: Use them in a program with:  use: hashing
+note: Kinds of hash: "sha256" (the usual one), "sha512", "sha1" and "md5" (old: fine for spotting changes, not for safety).
+note: Hashes come back as text in hexadecimal, like "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <bcrypt.h>
+link: bcrypt
+
+code:
+  namespace stellanova_hashing
+  {
+  	inline const wchar_t* algorithm(const std::string& kind, int line)
+  	{
+  		if (kind == "sha256") return BCRYPT_SHA256_ALGORITHM;
+  		if (kind == "sha512") return BCRYPT_SHA512_ALGORITHM;
+  		if (kind == "sha1") return BCRYPT_SHA1_ALGORITHM;
+  		if (kind == "md5") return BCRYPT_MD5_ALGORITHM;
+  		stellanova::fail(line, "there is no kind of hash called \"" + kind + "\". Kinds: sha256, sha512, sha1, md5.");
+  	}
+  	inline std::string hash(const std::string& kind, const std::string& data, const std::string* key, int line)
+  	{
+  		BCRYPT_ALG_HANDLE alg = nullptr;
+  		if (BCryptOpenAlgorithmProvider(&alg, algorithm(kind, line), nullptr, key ? BCRYPT_ALG_HANDLE_HMAC_FLAG : 0) != 0)
+  			stellanova::fail(line, "this computer can't make " + kind + " hashes.");
+  		DWORD size = 0, got = 0;
+  		BCryptGetProperty(alg, BCRYPT_HASH_LENGTH, (PUCHAR)&size, sizeof size, &got, 0);
+  		std::vector<unsigned char> out(size);
+  		BCRYPT_HASH_HANDLE h = nullptr;
+  		BCryptCreateHash(alg, &h, nullptr, 0, key ? (PUCHAR)key->data() : nullptr, key ? (ULONG)key->size() : 0, 0);
+  		BCryptHashData(h, (PUCHAR)data.data(), (ULONG)data.size(), 0);
+  		BCryptFinishHash(h, out.data(), size, 0);
+  		BCryptDestroyHash(h);
+  		BCryptCloseAlgorithmProvider(alg, 0);
+  		static const char* digits = "0123456789abcdef";
+  		std::string hex;
+  		for (unsigned char c : out)
+  			hex += digits[c >> 4], hex += digits[c & 15];
+  		return hex;
+  	}
+  	inline std::string bytes(const std::vector<double>& numbers, int line)
+  	{
+  		std::string out;
+  		for (double x : numbers)
+  		{
+  			if (x < 0 || x > 255 || x != (double)(int)x)
+  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  			out += (char)(unsigned char)x;
+  		}
+  		return out;
+  	}
+  }
+
+python:
+  import hashlib as _hashlib
+  import hmac as _hmac
+  def _kind(kind):
+      if kind not in ("sha256", "sha512", "sha1", "md5"):
+          raise RunError(0, 'there is no kind of hash called "' + kind + '". Kinds: sha256, sha512, sha1, md5.')
+      return kind
+  def _bytes(numbers):
+      for x in numbers:
+          if x < 0 or x > 255 or x != int(x):
+              raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
+      return bytes(int(x) for x in numbers)
+
+to the hash of, given kind (text) and words (text), returning text = stellanova_hashing::hash({kind}, {words}, nullptr, {line})
+  runs: _hashlib.new(_kind({kind}), {words}.encode("utf-8")).hexdigest()
+  web: await stellanova_hashing.hash({kind}, new TextEncoder().encode({words}), null, {line})
+to the hash of the bytes, given kind (text) and bytes (a list of numbers), returning text = stellanova_hashing::hash({kind}, stellanova_hashing::bytes({bytes}, {line}), nullptr, {line})
+  runs: _hashlib.new(_kind({kind}), _bytes({bytes})).hexdigest()
+  web: await stellanova_hashing.hash({kind}, stellanova_hashing.bytes({bytes}, {line}), null, {line})
+to the signature of, given kind (text) and key (text) and words (text), returning text = [&] { std::string k = {key}; return stellanova_hashing::hash({kind}, {words}, &k, {line}); }()
+  runs: _hmac.new({key}.encode("utf-8"), {words}.encode("utf-8"), _kind({kind})).hexdigest()
+  web: await stellanova_hashing.hash({kind}, new TextEncoder().encode({words}), new TextEncoder().encode({key}), {line})
+
+javascript:
+  const stellanova_hashing = {
+    bytes(numbers, line) {
+      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `a byte is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
+      return Uint8Array.from(numbers);
+    },
+    async hash(kind, data, key, line) {
+      if (!["sha256", "sha512", "sha1", "md5"].includes(kind)) stellanova.fail(line, `there is no kind of hash called "${kind}". Kinds: sha256, sha512, sha1, md5.`);
+      if (typeof require === "function") {
+        const crypto = require("crypto");
+        return (key ? crypto.createHmac(kind, key) : crypto.createHash(kind)).update(data).digest("hex");
+      }
+      if (kind === "md5") stellanova.fail(line, "a web page can't make md5 hashes; use sha256.");
+      const name = { sha256: "SHA-256", sha512: "SHA-512", sha1: "SHA-1" }[kind];
+      const out = key
+        ? await crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: name }, false, ["sign"]), data)
+        : await crypto.subtle.digest(name, data);
+      return Array.from(new Uint8Array(out), (b) => b.toString(16).padStart(2, "0")).join("");
+    },
+  };
