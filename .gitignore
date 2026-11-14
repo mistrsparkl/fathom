@@ -13,3 +13,7 @@ editor/studio/node_modules/
 editor/studio/generated/
 editor/studio/ui/screens.js
 editor/studio/ui/stellanova.js
+
+# the tutorial film: everything made while filming
+tutorial/out/
+tutorial/__pycache__/

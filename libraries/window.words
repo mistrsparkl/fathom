@@ -42,6 +42,43 @@ code:
   	inline int width = 0, height = 0;
   	inline LARGE_INTEGER last_frame{};
 
+  	// Recording a game for a video (built programs only): STELLANOVA_DEMO_FRAMES names a file that gets every frame
+  	// (raw BGRA, width x height), and STELLANOVA_DEMO_KEYS a file of "frame key down|up" lines (or "frame quit") played
+  	// as if pressed. The window stays hidden and every frame counts as exactly 1/60 of a second.
+  	struct DemoKey { long frame; int key; bool down; };
+  	inline FILE* demo_frames = nullptr;
+  	inline std::vector<DemoKey> demo_keys;
+  	inline size_t demo_next = 0;
+  	inline long demo_frame = 0;
+  	inline bool demo = false;
+  	inline int key_code(const std::string& name, int line);
+  	inline void demo_start()
+  	{
+  		char path[1024];
+  		if (GetEnvironmentVariableA("STELLANOVA_DEMO_FRAMES", path, sizeof path))
+  		{
+  			demo = true;
+  			demo_frames = std::fopen(path, "wb");
+  		}
+  		if (GetEnvironmentVariableA("STELLANOVA_DEMO_KEYS", path, sizeof path))
+  		{
+  			demo = true;
+  			if (FILE* f = std::fopen(path, "r"))
+  			{
+  				char name[64], how[16];
+  				long at;
+  				while (std::fscanf(f, "%ld %63s", &at, name) == 2)
+  				{
+  					if (std::string(name) == "quit") { demo_keys.push_back({at, -1, false}); continue; }
+  					if (std::fscanf(f, "%15s", how) != 1) break;
+  					demo_keys.push_back({at, key_code(name, 0), std::string(how) == "down"});
+  				}
+  				std::fclose(f);
+  			}
+  		}
+  	}
+  	inline void demo_step();
+
   	inline std::wstring wide(const std::string& s)
   	{
   		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
@@ -163,7 +200,8 @@ code:
   		RECT all{0, 0, width, height};
   		FillRect(canvas, &all, (HBRUSH)GetStockObject(BLACK_BRUSH));
   		open_now = opened = true;
-  		ShowWindow(window, SW_SHOW);
+  		demo_start();
+  		ShowWindow(window, demo ? SW_HIDE : SW_SHOW);
   		pump();
   		QueryPerformanceCounter(&last_frame);
   	}
@@ -240,6 +278,8 @@ code:
   			UpdateWindow(window);
   		}
   		pump();
+  		if (demo)
+  			demo_step();
   		for (int k = 0; k < 256; ++k)
   		{
   			pressed[k] = fresh[k];
@@ -272,6 +312,11 @@ code:
   		}
   		last_mouse_x = mouse_x_now;
   		last_mouse_y = mouse_y_now;
+  		if (demo)
+  		{
+  			frame_time = 1.0 / 60;
+  			return;
+  		}
   		LARGE_INTEGER now, freq;
   		QueryPerformanceFrequency(&freq);
   		QueryPerformanceCounter(&now);
@@ -281,6 +326,38 @@ code:
   		LARGE_INTEGER before = last_frame;
   		QueryPerformanceCounter(&last_frame);
   		frame_time = double(last_frame.QuadPart - before.QuadPart) / double(freq.QuadPart);
+  	}
+
+  	inline void demo_step()
+  	{
+  		if (demo_frames)
+  		{
+  			BITMAPINFO info{};
+  			info.bmiHeader.biSize = sizeof info.bmiHeader;
+  			info.bmiHeader.biWidth = width;
+  			info.bmiHeader.biHeight = -height;  // top row first
+  			info.bmiHeader.biPlanes = 1;
+  			info.bmiHeader.biBitCount = 32;
+  			info.bmiHeader.biCompression = BI_RGB;
+  			std::vector<unsigned char> pixels((size_t)width * height * 4);
+  			HBITMAP shown = (HBITMAP)GetCurrentObject(canvas, OBJ_BITMAP);
+  			GetDIBits(canvas, shown, 0, height, pixels.data(), &info, DIB_RGB_COLORS);
+  			std::fwrite(pixels.data(), 1, pixels.size(), demo_frames);
+  			std::fflush(demo_frames);
+  		}
+  		++demo_frame;
+  		for (; demo_next < demo_keys.size() && demo_keys[demo_next].frame <= demo_frame; ++demo_next)
+  		{
+  			const DemoKey& k = demo_keys[demo_next];
+  			if (k.key < 0)
+  			{
+  				open_now = false;
+  				continue;
+  			}
+  			if (k.down && !keys[k.key])
+  				fresh[k.key] = true;
+  			keys[k.key] = k.down;
+  		}
   	}
 
   	inline Gdiplus::Image* picture(const std::string& file, int line)

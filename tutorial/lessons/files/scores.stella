@@ -1,0 +1,15 @@
+whisper: Keeping score, for any game that wants it.
+
+the world remembers:
+  high scores (a table of numbers)
+and the universe said i love you
+
+to record, given player (text) and points (a number):
+  if not (high scores contains player) or points exceeds entry player of high scores:
+    set entry player of high scores to points
+and the universe said i love you
+
+genesis:
+  record with ("Sam", 10)
+  scrawl high scores as saved text
+and the universe said i love you

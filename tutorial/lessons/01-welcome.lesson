@@ -1,0 +1,74 @@
+title: Welcome
+card: Stellanova | Learning the language | Every part of it, from the first line to a game of your own
+say:
+  Welcome to Stellanova, a programming language that reads like English.
+  In this film we'll go through every part of the language: what each piece does, and how to use it.
+  At the end, we'll make a whole platform game together, and take it apart to see how it works.
+uncard
+
+say: This is Stellanova Studio, where we'll write everything. Let's take a quick look around.
+point: #files
+say: On the left are the files in our folder. Programs are files whose names end in dot stella.
+point: #word-search
+say: Below them is a list of every word the language knows. You can search it, and click a word to see what it does.
+point: #run
+say:
+  Across the top are the buttons that do things with a program.
+  Run runs it. Watch runs it one line at a time. Test runs its checks. Build makes it into a program of its own, and Web makes it into a web page.
+point: #output
+say: And at the bottom, this is where a program's words appear when it runs.
+hide cursor
+
+card: Chapter 1 | Saying something | Your first program
+say: Every program starts somewhere. Let's write the smallest one.
+uncard
+
+new: hello.stella
+type:
+  genesis:
+    scrawl "Hello!"
+  and the universe said i love you
+zoom: lines 1-3
+spot: line 1
+say:
+  The word genesis, with a colon, is where every program begins.
+spot: line 2
+say:
+  The lines that belong to it are moved to the right, with two spaces. This one says scrawl, which shows something on the screen.
+  Text goes between quote marks.
+spot: line 3
+say:
+  And every block ends with this line: and the universe said I love you. It tells Stellanova that genesis is finished.
+spot: off
+zoom: out
+say: Let's run it.
+run
+zoom: output
+say: There it is. Hello.
+wait
+zoom: out
+
+say: Now something a little more useful. Text can have names inside it, in square brackets.
+clear
+type:
+  genesis:
+    set name to "Sam"
+    set coins to 3
+    scrawl "Hello, [name]! You have [coins] coins."
+    scrawl "After this one, you'll have [coins plus 1]."
+  and the universe said i love you
+zoom: lines 2-5
+spot: lines 2-3
+say:
+  Set name to Sam remembers the text Sam under the name: name.
+  And coins remembers the number three.
+spot: line 4
+say: Inside the quote marks, square brackets are filled in with whatever the words in them hold.
+spot: line 5
+say: And they can even work things out, like coins plus one.
+spot: off
+run
+zoom: output
+say: Hello Sam, you have three coins. After this one, you'll have four.
+wait
+zoom: out

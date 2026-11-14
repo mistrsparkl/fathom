@@ -1,0 +1,128 @@
+title: Sharing, several scripts, saving, and two things at once
+card: Chapter 9 | Names the whole program shares | The world remembers
+say:
+  A name set inside a command belongs to that command, and disappears when it ends.
+  Names that every command shares go in a block called: the world remembers.
+uncard
+files: scores.stella
+open: scores.stella
+zoom: lines 1-10
+spot: line 1
+say: This script was written earlier. The first line is a whisper: a note for people. The computer ignores it.
+spot: lines 3-5
+say:
+  The world remembers high scores, a table of numbers. Every command in the program can read it and change it.
+  Shared names start empty: zero, no, empty text, or an empty list or table.
+spot: lines 7-10
+say:
+  Record keeps a player's points, if they're new, or better than before.
+spot: off
+zoom: out
+
+card: Chapter 9 | Several scripts | One program, made of many files
+say: A bigger program is easier to keep in several scripts. Let's make a game that uses this one.
+uncard
+new: game.stella
+type:
+  use: scores.stella
+
+  the world remembers:
+    games played (a number)
+  and the universe said i love you
+
+  to play a round, given player (text) and points (a number):
+    set games played to games played plus 1
+    record with (player, points)
+  and the universe said i love you
+
+  genesis:
+    play a round with ("Sam", 31)
+    play a round with ("Jo", 7)
+    play a round with ("Sam", 12)
+    scrawl games played, " games. Best scores: ", high scores as saved text
+  and the universe said i love you
+zoom: lines 1-5
+spot: line 1
+say:
+  Use scores dot stella brings in that script's commands, kinds, and shared names. It's looked for next to this one.
+  Its genesis is left out, so each script can still be run and tried by itself.
+spot: lines 3-5
+say: This script remembers its own shared name too: how many games were played.
+spot: off
+zoom: lines 7-10
+say: Play a round counts the game, and uses record, from the other script.
+zoom: lines 12-17
+spot: line 16
+say:
+  As saved text writes any value as JSON: the text format websites and other programs use. Load from the text reads it back.
+spot: off
+zoom: out
+run
+zoom: output
+say: Three games, and the best scores: Jo seven, Sam thirty one. Sam's twelve wasn't better, so it wasn't kept.
+wait
+zoom: out
+
+card: Chapter 9 | Saving and loading | Remembering between runs
+say: When the program ends, its names are gone. To remember high scores for next time, save them in a file.
+uncard
+line: 16
+type:
+
+    save high scores to file "scores.json"
+line: 12
+type:
+
+    if file "scores.json" exists: load high scores from file "scores.json"
+zoom: lines 12-18
+spot: line 13
+say:
+  If the file exists, load high scores from it. Load needs a name that already holds the right kind of value, here, a table of numbers.
+spot: line 18
+say: And at the end, save writes them to the file. Lists, tables, places and your own kinds of things can all be saved, even inside each other.
+spot: off
+zoom: out
+run
+say: The first run saves the scores. Now let's change the game, and run it again.
+line: 14
+keys: end
+keys: backspace backspace backspace
+type: 50)
+run
+zoom: output
+say: Sam scored fifty, and that beat the thirty one that was loaded from the file.
+wait
+zoom: out
+
+card: Chapter 9 | Two things at once | Meanwhile
+say: Last in this chapter: doing two things at the same time.
+uncard
+new: both.stella
+type:
+  to count, given who (text) and gap (a number):
+    for each n from 1 to 3:
+      wait gap
+      scrawl who, " ", n
+  and the universe said i love you
+
+  genesis:
+    meanwhile count with ("fast", 0.3)
+    meanwhile count with ("slow", 0.5)
+    wait for the others
+    scrawl "Both done."
+  and the universe said i love you
+zoom: lines 1-5
+say: Count waits a moment between numbers. Wait comes from the time library, and gap says how many seconds.
+zoom: lines 7-12
+spot: lines 8-9
+say:
+  Meanwhile starts a command going on its own, and the next line carries on straight away. So both counters run at once.
+spot: line 10
+say: Wait for the others waits until everything started with meanwhile has finished.
+spot: off
+zoom: out
+run
+zoom: output
+say: Fast and slow take turns, each at its own speed, and then: both done.
+wait
+zoom: out

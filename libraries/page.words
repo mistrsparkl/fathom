@@ -106,6 +106,10 @@ to scroll into view, given element (a number)
   web: stellanova_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
 to scroll to the end, given element (a number)
   web: stellanova_page::end({element}, {line})
+to scrolled down in the element, given element (a number), returning a number
+  web: stellanova_page::get({element}, {line}).scrollTop
+to scrolled across in the element, given element (a number), returning a number
+  web: stellanova_page::get({element}, {line}).scrollLeft
 
 note: ---- answering the person: 'whenever with (button, "click", the command pressed)' where pressed is given the event
 to listen for an event, given element (a number) and happening (text) and then (a command given a number)

@@ -1,0 +1,196 @@
+title: Places, asking, files and problems
+card: Chapter 8 | Places | Where things are
+say:
+  Games and drawings need to know where things are. In Stellanova, a place is a value too.
+uncard
+
+new: places.stella
+type:
+  genesis:
+    set home to 100 horizontal 50 vertical
+    set step to 30 horizontal 40 vertical
+    scrawl home plus step
+    scrawl "The step is ", the size of step, " long."
+    scrawl "It goes ", (home plus step) of horizontal, " across."
+  and the universe said i love you
+zoom: lines 2-6
+spot: line 2
+say:
+  A hundred horizontal, fifty vertical, is a flat place: a hundred across, and fifty down. On a screen, down is more.
+  A place can have a depth too, for three D.
+spot: line 4
+say: Places can be added and taken away, and made bigger or smaller with times.
+spot: line 5
+say: The size of a place is how far it is from zero. Thirty across and forty down is fifty long.
+spot: line 6
+say: And of horizontal is just the across part. Of vertical is the down part.
+spot: off
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 8 | Birth and existence | Where a thing starts, and where it is now
+say:
+  Here's a special pair of words. Give a kind of thing a part called birth, and it gets a part called existence by itself.
+  Birth is where it starts. Existence is where it is now.
+uncard
+clear
+type:
+  a ball has:
+    birth (a flat place)
+    radius (a number)
+  and the universe said i love you
+
+  genesis:
+    conjure a ball as red
+    set the birth of red to 100 horizontal 50 vertical
+    set the radius of red to 20
+    set the existence of red to the existence of red plus 30 horizontal 40 vertical
+    scrawl "Red began at ", the birth of red, " and is now at ", the existence of red
+    conjure a ball as blue
+    set the birth of blue to 160 horizontal 90 vertical
+    set the radius of blue to 20
+    if red touches blue: scrawl "They touch!"
+    if the existence of red is within 50 of the existence of blue: scrawl "And they're close."
+    set the existence of red to the birth of red
+    scrawl "Red is home again at ", the existence of red
+  and the universe said i love you
+zoom: lines 1-4
+say: A ball has a birth, which is a flat place, and a radius.
+zoom: lines 7-11
+spot: line 8
+say: Setting the birth of red puts its existence there too.
+spot: line 10
+say: Then we move it, by adding to its existence.
+spot: off
+zoom: lines 12-18
+spot: line 15
+say:
+  Touches asks whether two things' circles overlap. Each needs a birth, which gives it an existence, and a radius.
+spot: line 16
+say: Is within fifty of asks whether two places are fifty or less apart. That's handy for picking things up in a game.
+spot: line 17
+say: And setting existence to birth sends it back to where it started.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 8 | Asking | Questions for the person using the program
+say: A program can ask the person using it a question, and wait for the answer.
+uncard
+clear
+type:
+  genesis:
+    ask "What's your name? " into name
+    ask "How old are you? " into age (a number)
+    scrawl "Hi ", name, "! In ten years you'll be ", age plus 10, "."
+  and the universe said i love you
+zoom: lines 2-4
+spot: line 2
+say: Ask shows the question, and keeps what the person types under a name, as text.
+spot: line 3
+say: With a number in brackets, it keeps asking until a number is typed.
+spot: off
+zoom: out
+run: and keep going
+say: When a program asks, the answer box at the bottom is where we type.
+answer: Sam
+answer: ten
+zoom: output
+say: Ten is a word, not a number, so it asks again.
+wait
+zoom: out
+answer: 11
+until finished
+zoom: output
+say: Hi Sam. In ten years you'll be twenty one.
+wait
+zoom: out
+
+card: Chapter 8 | Files | Keeping things after the program ends
+say: Programs can write files, and read them back.
+uncard
+line: 4
+type:
+
+    inscribe "Name: " plus name plus new line into file "visitors.txt"
+    add "Age: " plus age to file "visitors.txt"
+    for each line in lines of file "visitors.txt":
+      scrawl "> ", line
+zoom: lines 5-8
+spot: line 5
+say:
+  Inscribe makes a file holding this text, or replaces it if it's already there. New line is a line break.
+spot: line 6
+say: Add to file adds a line to the end of a file.
+spot: line 7
+say:
+  And lines of file reads a file back, as a list of lines. Contents of file gives the whole file as one piece of text.
+spot: off
+zoom: out
+run: and keep going
+answer: Sam
+answer: 11
+until finished
+zoom: output
+wait
+zoom: out
+
+card: Chapter 8 | When things go wrong | Try, the wound, and raising an error
+say:
+  Sometimes things go wrong while a program runs. A file might be missing. Let's see what happens.
+uncard
+clear
+type:
+  genesis:
+    set crew to a list of ("Ann", "Bo")
+    scrawl item 5 of crew
+    scrawl "This line never runs."
+  and the universe said i love you
+run: expect a problem
+zoom: output
+say:
+  The program stops, with the line, and the reason in plain words. There is no item five in a list of two items.
+wait
+zoom: out
+say: To carry on instead, put the lines that might go wrong under try.
+clear
+type:
+  to fly, given fuel (a number):
+    if fuel falls below 10: raise an error with "not enough fuel (only " plus fuel plus ")"
+    scrawl "Up we go!"
+  and the universe said i love you
+
+  genesis:
+    try:
+      scrawl contents of file "missing.txt"
+    if that went wrong:
+      scrawl "No luck: ", the wound
+    try:
+      fly with 3
+    if that went wrong:
+      scrawl "Grounded: ", the wound
+    scrawl "Still going."
+  and the universe said i love you
+zoom: lines 7-10
+spot: lines 7-8
+say: Try, and below it, the lines that might go wrong.
+spot: lines 9-10
+say:
+  If that went wrong, at the same indent, right after, says what to do instead. Inside it, the wound is the reason, as text.
+spot: off
+zoom: lines 1-4
+spot: line 2
+say:
+  Your own commands can go wrong on purpose, with raise an error. Try catches that the same way.
+spot: off
+zoom: out
+run
+zoom: output
+say: No luck reading the missing file. Grounded, with only three fuel. And the program is still going.
+wait
+zoom: out

@@ -1,0 +1,105 @@
+title: Doing things again
+card: Chapter 4 | Doing things again | Repeat, for each, as long as, every and whenever
+say: Computers are good at doing things again and again. Stellanova has a few ways to say how many times.
+uncard
+
+new: loops.stella
+type:
+  genesis:
+    repeat 3 times:
+      scrawl "Hip hip hooray!"
+    for each n from 1 to 5:
+      scrawl n, " times 7 is ", n times 7
+  and the universe said i love you
+zoom: lines 2-5
+spot: lines 2-3
+say: Repeat three times does the lines below it three times.
+spot: lines 4-5
+say:
+  For each n from one to five does them once for each number, and while it does, the name n holds that number.
+  So the first time round n is one, then two, and so on up to five.
+spot: off
+run
+zoom: output
+say: Three cheers, and the seven times table.
+wait
+zoom: out
+
+say: For each can count in steps, too, and even count down.
+line: 5
+type:
+
+    for each n from 10 to 0 by -5:
+      scrawl n
+zoom: lines 6-7
+say: From ten to zero, by minus five: ten, five, zero.
+zoom: out
+
+say: When you don't know how many times, use as long as. It keeps going while something is yes.
+type:
+
+    set guess to 1
+    as long as guess times guess falls below 50:
+      set guess to guess plus 1
+    scrawl "The first square past 50 is ", guess times guess
+zoom: lines 8-11
+spot: lines 9-10
+say:
+  As long as guess times guess is below fifty, add one to guess.
+  When it's no longer below fifty, the loop stops, and the program carries on below it.
+spot: off
+zoom: out
+
+say: Two more words steer a loop from inside: move on, and break free.
+type:
+
+    for each n from 1 to 10:
+      if n is 3: move on
+      if n is 6: break free
+      scrawl "n is ", n
+zoom: lines 12-15
+spot: line 13
+say: Move on skips the rest of this round, and goes straight to the next one. So three is never shown.
+spot: line 14
+say: Break free leaves the loop altogether. So at six it stops.
+spot: off
+run
+zoom: output
+say: Ten, five, zero. Sixty four is the first square past fifty. And one, two, four, five.
+wait
+zoom: out
+
+card: Chapter 4 | Every and whenever | Things that happen on their own
+say:
+  A command can also say what to do every so often, and what to do whenever something happens.
+uncard
+clear
+type:
+  genesis:
+    set ticks to 0
+    every 0.5 seconds:
+      set ticks to ticks plus 1
+      scrawl "tick [ticks]"
+    whenever ticks is 3:
+      scrawl "That's three."
+      end the program with 0
+    scrawl "Waiting..."
+  and the universe said i love you
+zoom: lines 2-9
+spot: lines 3-5
+say: Every half a second, add one to ticks, and show it.
+spot: lines 6-8
+say:
+  Whenever ticks is three, say so, and end the program. End the program with zero stops it at once. Zero means all went well.
+spot: line 9
+say:
+  Here's the interesting part. Every and whenever don't start straight away. They start once the command's other lines are done.
+  So waiting is shown first.
+spot: off
+run
+zoom: output
+say: Waiting, then a tick every half second, and at three, it stops.
+wait
+zoom: out
+say:
+  In a game, every frame works the same way, for what happens sixty times a second, and whenever key pressed space, for what a key does.

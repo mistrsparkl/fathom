@@ -1,0 +1,105 @@
+title: Building, web pages, and grammar
+card: Chapter 11 | Building | A program of its own
+say:
+  So far Stellanova has run our programs directly. But a program can also be built: made into a dot exe file that runs on its own, and fast, on any Windows computer, without Stellanova.
+uncard
+
+new: count.stella
+type:
+  genesis:
+    set total to 0
+    for each n from 1 to 1000000:
+      set total to total plus n
+    scrawl "One to a million adds up to ", total with commas
+  and the universe said i love you
+zoom: lines 2-5
+say: Here's a program that adds up every number from one to a million.
+zoom: out
+build
+zoom: output
+say:
+  Build turns it into C++, and then into a program of its own. Built programs run far faster, so they're the way to go for games.
+wait
+zoom: out
+
+card: Chapter 11 | Web pages | Programs inside a page
+say:
+  The Web button makes a program into JavaScript instead, so it can be the inside of a web page, or an app.
+  The page library gives it the page.
+uncard
+new: clicker.stella
+type:
+  use: page
+
+  the world remembers:
+    clicks (a number)
+  and the universe said i love you
+
+  to pressed, given event (a number):
+    set clicks to clicks plus 1
+    set the text with (the element "#count", "Clicks: " plus clicks)
+  and the universe said i love you
+
+  genesis:
+    listen for an event with (the element "button", "click", the command pressed)
+  and the universe said i love you
+zoom: lines 12-14
+spot: line 13
+say:
+  Listen for an event says: when the button on the page is clicked, do the command pressed.
+  The element button finds it, the same way CSS selectors do.
+spot: off
+zoom: lines 7-10
+spot: line 8
+say: Pressed counts the click.
+spot: line 9
+say: And set the text puts the count into the element whose id is count.
+spot: off
+zoom: out
+web
+zoom: output
+say:
+  It made clicker dot j s, and Stellanova's own runtime next to it. A page that loads them both runs the program.
+  This studio is made this way: its screens are written in Stellanova, and so is the part that reads and writes your files.
+wait
+zoom: out
+
+card: Chapter 11 | Grammar for people | Reading like English
+say:
+  Stellanova is written for people to read. So in a few places, it asks for grammar, even though the computer skips it.
+uncard
+new: grammar.stella
+type:
+  a notice has:
+    title (text)
+  and the universe said i love you
+
+  genesis:
+    conjure a notice as first notice
+    set the title of first notice to "Hello"
+    set shown notices to a list containing first notice
+    scrawl size of shown notices
+  and the universe said i love you
+run: expect a mistake
+zoom: output
+say:
+  Write the size of, not size of. The is needed before a part of something: the size of, the title of.
+wait
+zoom: out
+line: 9
+keys: backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace
+type: the size of shown notices
+zoom: lines 6-9
+spot: line 6
+say: A or an is needed after conjure. And it checks you wrote a before a consonant, and an before a vowel.
+spot: line 8
+say: And a is needed before list containing.
+spot: off
+say:
+  Everywhere else, the, a and an are up to you. Set the notices, and set notices, are the same line.
+  That's also why a, an and the can't be names on their own.
+zoom: out
+run
+zoom: output
+wait
+zoom: out

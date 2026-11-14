@@ -1,0 +1,122 @@
+title: Lists and tables
+card: Chapter 5 | Lists and tables | Keeping many things together
+say: One name can hold many values, in a list. A list keeps them in order.
+uncard
+
+new: lists.stella
+type:
+  genesis:
+    set shopping to a list of ("milk", "eggs")
+    add "bread" to shopping
+    scrawl "I need ", the size of shopping, " things: ", shopping
+    for each thing in shopping:
+      scrawl "- ", thing
+    if shopping contains "eggs": scrawl "Don't drop the eggs!"
+    scrawl "The first thing is ", item 1 of shopping, "."
+  and the universe said i love you
+zoom: lines 2-8
+spot: line 2
+say: A list of milk and eggs. The values go in brackets, with commas between them.
+spot: line 3
+say: Add bread to shopping puts bread at the end.
+spot: line 4
+say: The size of a list is how many things it holds.
+spot: lines 5-6
+say: For each thing in shopping goes through the list, one thing at a time.
+spot: line 7
+say: Contains asks if something is in the list.
+spot: line 8
+say: And item one of shopping is the first thing. Items are counted from one, the way people count.
+spot: off
+run
+zoom: output
+say: Three things, each on its own line, a warning about the eggs, and the first thing is milk.
+wait
+zoom: out
+
+say: Items can be changed and taken out, too.
+line: 8
+type:
+
+    set item 2 of shopping to "butter"
+    remove item 1 from shopping
+    scrawl shopping
+zoom: lines 9-11
+say: Set item two to butter changes the second thing. Remove item one takes the first thing out, so everything after it moves up.
+zoom: out
+run
+zoom: output
+say: Butter and bread.
+wait
+zoom: out
+
+say: Lists of numbers can be sorted, added up, and more.
+type:
+
+    set scores to a list of (31, 7, 18, 25)
+    scrawl sorted scores
+    scrawl "Best: ", biggest of scores, ", average: ", average of scores
+    scrawl first 2 of reversed scores
+    scrawl join shopping with " and "
+    scrawl "a,b,c" split by ","
+zoom: lines 12-17
+spot: line 13
+say: Sorted gives a copy of the list, smallest first. The list itself stays as it was.
+spot: line 14
+say: Biggest of, smallest of, sum of and average of work a list of numbers out.
+spot: line 15
+say: Reversed turns it back to front, and first two takes the first two of those.
+spot: lines 16-17
+say: Join makes a list into one piece of text, and split by cuts text into a list.
+spot: off
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 5 | Tables | Looking things up by name
+say: A table is like a phone book. It keeps values under names, so you can look them up.
+uncard
+clear
+type:
+  genesis:
+    set ages to a table of numbers
+    set entry "Rex" of ages to 3
+    set entry "Tom" of ages to 7
+    scrawl "Rex is ", entry "Rex" of ages
+    scrawl keys of ages
+    if ages contains "Tom": scrawl "We know Tom."
+  and the universe said i love you
+zoom: lines 2-7
+spot: line 2
+say: A table of numbers starts empty.
+spot: lines 3-4
+say: Set entry Rex of ages to three keeps three under the name Rex. Setting it again would replace it.
+spot: line 5
+say: Entry Rex of ages looks it up.
+spot: line 6
+say: Keys of ages gives every name it holds, in alphabetical order.
+spot: line 7
+say: And contains asks whether a name is there.
+spot: off
+run
+zoom: output
+wait
+zoom: out
+
+say: Lists can hold lists, too. A list of lists of numbers is a grid.
+line: 7
+type:
+
+    set grid to a list of lists of numbers
+    add a list of (1, 2) to grid
+    add a list of (3, 4) to grid
+    scrawl grid, " / ", item 2 of item 1 of grid
+zoom: lines 8-11
+say: Item two of item one of grid reaches inside: the second number of the first row.
+zoom: out
+run
+zoom: output
+say: The rows are shown in brackets, and the number we reached for is two.
+wait
+zoom: out

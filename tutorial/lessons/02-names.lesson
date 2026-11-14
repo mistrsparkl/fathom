@@ -1,0 +1,124 @@
+title: Remembering and working things out
+card: Chapter 2 | Remembering things | Names, numbers, text, and working things out
+say:
+  Programs need to remember things. In Stellanova, you give a value a name with the word set.
+uncard
+
+new: shop.stella
+type:
+  genesis:
+    set price to 4.5
+    set count to 3
+    set total to price times count
+    scrawl "Three cakes cost ", total
+  and the universe said i love you
+zoom: lines 1-5
+spot: lines 2-3
+say:
+  Set price to four point five. Set count to three.
+  A name is made the first time it's set, and it can be several words long, like best score or cake price.
+spot: line 4
+say:
+  Total is price times count. Numbers can be added with plus, taken away with minus, multiplied with times, and divided with divided by.
+  The symbols plus, minus, star and slash work too, if you like them better.
+spot: line 5
+say: And scrawl can show several things one after another, with commas between them.
+spot: off
+run
+zoom: output
+say: Three cakes cost thirteen and a half.
+wait
+zoom: out
+
+say: There are many ways to work numbers out. Let's try a few.
+line: 5
+type:
+
+    scrawl "With a tip: ", (total times 1.15) rounded to 2 decimal places
+    scrawl "The larger is ", larger of 7 and 12
+    scrawl "Kept in range: ", clamp 150 between 0 and 100
+    scrawl "A dice roll: ", random number from 1 to 6
+zoom: lines 6-9
+spot: line 6
+say:
+  Rounded to two decimal places rounds a number. The brackets say exactly what belongs together: the total times one point one five, and then that is rounded.
+spot: line 7
+say: Larger of, and smaller of, pick one of two numbers.
+spot: line 8
+say: Clamp keeps a number inside a range. A hundred and fifty, kept between zero and a hundred, is a hundred.
+spot: line 9
+say: And random number from one to six rolls a dice. Both ends can come up.
+spot: off
+run
+zoom: output
+say: Here they all are. The dice roll will be different every time.
+wait
+zoom: out
+
+card: Chapter 2 | Text | Words between quote marks
+say: Text has its own words too.
+uncard
+clear
+type:
+  genesis:
+    set name to "Ada Lovelace"
+    scrawl upper case of name
+    scrawl "Her name has ", the size of name, " letters."
+    scrawl name begins with "Ada"
+    scrawl replace "Lovelace" with "L." in name
+    scrawl "Next year she turns " plus (36 plus 1)
+    scrawl "42" as a number plus 8
+    scrawl 1234567 with commas
+  and the universe said i love you
+zoom: lines 2-9
+spot: line 3
+say: Upper case of name gives it in capitals. Lower case of gives small letters.
+spot: line 4
+say: The size of text is how many letters it has.
+spot: line 5
+say: Begins with, and ends with, answer yes or no. That's a third kind of value: yes or no.
+spot: line 6
+say: Replace changes every copy of one piece of text into another.
+spot: line 7
+say: Plus joins text together, and a number joined to text is written out.
+spot: line 8
+say: As a number turns text like forty two into a number you can add to. As text goes the other way.
+spot: line 9
+say: And with commas writes big numbers the way people read them.
+spot: off
+run
+zoom: output
+wait
+say: Each line did what it said.
+zoom: out
+
+card: Chapter 2 | Kinds of values | Numbers, text, and yes or no
+say:
+  So a name can hold a number, text, or yes or no. Once a name holds one kind, it keeps that kind.
+  Let's see what happens if we break that rule.
+uncard
+clear
+type:
+  genesis:
+    set count to 3
+    set count to "three"
+  and the universe said i love you
+run: expect a mistake
+zoom: output
+say:
+  Stellanova finds the mistake before the program even starts, and says it plainly:
+  count holds a number, not text. It even says which line.
+wait
+zoom: out
+say: Mistakes in spelling are found the same way.
+clear
+type:
+  genesis:
+    set score to 3
+    scrawl scroe
+  and the universe said i love you
+run: expect a mistake
+zoom: output
+say: I don't know scroe. Did you mean score? Every mistake is written in plain words like this.
+wait
+zoom: out

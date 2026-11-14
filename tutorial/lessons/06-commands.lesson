@@ -1,0 +1,146 @@
+title: Your own commands
+card: Chapter 6 | Your own commands | Giving a job a name
+say:
+  So far everything has been inside genesis. But you can make new commands of your own.
+  Putting a job in its own command gives it a name, so the program reads like a list of what happens.
+uncard
+
+new: greet.stella
+type:
+  genesis:
+    greet with "Sam"
+    greet with "Ann"
+    scrawl "Double 21 is ", double 21
+  and the universe said i love you
+
+  to greet, given who (text):
+    scrawl "Hello, ", who, "!"
+  and the universe said i love you
+
+  to double, given x (a number), returning a number:
+    return x times 2
+  and the universe said i love you
+zoom: lines 7-9
+spot: line 7
+say:
+  To greet makes a command called greet. After the word given come its inputs. This one has one input, called who, and in brackets, the kind of value it is: text.
+spot: line 8
+say: Inside, who holds whatever it was given.
+spot: line 9
+say: A command ends with the same line as genesis does.
+spot: off
+zoom: lines 11-13
+spot: line 11
+say:
+  Double is a command that gives back an answer. Returning a number says what kind of answer.
+spot: line 12
+say: And return hands the answer back, and leaves the command.
+spot: off
+zoom: lines 1-4
+say:
+  Now genesis reads like a story. Greet with Sam. Greet with Ann. Scrawl double twenty one.
+  A command can be written before or after the place that uses it.
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 6 | Usual values | Inputs you can leave out
+say: An input can have a usual value. Leave it out, and the command gets that value instead.
+uncard
+select: 7-9
+type:
+  to greet, given who (text, usually "friend") and count (a number, usually 1):
+    repeat count times:
+      scrawl "Hello, [who]!"
+  and the universe said i love you
+keys: enter
+zoom: lines 7-10
+spot: line 7
+say:
+  Two inputs now, joined with and. Who is usually friend, and count is usually one.
+  Inputs with a usual value go last.
+spot: off
+line: 3
+type:
+
+    greet
+    greet with ("Jo", 2)
+zoom: lines 2-5
+say:
+  Greet on its own uses both usual values. With two or more inputs, they go in brackets, in order, with commas.
+zoom: out
+run
+zoom: output
+say: Hello Sam, hello Ann, hello friend, and two hellos for Jo.
+wait
+zoom: out
+
+card: Chapter 6 | Commands as values | Keeping a command to do later
+say:
+  A command can even be kept in a name, or given to another command, like any other value.
+uncard
+clear
+type:
+  to double, given x (a number), returning a number:
+    return x times 2
+  and the universe said i love you
+
+  to is big, given x (a number), returning yes or no:
+    return x exceeds 10
+  and the universe said i love you
+
+  to do twice, given f (a command given a number returning a number) and x (a number), returning a number:
+    return invoke f with (invoke f with x)
+  and the universe said i love you
+
+  genesis:
+    scrawl do twice with (the command double, 5)
+    set numbers to a list of (4, 9, 15, 30)
+    scrawl numbers changed by the command double
+    scrawl numbers kept by the command is big
+  and the universe said i love you
+zoom: lines 9-11
+spot: line 9
+say:
+  Do twice takes a command as its first input. Its kind says what that command takes and gives back: a command given a number, returning a number.
+spot: line 10
+say: Invoke does the command it was given. Here it does it twice: once on x, and then again on the answer.
+spot: off
+zoom: lines 13-18
+spot: line 14
+say:
+  The command double, with the word the in front, is the command itself, not its answer. So do twice, with double and five, is double of double of five: twenty.
+spot: lines 16-17
+say:
+  Changed by does a command to every item of a list, and kept by keeps only the items a command says yes to.
+spot: off
+zoom: out
+run
+zoom: output
+say: Twenty. Every number doubled. And just the big ones.
+wait
+zoom: out
+
+say:
+  One more way to write inputs: when a command has many, they can go on their own lines, under the word use, before its instructions.
+clear
+type:
+  to tell, use:
+    title (text)
+    count (a number)
+
+    scrawl title, " times ", count
+  and the universe said i love you
+
+  genesis:
+    tell with "apples", 3
+  and the universe said i love you
+zoom: lines 1-6
+say: Each input on its own line, a blank line, and then what the command does.
+zoom: out
+run
+zoom: output
+wait
+zoom: out

@@ -1,0 +1,171 @@
+title: Your own kinds of things
+card: Chapter 7 | Your own kinds of things | Describing things with parts
+say:
+  Numbers, text and lists go a long way. But programs are usually about things: pets, players, coins, enemies.
+  Stellanova lets you describe a new kind of thing, and the parts it has.
+uncard
+
+new: pets.stella
+type:
+  a pet has:
+    name (text)
+    age (a number)
+  and the universe said i love you
+
+  genesis:
+    set tom to conjure a pet
+    set the name of tom to "Tom"
+    set the age of tom to 3
+    scrawl tom
+    scrawl the name of tom, " is ", the age of tom, "."
+  and the universe said i love you
+zoom: lines 1-4
+say:
+  A pet has: a name, which is text, and an age, which is a number. One part per line, each with its kind in brackets.
+zoom: lines 6-12
+spot: line 7
+say:
+  Conjure a pet makes a new pet. Its numbers start at zero, and its text starts empty.
+spot: lines 8-9
+say: The name of tom is one of tom's parts. Set changes it.
+spot: lines 10-11
+say: Scrawl tom shows the whole pet, with its parts. And the name of tom is just that part.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 7 | Commands for a kind | Things a pet can do
+say:
+  A command can belong to a kind of thing. Inside it, the thing's parts are used by their own names.
+uncard
+line: 4
+type:
+
+  
+  to have a birthday, for a pet:
+    set age to age plus 1
+  and the universe said i love you
+line: 15
+type:
+
+    have a birthday tom
+    scrawl the name of tom, " is ", the age of tom, " now."
+zoom: lines 6-8
+spot: line 6
+say: To have a birthday, for a pet. This command belongs to pets.
+spot: line 7
+say:
+  Inside it, age means this pet's age. And changing it changes the pet it was given, not a copy.
+spot: off
+zoom: out
+run
+zoom: output
+say: Tom was three, and after his birthday, he's four.
+wait
+zoom: out
+
+card: Chapter 7 | Kinds of kinds | A dog is a kind of pet
+say:
+  Now let's go further. A dog is a kind of pet: it has everything a pet has, and more. Here's a bigger program, and we'll go through it piece by piece.
+uncard
+clear
+paste:
+  a pet has:
+    name (text)
+    age (a number)
+  and the universe said i love you
+
+  a dog is a kind of pet that has:
+    tricks (a list of text)
+  and the universe said i love you
+
+  a robot has:
+    model (text)
+  and the universe said i love you
+
+  a speaker is anything that can speak.
+
+  to speak, for a pet, returning text:
+    return name plus " makes a sound."
+  and the universe said i love you
+
+  to speak, for a dog, returning text:
+    return name plus " barks and knows " plus (the size of tricks) plus " tricks."
+  and the universe said i love you
+
+  to speak, for a robot, returning text:
+    return "Beep, I am " plus model plus "."
+  and the universe said i love you
+
+  to have a birthday, for a pet:
+    set age to age plus 1
+  and the universe said i love you
+
+  to the oldest, given pets (a list of pets), returning a pet:
+    set best to no pet
+    for each p in pets:
+      if best is nothing or the age of p exceeds the age of best: set best to p
+    return best
+  and the universe said i love you
+
+  genesis:
+    set tom to conjure a pet
+    set the name of tom to "Tom"
+    set the age of tom to 3
+    scrawl tom
+    have a birthday tom
+    scrawl the name of tom, " is ", the age of tom, " now."
+    conjure a dog as rex
+    set the name of rex to "Rex"
+    add "sit" to the tricks of rex
+    conjure a robot as bolt
+    set the model of bolt to "R2"
+    set talkers to a list of speakers
+    add tom to talkers
+    add rex to talkers
+    add bolt to talkers
+    for each t in talkers: scrawl speak t
+    set nobody to the oldest with a list of pets
+    if nobody is nothing: scrawl "No pets, so nobody is oldest."
+    scrawl the oldest with a list containing tom
+  and the universe said i love you
+line: 1
+zoom: lines 6-8
+say:
+  A dog is a kind of pet that has tricks. So a dog has a name and an age, because every pet does, and a list of tricks as well.
+zoom: lines 16-22
+spot: lines 16-18
+say: Speak, for a pet, returns some text: the pet's name, and makes a sound.
+spot: lines 20-22
+say:
+  And speak, for a dog, is the dog's own version. Dogs use this one instead. Every other kind of pet uses the first.
+spot: off
+zoom: lines 10-14
+spot: lines 10-12
+say: A robot is not a pet at all. But it can speak too, in its own way.
+spot: line 14
+say:
+  So this line makes a new kind, called a speaker: anything that can speak. Any kind of thing with its own speak command counts. Pets, dogs, and robots are all speakers.
+spot: off
+line: 59
+zoom: lines 50-55
+say:
+  So a list of speakers can hold a pet, a dog and a robot together. And speak t does the speaking the way that kind of thing does it, while the program runs.
+zoom: out
+line: 32
+zoom: lines 32-37
+spot: line 33
+say:
+  One more idea: nothing. Best starts as no pet. A name for a kind of thing can hold nothing, when there isn't one.
+spot: line 35
+say: And is nothing, or is something, asks which. This command finds the oldest pet, and if there are no pets, it gives back nothing.
+spot: off
+zoom: out
+run
+zoom: output
+say: Tom makes a sound. Rex barks. The robot beeps. And with no pets, nobody is oldest.
+wait
+zoom: out

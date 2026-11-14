@@ -1,0 +1,105 @@
+title: Libraries
+card: Chapter 10 | Libraries | More words, for more things
+say:
+  The language itself is small. Libraries give it more words: for maths, time, files and folders, databases, the web, sound, windows and games.
+  A library loads by itself as soon as a program uses one of its words. Writing use, and its name, at the top says so out loud.
+uncard
+
+new: libraries.stella
+type fast:
+  use: maths
+  use: time
+  use: patterns
+
+  genesis:
+    scrawl "Sine of 30 is ", sine of 30
+    scrawl "2 to the power 10 is ", power of (2, 10)
+    scrawl "17 shared by 5 leaves ", remainder of (17, 5)
+    scrawl "Christmas 2026 is a ", weekday of "2026-12-25"
+    scrawl "A month after 13 November: ", date plus days ("2026-11-13", 30)
+    set line to "Sam scored 31, Jo scored 7"
+    scrawl matches of the pattern with ("[0-9]+", line)
+    scrawl replace the pattern with ("[0-9]+", line, "#")
+  and the universe said i love you
+zoom: lines 5-10
+spot: lines 6-8
+say:
+  From maths: sine, cosine and tangent, in degrees. Power of, remainder of, rounding, pi, and logarithms.
+spot: line 9
+say: From time: wait, the time now, today, and dates. Dates are text like twenty twenty six, twelve, twenty five, so they sort and save as they are.
+spot: line 10
+say: Date plus days counts forward, or back with a number below zero.
+spot: off
+zoom: lines 11-13
+spot: line 12
+say:
+  The patterns library finds text by its shape. Zero to nine in square brackets, then plus, means one or more digits.
+  So matches of the pattern finds every number in the line.
+spot: line 13
+say: And replace the pattern changes each one.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+say: A few more: folders, databases, and letters.
+clear
+type fast:
+  use: folders
+  use: database
+  use: letters
+
+  genesis:
+    make the folder "notes"
+    inscribe "hello" into file "notes/a.txt"
+    scrawl files in the folder "notes"
+    change the database ("shop.db", "create table if not exists items (name text, price real)")
+    change the database with values ("shop.db", "insert into items values (?, ?)", a list containing ("tea", "2.5"))
+    scrawl rows from the database ("shop.db", "select name, price from items")
+    scrawl code of the letter "A", " ", the letter with code 233
+  and the universe said i love you
+zoom: lines 6-8
+say:
+  Folders makes, lists, moves, copies and erases files and folders.
+zoom: lines 9-11
+say:
+  Database keeps data in an SQLite file, with SQL, the language databases speak. A question mark stands for each value, so text that people type can't change the command.
+zoom: line 12
+say: And letters turns a letter into the number behind it, and back again.
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+say:
+  There are more. The web library fetches and sends web pages. Server makes your program a web server. Sound plays sounds and music.
+  Computer runs other programs, and spreadsheet reads and writes CSV files. Every one of their words is in the list on the left.
+click: #word-search
+type: weekday
+zoom: #side
+say: Searching shows what a word means, and how to use it.
+wait
+zoom: out
+focus
+
+card: Chapter 10 | Making a library | How a word is made
+say: So how is a library made? Here is the time library's own file.
+uncard
+open library: time
+line: 30
+zoom: lines 28-30
+spot: line 28
+say:
+  Each word says what it means in C++, for programs that are built, after the equals sign.
+  Seconds in curly brackets stands for the input.
+spot: line 29
+say: The runs line says what it means in Python, for running directly.
+spot: line 30
+say: And the web line says what it means in JavaScript, for programs made into web pages.
+spot: off
+zoom: out
+say:
+  So anything C++, Python or JavaScript can do, can be given an English word this way. A library file can sit in the libraries folder, or right next to your program.

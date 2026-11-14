@@ -474,7 +474,7 @@ and the universe said i love you
 to paint the rows:
   whisper: only the rows in sight (and a few around them) are drawn, so long files stay quick
   if current is 0: cease
-  set scrolled to (the top edge of code box) minus (the top edge of rows box)
+  set scrolled to scrolled down in the element code box
   set shown start to larger of 1 and ((round down (scrolled divided by 20)) minus 4)
   set shown end to smaller of (the size of body) and (shown start plus (round down ((the height of code box) divided by 20)) plus 9)
   set made to ""

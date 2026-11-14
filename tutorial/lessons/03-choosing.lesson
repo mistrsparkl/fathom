@@ -1,0 +1,145 @@
+title: Choosing
+card: Chapter 3 | Choosing | If, otherwise, and depending on
+say: A program often has to choose what to do. That's what if is for.
+uncard
+
+new: weather.stella
+type:
+  genesis:
+    set temperature to 31
+    if temperature exceeds 30:
+      scrawl "It's hot."
+    otherwise if temperature falls below 10:
+      scrawl "It's cold."
+    otherwise:
+      scrawl "It's nice."
+  and the universe said i love you
+zoom: lines 2-8
+spot: lines 3-4
+say:
+  If temperature exceeds thirty, with a colon. The lines moved in below it happen only when that's yes.
+  Exceeds means more than. Falls below means less than. There's also is at least, is at most, is, and is not.
+spot: lines 5-6
+say: Otherwise if is tried next, only when the ones above it were no.
+spot: lines 7-8
+say: And otherwise catches everything else.
+spot: off
+run
+zoom: output
+say: Thirty one is more than thirty, so it's hot.
+wait
+zoom: out
+
+say: When a choice is about one value, depending on reads better.
+clear
+type:
+  genesis:
+    set weather to "snow"
+    depending on weather:
+      "rain": scrawl "Take an umbrella."
+      "snow", "hail":
+        scrawl "Wear a coat."
+        scrawl "And boots."
+      anything else: scrawl "Enjoy the day."
+  and the universe said i love you
+zoom: lines 2-8
+spot: line 3
+say: Depending on weather looks at the weather once.
+spot: line 4
+say: Each line under it is a value, a colon, and what to do. A short choice fits on the same line.
+spot: lines 5-7
+say: Several values can share one choice, with commas between them, and a longer choice goes on its own lines below.
+spot: line 8
+say: Anything else is for every other value.
+spot: off
+run
+zoom: output
+say: It's snowing, so: wear a coat, and boots.
+wait
+zoom: out
+
+say: Choices can be joined together with and, or, and not, and is one of checks a value against several at once.
+clear
+type:
+  genesis:
+    set answer to "y"
+    set hungry to yes
+    if answer is one of ("yes", "y", "sure") and not hungry:
+      scrawl "Let's go now."
+    otherwise if hungry or answer is "later":
+      scrawl "Lunch first."
+  and the universe said i love you
+zoom: lines 2-7
+spot: line 4
+say: Answer is one of yes, y, or sure. And not hungry.
+spot: line 6
+say: Hungry or answer is later.
+spot: off
+run
+zoom: output
+say: We are hungry, so: lunch first.
+wait
+zoom: out
+
+card: Chapter 3 | Testing | Checks that say what should be so
+say:
+  How do you know a program is right? You test it. A check line says something that should be so.
+uncard
+clear
+type:
+  to double, given x (a number), returning a number:
+    return x times 2
+  and the universe said i love you
+
+  to test doubling:
+    check double with 2 is 4
+    check double with 0 is 0
+    check double with -3 is -6
+  and the universe said i love you
+
+  genesis:
+    scrawl double with 21
+  and the universe said i love you
+zoom: lines 1-3
+say:
+  This is a command of our own, called double. We'll see commands properly soon. For now: it takes a number, and gives back twice that number.
+zoom: lines 5-9
+say:
+  A command whose name starts with test holds checks. Check double with two is four.
+  Checks don't run when the program runs. They run when you press Test.
+zoom: out
+test
+zoom: output
+say: Every check passed.
+wait
+zoom: out
+say: Now let's make one fail on purpose, to see what that looks like.
+line: 7
+keys: backspace
+type: 1
+test: expect a failure
+zoom: output
+say: The test failed, and Stellanova says which line, and the check that wasn't so.
+wait
+zoom: out
+
+card: Chapter 3 | Watching | Seeing a program think
+say: Last, the Watch button. It runs a program one line at a time, and shows what each line did.
+uncard
+clear
+type:
+  genesis:
+    set temperature to 31
+    if temperature exceeds 30:
+      scrawl "It's hot."
+    otherwise:
+      scrawl "It's nice."
+  and the universe said i love you
+watch
+zoom: output
+say:
+  Each line is shown as it happens. Line two set temperature to thirty one.
+  Line three asked if it exceeds thirty, and the answer was yes. So line four said: it's hot.
+  When a program does something you don't expect, watching it is the quickest way to find out why.
+wait
+zoom: out
