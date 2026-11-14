@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -449,6 +449,28 @@ def program_checks():
                ]))
     assert out.stdout == 'yes no\n|\n32\na secret message, long enough to need more than one block of sixty-four bytes: héllo wörld 12345 67890 and more more more\nthe password is wrong, or the encrypted text was changed.\n', repr(out.stdout + out.stderr)
     assert out.stderr.startswith("Line 14: that isn't encrypted text"), repr(out.stderr)
+
+    # JSON paths: reading parts, lists and names, and changing parts.
+    out = both(''.join([
+               'use: json\n'
+               '\n'
+               'genesis:\n'
+               '  set q to a quotation mark\n'
+               '  set weather to "{" plus q plus "city" plus q plus ": " plus q plus "Oslo" plus q plus ", " plus q plus "days" plus q plus ": [{" plus q plus "high" plus q plus ": 12.5, " plus q plus "sunny" plus q plus ": true}, {" plus q plus "high" plus q plus ": 9, " plus q plus "note" plus q plus ": " plus q plus "rain\\nlater" plus q plus "}]}"\n'
+               '  scrawl the json at with (weather, "city"), " ", the json number at with (weather, "days[1].high")\n'
+               '  scrawl the json at with (weather, "days[1]")\n'
+               '  scrawl the json list at with (weather, "days")\n'
+               '  scrawl the json names at with (weather, "days[2]"), " ", there is json at with (weather, "days[3]"), " ", there is json at with (weather, "days[2].note")\n'
+               '  set weather to the json changed at with (weather, "days[2].high", "11")\n'
+               '  set weather to the json changed at with (weather, "country", as json text ("Nor" plus q plus "way"))\n'
+               '  set weather to the json changed at with (weather, "days[3]", "null")\n'
+               '  scrawl weather\n'
+               '  scrawl the json at with ("[1, 2.5e3, -0.25]", "")\n'
+               '  scrawl the json at with (weather, "days[9]")\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == 'Oslo 12.5\n{"high":12.5,"sunny":true}\n{"high":12.5,"sunny":true}, {"high":9,"note":"rain\\nlater"}\nhigh, note no yes\n{"city":"Oslo","days":[{"high":12.5,"sunny":true},{"high":11,"note":"rain\\nlater"},null],"country":"Nor\\"way"}\n[1,2500,-0.25]\n', repr(out.stdout + out.stderr)
+    assert out.stderr.startswith('Line 15: there is nothing at "days[9]" in the JSON.'), repr(out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([

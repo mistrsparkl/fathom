@@ -1,0 +1,416 @@
+note: Words for reaching into JSON text (what web services send) with a path. Use them with:  use: json
+note: A path is names with dots between, and items in brackets, counted from 1: "weather.days[2].high".
+note: An empty path "" is the whole of it. Parts that are text come back as the text itself; anything else comes
+note: back as JSON text, which these words can read again.
+
+code:
+  namespace stellanova_json
+  {
+  	using Data = stellanova::SavedData;
+  	inline Data read(const std::string& json, int line)
+  	{
+  		stellanova::SavedReader reader{json};
+  		Data d;
+  		bool ok = reader.value(d);
+  		reader.space();
+  		if (!ok || reader.i != json.size())
+  			stellanova::fail(line, "that isn't JSON text.");
+  		return d;
+  	}
+  	inline void quoted(std::string& out, const std::string& s)
+  	{
+  		out += '"';
+  		for (unsigned char c : s)
+  		{
+  			if (c == '"') out += "\\\"";
+  			else if (c == '\\') out += "\\\\";
+  			else if (c == '\n') out += "\\n";
+  			else if (c == '\t') out += "\\t";
+  			else if (c == '\r') out += "\\r";
+  			else if (c < 0x20) { char b[8]; std::snprintf(b, sizeof b, "\\u%04x", c); out += b; }
+  			else out += (char)c;
+  		}
+  		out += '"';
+  	}
+  	inline void write(std::string& out, const Data& d)
+  	{
+  		switch (d.type)
+  		{
+  		case Data::Nothing: out += "null"; break;
+  		case Data::Number: out += stellanova::text(d.number); break;
+  		case Data::YesNo: out += d.yes ? "true" : "false"; break;
+  		case Data::Text: quoted(out, d.words); break;
+  		case Data::List:
+  			out += '[';
+  			for (size_t k = 0; k < d.items.size(); ++k)
+  				out += k ? "," : "", write(out, d.items[k]);
+  			out += ']';
+  			break;
+  		case Data::Table:
+  			out += '{';
+  			for (size_t k = 0; k < d.parts.size(); ++k)
+  				out += k ? "," : "", quoted(out, d.parts[k].first), out += ':', write(out, d.parts[k].second);
+  			out += '}';
+  			break;
+  		}
+  	}
+  	inline std::vector<std::string> steps(const std::string& path, int line)  // "a.b[2]" -> a, b, [2
+  	{
+  		std::vector<std::string> out;
+  		std::string now;
+  		for (size_t k = 0; k < path.size(); ++k)
+  		{
+  			char c = path[k];
+  			if (c == '.' || c == '[')
+  			{
+  				if (!now.empty()) out.push_back(now);
+  				now = c == '[' ? "[" : "";
+  			}
+  			else if (c == ']')
+  			{
+  				if (now.size() < 2 || now[0] != '[' || now.find_first_not_of("0123456789", 1) != std::string::npos)
+  					stellanova::fail(line, "in the path \"" + path + "\", brackets hold an item's number, like [2].");
+  				out.push_back(now), now.clear();
+  			}
+  			else
+  				now += c;
+  		}
+  		if (!now.empty())
+  		{
+  			if (now[0] == '[')
+  				stellanova::fail(line, "in the path \"" + path + "\", a bracket isn't closed.");
+  			out.push_back(now);
+  		}
+  		return out;
+  	}
+  	inline Data* find(Data& d, const std::string& path, int line)  // nullptr: nothing there
+  	{
+  		Data* at = &d;
+  		for (const std::string& s : steps(path, line))
+  		{
+  			if (s[0] == '[')
+  			{
+  				size_t k = (size_t)std::stoull(s.substr(1));
+  				if (at->type != Data::List || k < 1 || k > at->items.size())
+  					return nullptr;
+  				at = &at->items[k - 1];
+  			}
+  			else
+  			{
+  				if (at->type != Data::Table)
+  					return nullptr;
+  				Data* found = nullptr;
+  				for (auto it = at->parts.rbegin(); it != at->parts.rend() && !found; ++it)
+  					if (it->first == s)
+  						found = &it->second;
+  				if (!found)
+  					return nullptr;
+  				at = found;
+  			}
+  		}
+  		return at;
+  	}
+  	inline Data& need(Data& d, const std::string& path, int line)
+  	{
+  		Data* at = find(d, path, line);
+  		if (!at)
+  			stellanova::fail(line, "there is nothing at \"" + path + "\" in the JSON.");
+  		return *at;
+  	}
+  	inline std::string shown(const Data& d)
+  	{
+  		if (d.type == Data::Text)
+  			return d.words;
+  		std::string out;
+  		write(out, d);
+  		return out;
+  	}
+  	inline std::string at(const std::string& json, const std::string& path, int line) { Data d = read(json, line); return shown(need(d, path, line)); }
+  	inline double number_at(const std::string& json, const std::string& path, int line)
+  	{
+  		Data d = read(json, line);
+  		Data& x = need(d, path, line);
+  		if (x.type != Data::Number)
+  			stellanova::fail(line, "the JSON at \"" + path + "\" isn't a number.");
+  		return x.number;
+  	}
+  	inline std::vector<std::string> list_at(const std::string& json, const std::string& path, int line)
+  	{
+  		Data d = read(json, line);
+  		Data& x = need(d, path, line);
+  		if (x.type != Data::List)
+  			stellanova::fail(line, "the JSON at \"" + path + "\" isn't a list.");
+  		std::vector<std::string> out;
+  		for (const Data& item : x.items)
+  			out.push_back(shown(item));
+  		return out;
+  	}
+  	inline std::vector<std::string> keys_at(const std::string& json, const std::string& path, int line)
+  	{
+  		Data d = read(json, line);
+  		Data& x = need(d, path, line);
+  		if (x.type != Data::Table)
+  			stellanova::fail(line, "the JSON at \"" + path + "\" has no names in it.");
+  		std::vector<std::string> out;
+  		for (const auto& part : x.parts)
+  			if (std::find(out.begin(), out.end(), part.first) == out.end())
+  				out.push_back(part.first);
+  		return out;
+  	}
+  	inline bool there(const std::string& json, const std::string& path, int line) { Data d = read(json, line); return find(d, path, line) != nullptr; }
+  	inline std::string changed(const std::string& json, const std::string& path, const std::string& value, int line)
+  	{
+  		Data d = read(json, line), v = read(value, line);
+  		std::vector<std::string> all = steps(path, line);
+  		if (all.empty())
+  			d = v;
+  		else
+  		{
+  			std::string last = all.back(), parent;
+  			for (size_t k = 0; k + 1 < all.size(); ++k)
+  				parent += all[k][0] == '[' ? all[k] + "]" : (k ? "." : "") + all[k];
+  			Data& p = need(d, parent, line);
+  			if (last[0] == '[')
+  			{
+  				size_t k = (size_t)std::stoull(last.substr(1));
+  				if (p.type != Data::List || k < 1 || k > p.items.size() + 1)
+  					stellanova::fail(line, "there is no item " + last.substr(1) + " to change at \"" + path + "\".");
+  				if (k == p.items.size() + 1)
+  					p.items.push_back(v);
+  				else
+  					p.items[k - 1] = v;
+  			}
+  			else
+  			{
+  				if (p.type != Data::Table)
+  					stellanova::fail(line, "the JSON at \"" + parent + "\" has no names in it, so it can't have \"" + last + "\".");
+  				bool done = false;
+  				for (auto& part : p.parts)
+  					if (part.first == last)
+  						part.second = v, done = true;
+  				if (!done)
+  					p.parts.push_back({last, v});
+  			}
+  		}
+  		std::string out;
+  		write(out, d);
+  		return out;
+  	}
+  	inline std::string as_json(const std::string& s) { std::string out; quoted(out, s); return out; }
+  }
+
+python:
+  import json as _json
+  def _read(s):
+      try:
+          return _json.loads(s)
+      except ValueError:
+          raise RunError(0, "that isn't JSON text.")
+  def _quoted(s):
+      out = '"'
+      for ch in s:
+          out += {'"': '\\"', "\\": "\\\\", "\n": "\\n", "\t": "\\t", "\r": "\\r"}.get(ch, ch if ord(ch) >= 0x20 else "\\u%04x" % ord(ch))
+      return out + '"'
+  def _write(d):
+      if d is None:
+          return "null"
+      if d is True or d is False:
+          return "true" if d else "false"
+      if isinstance(d, (int, float)):
+          return text(float(d))
+      if isinstance(d, str):
+          return _quoted(d)
+      if isinstance(d, list):
+          return "[" + ",".join(_write(x) for x in d) + "]"
+      return "{" + ",".join(_quoted(k) + ":" + _write(v) for k, v in d.items()) + "}"
+  def _steps(path):
+      import re as _re
+      out, now, k = [], "", 0
+      for ch in path:
+          if ch in ".[":
+              if now:
+                  out.append(now)
+              now = "[" if ch == "[" else ""
+          elif ch == "]":
+              if not _re.fullmatch(r"\[\d+", now):
+                  raise RunError(0, 'in the path "' + path + '", brackets hold an item\'s number, like [2].')
+              out.append(now)
+              now = ""
+          else:
+              now += ch
+      if now:
+          if now[0] == "[":
+              raise RunError(0, 'in the path "' + path + '", a bracket isn\'t closed.')
+          out.append(now)
+      return out
+  _MISSING = object()
+  def _find(d, path):
+      for s in _steps(path):
+          if s[0] == "[":
+              k = int(s[1:])
+              if not isinstance(d, list) or not 1 <= k <= len(d):
+                  return _MISSING
+              d = d[k - 1]
+          else:
+              if not isinstance(d, dict) or s not in d:
+                  return _MISSING
+              d = d[s]
+      return d
+  def _need(d, path):
+      x = _find(d, path)
+      if x is _MISSING:
+          raise RunError(0, 'there is nothing at "' + path + '" in the JSON.')
+      return x
+  def _shown(x):
+      return x if isinstance(x, str) else _write(x)
+  def json_at(s, path):
+      return _shown(_need(_read(s), path))
+  def json_number_at(s, path):
+      x = _need(_read(s), path)
+      if isinstance(x, bool) or not isinstance(x, (int, float)):
+          raise RunError(0, 'the JSON at "' + path + '" isn\'t a number.')
+      return float(x)
+  def json_list_at(s, path):
+      x = _need(_read(s), path)
+      if not isinstance(x, list):
+          raise RunError(0, 'the JSON at "' + path + '" isn\'t a list.')
+      return [_shown(v) for v in x]
+  def json_keys_at(s, path):
+      x = _need(_read(s), path)
+      if not isinstance(x, dict):
+          raise RunError(0, 'the JSON at "' + path + '" has no names in it.')
+      return list(x.keys())
+  def json_there(s, path):
+      return _find(_read(s), path) is not _MISSING
+  def json_changed(s, path, value):
+      d, v, all_ = _read(s), _read(value), _steps(path)
+      if not all_:
+          return _write(v)
+      last, parent = all_[-1], "".join(x + "]" if x[0] == "[" else ("." if k else "") + x for k, x in enumerate(all_[:-1]))
+      p = _need(d, parent)
+      if last[0] == "[":
+          k = int(last[1:])
+          if not isinstance(p, list) or not 1 <= k <= len(p) + 1:
+              raise RunError(0, "there is no item " + last[1:] + ' to change at "' + path + '".')
+          if k == len(p) + 1:
+              p.append(v)
+          else:
+              p[k - 1] = v
+      else:
+          if not isinstance(p, dict):
+              raise RunError(0, 'the JSON at "' + parent + '" has no names in it, so it can\'t have "' + last + '".')
+          p[last] = v
+      return _write(d)
+
+to the json at, given json (text) and path (text), returning text = stellanova_json::at({json}, {path}, {line})
+  runs: json_at({json}, {path})
+  web: stellanova_json.at({json}, {path}, {line})
+to the json number at, given json (text) and path (text), returning a number = stellanova_json::number_at({json}, {path}, {line})
+  runs: json_number_at({json}, {path})
+  web: stellanova_json.numberAt({json}, {path}, {line})
+to the json list at, given json (text) and path (text), returning a list of text = stellanova_json::list_at({json}, {path}, {line})
+  runs: json_list_at({json}, {path})
+  web: stellanova_json.listAt({json}, {path}, {line})
+to the json names at, given json (text) and path (text), returning a list of text = stellanova_json::keys_at({json}, {path}, {line})
+  runs: json_keys_at({json}, {path})
+  web: stellanova_json.keysAt({json}, {path}, {line})
+to there is json at, given json (text) and path (text), returning yes or no = stellanova_json::there({json}, {path}, {line})
+  runs: json_there({json}, {path})
+  web: stellanova_json.there({json}, {path}, {line})
+to the json changed at, given json (text) and path (text) and value (text), returning text = stellanova_json::changed({json}, {path}, {value}, {line})
+  runs: json_changed({json}, {path}, {value})
+  web: stellanova_json.changed({json}, {path}, {value}, {line})
+to as json text, given words (text), returning text = stellanova_json::as_json({words})
+  runs: _quoted({words})
+  web: stellanova_json.quoted({words})
+
+javascript:
+  const stellanova_json = {
+    read(s, line) {
+      try { return JSON.parse(s); } catch { stellanova.fail(line, "that isn't JSON text."); }
+    },
+    quoted(s) {
+      let out = '"';
+      for (const ch of s) {
+        const esc = { '"': '\\"', "\\": "\\\\", "\n": "\\n", "\t": "\\t", "\r": "\\r" }[ch];
+        out += esc !== undefined ? esc : ch.codePointAt(0) < 0x20 ? "\\u" + ch.codePointAt(0).toString(16).padStart(4, "0") : ch;
+      }
+      return out + '"';
+    },
+    write(d) {  // shortcut: JavaScript puts names that are whole numbers first; the other ways keep the JSON's order
+      if (d === null) return "null";
+      if (d === true || d === false) return d ? "true" : "false";
+      if (typeof d === "number") return stellanova.text(d);
+      if (typeof d === "string") return this.quoted(d);
+      if (Array.isArray(d)) return "[" + d.map((x) => this.write(x)).join(",") + "]";
+      return "{" + Object.keys(d).map((k) => this.quoted(k) + ":" + this.write(d[k])).join(",") + "}";
+    },
+    steps(path, line) {
+      const out = [];
+      let now = "";
+      for (const ch of path) {
+        if (ch === "." || ch === "[") { if (now) out.push(now); now = ch === "[" ? "[" : ""; }
+        else if (ch === "]") {
+          if (!/^\[\d+$/.test(now)) stellanova.fail(line, `in the path "${path}", brackets hold an item's number, like [2].`);
+          out.push(now); now = "";
+        } else now += ch;
+      }
+      if (now) {
+        if (now[0] === "[") stellanova.fail(line, `in the path "${path}", a bracket isn't closed.`);
+        out.push(now);
+      }
+      return out;
+    },
+    MISSING: Symbol("missing"),
+    find(d, path, line) {
+      for (const s of this.steps(path, line)) {
+        if (s[0] === "[") {
+          const k = Number(s.slice(1));
+          if (!Array.isArray(d) || k < 1 || k > d.length) return this.MISSING;
+          d = d[k - 1];
+        } else {
+          if (d === null || typeof d !== "object" || Array.isArray(d) || !Object.prototype.hasOwnProperty.call(d, s)) return this.MISSING;
+          d = d[s];
+        }
+      }
+      return d;
+    },
+    need(d, path, line) {
+      const x = this.find(d, path, line);
+      if (x === this.MISSING) stellanova.fail(line, `there is nothing at "${path}" in the JSON.`);
+      return x;
+    },
+    shown(x) { return typeof x === "string" ? x : this.write(x); },
+    at(s, path, line) { return this.shown(this.need(this.read(s, line), path, line)); },
+    numberAt(s, path, line) {
+      const x = this.need(this.read(s, line), path, line);
+      if (typeof x !== "number") stellanova.fail(line, `the JSON at "${path}" isn't a number.`);
+      return x;
+    },
+    listAt(s, path, line) {
+      const x = this.need(this.read(s, line), path, line);
+      if (!Array.isArray(x)) stellanova.fail(line, `the JSON at "${path}" isn't a list.`);
+      return x.map((v) => this.shown(v));
+    },
+    keysAt(s, path, line) {
+      const x = this.need(this.read(s, line), path, line);
+      if (x === null || typeof x !== "object" || Array.isArray(x)) stellanova.fail(line, `the JSON at "${path}" has no names in it.`);
+      return Object.keys(x);
+    },
+    there(s, path, line) { return this.find(this.read(s, line), path, line) !== this.MISSING; },
+    changed(s, path, value, line) {
+      const d = this.read(s, line), v = this.read(value, line), all = this.steps(path, line);
+      if (!all.length) return this.write(v);
+      const last = all[all.length - 1], parent = all.slice(0, -1).map((x, k) => (x[0] === "[" ? x + "]" : (k ? "." : "") + x)).join("");
+      const p = this.need(d, parent, line);
+      if (last[0] === "[") {
+        const k = Number(last.slice(1));
+        if (!Array.isArray(p) || k < 1 || k > p.length + 1) stellanova.fail(line, `there is no item ${last.slice(1)} to change at "${path}".`);
+        p[k - 1] = v;
+      } else {
+        if (p === null || typeof p !== "object" || Array.isArray(p)) stellanova.fail(line, `the JSON at "${parent}" has no names in it, so it can't have "${last}".`);
+        p[last] = v;
+      }
+      return this.write(d);
+    },
+  };
