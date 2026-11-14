@@ -3995,11 +3995,97 @@ def watched_test(cond, n):
     return go
 
 
+DEBUG = None  # 'stellanova debug': where to stop, and how it goes on from a stop (see debug_pause)
+DEBUG_HELP = ("Enter or step: run this line, stop at the next one.  over: run this line and any commands it calls.  "
+              "out: run until this command gives back.  go: run until the next stop.  names: the names and what they hold.  "
+              "look <name>: one name.  stop at <line> / forget <line>: add or remove a stop.  stops: the stops.  quit: end the program.")
+
+
+def debug_pause(env, n):
+    """Before line n: stops if it is a stop, or the last command (step, over, out) says so; then waits for commands."""
+    d = DEBUG
+    envs = d["envs"]  # each running command has its own names, so they tell how deep the program is
+    if any(e is env for e in envs):
+        while envs[-1] is not env:
+            envs.pop()
+    else:
+        envs.append(env)
+    depth, mode = len(envs), d["mode"]
+    if not (n in d["stops"] or mode == "step" or (mode == "over" and depth <= d["depth"]) or (mode == "out" and depth < d["depth"])):
+        return
+    sys.stdout.flush()
+    where_ = f"line {n}" if n < PER_FILE else where(n)
+    names = names_shown(env)
+    while True:
+        if d["studio"]:  # one marked line the studio reads (and doesn't show as printed)
+            print("\x1edebug " + json.dumps({"line": n, "where": where_, "source": SOURCE.get(n, ""), "depth": depth,
+                                              "names": names, "stops": sorted(d["stops"])}), flush=True)
+        else:
+            print(f"■ {where_}: {SOURCE.get(n, '?')}", flush=True)
+        while True:
+            if not d["studio"]:
+                print("(debug) ", end="", flush=True)
+            said = sys.stdin.readline()
+            if not said:
+                d["mode"] = "go"  # nothing more to read: carry on to the end
+                return
+            words = said.strip().lower().split()
+            what = " ".join(words)
+            if what in ("", "step", "s"):
+                d["mode"] = "step"
+                return
+            if what in ("over", "o", "next", "n"):
+                d.update(mode="over", depth=depth)
+                return
+            if what == "out":
+                d.update(mode="out", depth=depth)
+                return
+            if what in ("go", "g", "c"):
+                d["mode"] = "go"
+                return
+            if what in ("quit", "q"):
+                print("(the program was ended)", flush=True)
+                sys.stdout.flush()
+                os._exit(1)
+            if what == "names":
+                if not d["studio"]:
+                    print("\n".join(f"    {k}: {v}" for k, v in names.items()) or "    (no names yet)", flush=True)
+            elif words[:1] == ["look"] and len(words) > 1:
+                wanted = " ".join(words[1:])
+                print(f"    {wanted}: {names[wanted]}" if wanted in names else f"    there is no name '{wanted}' here.", flush=True)
+            elif words[:2] == ["stop", "at"] or words[:1] == ["forget"]:
+                number = words[-1]
+                if not number.isdigit():
+                    print("    say a line number, like: stop at 12", flush=True)
+                elif words[0] == "stop":
+                    d["stops"].add(int(number))
+                else:
+                    d["stops"].discard(int(number))
+                if d["studio"]:
+                    break  # show the stop again, with the stops as they are now
+            elif what == "stops":
+                print("    stops: " + (", ".join(map(str, sorted(d["stops"]))) or "none"), flush=True)
+            else:
+                print("    " + DEBUG_HELP, flush=True)
+            if d["studio"]:
+                break
+
+
+def debugged(run, n):
+    def go(env):
+        debug_pause(env, n)
+        return run(env)
+    return go
+
+
 def guard(run, n):
     """Turns a surprise inside Stellanova into a plain message with the line it happened on."""
     if WATCHING and not getattr(run, "watched", False):
         run = watched(run, n)
         run.watched = True
+    if DEBUG is not None and not getattr(run, "debugged", False):
+        run = debugged(run, n)
+        run.debugged = True
 
     def guarded(env):
         try:
@@ -5224,6 +5310,17 @@ def main(argv):
         return got_packages()
     if len(args) == 2 and args[0] == "drop":
         return drop_package(args[1])
+    if len(args) >= 2 and args[0] == "debug":  # runs it directly, stopping at lines: 'stellanova debug game.stella 12 30'
+        global DEBUG
+        studio = args[1] == "--studio"
+        rest = args[2:] if studio else args[1:]
+        if not rest or not all(a.isdigit() for a in rest[1:]):
+            print("Say the script, then the lines to stop at (if any): stellanova debug game.stella 12 30")
+            return 2
+        DEBUG = {"stops": {int(a) for a in rest[1:]}, "mode": "step" if len(rest) == 1 else "go", "depth": 0, "envs": [], "studio": studio}
+        if not studio:
+            print(DEBUG_HELP)
+        args = ["run", rest[0]]
     if len(args) == 2 and args[0] == "watch":  # runs it directly, showing each line and the names it changes
         global WATCHING
         WATCHING = True

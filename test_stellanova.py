@@ -1,4 +1,5 @@
 """Self-check for stellanova.py. Run: py -3 test_stellanova.py"""
+import json
 import os
 import shutil
 import sys
@@ -979,6 +980,23 @@ def program_checks():
                                encoding="utf-8", cwd=d).stdout
     assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
                      "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
+
+    # stellanova debug: stops, stepping into, over and out of commands, names; and the studio's marked lines
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "d.stella").write_text('to double, given x (a number), returning a number:\n  set y to x times 2\n  return y\n'
+                                          'and the universe said i love you\n\ngenesis:\n  set total to 0\n  for each n from 1 to 3:\n'
+                                          '    set total to total plus double with n\n  scrawl total\nand the universe said i love you\n', encoding="utf-8")
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "debug", "d.stella"], input="step\nstep\nstep\nlook x\nout\nover\ngo\n",
+                               capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
+        stops = [l.replace("(debug) ", "") for l in shown.splitlines()[1:]]
+        assert stops == ["\u25a0 line 7: set total to 0", "\u25a0 line 8: for each n from 1 to 3:", "\u25a0 line 9: set total to total plus double with n",
+                         "\u25a0 line 2: set y to x times 2", "    x: 1", "\u25a0 line 9: set total to total plus double with n",
+                         "\u25a0 line 9: set total to total plus double with n", "12"], stops
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "debug", "--studio", "d.stella", "3"], input="go\nforget 3\ngo\n",
+                               capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
+        marked = [json.loads(l[7:]) for l in shown.split("\n") if l.startswith("\x1edebug ")]  # (splitlines would break at the mark)
+        assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked
+        assert shown.splitlines()[-1] == "12", shown
 
     # is one of
     out = both('genesis:\n  set answer to "y"\n  set sizes to a list containing (1, 2, 3)\n'

@@ -26,6 +26,7 @@ Stellanova is a programming language written in plain English words. Scripts end
 
 - **Checking for mistakes** without running: `stellanova check examples/guess.stella`.
 - **Testing it**: `stellanova test examples/maths.stella` runs each command called `to test ...:` (not genesis) and shows which passed. In them (or anywhere), `check double with 2 is 4` stops with `this check failed: double with 2 is 4` when it isn't so.
+- **Stopping it to look inside**: `stellanova debug examples/guess.stella 12 30` runs it and stops before line 12 and line 30 (with no lines, it stops before the first one). At a stop, press Enter (or `step`) to run that line and stop at the next, `over` to run it and the commands it calls, `out` to run until the command you are in gives back, and `go` to run to the next stop. `names` shows every name and what it holds, `look score` shows one, `stop at 40` and `forget 12` change the stops, and `quit` ends the program. In the studio, click beside a line's number to stop there, then use Debug.
 - **Watching it run**, line by line: `stellanova watch examples/guess.stella` shows each line as it runs, the names it changed (with what they hold now), and whether each `if` was yes or no.
 - **Trying things out:** type just `stellanova` for a prompt. Each line you type is done straight away, and names are kept from line to line. Type a value on its own (`5 plus 3`) to see it. A line ending in `:` takes the indented lines after it, finished with an empty line. `bye` finishes.
 
