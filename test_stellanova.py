@@ -196,6 +196,50 @@ def program_checks():
                           "bits need whole numbers smaller than 9007199254740992, not 1.5.\n"), repr(out.stdout)
     assert out.stderr == "Line 15: -8 to the power 0.5 can't be worked out (it is too big, or not a real number).\n", repr(out.stderr)
 
+    # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
+    out = both(''.join([
+               'a stack of anything has:\n'
+               '  items (a list of anything)\n'
+               'and the universe said i love you\n'
+               '\n'
+               'a pet has:\n'
+               '  name (text)\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to push, for a stack of anything, given x (anything):\n'
+               '  add x to items\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to top, for a stack of anything, returning anything:\n'
+               '  return last item of items\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to pop, for a stack of anything:\n'
+               '  remove item (the size of items) from items\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  conjure a stack of numbers as counts\n'
+               '  push with (counts, 3)\n'
+               '  push with (counts, 7)\n'
+               '  scrawl top counts\n'
+               '  pop counts\n'
+               '  scrawl counts\n'
+               '  set words to conjure a stack of text\n'
+               '  push with (words, "hello")\n'
+               '  scrawl top words\n'
+               '  conjure a stack of pets as zoo\n'
+               '  set rex to conjure a pet\n'
+               '  set the name of rex to "Rex"\n'
+               '  push with (zoo, rex)\n'
+               '  scrawl the name of top zoo\n'
+               '  set piles to a list of stacks of numbers\n'
+               '  add counts to piles\n'
+               '  scrawl the size of piles\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "7\na stack of numbers (items: 3)\nhello\nRex\n1\n", repr(out.stdout)
+
     # List maths, and sorting things by one of their parts (ties keep their order).
     out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +
                'genesis:\n  set xs to a list of (4, 1.5, 9, 2)\n  set sum to 1\n'

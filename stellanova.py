@@ -255,7 +255,8 @@ def parse_kind(text):
         if None in ins or (m.group(2) and not gives):
             return None
         return command_kind(ins, gives)
-    for name in (phrase, phrase[:-1] if phrase.endswith("s") else None):
+    first_plural = " ".join([words[0][:-1]] + words[1:]) if words and words[0].endswith("s") else None  # 'stacks of numbers'
+    for name in (phrase, phrase[:-1] if phrase.endswith("s") else None, first_plural):
         if name in THINGS:
             return "thing " + name
     return None
@@ -2057,6 +2058,8 @@ class Expr:
             if not command.gives:
                 raise ScriptError(line, f"'{' '.join(key)}' doesn't return anything, so it can't be used as a value.")
             cpp, run = call(key, args, self.names, line)
+            if command.versions and args and is_thing(args[0].kind):  # copies of a kind for any kind give back their own kinds
+                command = nearest_version(command.versions, args[0].kind) or command
             return with_ir(Value(cpp, command.gives, run), getattr(run, "ir", None))
         if tok == "no" and self.peek(1) is not None:  # 'no enemy': a thing that isn't there
             for n in range(min(6, len(self.t) - self.i - 1), 0, -1):
@@ -2238,7 +2241,9 @@ class Expr:
             if not is_list(v.kind):
                 raise ScriptError(line, f"'last item of' needs a list, but this is {kind_name(v.kind)}.")
             a = v.run
-            return builtin("stellanova::last({a0}, {line})", element(v.kind), lambda env: last(a(env), line), [v], line)
+            out = builtin("stellanova::last({a0}, {line})", element(v.kind), lambda env: last(a(env), line), [v], line)
+            item = element(v.kind)  # in machine code, the library's own: any kind of item (things too)
+            return with_ir(out, lambda f: f.unbox(f.call("ptr", "cn_list_last", ("ptr", machine.emit(f, v)), ("i32", line), checked=True), item))
         if self.at("square", "root", "of"):
             self.i += 3
             v = self.need(self.sum(), NUMBER, "square root")
@@ -2671,6 +2676,111 @@ def gather(path, from_line=None, seen=None):
     return lines, numbers
 
 
+GENERIC_COPIES = set()  # the kinds written out from a kind for any kind ('stack of numbers'): their commands may differ
+GENERIC_HEAD = re.compile(r"an? ([a-z][a-z ]*?) of anything (?:has|is a kind of .+):", re.IGNORECASE)
+GENERIC_FOR = re.compile(r"to .+?, for an? ([a-z][a-z ]*?) of anything\b.*:", re.IGNORECASE)
+ANYTHING = re.compile(r"\banything\b(?! else)")
+
+
+def expand_generics(lines, numbers):
+    """Kinds for any kind: 'a stack of anything has:' (and commands 'to push, for a stack of anything, given x (anything):')
+    are written out again for each kind the program uses them with, so 'a stack of numbers' is a kind of its own, with
+    'anything' read as 'a number' (and 'of anything' as 'of numbers'). Each copy keeps the line numbers it came from."""
+    def block_end(i):
+        j = i + 1
+        while j < len(lines) and not is_closing(lines[j]):
+            j += 1
+        return j
+
+    generic = {}  # name -> [(start, end)] of its description and commands
+    i, kept, kept_numbers = 0, [], []
+    while i < len(lines):
+        raw = lines[i]
+        m = None if raw[:1].isspace() else (GENERIC_HEAD.fullmatch(raw.strip()) or GENERIC_FOR.fullmatch(raw.strip()))
+        if m:
+            end = block_end(i)
+            generic.setdefault(m.group(1).lower(), []).append((lines[i:end + 1], numbers[i:end + 1]))
+            kept.append(("generic", m.group(1).lower()))
+            kept_numbers.append(None)
+            i = end + 1
+            continue
+        kept.append(raw)
+        kept_numbers.append(numbers[i])
+        i += 1
+    if not generic:
+        return lines, numbers
+    described = {m.group(1).lower() for raw in lines for m in [re.match(r"an? ([a-z][a-z ]*?) (?:has|is a kind of .+):", raw.strip(), re.IGNORECASE)] if m}
+    names = "|".join(sorted((re.escape(g) for g in generic), key=len, reverse=True))
+    use = re.compile(rf"\b({names})s? of ((?:[a-z]+ ?){{1,5}})", re.IGNORECASE)
+
+    def kind_at(words):
+        """the longest start of words that is a kind (as 'of ...' says it: 'numbers', 'lists of pets'): (kind, how many words)"""
+        global THINGS
+        saved, THINGS = THINGS, {name: [] for name in described}
+        try:
+            for n in range(len(words), 0, -1):
+                phrase = " ".join(words[:n])
+                if phrase == "anything":
+                    continue
+                kind = parse_kind(phrase) or (parse_kind(phrase[:-1]) if phrase.endswith("s") and " " not in phrase else None)
+                if kind:
+                    return kind, n
+        finally:
+            THINGS = saved
+        return None, 0
+
+    made = {}  # (generic, kind) -> the copy's name
+    out, out_numbers = [], []
+    pending = [(x, n) for x, n in zip(kept, kept_numbers)]
+
+    def rewrite(raw):
+        """uses of a generic kind, written the one way its copy is named ('stack of number' -> 'stack of numbers')"""
+        if raw.lstrip().lower().startswith("note:"):
+            return raw
+
+        def one(m):
+            kind, n = kind_at(m.group(2).split())
+            if not kind:
+                return m.group(0)
+            rest = m.group(2).split()[n:]
+            made.setdefault((m.group(1).lower(), kind), f"{m.group(1).lower()} of {plural(kind)}")
+            tail = (" " + " ".join(rest) if rest else "") + (" " if m.group(2).endswith(" ") else "")
+            return f"{m.group(0)[:len(m.group(1))]}{'s' if m.group(0)[len(m.group(1)):].startswith('s') else ''} of {plural(kind)}{tail}"
+        return use.sub(one, raw)
+
+    for x, n in pending:
+        if isinstance(x, tuple):
+            out.append(x)
+            out_numbers.append(None)
+        else:
+            out.append(rewrite(x))
+            out_numbers.append(n)
+    copies = {}  # generic -> [lines and numbers of its copies]
+    done = set()
+    for _ in range(20):  # copies can use other generic kinds: write those out too
+        new = [key for key in made if key not in done]
+        if not new:
+            break
+        for name, kind in new:
+            done.add((name, kind))
+            for block, block_numbers in generic[name]:
+                for raw, n in zip(block, block_numbers):
+                    raw = re.sub(r"\bof anything\b(?! else)", "of " + plural(kind), raw)
+                    raw = ANYTHING.sub(kind_name(kind), raw)
+                    copies.setdefault(name, []).append((rewrite(raw), n))
+    GENERIC_COPIES.update(made.values())
+    lines, numbers = [], []
+    for x, n in zip(out, out_numbers):
+        if isinstance(x, tuple):
+            for raw, number in copies.pop(x[1], []):
+                lines.append(raw)
+                numbers.append(number)
+        else:
+            lines.append(x)
+            numbers.append(n)
+    return lines, numbers
+
+
 def read_script(path):
     """Reads one .stella file. Returns (C++ text, Program or None), or raises ScriptError.
 
@@ -2692,7 +2802,7 @@ DEFINITION = re.compile(r"to .+:|an? [a-z][a-z ]* (?:has|is a kind of .+):|the w
 def read_one(path, auto):
     global THINGS
     FILES.clear()
-    lines, numbers = gather(path)
+    lines, numbers = expand_generics(*gather(path))
     main_lines = sum(1 for x in numbers if x < PER_FILE)
     names, info, settings, out = None, {}, [], []
     commands = []  # (header text, line, body)
@@ -2850,7 +2960,8 @@ def read_one(path, auto):
             owner = inputs[0][1] if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else None
             if have.versions is None or owner is None or owner in have.versions:
                 raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
-            if len(have.kinds) != len(command.kinds) or have.kinds[1:] != command.kinds[1:] or have.gives != gives:
+            copies = owner[6:] in GENERIC_COPIES and all(k[6:] in GENERIC_COPIES for k in have.versions)
+            if not copies and (len(have.kinds) != len(command.kinds) or have.kinds[1:] != command.kinds[1:] or have.gives != gives):
                 raise ScriptError(n, f"Every version of '{' '.join(words)}' must take the same inputs and return the same kind.")
             have.versions[owner] = command
         else:

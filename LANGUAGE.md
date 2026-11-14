@@ -117,6 +117,24 @@ and the universe said i love you
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
+**Kinds for any kind.** A kind of thing can be described once for every kind it may hold, with `anything` standing for that kind:
+
+```
+a stack of anything has:
+  items (a list of anything)
+and the universe said i love you
+
+to push, for a stack of anything, given x (anything):
+  add x to items
+and the universe said i love you
+
+to top, for a stack of anything, returning anything:
+  return last item of items
+and the universe said i love you
+```
+
+Then `conjure a stack of numbers`, `a stack of text` and `a list of stacks of pets` are kinds of their own: each is the description written out again with `anything` as a number (or text, or a pet), and `of anything` as `of numbers`. Commands for it go with each one too, so `push with (counts, 3)` and `top words` work on whichever stack they are given.
+
 **Kinds of kinds.** A kind of thing can be a kind of another one. It has all of the other's parts, and more of its own:
 
 ```
