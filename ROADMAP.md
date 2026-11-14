@@ -16,7 +16,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 ## 2. Reaching everything else
 - [x] Call any C library / DLL from a program (`use the library "user32.dll"` and a word for each function)
 - [x] Call any Python package when running directly (`use python: numpy`)
-- [ ] Sockets: TCP, UDP, WebSockets
+- [x] Sockets: TCP, UDP, WebSockets (`use: network`)
 - [ ] Threads that share things, with locks
 - [ ] A package manager: `stellanova get <library>`
 

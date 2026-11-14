@@ -14,6 +14,64 @@ translate.LOGIC = Path(__file__).resolve().parent / "examples"
 END = "and the universe said i love you\n"
 
 
+def websocket_echo(port):
+    """A tiny WebSocket echo server (ws://127.0.0.1:port/), for the network library's test."""
+    import base64
+    import hashlib
+    import socket
+    import threading
+
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", port))
+    listener.listen()
+
+    def one(s):
+        with s:
+            data = b""
+            while b"\r\n\r\n" not in data:
+                more = s.recv(4096)
+                if not more:
+                    return
+                data += more
+            key = next(l.split(b":", 1)[1].strip() for l in data.split(b"\r\n") if l.lower().startswith(b"sec-websocket-key"))
+            accept = base64.b64encode(hashlib.sha1(key + b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest())
+            s.sendall(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + b"\r\n\r\n")
+            buf = data[data.index(b"\r\n\r\n") + 4:]
+
+            def need(n):
+                nonlocal buf
+                while len(buf) < n:
+                    more = s.recv(4096)
+                    if not more:
+                        raise ConnectionError
+                    buf += more
+                out, buf = buf[:n], buf[n:]
+                return out
+            try:
+                while True:
+                    a, b = need(2)
+                    op, n = a & 15, b & 127
+                    if n >= 126:
+                        n = int.from_bytes(need(2 if n == 126 else 8), "big")
+                    mask = need(4) if b & 0x80 else b"\0\0\0\0"
+                    payload = bytes(x ^ mask[k % 4] for k, x in enumerate(need(n)))
+                    if op == 8:
+                        s.sendall(b"\x88\x00")
+                        return
+                    reply = b"echo: " + payload
+                    head = bytes([0x81, len(reply)]) if len(reply) < 126 else bytes([0x81, 126]) + len(reply).to_bytes(2, "big")
+                    s.sendall(head + reply)
+            except (ConnectionError, OSError):
+                return
+
+    def loop():
+        while True:
+            s, _ = listener.accept()
+            threading.Thread(target=one, args=(s,), daemon=True).start()
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def run(body, part_of="this is part of: creature body\n\n"):
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "probe.stella"
@@ -92,7 +150,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: big numbers, computer, database, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -278,6 +336,52 @@ def program_checks():
                'and the universe said i love you\n'
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
+
+    # The network: TCP (with a server going alongside), UDP, and WebSockets.
+    out = both(''.join([
+               'use: network\n'
+               '\n'
+               'to echo once, given listener (a number):\n'
+               '  set client to accept a connection on listener\n'
+               '  set heard to receive a line from client\n'
+               '  send a line on with (client, "you said: " plus heard)\n'
+               '  close the connection client\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  set listener to listen on port 47811\n'
+               '  meanwhile echo once with listener\n'
+               '  set c to connect to with ("127.0.0.1", 47811)\n'
+               '  send a line on with (c, "hello there")\n'
+               '  scrawl receive a line from c\n'
+               '  scrawl "[", receive from c, "]"\n'
+               '  close the connection c\n'
+               '  set u to open the udp port 47812\n'
+               '  send udp with (u, "127.0.0.1", 47812, "a note to myself")\n'
+               '  scrawl receive udp from u\n'
+               '  try:\n'
+               '    connect to with ("127.0.0.1", 1)\n'
+               '  if that went wrong:\n'
+               '    scrawl the wound\n'
+               '  close the connection 99\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "you said: hello there\n[]\na note to myself\nI couldn't connect to 127.0.0.1 on port 1.\n", repr(out.stdout)
+    assert out.stderr == "Line 25: there is no open connection 99.\n", repr(out.stderr)
+    websocket_echo(47813)
+    out = both(''.join([
+               'use: network\n'
+               '\n'
+               'genesis:\n'
+               '  set w to connect a websocket to "ws://127.0.0.1:47813/echo"\n'
+               '  send on with (w, "hello")\n'
+               '  scrawl receive from w\n'
+               '  send on with (w, "two")\n'
+               '  scrawl receive from w\n'
+               '  close the connection w\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "echo: hello\necho: two\n", repr(out.stdout + out.stderr)
 
     # Python packages, when running directly: a word for each function.
     with tempfile.TemporaryDirectory() as d:

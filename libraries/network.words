@@ -1,0 +1,543 @@
+note: Words for talking to other programs over the network: TCP connections, UDP messages and WebSockets.
+note: Use them in a program with:  use: network
+note: Each connection is a number. Text goes as UTF-8; 'bytes' words send and take numbers from 0 to 255.
+note: On the web, only the WebSocket words work (a web page can't open other connections).
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <ws2tcpip.h>
+include: <windows.h>
+include: <map>
+include: <mutex>
+include: <random>
+link: ws2_32
+
+code:
+  namespace stellanova_network
+  {
+  	struct Link
+  	{
+  		SOCKET s = INVALID_SOCKET;
+  		bool udp = false, web = false;  // a UDP port, or a WebSocket (TCP with frames)
+  		std::string kept;  // what arrived but wasn't taken yet
+  	};
+  	inline std::mutex lock;
+  	inline std::map<int, Link> links;
+  	inline int next = 0;
+
+  	inline void start()
+  	{
+  		static bool started = [] { WSADATA w; return WSAStartup(MAKEWORD(2, 2), &w) == 0; }();
+  		(void)started;
+  	}
+  	inline int add(const Link& l)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		links[++next] = l;
+  		return next;
+  	}
+  	inline Link& get(double n, int line)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		auto at = links.find((int)n);
+  		if (at == links.end())
+  			stellanova::fail(line, "there is no open connection " + stellanova::text(n) + ".");
+  		return at->second;
+  	}
+  	inline addrinfo* lookup(const std::string& host, double port, bool udp, int line)
+  	{
+  		start();
+  		addrinfo hints{}, *found = nullptr;
+  		hints.ai_family = AF_INET;
+  		hints.ai_socktype = udp ? SOCK_DGRAM : SOCK_STREAM;
+  		if (getaddrinfo(host.c_str(), std::to_string((int)port).c_str(), &hints, &found) != 0 || !found)
+  			stellanova::fail(line, "I couldn't find the computer \"" + host + "\".");
+  		return found;
+  	}
+  	inline SOCKET open_tcp(const std::string& host, double port, int line)
+  	{
+  		addrinfo* found = lookup(host, port, false, line);
+  		SOCKET s = socket(found->ai_family, found->ai_socktype, found->ai_protocol);
+  		bool ok = s != INVALID_SOCKET && connect(s, found->ai_addr, (int)found->ai_addrlen) == 0;
+  		freeaddrinfo(found);
+  		if (!ok)
+  		{
+  			if (s != INVALID_SOCKET)
+  				closesocket(s);
+  			stellanova::fail(line, "I couldn't connect to " + host + " on port " + stellanova::text(port) + ".");
+  		}
+  		return s;
+  	}
+  	inline double connect_to(const std::string& host, double port, int line)
+  	{
+  		Link l;
+  		l.s = open_tcp(host, port, line);
+  		return add(l);
+  	}
+  	inline double listen_on(double port, int line)
+  	{
+  		start();
+  		SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  		BOOL yes = TRUE;
+  		setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof yes);
+  		sockaddr_in at{};
+  		at.sin_family = AF_INET;
+  		at.sin_port = htons((u_short)port);
+  		at.sin_addr.s_addr = htonl(INADDR_ANY);
+  		if (s == INVALID_SOCKET || bind(s, (sockaddr*)&at, sizeof at) != 0 || listen(s, SOMAXCONN) != 0)
+  			stellanova::fail(line, "I couldn't listen on port " + stellanova::text(port) + " (another program may be using it).");
+  		Link l;
+  		l.s = s;
+  		return add(l);
+  	}
+  	inline double accept_on(double listener, int line)
+  	{
+  		SOCKET s = accept(get(listener, line).s, nullptr, nullptr);
+  		if (s == INVALID_SOCKET)
+  			stellanova::fail(line, "I couldn't take a connection on " + stellanova::text(listener) + ".");
+  		Link l;
+  		l.s = s;
+  		return add(l);
+  	}
+  	inline void send_all(SOCKET s, const std::string& data, int line)
+  	{
+  		size_t done = 0;
+  		while (done < data.size())
+  		{
+  			int sent = send(s, data.data() + done, (int)(data.size() - done), 0);
+  			if (sent <= 0)
+  				stellanova::fail(line, "the connection is closed, so I couldn't send to it.");
+  			done += (size_t)sent;
+  		}
+  	}
+  	inline bool fill(Link& l)  // more of what arrived into kept; false at the end
+  	{
+  		char buffer[65536];
+  		int got = recv(l.s, buffer, sizeof buffer, 0);
+  		if (got <= 0)
+  			return false;
+  		l.kept.append(buffer, (size_t)got);
+  		return true;
+  	}
+  	inline std::string take(Link& l, size_t n)
+  	{
+  		std::string out = l.kept.substr(0, n);
+  		l.kept.erase(0, n);
+  		return out;
+  	}
+  	inline std::string exactly(Link& l, size_t n, int line)
+  	{
+  		while (l.kept.size() < n)
+  			if (!fill(l))
+  				stellanova::fail(line, "the connection closed in the middle of a message.");
+  		return take(l, n);
+  	}
+
+  	// WebSockets (ws:// only): a TCP connection that says hello like a web page, then sends messages in frames
+  	inline void send_frame(Link& l, int opcode, const std::string& data, int line)
+  	{
+  		std::string f(1, (char)(0x80 | opcode));
+  		size_t n = data.size();
+  		if (n < 126)
+  			f += (char)(0x80 | n);
+  		else if (n < 65536)
+  			f += (char)(0x80 | 126), f += (char)(n >> 8), f += (char)(n & 255);
+  		else
+  		{
+  			f += (char)(0x80 | 127);
+  			for (int k = 7; k >= 0; --k)
+  				f += (char)((n >> (8 * k)) & 255);
+  		}
+  		static thread_local std::mt19937 random{std::random_device{}()};
+  		char mask[4];
+  		for (char& m : mask)
+  			m = (char)(random() & 255);
+  		f.append(mask, 4);
+  		for (size_t k = 0; k < n; ++k)
+  			f += (char)(data[k] ^ mask[k % 4]);
+  		send_all(l.s, f, line);
+  	}
+  	inline double connect_websocket(const std::string& address, int line)
+  	{
+  		if (address.rfind("ws://", 0) != 0)
+  			stellanova::fail(line, "a WebSocket address starts with ws:// (like \"ws://localhost:8080/chat\"); wss:// isn't there yet.");
+  		std::string rest = address.substr(5), path = "/";
+  		if (rest.find('/') != std::string::npos)
+  			path = rest.substr(rest.find('/')), rest = rest.substr(0, rest.find('/'));
+  		std::string host = rest;
+  		double port = 80;
+  		if (rest.find(':') != std::string::npos)
+  			host = rest.substr(0, rest.find(':')), port = std::stod(rest.substr(rest.find(':') + 1));
+  		Link l;
+  		l.s = open_tcp(host, port, line);
+  		l.web = true;
+  		send_all(l.s, "GET " + path + " HTTP/1.1\r\nHost: " + rest + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+  		              "Sec-WebSocket-Key: c3RlbGxhbm92YXdzIGtleQ==\r\nSec-WebSocket-Version: 13\r\n\r\n", line);
+  		while (l.kept.find("\r\n\r\n") == std::string::npos)
+  			if (!fill(l))
+  				stellanova::fail(line, "the WebSocket at " + address + " closed before saying hello.");
+  		std::string hello = take(l, l.kept.find("\r\n\r\n") + 4);
+  		if (hello.find(" 101 ") == std::string::npos)  // shortcut: the server's Sec-WebSocket-Accept isn't checked
+  			stellanova::fail(line, "the address " + address + " didn't answer as a WebSocket.");
+  		return add(l);
+  	}
+  	inline std::string receive_frame(Link& l, int line)  // the next whole message; "" when the other side closes
+  	{
+  		std::string message;
+  		while (true)
+  		{
+  			if (l.kept.empty() && !fill(l))
+  				return "";
+  			std::string head = exactly(l, 2, line);
+  			int opcode = head[0] & 15;
+  			bool last = (head[0] & 0x80) != 0, masked = (head[1] & 0x80) != 0;
+  			unsigned long long n = head[1] & 127;
+  			if (n >= 126)
+  			{
+  				std::string size = exactly(l, n == 126 ? 2 : 8, line);
+  				n = 0;
+  				for (unsigned char c : size)
+  					n = (n << 8) | c;
+  			}
+  			std::string mask = masked ? exactly(l, 4, line) : "";
+  			std::string data = exactly(l, (size_t)n, line);
+  			for (size_t k = 0; masked && k < data.size(); ++k)
+  				data[k] ^= mask[k % 4];
+  			if (opcode == 8)
+  				return "";
+  			if (opcode == 9)
+  			{
+  				send_frame(l, 10, data, line);
+  				continue;
+  			}
+  			if (opcode == 10)
+  				continue;
+  			message += data;
+  			if (last)
+  				return message;
+  		}
+  	}
+
+  	inline void send_text(double c, const std::string& message, int line)
+  	{
+  		Link& l = get(c, line);
+  		if (l.web)
+  			send_frame(l, 1, message, line);
+  		else
+  			send_all(l.s, message, line);
+  	}
+  	inline std::string receive(double c, int line)
+  	{
+  		Link& l = get(c, line);
+  		if (l.web)
+  			return receive_frame(l, line);
+  		if (l.kept.empty())
+  			fill(l);
+  		return take(l, l.kept.size());
+  	}
+  	inline std::string receive_line(double c, int line)
+  	{
+  		Link& l = get(c, line);
+  		while (l.kept.find('\n') == std::string::npos)
+  			if (!fill(l))
+  				return take(l, l.kept.size());
+  		std::string out = take(l, l.kept.find('\n') + 1);
+  		out.pop_back();
+  		if (!out.empty() && out.back() == '\r')
+  			out.pop_back();
+  		return out;
+  	}
+  	inline std::string from_bytes(const std::vector<double>& bytes, int line)
+  	{
+  		std::string out;
+  		for (double x : bytes)
+  		{
+  			if (x < 0 || x > 255 || x != (double)(int)x)
+  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  			out += (char)(unsigned char)x;
+  		}
+  		return out;
+  	}
+  	inline std::vector<double> to_bytes(const std::string& s)
+  	{
+  		std::vector<double> out;
+  		for (unsigned char c : s)
+  			out.push_back((double)c);
+  		return out;
+  	}
+  	inline void close(double c, int line)
+  	{
+  		Link l = get(c, line);
+  		if (l.web)
+  		{
+  			try { send_frame(l, 8, "", line); } catch (const stellanova::Problem&) {}
+  		}
+  		closesocket(l.s);
+  		std::lock_guard<std::mutex> hold(lock);
+  		links.erase((int)c);
+  	}
+
+  	inline double open_udp(double port, int line)
+  	{
+  		start();
+  		SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  		sockaddr_in at{};
+  		at.sin_family = AF_INET;
+  		at.sin_port = htons((u_short)port);
+  		at.sin_addr.s_addr = htonl(INADDR_ANY);
+  		if (s == INVALID_SOCKET || bind(s, (sockaddr*)&at, sizeof at) != 0)
+  			stellanova::fail(line, "I couldn't open the UDP port " + stellanova::text(port) + " (another program may be using it).");
+  		Link l;
+  		l.s = s;
+  		l.udp = true;
+  		return add(l);
+  	}
+  	inline void send_udp(double c, const std::string& host, double port, const std::string& message, int line)
+  	{
+  		SOCKET s = get(c, line).s;
+  		addrinfo* found = lookup(host, port, true, line);
+  		int sent = sendto(s, message.data(), (int)message.size(), 0, found->ai_addr, (int)found->ai_addrlen);
+  		freeaddrinfo(found);
+  		if (sent < 0)
+  			stellanova::fail(line, "I couldn't send to " + host + ".");
+  	}
+  	inline std::string receive_udp(double c, int line)
+  	{
+  		char buffer[65536];
+  		int got = recvfrom(get(c, line).s, buffer, sizeof buffer, 0, nullptr, nullptr);
+  		return got > 0 ? std::string(buffer, (size_t)got) : std::string();
+  	}
+  }
+
+python:
+  import socket as _socket
+  import os as _os
+  NET = {}
+  NET_NEXT = [0]
+  class _Link:
+      def __init__(self, s, udp=False, web=False):
+          self.s, self.udp, self.web, self.kept = s, udp, web, b""
+  def _add(link):
+      NET_NEXT[0] += 1
+      NET[NET_NEXT[0]] = link
+      return float(NET_NEXT[0])
+  def _get(n):
+      if int(n) not in NET:
+          raise RunError(0, "there is no open connection " + text(n) + ".")
+      return NET[int(n)]
+  def _open_tcp(host, port):
+      try:
+          return _socket.create_connection((host, int(port)))
+      except _socket.gaierror:
+          raise RunError(0, 'I couldn\'t find the computer "' + host + '".')
+      except OSError:
+          raise RunError(0, "I couldn't connect to " + host + " on port " + text(port) + ".")
+  def net_connect(host, port):
+      return _add(_Link(_open_tcp(host, port)))
+  def net_listen(port):
+      s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+      s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+      try:
+          s.bind(("", int(port)))
+          s.listen()
+      except OSError:
+          raise RunError(0, "I couldn't listen on port " + text(port) + " (another program may be using it).")
+      return _add(_Link(s))
+  def net_accept(listener):
+      try:
+          s, _ = _get(listener).s.accept()
+      except OSError:
+          raise RunError(0, "I couldn't take a connection on " + text(listener) + ".")
+      return _add(_Link(s))
+  def _send_all(link, data):
+      try:
+          link.s.sendall(data)
+      except OSError:
+          raise RunError(0, "the connection is closed, so I couldn't send to it.")
+  def _fill(link):
+      try:
+          got = link.s.recv(65536)
+      except OSError:
+          got = b""
+      link.kept += got
+      return bool(got)
+  def _take(link, n):
+      out, link.kept = link.kept[:n], link.kept[n:]
+      return out
+  def _exactly(link, n):
+      while len(link.kept) < n:
+          if not _fill(link):
+              raise RunError(0, "the connection closed in the middle of a message.")
+      return _take(link, n)
+  def _send_frame(link, opcode, data):
+      n = len(data)
+      f = bytes([0x80 | opcode])
+      if n < 126:
+          f += bytes([0x80 | n])
+      elif n < 65536:
+          f += bytes([0x80 | 126, n >> 8, n & 255])
+      else:
+          f += bytes([0x80 | 127]) + n.to_bytes(8, "big")
+      mask = _os.urandom(4)
+      _send_all(link, f + mask + bytes(b ^ mask[k % 4] for k, b in enumerate(data)))
+  def net_websocket(address):
+      if not address.startswith("ws://"):
+          raise RunError(0, 'a WebSocket address starts with ws:// (like "ws://localhost:8080/chat"); wss:// isn\'t there yet.')
+      rest, path = address[5:], "/"
+      if "/" in rest:
+          rest, path = rest[:rest.index("/")], rest[rest.index("/"):]
+      host, port = (rest.split(":", 1) + ["80"])[:2]
+      link = _Link(_open_tcp(host, float(port)), web=True)
+      _send_all(link, ("GET " + path + " HTTP/1.1\r\nHost: " + rest + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                       "Sec-WebSocket-Key: c3RlbGxhbm92YXdzIGtleQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+      while b"\r\n\r\n" not in link.kept:
+          if not _fill(link):
+              raise RunError(0, "the WebSocket at " + address + " closed before saying hello.")
+      hello = _take(link, link.kept.index(b"\r\n\r\n") + 4)
+      if b" 101 " not in hello:
+          raise RunError(0, "the address " + address + " didn't answer as a WebSocket.")
+      return _add(link)
+  def _receive_frame(link):
+      message = b""
+      while True:
+          if not link.kept and not _fill(link):
+              return b""
+          head = _exactly(link, 2)
+          opcode, last, masked, n = head[0] & 15, head[0] & 0x80, head[1] & 0x80, head[1] & 127
+          if n >= 126:
+              n = int.from_bytes(_exactly(link, 2 if n == 126 else 8), "big")
+          mask = _exactly(link, 4) if masked else b""
+          data = _exactly(link, n)
+          if masked:
+              data = bytes(b ^ mask[k % 4] for k, b in enumerate(data))
+          if opcode == 8:
+              return b""
+          if opcode == 9:
+              _send_frame(link, 10, data)
+              continue
+          if opcode == 10:
+              continue
+          message += data
+          if last:
+              return message
+  def net_send(c, message):
+      link = _get(c)
+      data = message.encode("utf-8") if isinstance(message, str) else message
+      _send_frame(link, 1, data) if link.web else _send_all(link, data)
+  def net_receive_raw(c):
+      link = _get(c)
+      if link.web:
+          return _receive_frame(link)
+      if not link.kept:
+          _fill(link)
+      return _take(link, len(link.kept))
+  def net_receive(c):
+      return net_receive_raw(c).decode("utf-8", "replace")
+  def net_receive_line(c):
+      link = _get(c)
+      while b"\n" not in link.kept:
+          if not _fill(link):
+              return _take(link, len(link.kept)).decode("utf-8", "replace")
+      out = _take(link, link.kept.index(b"\n") + 1)[:-1]
+      return out.rstrip(b"\r").decode("utf-8", "replace")
+  def net_bytes(numbers):
+      for x in numbers:
+          if x < 0 or x > 255 or x != int(x):
+              raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
+      return bytes(int(x) for x in numbers)
+  def net_close(c):
+      link = _get(c)
+      if link.web:
+          try:
+              _send_frame(link, 8, b"")
+          except RunError:
+              pass
+      link.s.close()
+      del NET[int(c)]
+  def net_udp(port):
+      s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+      try:
+          s.bind(("", int(port)))
+      except OSError:
+          raise RunError(0, "I couldn't open the UDP port " + text(port) + " (another program may be using it).")
+      return _add(_Link(s, udp=True))
+  def net_send_udp(c, host, port, message):
+      try:
+          _get(c).s.sendto(message.encode("utf-8"), (host, int(port)))
+      except _socket.gaierror:
+          raise RunError(0, 'I couldn\'t find the computer "' + host + '".')
+      except OSError:
+          raise RunError(0, "I couldn't send to " + host + ".")
+  def net_receive_udp(c):
+      return _get(c).s.recvfrom(65536)[0].decode("utf-8", "replace")
+
+to connect to, given host (text) and port (a number), returning a number = stellanova_network::connect_to({host}, {port}, {line})
+  runs: net_connect({host}, {port})
+to listen on port, given port (a number), returning a number = stellanova_network::listen_on({port}, {line})
+  runs: net_listen({port})
+to accept a connection on, given listener (a number), returning a number = stellanova_network::accept_on({listener}, {line})
+  runs: net_accept({listener})
+to send on, given connection (a number) and message (text) = stellanova_network::send_text({connection}, {message}, {line})
+  runs: net_send({connection}, {message})
+  web: await stellanova_network.send({connection}, {message}, {line})
+to send a line on, given connection (a number) and message (text) = stellanova_network::send_text({connection}, {message} + "\n", {line})
+  runs: net_send({connection}, {message} + "\n")
+to send bytes on, given connection (a number) and bytes (a list of numbers) = stellanova_network::send_text({connection}, stellanova_network::from_bytes({bytes}, {line}), {line})
+  runs: net_send({connection}, net_bytes({bytes}))
+to receive from, given connection (a number), returning text = stellanova_network::receive({connection}, {line})
+  runs: net_receive({connection})
+  web: await stellanova_network.receive({connection}, {line})
+to receive bytes from, given connection (a number), returning a list of numbers = stellanova_network::to_bytes(stellanova_network::receive({connection}, {line}))
+  runs: [float(b) for b in net_receive_raw({connection})]
+to receive a line from, given connection (a number), returning text = stellanova_network::receive_line({connection}, {line})
+  runs: net_receive_line({connection})
+to close the connection, given connection (a number) = stellanova_network::close({connection}, {line})
+  runs: net_close({connection})
+  web: stellanova_network.close({connection}, {line})
+to connect a websocket to, given address (text), returning a number = stellanova_network::connect_websocket({address}, {line})
+  runs: net_websocket({address})
+  web: await stellanova_network.websocket({address}, {line})
+to open the udp port, given port (a number), returning a number = stellanova_network::open_udp({port}, {line})
+  runs: net_udp({port})
+to send udp, given connection (a number) and host (text) and port (a number) and message (text) = stellanova_network::send_udp({connection}, {host}, {port}, {message}, {line})
+  runs: net_send_udp({connection}, {host}, {port}, {message})
+to receive udp from, given connection (a number), returning text = stellanova_network::receive_udp({connection}, {line})
+  runs: net_receive_udp({connection})
+
+javascript:
+  const stellanova_network = {
+    links: new Map(),
+    next: 0,
+    get(n, line) {
+      const l = this.links.get(n);
+      if (!l) stellanova.fail(line, "there is no open connection " + stellanova.text(n) + ".");
+      return l;
+    },
+    websocket(address, line) {
+      if (!address.startsWith("ws://") && !address.startsWith("wss://")) stellanova.fail(line, 'a WebSocket address starts with ws:// (like "ws://localhost:8080/chat").');
+      return new Promise((resolve, reject) => {
+        const socket = new WebSocket(address);
+        const l = { socket, waiting: [], kept: [], closed: false };
+        socket.onmessage = (e) => { const m = typeof e.data === "string" ? e.data : ""; l.waiting.length ? l.waiting.shift()(m) : l.kept.push(m); };
+        socket.onclose = () => { l.closed = true; while (l.waiting.length) l.waiting.shift()(""); };
+        socket.onopen = () => { this.links.set(++this.next, l); resolve(this.next); };
+        socket.onerror = () => { if (socket.readyState !== 1) reject(new stellanova.Problem(line, "I couldn't connect to the WebSocket at " + address + ".")); };
+      });
+    },
+    async send(n, message, line) {
+      const l = this.get(n, line);
+      if (l.closed) stellanova.fail(line, "the connection is closed, so I couldn't send to it.");
+      l.socket.send(message);
+    },
+    receive(n, line) {
+      const l = this.get(n, line);
+      if (l.kept.length) return Promise.resolve(l.kept.shift());
+      if (l.closed) return Promise.resolve("");
+      return new Promise((resolve) => l.waiting.push(resolve));
+    },
+    close(n, line) {
+      this.get(n, line).socket.close();
+      this.links.delete(n);
+    },
+  };

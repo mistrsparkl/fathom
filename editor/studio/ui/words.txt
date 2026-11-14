@@ -108,3 +108,7 @@ raise a|A kind of problem of your own: raise a fuel problem with "empty"; caught
 if that went wrong with|After try: takes one kind of problem only: if that went wrong with a fuel problem:
 use the library|C functions from any .dll: use the library "user32.dll": then lines like to beep, given ... = bool Beep(unsigned, unsigned)
 use python|A Python package's functions (running directly): use python "statistics": then lines like to middle of, given xs (a list of numbers), returning a number = median
+connect to|TCP (library network): connect to with ("example.com", 80) gives a connection; then send on, receive from, receive a line from, close the connection.
+listen on port|A TCP server (library network): set listener to listen on port 8080, then accept a connection on listener.
+connect a websocket to|A WebSocket (library network): connect a websocket to "ws://localhost:8080"; send on and receive from take whole messages.
+open the udp port|UDP (library network): open the udp port 9000; send udp with (u, host, port, text); receive udp from u.
