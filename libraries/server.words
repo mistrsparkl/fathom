@@ -223,10 +223,13 @@ python:
 
 to serve the web, given port (a number) and answer (a command given text returning text) = stellanova_server::serve({port}, {answer}, {line})
   runs: serve_from({port}, "", {answer})
+  web: await stellanova_server_web.serve({port}, "", {answer}, {line})
 to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text returning text) = stellanova_server::serve_from({port}, {folder}, {answer}, {line})
   runs: serve_from({port}, {folder}, {answer})
+  web: await stellanova_server_web.serve({port}, {folder}, {answer}, {line})
 the web message = stellanova_server::message, text, read only
   runs: MESSAGE[0]
+  web: stellanova_server_web.message
 to web decoded, given piece (text), returning text = stellanova_server::decoded({piece})
   runs: urllib.parse.unquote_plus({piece})
   web: stellanova_server_web::decoded({piece})
@@ -235,14 +238,70 @@ to web encoded, given piece (text), returning text = stellanova_server::encoded(
   web: encodeURIComponent({piece})
 to answer with the file, given name (text) = stellanova_server::answer_with({name}, {line})
   runs: answer_with({name})
+  web: stellanova_server_web.answerWith({name}, {line})
 
 javascript:
   const stellanova_server_web = {
+    message: "",
+    asked: "",
     decoded(piece) {
       try {
         return decodeURIComponent(piece.replace(/\+/g, " "));
       } catch {
         return piece;
       }
+    },
+    kinds: { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+             ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+             ".ico": "image/x-icon", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".mp3": "audio/mpeg",
+             ".wav": "audio/wav", ".txt": "text/plain; charset=utf-8", ".webp": "image/webp" },
+    kindOf(path) {
+      const m = /\.[^./]*$/.exec(path.split("?")[0]);
+      return (m && this.kinds[m[0].toLowerCase()]) || "text/html; charset=utf-8";
+    },
+    answerWith(name, line) {
+      const fs = require("fs");
+      let file = false;
+      try { file = fs.statSync(name).isFile(); } catch {}
+      if (!file) stellanova.fail(line, `there is no file called ${name}.`);
+      this.asked = name;
+    },
+    fileFor(folder, path) {
+      if (!folder) return null;
+      let name = this.decoded(path.split("?")[0]);
+      if (name === "/") name = "/index.html";
+      if (name.includes("..")) return null;
+      try { return require("fs").readFileSync(folder + name); } catch { return null; }
+    },
+    serve(port, folder, answer, line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page can't serve the web (this works with node).");
+      const http = require("http"), fs = require("fs");
+      let turn = Promise.resolve();  // one request at a time, so 'the web message' is the one being answered
+      const server = http.createServer((request, response) => {
+        const parts = [];
+        request.on("data", (d) => parts.push(d));
+        request.on("end", () => {
+          turn = turn.then(async () => {
+            this.message = Buffer.concat(parts).toString("utf8");
+            let page = this.fileFor(folder, request.url), kind = this.kindOf(request.url === "/" && folder ? "/index.html" : request.url);
+            if (page === null) {
+              this.asked = "";
+              try {
+                page = Buffer.from(String(await answer(request.url)), "utf8");
+              } catch (e) {
+                stellanova.report(e);
+                page = Buffer.from("", "utf8");
+              }
+              if (this.asked) page = fs.readFileSync(this.asked), kind = this.kindOf(this.asked);
+            }
+            response.writeHead(200, { "Content-Type": kind, "Cache-Control": "no-store", "Content-Length": page.length, Connection: "close" });
+            response.end(page);
+          });
+        });
+      });
+      return new Promise((resolve, reject) => {  // it never ends: serving is all it does
+        server.once("error", () => reject(new stellanova.Problem(line, `I couldn't serve the web on port ${stellanova.text(port)} (is something else using it?).`)));
+        server.listen(port, "127.0.0.1");
+      });
     },
   };
