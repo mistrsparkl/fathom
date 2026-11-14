@@ -9,6 +9,11 @@ include: <winsock2.h>
 include: <windows.h>
 include: <GL/gl.h>
 include: <cstring>
+include: <functional>
+include: <fstream>
+include: <sstream>
+include: <filesystem>
+include: <map>
 link: user32
 link: gdi32
 link: opengl32
@@ -447,14 +452,16 @@ code:
   	inline std::vector<Item3> items3;
   	inline double eye_x = 0, eye_y = 1.5, eye_z = -6, eye_turn = 0, eye_tilt = 0;
   	inline const double near3 = 0.05, far3 = 1000, pi3 = 3.14159265358979323846;
-  	inline const double sun[3] = {0.371, 0.743, -0.557};  // the light: up, a little right and behind
+  	inline double sun[3] = {0.371, 0.743, -0.557};  // toward the light: up, a little right and behind ('shine the light from')
+  	inline double view_angle = 60;  // how wide the eye sees, top to bottom, in degrees ('set the eye view to')
+  	inline std::function<std::string(FVector, std::string)> shader;  // 'shade the shapes with': gives each shape its colour
 
   	inline void need_open(int line)
   	{
   		if (!opened)
   			stellanova::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
   	}
-  	inline double focal() { return (height / 2.0) / std::tan(30.0 * pi3 / 180.0); }  // 60 degrees from top to bottom
+  	inline double focal() { return (height / 2.0) / std::tan(view_angle / 2 * pi3 / 180.0); }
   	inline void axes(double r[3][3])  // rows: the eye's across, up and forward, in the world
   	{
   		double t = eye_turn * pi3 / 180.0, a = eye_tilt * pi3 / 180.0;
@@ -479,9 +486,43 @@ code:
   	{
   		return RGB((GetRValue(c) + 255) / 2, (GetGValue(c) + 255) / 2, (GetBValue(c) + 255) / 2);
   	}
+  	inline std::string hex_colour(COLORREF c)
+  	{
+  		char s[8];
+  		std::snprintf(s, sizeof s, "#%02x%02x%02x", GetRValue(c), GetGValue(c), GetBValue(c));
+  		return s;
+  	}
+  	inline COLORREF colour(const std::string& name, int line);
+  	inline COLORREF shaded(V3 at, COLORREF col)  // the shader command's colour for a shape there, if there is one
+  	{
+  		if (!shader)
+  			return col;
+  		return colour(shader(FVector(at.x, at.y, at.z), hex_colour(col)), 0);
+  	}
   	inline void polygon3(const std::vector<V3>& world, COLORREF col, double far_first = 0, V3 n = {0, 0, 0})
   	{
+  		if (shader)
+  		{
+  			V3 c{0, 0, 0};
+  			for (const V3& w : world)
+  				c.x += w.x / world.size(), c.y += w.y / world.size(), c.z += w.z / world.size();
+  			col = shaded(c, col);
+  		}
   		(keeping.empty() ? items3 : kept[keeping].items).push_back({false, world, {}, 0, col, far_first, n});
+  	}
+  	inline void face3(std::vector<V3> pts, COLORREF col)  // a flat shape seen from both sides, lit by the light
+  	{
+  		if (pts.size() < 3)
+  			return;
+  		V3 a = pts[0], b = pts[1], c = pts[2];
+  		V3 u{b.x - a.x, b.y - a.y, b.z - a.z}, v{c.x - a.x, c.y - a.y, c.z - a.z};
+  		V3 n{u.y * v.z - u.z * v.y, u.z * v.x - u.x * v.z, u.x * v.y - u.y * v.x};
+  		double size = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+  		if (size == 0)
+  			return;
+  		n = {n.x / size, n.y / size, n.z / size};
+  		double lit = std::fabs(n.x * sun[0] + n.y * sun[1] + n.z * sun[2]);
+  		polygon3(pts, shade(col, 0.6 + 0.4 * lit), 0, {0, 0, 0});
   	}
   	inline bool facing_away(const Item3& item)
   	{
@@ -671,7 +712,7 @@ code:
   		glEnable(GL_DEPTH_TEST);
   		glMatrixMode(GL_PROJECTION);
   		glLoadIdentity();
-  		double top = near3 * std::tan(30.0 * pi3 / 180.0), right = top * width / height;
+  		double top = near3 * std::tan(view_angle / 2 * pi3 / 180.0), right = top * width / height;
   		glFrustum(-right, right, -top, top, near3, far3);
   		double r[3][3];
   		axes(r);
@@ -824,7 +865,140 @@ code:
   		need_open(line);
   		if (!(radius > 0))
   			stellanova::fail(line, "a ball's radius must be more than 0.");
-  		(keeping.empty() ? items3 : kept[keeping].items).push_back({true, {}, v3(middle), radius, colour(c, line), 0});
+  		(keeping.empty() ? items3 : kept[keeping].items).push_back({true, {}, v3(middle), radius, shaded(v3(middle), colour(c, line)), 0});
+  	}
+
+  	inline void triangle3(const FVector& a, const FVector& b, const FVector& c, const std::string& col, int line)
+  	{
+  		need_open(line);
+  		face3({v3(a), v3(b), v3(c)}, colour(col, line));
+  	}
+  	inline void shine_from(const FVector& d, int line)
+  	{
+  		double size = std::sqrt(d.X * d.X + d.Y * d.Y + d.Z * d.Z);
+  		if (size == 0)
+  			stellanova::fail(line, "the light needs a direction, not 0 horizontal 0 vertical 0 depth.");
+  		sun[0] = d.X / size, sun[1] = d.Y / size, sun[2] = d.Z / size;
+  	}
+  	inline void set_view(double degrees, int line)
+  	{
+  		if (!(degrees >= 10 && degrees <= 150))
+  			stellanova::fail(line, "the eye view is 10 to 150 degrees wide, not " + stellanova::text(degrees) + ".");
+  		view_angle = degrees;
+  	}
+
+  	// ---- models (.obj files, with their .mtl colours)
+  	struct Model { std::vector<V3> points; std::vector<std::pair<std::vector<int>, int>> faces; std::vector<COLORREF> colours; };  // faces: points, colour (-1: none)
+  	inline Model& model(const std::string& file, int line)
+  	{
+  		static std::map<std::string, Model> models;
+  		auto found = models.find(file);
+  		if (found != models.end())
+  			return found->second;
+  		std::ifstream in(std::filesystem::u8path(file));
+  		if (!in)
+  			stellanova::fail(line, "there is no model called \"" + file + "\".");
+  		Model m;
+  		std::map<std::string, int> named;  // material name -> colour
+  		int now = -1;
+  		auto folder = std::filesystem::u8path(file).parent_path();
+  		for (std::string row; std::getline(in, row);)
+  		{
+  			std::istringstream words(row);
+  			std::string kind;
+  			words >> kind;
+  			if (kind == "v")
+  			{
+  				V3 p{};
+  				words >> p.x >> p.y >> p.z;
+  				m.points.push_back(p);
+  			}
+  			else if (kind == "f")
+  			{
+  				std::vector<int> face;
+  				for (std::string w; words >> w;)
+  				{
+  					int k = std::atoi(w.c_str());
+  					k = k < 0 ? (int)m.points.size() + k : k - 1;
+  					if (k < 0 || k >= (int)m.points.size())
+  						stellanova::fail(line, "the model \"" + file + "\" has a face with a corner that isn't there.");
+  					face.push_back(k);
+  				}
+  				if (face.size() >= 3)
+  					m.faces.push_back({face, now});
+  			}
+  			else if (kind == "usemtl")
+  			{
+  				std::string name;
+  				words >> name;
+  				now = named.count(name) ? named[name] : -1;
+  			}
+  			else if (kind == "mtllib")
+  			{
+  				std::string name;
+  				std::getline(words >> std::ws, name);
+  				std::ifstream mtl(folder / std::filesystem::u8path(name));
+  				std::string material;
+  				for (std::string r; std::getline(mtl, r);)
+  				{
+  					std::istringstream mw(r);
+  					std::string mk;
+  					mw >> mk;
+  					if (mk == "newmtl")
+  						mw >> material;
+  					else if (mk == "Kd")
+  					{
+  						double cr = 0.8, cg = 0.8, cb = 0.8;
+  						mw >> cr >> cg >> cb;
+  						named[material] = (int)m.colours.size();
+  						m.colours.push_back(RGB((int)std::lround(cr * 255), (int)std::lround(cg * 255), (int)std::lround(cb * 255)));
+  					}
+  				}
+  			}
+  		}
+  		return models[file] = std::move(m);
+  	}
+  	inline void etch_model(const std::string& file, const FVector& middle, double size, double turn, const std::string& col, int line)
+  	{
+  		need_open(line);
+  		Model& m = model(file, line);
+  		COLORREF own = col.empty() ? RGB(200, 200, 200) : colour(col, line);
+  		double t = turn * pi3 / 180.0, ct = std::cos(t), st = std::sin(t);
+  		for (const auto& [face, which] : m.faces)
+  		{
+  			std::vector<V3> pts;
+  			for (int k : face)
+  			{
+  				const V3& p = m.points[(size_t)k];
+  				pts.push_back({middle.X + size * (p.x * ct + p.z * st), middle.Y + size * p.y, middle.Z + size * (-p.x * st + p.z * ct)});
+  			}
+  			face3(pts, col.empty() && which >= 0 ? m.colours[(size_t)which] : own);
+  		}
+  	}
+
+  	// ---- a picture laid on a flat part of the world, as a grid of coloured cells
+  	inline void picture_in_space(const std::string& file, const FVector& corner, const FVector& across, const FVector& down, int line)
+  	{
+  		need_open(line);
+  		picture(file, line);  // there, and readable
+  		static std::map<std::string, std::unique_ptr<Gdiplus::Bitmap>> bitmaps;
+  		auto& kept_bitmap = bitmaps[file];
+  		if (!kept_bitmap)
+  			kept_bitmap = std::make_unique<Gdiplus::Bitmap>(wide(file).c_str());
+  		Gdiplus::Bitmap* image = kept_bitmap.get();
+  		int w = (int)image->GetWidth(), h = (int)image->GetHeight();
+  		int nx = std::min(w, 48), ny = std::min(h, 48);
+  		for (int j = 0; j < ny; ++j)
+  			for (int i = 0; i < nx; ++i)
+  			{
+  				Gdiplus::Color dot;
+  				image->GetPixel((i * w + w / 2) / nx, (j * h + h / 2) / ny, &dot);
+  				if (dot.GetA() < 128)
+  					continue;
+  				auto at = [&](double a, double b) { return V3{corner.X + across.X * a + down.X * b, corner.Y + across.Y * a + down.Y * b, corner.Z + across.Z * a + down.Z * b}; };
+  				double a0 = (double)i / nx, a1 = (double)(i + 1) / nx, b0 = (double)j / ny, b1 = (double)(j + 1) / ny;
+  				face3({at(a0, b0), at(a1, b0), at(a1, b1), at(a0, b1)}, RGB(dot.GetR(), dot.GetG(), dot.GetB()));
+  			}
   	}
   	inline void start_keeping(const std::string& name, int line)
   	{
@@ -1115,7 +1289,8 @@ python:
   KEPT = {}  # name -> {"items": [...], "list": OpenGL list or None, "fresh": yes}: shapes kept to be etched again and again
   LIGHT = {"keeping": None, "daylight": 1.0}
   NEAR3, FAR3, PI3 = 0.05, 1000.0, 3.14159265358979323846
-  SUN = (0.371, 0.743, -0.557)
+  SUN = [0.371, 0.743, -0.557]  # toward the light ('shine the light from')
+  VIEW = {"angle": 60.0, "shader": None}  # how wide the eye sees; the shader command
   GL = {"tried": False, "ok": False}
 
   def need_open():
@@ -1123,7 +1298,7 @@ python:
           raise RunError(0, 'there is no window yet. Open one first, like: open a world with "My game", 800, 600')
 
   def focal():
-      return (win["size"][1] / 2.0) / math.tan(30.0 * PI3 / 180.0)
+      return (win["size"][1] / 2.0) / math.tan(VIEW["angle"] / 2 * PI3 / 180.0)
 
   def axes():
       t, a = EYE["turn"] * PI3 / 180.0, EYE["tilt"] * PI3 / 180.0
@@ -1144,7 +1319,14 @@ python:
   def lighter(col):
       return "#%02x%02x%02x" % tuple((v + 255) // 2 for v in rgb(col))
 
+  def shaded(at, col):
+      if VIEW["shader"] is None:
+          return col
+      return colour(VIEW["shader"](Place(*at), col))
+
   def polygon3(world, col, far_first=0.0, normal=None):
+      if VIEW["shader"] is not None:
+          col = shaded(tuple(sum(w[k] for w in world) / len(world) for k in range(3)), col)
       (ITEMS3 if LIGHT["keeping"] is None else KEPT[LIGHT["keeping"]]["items"]).append((False, world, 0.0, col, far_first, normal))
 
   def facing_away(where, normal):
@@ -1299,7 +1481,7 @@ python:
       gl.glEnable(0x0B71)  # GL_DEPTH_TEST
       gl.glMatrixMode(0x1701)  # GL_PROJECTION
       gl.glLoadIdentity()
-      top = NEAR3 * math.tan(30.0 * PI3 / 180.0)
+      top = NEAR3 * math.tan(VIEW["angle"] / 2 * PI3 / 180.0)
       gl.glFrustum(-top * w / h, top * w / h, -top, top, NEAR3, FAR3)
       r, e = axes(), (EYE["x"], EYE["y"], EYE["z"])
       m = [0.0] * 16  # the eye's view, as OpenGL wants it (it looks along -z)
@@ -1423,7 +1605,110 @@ python:
       need_open()
       if not radius > 0:
           raise RunError(0, "a ball's radius must be more than 0.")
-      (ITEMS3 if LIGHT["keeping"] is None else KEPT[LIGHT["keeping"]]["items"]).append((True, tuple(middle.parts()[:3]), radius, colour(c), 0.0, None))
+      (ITEMS3 if LIGHT["keeping"] is None else KEPT[LIGHT["keeping"]]["items"]).append((True, tuple(middle.parts()[:3]), radius, shaded(tuple(middle.parts()[:3]), colour(c)), 0.0, None))
+
+  def face3(pts, col):
+      if len(pts) < 3:
+          return
+      a, b, c = pts[0], pts[1], pts[2]
+      u, v = [b[k] - a[k] for k in range(3)], [c[k] - a[k] for k in range(3)]
+      n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+      size = math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
+      if size == 0:
+          return
+      lit = abs((n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]) / size)
+      polygon3([tuple(p) for p in pts], shade(col, 0.6 + 0.4 * lit), 0.0, None)
+
+  def triangle3(a, b, c, col):
+      need_open()
+      face3([tuple(a.parts()[:3]), tuple(b.parts()[:3]), tuple(c.parts()[:3])], colour(col))
+
+  def shine_from(d):
+      x, y, z = d.parts()[:3]
+      size = math.sqrt(x * x + y * y + z * z)
+      if size == 0:
+          raise RunError(0, "the light needs a direction, not 0 horizontal 0 vertical 0 depth.")
+      SUN[:] = [x / size, y / size, z / size]
+
+  def set_view(degrees):
+      if not 10 <= degrees <= 150:
+          raise RunError(0, "the eye view is 10 to 150 degrees wide, not " + text(degrees) + ".")
+      VIEW["angle"] = degrees
+
+  def shade_with(command):
+      VIEW["shader"] = command
+
+  MODELS = {}
+
+  def model(file):
+      if file in MODELS:
+          return MODELS[file]
+      try:
+          rows = open(file, encoding="utf-8", errors="replace").read().splitlines()
+      except OSError:
+          raise RunError(0, 'there is no model called "' + file + '".')
+      points, faces, named, now = [], [], {}, None
+      for row in rows:
+          words = row.split()
+          if not words:
+              continue
+          if words[0] == "v":
+              points.append(tuple(float(x) for x in words[1:4]))
+          elif words[0] == "f":
+              face = []
+              for w in words[1:]:
+                  k = int(w.split("/")[0])
+                  k = len(points) + k if k < 0 else k - 1
+                  if not 0 <= k < len(points):
+                      raise RunError(0, 'the model "' + file + '" has a face with a corner that isn\'t there.')
+                  face.append(k)
+              if len(face) >= 3:
+                  faces.append((face, now))
+          elif words[0] == "usemtl":
+              now = named.get(" ".join(words[1:2]))
+          elif words[0] == "mtllib":
+              material = None
+              try:
+                  for r in open(os.path.join(os.path.dirname(file), row.split(None, 1)[1].strip()), encoding="utf-8", errors="replace"):
+                      mw = r.split()
+                      if mw[:1] == ["newmtl"]:
+                          material = mw[1]
+                      elif mw[:1] == ["Kd"]:
+                          named[material] = "#%02x%02x%02x" % tuple(int(round(float(x) * 255)) for x in mw[1:4])
+              except OSError:
+                  pass
+      MODELS[file] = (points, faces)
+      return MODELS[file]
+
+  def etch_model(file, middle, size, turn, col):
+      need_open()
+      points, faces = model(file)
+      own = "#c8c8c8" if not col else colour(col)
+      t = turn * PI3 / 180.0
+      ct, st = math.cos(t), math.sin(t)
+      mx, my, mz = middle.parts()[:3]
+      for face, which in faces:
+          pts = [(mx + size * (points[k][0] * ct + points[k][2] * st), my + size * points[k][1], mz + size * (-points[k][0] * st + points[k][2] * ct)) for k in face]
+          face3(pts, which if not col and which else own)
+
+  def picture_in_space(file, corner, across, down):
+      need_open()
+      image = picture(file)
+      w, h = image.width(), image.height()
+      nx, ny = min(w, 48), min(h, 48)
+      c, a, d = corner.parts()[:3], across.parts()[:3], down.parts()[:3]
+      at = lambda s, u: tuple(c[k] + a[k] * s + d[k] * u for k in range(3))
+      for j in range(ny):
+          for i in range(nx):
+              x, y = (i * w + w // 2) // nx, (j * h + h // 2) // ny
+              try:
+                  if image.transparency_get(x, y):
+                      continue
+              except Exception:
+                  pass
+              dot = image.get(x, y)
+              dot = dot if isinstance(dot, tuple) else tuple(int(v) for v in str(dot).split())
+              face3([at(i / nx, j / ny), at((i + 1) / nx, j / ny), at((i + 1) / nx, (j + 1) / ny), at(i / nx, (j + 1) / ny)], "#%02x%02x%02x" % tuple(dot[:3]))
 
   def start_keeping(name):
       need_open()
@@ -1541,6 +1826,20 @@ to etch a cube, given middle (a place) and size (a number) and colour (text) = s
   runs: (lambda s: block({middle}, s, s, s, {colour}))({size})
 to etch a ball, given middle (a place) and radius (a number) and colour (text) = stellanova_window::ball({middle}, {radius}, {colour}, {line})
   runs: ball({middle}, {radius}, {colour})
+to etch a triangle in space, given first (a place) and second (a place) and third (a place) and colour (text) = stellanova_window::triangle3({first}, {second}, {third}, {colour}, {line})
+  runs: triangle3({first}, {second}, {third}, {colour})
+to etch the model, given file (text) and middle (a place) and size (a number) and turn (a number) and colour (text) = stellanova_window::etch_model({file}, {middle}, {size}, {turn}, {colour}, {line})
+  runs: etch_model({file}, {middle}, {size}, {turn}, {colour})
+to etch the picture in space, given file (text) and corner (a place) and across (a place) and down (a place) = stellanova_window::picture_in_space({file}, {corner}, {across}, {down}, {line})
+  runs: picture_in_space({file}, {corner}, {across}, {down})
+to shine the light from, given direction (a place) = stellanova_window::shine_from({direction}, {line})
+  runs: shine_from({direction})
+to set the eye view to, given degrees (a number) = stellanova_window::set_view({degrees}, {line})
+  runs: set_view({degrees})
+to shade the shapes with, given shader (a command given a place and text returning text) = (stellanova_window::shader = {shader}, (void)0)
+  runs: shade_with({shader})
+to stop shading the shapes = (stellanova_window::shader = nullptr, (void)0)
+  runs: shade_with(None)
 to etch the ground, given colour (text) and other colour (text) = stellanova_window::ground({colour}, {other colour}, {line})
   runs: ground({colour}, {other colour})
 the graphics card draws = stellanova_window::on_graphics_card(), yes or no, read only

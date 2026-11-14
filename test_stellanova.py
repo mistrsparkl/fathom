@@ -361,6 +361,26 @@ def program_checks():
     assert out.stdout == "122 280 yes\nno\n", repr(out.stdout + out.stderr)
     assert translate.plural_word("body") == "bodies" and translate.plural_word("box") == "boxes" and translate.plural_word("day") == "days"
 
+    # 3D: models (.obj with .mtl colours), triangles, pictures laid in space, the light, the eye's view, a shader command.
+    # Built, with its frames kept: the model's colours and the shader's show in the last frame.
+    if compiler and os.name == "nt":
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "three.stella").write_text('to tint, given where (a place) and colour (text), returning text:\n  if (where of horizontal) exceeds 3:\n    return "#0000ff"\n  return colour\nand the universe said i love you\n\ngenesis:\n  open a world with ("3d", 160, 120)\n  repeat 3 times:\n    consume the window with "black"\n    place the eye at 0 horizontal 0 vertical -6 depth\n    set the eye view to 60\n    shine the light from 0 horizontal 0 vertical -1 depth\n    etch the model with ("cube.obj", -2 horizontal 0 vertical 0 depth, 0.8, 30, "")\n    etch a triangle in space with (1 horizontal 1 vertical 0 depth, 2 horizontal -1 vertical 0 depth, 0 horizontal -1 vertical 0 depth, "yellow")\n    etch the picture in space with ("sheet.png", 2.5 horizontal 1 vertical 0 depth, 2 horizontal 0 vertical 0 depth, 0 horizontal -1 vertical 0 depth)\n    shade the shapes with the command tint\n    etch a ball with (4 horizontal 0 vertical 0 depth, 0.3, "white")\n    stop shading the shapes\n    reveal the frame\n  end the world\nand the universe said i love you\n'.replace('"sheet.png"', '"cube.png"'), encoding="utf-8")
+            (Path(d) / "cube.obj").write_text('mtllib cube.mtl\nv -1 -1 -1\nv 1 -1 -1\nv 1 1 -1\nv -1 1 -1\nv -1 -1 1\nv 1 -1 1\nv 1 1 1\nv -1 1 1\nusemtl redstuff\nf 1 2 3 4\nf 5 8 7 6\nusemtl greenstuff\nf 1 5 6 2\nf 4 3 7 8\nf 1 4 8 5\nf 2 6 7 3\n', encoding="utf-8")
+            (Path(d) / "cube.mtl").write_text('newmtl redstuff\nKd 1 0 0\nnewmtl greenstuff\nKd 0 1 0\n', encoding="utf-8")
+            import struct, zlib
+            chunk = lambda kind, body: struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+            rows = b"".join(b"\x00" + bytes([255, 0, 0, 255] * 4) for _ in range(2))  # a 4 by 2 red picture
+            (Path(d) / "cube.png").write_bytes(bytes([137, 80, 78, 71, 13, 10, 26, 10]) + chunk(b"IHDR", struct.pack(">IIBBBBB", 4, 2, 8, 6, 0, 0, 0))
+                                               + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+            assert translate.build(Path(d) / "three.stella", Path(d) / "three.exe") is None
+            subprocess.run([str(Path(d) / "three.exe")], cwd=d, env=dict(os.environ, STELLANOVA_DEMO_FRAMES="f.raw"), timeout=60, check=True)
+            frame = (Path(d) / "f.raw").read_bytes()[-160 * 120 * 4:]
+            dots = {tuple(frame[k:k + 3]) for k in range(0, len(frame), 4)}  # blue, green, red
+            assert all(any(c[k] > 180 and c[(k + 1) % 3] < 60 and c[(k + 2) % 3] < 60 for c in dots) for k in range(3)), "3D colours missing"  # red, green, blue
+            out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "three.stella"], cwd=d, capture_output=True, text=True)
+            assert "no mistakes found" in out.stdout, out.stdout
+
     # Pictures: dots read and changed, saved as .png and read back, made from a list of numbers.
     out = both(''.join([
                'use: pictures\n'
@@ -1048,7 +1068,7 @@ def program_checks():
     assert out.stdout == "ok\n", repr(out.stdout)
     assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
         "I don't know 'etch a triangle with'. Words that start with 'etch': etch a ball, etch a block, etch a box, etch a circle, etch a cube, etch a line, "
-        "etch a square, etch the ground, etch the kept shapes, etch the picture, etch the picture turned, etch the sheet frame, etch words.")
+        "etch a square, etch a triangle in space, etch the ground, etch the kept shapes, etch the model, etch the picture, etch the picture in space, etch the picture turned, etch the sheet frame, etch words.")
 
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'

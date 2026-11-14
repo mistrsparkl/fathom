@@ -128,3 +128,9 @@ the picture in the file|Reads a picture to change (library pictures): the pictur
 colour the dot with|Changes one dot (library pictures): colour the dot with (picture, x, y, "#ff8800").
 the dot at with|One dot's colour (library pictures): the dot at with (picture, x, y).
 save the picture with|Writes a .png (library pictures): save the picture with (picture, "out.png").
+etch the model with|A 3D model (.obj): etch the model with ("ship.obj", middle, size, turn, "") keeps its .mtl colours.
+etch a triangle in space with|A 3D triangle: etch a triangle in space with (a, b, c, "yellow").
+etch the picture in space with|A picture laid in 3D, like a texture: etch the picture in space with ("door.png", corner, across, down).
+shine the light from|Where the 3D light comes from: shine the light from 1 horizontal 2 vertical -1 depth.
+set the eye view to|How wide the eye sees, in degrees: set the eye view to 90.
+shade the shapes with|A shader: shade the shapes with the command tint (given a place and a colour, returning a colour).

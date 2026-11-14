@@ -25,7 +25,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Physics: bodies, collisions, gravity (`use: physics.stella`, written in Stellanova)
 - [x] Sound making: tones, effects, recording (`use: sound making`)
 - [x] Pictures: load, change dots, save (`use: pictures`)
-- [ ] 3D models (.obj), textures, shaders, lights and cameras
+- [x] 3D models (.obj), textures, shaders, lights and cameras (window library: models, pictures in space, shader commands, light, eye view)
 - [ ] Compression (zip), hashing, encryption, JSON paths, email
 - [ ] Desktop forms: buttons, fields, lists in a window
 - [ ] The web build gets the words it lacks (database included)
