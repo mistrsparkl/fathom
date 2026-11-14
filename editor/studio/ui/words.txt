@@ -13,6 +13,7 @@ set … to|Gives a name a value.
 scrawl|Shows text or values.
 ask|Asks the person a question; the answer goes into a name.
 add … to|Adds to a number, or puts an item at the end of a list.
+insert … at … in|Puts an item in a list at a place: insert "tea" at 2 in drinks.
 remove … from|Takes an item out of a list.
 inscribe … into file|Makes or replaces a file with this text.
 if|Does the indented lines only when this is so.
@@ -30,6 +31,7 @@ if that went wrong|After 'try:': what to do when it went wrong (the wound says w
 the wound|Inside 'if that went wrong:', the reason, as text.
 raise an error with|Stops with a problem of your own (try: can catch it).
 return|Gives a value back from a command.
+each … becomes|A command written where it is used: scores changed by each s becomes s times 2.
 cease|Stops the command (or the program, in genesis).
 break free|Leaves the loop it is in.
 move on|Skips to the next round of the loop.
