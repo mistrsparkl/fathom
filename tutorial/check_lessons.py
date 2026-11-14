@@ -117,7 +117,7 @@ def check(lesson, verbose):
                 a, b = int(m.group(1)), int(m.group(2) or m.group(1))
                 rows = ed.text.split("\n")
                 print(f"  zoom {a}-{b}: " + " | ".join(r.strip() for r in rows[a - 1: b]))
-        elif what in ("run", "test", "watch", "build", "web", "save"):
+        elif what in ("run", "test", "watch", "build", "web", "profile", "debug", "save"):
             if current:
                 current.write_text(ed.text, encoding="utf-8")
             if what == "save":

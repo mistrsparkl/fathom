@@ -1008,6 +1008,12 @@ def program_checks():
     assert shown[:4] == ["9045050", "9045050", "", "Where the time went (the 20 slowest lines, by their own time):"], shown
     runs = {int(l.split()[0]): int(l.split()[1]) for l in shown[5:]}
     assert runs == {2: 2, 3: 2, 4: 600, 5: 2, 9: 1, 10: 1}, runs
+    # an if line counts every time it is tried, not only when its test is yes
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "p.stella").write_text('genesis:\n  for each k from 1 to 10:\n    if k exceeds 8: scrawl k\nand the universe said i love you\n', encoding="utf-8")
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "profile", "p.stella"], capture_output=True, text=True,
+                               encoding="utf-8", cwd=d).stdout.splitlines()
+    assert {int(l.split()[0]): int(l.split()[1]) for l in shown[5:]} == {2: 1, 3: 10}, shown
 
     # is one of
     out = both('genesis:\n  set answer to "y"\n  set sizes to a list containing (1, 2, 3)\n'

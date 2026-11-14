@@ -1,0 +1,104 @@
+title: JSON, fingerprints, secrets, and zip files
+card: Chapter 14 | JSON | Reaching into what web services send
+say:
+  Web services answer in JSON: names, values and lists inside each other. The json library reaches straight in, with a path.
+uncard
+
+new: weather.stella
+type fast:
+  use: json
+
+  genesis:
+    set answer to replace "~" with a quotation mark in "{~city~: ~Oslo~, ~days~: [{~high~: 4}, {~high~: 7}]}"
+    scrawl "City: ", the json at with (answer, "city")
+    scrawl "Tomorrow's high: ", the json number at with (answer, "days[2].high")
+    scrawl "Days: ", the size of the json list at with (answer, "days")
+    set answer to the json changed at with (answer, "days[1].high", "5")
+    scrawl answer
+  and the universe said i love you
+zoom: lines 4-5
+spot: line 4
+say: Here's an answer like a weather service might send. Each tilde becomes a quote mark, to keep the line easy to read.
+spot: line 5
+say: The json at, with a path: the part called city.
+zoom: lines 6-7
+spot: line 6
+say:
+  Names go with dots between them, and items in square brackets, counted from one. So days, item two, high.
+spot: line 7
+say: The json list at gives a list, to go through or count.
+zoom: lines 8-9
+spot: line 8
+say: And the json changed at gives the whole thing back, with one part changed.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 14 | Fingerprints and secrets | Hashing and encryption
+say:
+  A hash is a fingerprint of some text. It's always the same for the same text, and completely different if one letter changes.
+  Encryption keeps text secret: only someone with the password can read it.
+uncard
+new: secret.stella
+type fast:
+  use: hashing
+  use: encryption
+
+  genesis:
+    scrawl the hash of with ("sha256", "hello")
+    scrawl the hash of with ("sha256", "hellp")
+    set secret to encrypted with ("meet at noon", "swordfish")
+    scrawl secret
+    scrawl decrypted with (secret, "swordfish")
+    try:
+      scrawl decrypted with (secret, "wrong")
+    if that went wrong:
+      scrawl "Wrong password: ", the wound
+  and the universe said i love you
+zoom: lines 5-6
+spot: lines 5-6
+say: Hello and hellp differ by one letter, but their fingerprints have nothing in common. Websites keep fingerprints of passwords, not the passwords.
+zoom: lines 7-9
+spot: line 7
+say: Encrypted with turns the message into text that can be kept or sent anywhere.
+spot: line 9
+say: Decrypted with, and the same password, gives it back.
+zoom: lines 10-13
+spot: lines 10-13
+say: A wrong password is a problem. So is any change to the secret text, so changes are always noticed.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 14 | Zip files | Many files in one
+uncard
+new: backup.stella
+type fast:
+  use: zip
+
+  genesis:
+    inscribe "Level 3, 120 coins" into file "save.txt"
+    pack the zip with (a list containing "save.txt", "backup.zip")
+    scrawl the files in the zip "backup.zip"
+    unpack the zip with ("backup.zip", "restored")
+    scrawl contents of file "restored/save.txt"
+  and the universe said i love you
+zoom: lines 4-8
+spot: line 5
+say: Pack the zip puts files and folders, with everything inside them, into one zip file.
+spot: line 6
+say: The files in the zip lists what it holds.
+spot: line 7
+say: And unpack the zip puts them all into a folder.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out

@@ -1313,6 +1313,10 @@ to on go press, given event (a number):
   debug say with "go"
 and the universe said i love you
 
+to on profile press, given event (a number):
+  start running with "profile"
+and the universe said i love you
+
 to on debug press, given event (a number):
   start running with "debug"
 and the universe said i love you
@@ -1432,6 +1436,7 @@ genesis:
   hook up with ("#run", "click", the command on run press)
   hook up with ("#watch", "click", the command on watch press)
   hook up with ("#debug", "click", the command on debug press)
+  hook up with ("#profile", "click", the command on profile press)
   hook up with ("#step", "click", the command on step press)
   hook up with ("#over", "click", the command on over press)
   hook up with ("#out", "click", the command on out press)

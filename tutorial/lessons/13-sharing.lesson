@@ -1,0 +1,135 @@
+title: Shared abilities, nothing, and kinds of problems
+card: Chapter 13 | Shared abilities | Different things that can do the same thing
+say:
+  A dog and a robot are different kinds of things. But both can speak. Stellanova can keep them together, as things that can speak.
+uncard
+
+new: speakers.stella
+type fast:
+  a speaker is anything that can speak.
+
+  a dog has:
+    name (text)
+  and the universe said i love you
+
+  a robot has:
+    model (a number)
+  and the universe said i love you
+
+  to speak, for a dog, returning text:
+    return "Woof, I'm [name]"
+  and the universe said i love you
+
+  to speak, for a robot, returning text:
+    return "Beep, model [model]"
+  and the universe said i love you
+
+  genesis:
+    conjure a dog as rex
+    set the name of rex to "Rex"
+    conjure a robot as unit
+    set the model of unit to 7
+    set talkers to a list of speakers
+    add rex to talkers
+    add unit to talkers
+    for each t in talkers:
+      scrawl speak t
+  and the universe said i love you
+zoom: line 1
+spot: line 1
+say:
+  A speaker is anything that can speak. That one line makes a new kind: any kind of thing with its own speak command is a speaker.
+zoom: lines 11-17
+spot: lines 11-13
+say: A dog speaks its own way.
+spot: lines 15-17
+say: And a robot speaks another.
+zoom: lines 19-29
+spot: lines 24-26
+say: A list of speakers holds the dog and the robot together.
+spot: lines 27-28
+say: And speak does the speaking the way each kind of thing does it, found while the program runs.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 13 | Nothing | When there isn't one
+say:
+  Sometimes a command looks for something, and doesn't find it. A name for a kind of thing can hold nothing.
+uncard
+new: nothing.stella
+type fast:
+  an enemy has:
+    health (a number)
+  and the universe said i love you
+
+  to the weakest, given enemies (a list of enemys), returning an enemy:
+    set best to no enemy
+    for each e in enemies:
+      if best is nothing or the health of e falls below the health of best:
+        set best to e
+    return best
+  and the universe said i love you
+
+  genesis:
+    set nobody to a list of enemys
+    set found to the weakest with nobody
+    if found is nothing:
+      scrawl "No enemies left!"
+  and the universe said i love you
+zoom: lines 5-10
+spot: line 6
+say: Set best to no enemy: best holds nothing, for now.
+spot: line 8
+say: If best is nothing, there's no best yet, so this enemy is the best so far.
+zoom: lines 13-17
+spot: lines 14-17
+say:
+  Given an empty list, the weakest finds nothing, and the program can ask: is it nothing? Asking for a part of nothing stops the program, with a message that says so.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 13 | Kinds of problems | Catching only some mistakes
+say:
+  In chapter eight, try caught every problem. A problem can also have a kind of its own, named in your own words, and be caught on its own.
+uncard
+new: fuel.stella
+type fast:
+  to drive, given fuel (a number):
+    if fuel is 0: raise a fuel problem with "the tank is empty"
+    if fuel exceeds 100: raise an error with "that's too much fuel"
+    scrawl "Driving with ", fuel
+  and the universe said i love you
+
+  genesis:
+    for each f in a list of (50, 0, 500):
+      try:
+        drive with f
+      if that went wrong with a fuel problem:
+        scrawl "Fuel problem: ", the wound
+      if that went wrong:
+        scrawl "Some other problem: ", the wound
+  and the universe said i love you
+zoom: lines 1-4
+spot: line 2
+say: Raise a fuel problem: a kind of problem, named in our own words.
+spot: line 3
+say: Raise an error is a plain problem.
+zoom: lines 7-14
+spot: lines 11-12
+say: If that went wrong with a fuel problem takes only fuel problems.
+spot: lines 13-14
+say: And a plain if that went wrong, last, takes the rest.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out

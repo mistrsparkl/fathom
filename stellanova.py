@@ -3696,7 +3696,13 @@ def statements(body, names, declared, depth):
                 cond = watched_test(cond, n)
             if which == "if":
                 chain = [(cond, run)]
-                runs.append(choose(chain))
+                pick = choose(chain)
+                # the whole choice is the if line's (its test too), so it stops and is timed even when the test is no
+                if DEBUG is not None:
+                    pick = debugged(pick, n)
+                if PROFILE is not None:
+                    pick = profiled(pick, n)
+                runs.append(pick)
             elif chain is None:
                 raise ScriptError(n, f"'{raw.strip().split(':')[0]}' needs an 'if' line just above it, at the same indent.")
             else:
@@ -4218,6 +4224,8 @@ def statement(n, text_, inner, names, declared, depth):
             line += f" ({strip_parens(v.cpp)})"
             test = with_ir(v.run, v.ir)
         lines, then = body()
+        if which == "if":
+            then.debugged = then.profiled = True  # the choice holding it does these (see block)
         return [line, tab + "{"] + lines + [tab + "}"], guard(then, n), (which, test)
     if inner:
         raise ScriptError(inner[0][0], "Only 'if', 'otherwise', 'repeat', 'as long as', 'for each' and 'try' lines can have indented lines under them.")

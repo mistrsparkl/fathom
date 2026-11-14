@@ -497,15 +497,34 @@ async function film(lesson, filePort) {
         case "point": await js(`film.pointAt(${JSON.stringify(v)})`); await wait(800); break;
         case "click": await press(v); break;
         case "hide cursor": await js("film.hideCursor()"); break;
-        case "run": case "watch": case "test": case "build": case "web": {
+        case "run": case "watch": case "test": case "build": case "web": case "profile": case "debug": {
           await press(`#${step.what}`);
           if (v !== "and keep going") {
             for (let k = 0; k < 1200; k++) {
               await wait(250);
-              if (!(await state()).running) break;
+              const now = await state();
+              if (!now.running || now.status.startsWith("Paused")) break;
             }
             await wait(500);
           }
+          break;
+        }
+        case "stop at": {  // a click beside a line's number: the program will stop there when debugged
+          const spot = JSON.parse(await js(`(() => { const n = [...document.querySelectorAll(".row .num")].find((e) => e.textContent === ${JSON.stringify(v)}); const r = n.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width - 22, y: r.top + r.height / 2 }); })()`));
+          await js(`film.cursorTo(${spot.x}, ${spot.y})`);
+          await wait(600);
+          wc.sendInputEvent({ type: "mouseDown", x: Math.round(spot.x), y: Math.round(spot.y), button: "left", clickCount: 1 });
+          wc.sendInputEvent({ type: "mouseUp", x: Math.round(spot.x), y: Math.round(spot.y), button: "left", clickCount: 1 });
+          await wait(500);
+          break;
+        }
+        case "until paused": {
+          for (let k = 0; k < 1200; k++) {
+            await wait(250);
+            const now = await state();
+            if (!now.running || now.status.startsWith("Paused")) break;
+          }
+          await wait(400);
           break;
         }
         case "until finished": {

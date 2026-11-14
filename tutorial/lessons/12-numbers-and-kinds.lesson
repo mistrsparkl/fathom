@@ -1,0 +1,124 @@
+title: Powers, bits, big numbers, and kinds for any kind
+card: Chapter 12 | Powers and bits | More ways to work with numbers
+say:
+  Numbers can do more than add and multiply. Here are powers, the bits inside whole numbers, and numbers too big for any computer's own numbers.
+uncard
+
+new: numbers.stella
+type fast:
+  use: big numbers
+
+  genesis:
+    scrawl "2 to the power 10 is ", 2 to the power 10
+    scrawl "3 times 2 to the power 3 is ", 3 times 2 to the power 3
+    scrawl "12 bitwise and 10 is ", 12 bitwise and 10
+    scrawl "12 bitwise or 3 is ", 12 bitwise or 3
+    scrawl "1 shifted left by 4 is ", 1 shifted left by 4
+    scrawl "2 to the power 100 is ", big power with ("2", 100)
+    scrawl "and times itself: ", big times with (big power with ("2", 100), big power with ("2", 100))
+  and the universe said i love you
+zoom: lines 4-5
+spot: line 4
+say: To the power multiplies a number by itself: two to the power ten is a thousand and twenty four.
+spot: line 5
+say:
+  A power is worked out first, as in maths. So three times two to the power three is three times eight.
+spot: lines 6-8
+zoom: lines 6-8
+say:
+  Every whole number is made of bits, ones and zeros. Bitwise and keeps the bits both numbers have, bitwise or keeps the bits either has, and shifted left moves them along, doubling the number each time.
+  Bits are a small, fast way to keep many yes or no answers in one number.
+spot: lines 9-10
+zoom: lines 9-10
+say:
+  Numbers have a largest size. The big numbers library has no limit: its numbers are kept as text, as long as they need to be.
+spot: off
+zoom: out
+run
+zoom: output
+say: Two to the power one hundred has thirty one digits, and times itself, sixty one. Every digit is exact.
+wait
+zoom: out
+
+card: Chapter 12 | Kinds for any kind | Describing something once
+say:
+  Some kinds of things work the same way whatever they hold. A stack keeps things on top of each other, whether they're numbers, words or pets.
+  Such a kind can be described once, with anything standing in for what it holds.
+uncard
+
+new: stacks.stella
+type fast:
+  a stack of anything has:
+    items (a list of anything)
+  and the universe said i love you
+
+  to push, for a stack of anything, given x (anything):
+    add x to items
+  and the universe said i love you
+
+  to top, for a stack of anything, returning anything:
+    return last item of items
+  and the universe said i love you
+
+  genesis:
+    conjure a stack of numbers as counts
+    push with (counts, 3)
+    push with (counts, 8)
+    conjure a stack of text as words
+    push with (words, "hello")
+    scrawl top counts, " and ", top words
+  and the universe said i love you
+zoom: lines 1-3
+spot: lines 1-2
+say: A stack of anything has a list of anything. Anything stands for whatever kind the stack will hold.
+zoom: lines 5-11
+spot: lines 5-7
+say: Push, for a stack of anything, is given anything, and adds it to the stack's items.
+spot: lines 9-11
+say: Top gives back the last item: again, of whatever kind it is.
+zoom: lines 13-19
+spot: lines 14-16
+say:
+  Then a stack of numbers is a kind of its own: the description written out again with anything as a number.
+spot: lines 17-18
+say: And a stack of text is another. Push and top work on both, and Stellanova still checks you only put numbers on the stack of numbers.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out
+
+card: Chapter 12 | Commands for a kind, kept | Doing it later
+say:
+  In chapter six, a command could be kept as a value. Commands for a kind of thing can be kept the same way.
+uncard
+new: grow.stella
+type fast:
+  a pet has:
+    name (text)
+    age (a number)
+  and the universe said i love you
+
+  to grow, for a pet, given years (a number):
+    set age to age plus years
+  and the universe said i love you
+
+  genesis:
+    conjure a pet as rex
+    set the name of rex to "Rex"
+    set older to the command grow
+    set rex to invoke older with (rex, 2)
+    scrawl rex
+  and the universe said i love you
+zoom: lines 10-16
+spot: line 13
+say: The command grow is kept in a name. It's a command given a pet and a number, returning a pet.
+spot: line 14
+say: Invoke gives it rex and two. It changes a copy of rex, and gives the changed copy back.
+spot: off
+zoom: out
+run
+zoom: output
+wait
+zoom: out

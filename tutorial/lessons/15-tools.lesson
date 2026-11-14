@@ -1,0 +1,88 @@
+title: Debugging and profiling
+card: Chapter 15 | Debugging | Stopping a program to look inside
+say:
+  When a program does something you didn't expect, it helps to stop it partway, and look at what its names hold.
+uncard
+
+new: average.stella
+type fast:
+  to the average of, given scores (a list of numbers), returning a number:
+    set total to 0
+    for each s in scores:
+      set total to total plus s
+    return total divided by the size of scores
+  and the universe said i love you
+
+  genesis:
+    set marks to a list containing (7, 9, 4, 10)
+    set middle to the average of marks
+    scrawl "The average is ", middle
+  and the universe said i love you
+stop at: 4
+zoom: lines 1-6
+spot: line 4
+say:
+  Clicking beside a line's number marks it with a red dot: a stop. When the program is debugged, it stops each time it reaches that line.
+spot: off
+zoom: out
+debug
+zoom: #output
+say:
+  Debug runs it. It stopped at line four, before running it, and shows every name the command has: the scores, the total so far, and s.
+wait
+zoom: out
+click: #go
+until paused
+zoom: #output
+say: Go carries on to the next stop. It's line four again, the next time round the loop, and the total has grown.
+wait
+zoom: out
+stop at: 4
+click: #step
+until paused
+zoom: #output
+say:
+  That click took the stop away. Step runs one line, and stops at the next. Over runs a line and every command it calls, and Out runs to the end of this command.
+wait
+zoom: out
+click: #go
+until finished
+zoom: #output
+say: With no stops left, Go runs to the end.
+wait
+zoom: out
+
+card: Chapter 15 | Profiling | Finding what is slow
+say:
+  When a program is slow, the profiler shows where the time goes: which lines ran most, and how long each took.
+uncard
+new: primes.stella
+type fast:
+  to is prime, given n (a number), returning yes or no:
+    if n falls below 2: return no
+    for each d from 2 to n minus 1:
+      if remainder of (n, d) is 0: return no
+    return yes
+  and the universe said i love you
+
+  genesis:
+    set found to 0
+    for each n from 1 to 3000:
+      if is prime with n: set found to found plus 1
+    scrawl found, " primes below 3000"
+  and the universe said i love you
+profile
+zoom: #output
+say:
+  Profile runs it, then lists the slowest lines. Line four ran six hundred thousand times. It and the loop around it, line three, take nearly all the time.
+  The loop tries every number below n. But a number that isn't prime always has a divisor no bigger than its square root.
+wait
+zoom: out
+line: 3
+keys: backspace backspace backspace backspace backspace backspace backspace backspace backspace backspace
+type: square root of n:
+profile
+zoom: #output
+say: Stopping at the square root, it runs far fewer times, and the whole program is many times faster.
+wait
+zoom: out
