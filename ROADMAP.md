@@ -22,7 +22,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 
 ## 3. Libraries
 - [x] Animation: easing, tweens, sprite sheets (`use: animation`, `etch the sheet frame`)
-- [ ] Physics: bodies, collisions, gravity
+- [x] Physics: bodies, collisions, gravity (`use: physics.stella`, written in Stellanova)
 - [ ] Sound making: tones, effects, recording
 - [ ] Pictures: load, change dots, save
 - [ ] 3D models (.obj), textures, shaders, lights and cameras

@@ -1,0 +1,94 @@
+whisper: Physics for boxes: bodies that fall, slide, land on things and bounce. Written in Stellanova itself.
+whisper: Use it in a program with:  use: physics.stella
+whisper: x and y are a body's top left corner (y grows downward, as on the window). Speeds are per second.
+
+a body has:
+  x (a number)
+  y (a number)
+  width (a number)
+  height (a number)
+  speed across (a number)
+  speed down (a number)
+  bounciness (a number)
+  fixed (yes or no)
+  landed (yes or no)
+and the universe said i love you
+
+a physics world has:
+  bodies (a list of bodies)
+  gravity (a number)
+and the universe said i love you
+
+to a box at, given x (a number) and y (a number) and width (a number) and height (a number), returning a body:
+  set b to conjure a body
+  set the x of b to x
+  set the y of b to y
+  set the width of b to width
+  set the height of b to height
+  return b
+and the universe said i love you
+
+to a wall at, given x (a number) and y (a number) and width (a number) and height (a number), returning a body:
+  set b to a box at with (x, y, width, height)
+  set the fixed of b to yes
+  return b
+and the universe said i love you
+
+to touching, given first (a body) and second (a body), returning yes or no:
+  if the x of first is at least the x of second plus the width of second:
+    return no
+  if the x of first plus the width of first is at most the x of second:
+    return no
+  if the y of first is at least the y of second plus the height of second:
+    return no
+  return the y of first plus the height of first exceeds the y of second
+and the universe said i love you
+
+to include the body, for a physics world, given b (a body):
+  add b to bodies
+and the universe said i love you
+
+to the body numbered, for a physics world, given which (a number), returning a body:
+  return item which of bodies
+and the universe said i love you
+
+to change the body, for a physics world, given which (a number) and b (a body):
+  set item which of bodies to b
+and the universe said i love you
+
+to push the body, for a physics world, given which (a number) and across (a number) and down (a number):
+  set b to item which of bodies
+  set the speed across of b to across
+  set the speed down of b to down
+  set item which of bodies to b
+and the universe said i love you
+
+whisper: Each moving body falls, then moves across and is stopped by anything it hits, then moves down the same way.
+whisper: Bodies are moved one at a time, so each meets the others where they are now.
+to step the physics, for a physics world, given seconds (a number):
+  for each k from 1 to the size of bodies:
+    set b to item k of bodies
+    if not the fixed of b:
+      set the speed down of b to the speed down of b plus gravity times seconds
+      set the x of b to the x of b plus the speed across of b times seconds
+      for each j from 1 to the size of bodies:
+        set other to item j of bodies
+        if j is not k and touching with (b, other):
+          if the speed across of b exceeds 0:
+            set the x of b to the x of other minus the width of b
+          otherwise:
+            set the x of b to the x of other plus the width of other
+          set the speed across of b to 0 minus the speed across of b times the bounciness of b
+      set the landed of b to no
+      set the y of b to the y of b plus the speed down of b times seconds
+      for each j from 1 to the size of bodies:
+        set other to item j of bodies
+        if j is not k and touching with (b, other):
+          if the speed down of b exceeds 0:
+            set the y of b to the y of other minus the height of b
+            set the landed of b to yes
+          otherwise:
+            set the y of b to the y of other plus the height of other
+          set the speed down of b to 0 minus the speed down of b times the bounciness of b
+      set item k of bodies to b
+and the universe said i love you

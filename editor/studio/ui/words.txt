@@ -119,3 +119,5 @@ tweened with|A number part way (library animation): tweened with (from, to, prog
 progress of with|How far along, 0 to 1 (library animation): progress of with (start, seconds, now).
 sheet frame with|Which sprite sheet frame to show now (library animation): sheet frame with (frames, per second, seconds).
 etch the sheet frame|One frame of a sprite sheet: etch the sheet frame with ("walk.png", frame, across, down, x, y).
+step the physics with|Moves every body on (use: physics.stella): step the physics with (world, 1 divided by 60).
+include the body with|Adds a body to a physics world: include the body with (w, a box at with (x, y, width, height)).

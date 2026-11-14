@@ -257,7 +257,9 @@ def parse_kind(text):
             return None
         return command_kind(ins, gives)
     first_plural = " ".join([words[0][:-1]] + words[1:]) if words and words[0].endswith("s") else None  # 'stacks of numbers'
-    for name in (phrase, phrase[:-1] if phrase.endswith("s") else None, first_plural):
+    singular = [phrase[:-3] + "y"] if phrase.endswith("ies") else []  # 'bodies', 'boxes'
+    singular += [phrase[:-2]] if phrase.endswith("es") else []
+    for name in (phrase, phrase[:-1] if phrase.endswith("s") else None, *singular, first_plural):
         if name in THINGS:
             return "thing " + name
     return None
@@ -280,6 +282,15 @@ def kind_name(kind):
     return {NUMBER: "a number", YESNO: "yes or no", PLACE: "a place", FLAT: "a flat place", TEXT: "text"}[kind]
 
 
+def plural_word(name):
+    """'pet' -> 'pets', 'body' -> 'bodies', 'box' -> 'boxes' (the last word of a name of several)"""
+    if re.search(r"[^aeiou]y$", name):
+        return name[:-1] + "ies"
+    if re.search(r"(s|x|z|ch|sh)$", name):
+        return name + "es"
+    return name + "s"
+
+
 def plural(kind):
     if is_command(kind):
         return command_words(kind, "commands")
@@ -288,7 +299,7 @@ def plural(kind):
     if is_table(kind):
         return "tables of " + plural(entry_kind(kind))
     if is_thing(kind):
-        return kind[6:] + "s"
+        return plural_word(kind[6:])
     return {NUMBER: "numbers", YESNO: "yes or no", PLACE: "places", FLAT: "flat places", TEXT: "text"}[kind]
 
 
@@ -2869,6 +2880,8 @@ def gather(path, from_line=None, seen=None):
         m = re.fullmatch(r"\s*use:\s*(.+\.stella)\s*", raw, re.IGNORECASE)
         if m and not raw[:1].isspace():
             other = path.parent / m.group(1).strip()
+            if not other.exists() and (HERE / "libraries" / m.group(1).strip()).exists():  # one of Stellanova's own
+                other = HERE / "libraries" / m.group(1).strip()
             if not other.exists():
                 raise ScriptError(k * PER_FILE + n, f"There is no script called '{m.group(1).strip()}' next to {path.name}.")
             if other.resolve() not in seen:  # a script used twice (or by itself) is read once

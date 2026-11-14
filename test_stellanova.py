@@ -338,6 +338,29 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Physics, written in Stellanova (libraries/physics.stella): a box falls, bounces off a wall and lands.
+    out = both(''.join([
+               'use: physics.stella\n'
+               '\n'
+               'genesis:\n'
+               '  set w to conjure a physics world\n'
+               '  set the gravity of w to 1000\n'
+               '  include the body with (w, a wall at with (0, 300, 400, 20))\n'
+               '  include the body with (w, a wall at with (300, 0, 20, 300))\n'
+               '  set ball to a box at with (100, 100, 20, 20)\n'
+               '  set the bounciness of ball to 0.5\n'
+               '  include the body with (w, ball)\n'
+               '  push the body with (w, 3, 250, 0)\n'
+               '  repeat 120 times:\n'
+               '    step the physics with (w, 1 divided by 60)\n'
+               '  set b to the body numbered with (w, 3)\n'
+               '  scrawl round the x of b, " ", round the y of b, " ", the landed of b\n'
+               '  scrawl touching with (b, the body numbered with (w, 1))\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "122 280 yes\nno\n", repr(out.stdout + out.stderr)
+    assert translate.plural_word("body") == "bodies" and translate.plural_word("box") == "boxes" and translate.plural_word("day") == "days"
+
     # Animation: easing, tweens, waves, sprite sheet frames.
     out = both(''.join([
                'use: animation\n'
