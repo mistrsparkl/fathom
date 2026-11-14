@@ -1,7 +1,7 @@
 note: A window to draw in, for games and pictures. Use it in a program with:  use: window
 note: Places in the window are counted in dots (pixels) from its top left corner: x goes right, y goes down.
 note: Colours are names (black, white, red, green, blue, yellow, orange, purple, pink, brown, grey) or "#rrggbb".
-note: Built programs draw with Windows' own drawing (GDI); programs run directly draw with Tkinter.
+note: Built programs draw with Windows' own drawing (GDI); programs run directly draw with Tkinter; on the web the window is a canvas in the page.
 
 code:
   #define NOMINMAX
@@ -1763,116 +1763,599 @@ python:
 
 to open a world, given title (text) and width (a number) and height (a number) = stellanova_window::open({title}, {width}, {height}, {line})
   runs: open_window({title}, {width}, {height})
+  web: stellanova_window_web.open({title}, {width}, {height}, {line})
 to consume the window, given colour (text) = stellanova_window::clear({colour}, {line})
   runs: clear({colour})
+  web: stellanova_window_web.clear({colour}, {line})
 to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = stellanova_window::box({x}, {y}, {width}, {height}, {colour}, {line})
   runs: box({x}, {y}, {width}, {height}, {colour})
+  web: stellanova_window_web.box({x}, {y}, {width}, {height}, {colour}, {line})
 to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = stellanova_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
   runs: box({x} - {radius}, {y} - {radius}, 2 * {radius}, 2 * {radius}, {colour})
+  web: stellanova_window_web.box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
 to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = stellanova_window::circle({x}, {y}, {radius}, {colour}, {line})
   runs: circle({x}, {y}, {radius}, {colour})
+  web: stellanova_window_web.circle({x}, {y}, {radius}, {colour}, {line})
 to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = stellanova_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
   runs: line_between({x}, {y}, {to x}, {to y}, {colour})
+  web: stellanova_window_web.lineBetween({x}, {y}, {to x}, {to y}, {colour}, {line})
 to etch words, given words (text) and x (a number) and y (a number) and colour (text) = stellanova_window::write({words}, {x}, {y}, {colour}, {line})
   runs: write({words}, {x}, {y}, {colour})
+  web: stellanova_window_web.write({words}, {x}, {y}, {colour}, {line})
 to set the text size to, given size (a number) = stellanova_window::set_text_size({size}, {line})
   runs: set_text_size({size})
+  web: stellanova_window_web.setTextSize({size}, {line})
 to reveal the frame = stellanova_window::show({line})
   runs: show()
+  web: await stellanova_window_web.show({line})
 to etch the picture, given file (text) and x (a number) and y (a number) = stellanova_window::draw_picture({file}, {x}, {y}, {line})
   runs: draw_picture({file}, {x}, {y})
+  web: await stellanova_window_web.drawPicture({file}, {x}, {y}, {line})
 to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = stellanova_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
   runs: draw_picture_turned({file}, {x}, {y}, {size}, {angle})
+  web: await stellanova_window_web.drawPictureTurned({file}, {x}, {y}, {size}, {angle}, {line})
 to etch the sheet frame, given file (text) and frame (a number) and across (a number) and down (a number) and x (a number) and y (a number) = stellanova_window::draw_sheet_frame({file}, {frame}, {across}, {down}, {x}, {y}, {line})
   runs: draw_sheet_frame({file}, {frame}, {across}, {down}, {x}, {y})
+  web: await stellanova_window_web.drawSheetFrame({file}, {frame}, {across}, {down}, {x}, {y}, {line})
 to width of picture, given file (text), returning a number = (double)stellanova_window::picture({file}, {line})->GetWidth()
   runs: size_of_picture({file}, 0)
+  web: (await stellanova_window_web.picture({file}, {line})).width
 to height of picture, given file (text), returning a number = (double)stellanova_window::picture({file}, {line})->GetHeight()
   runs: size_of_picture({file}, 1)
+  web: (await stellanova_window_web.picture({file}, {line})).height
 to end the world = stellanova_window::close()
   runs: close()
+  web: stellanova_window_web.close()
 to key held, given key (text), returning yes or no = (stellanova_window::keys[stellanova_window::key_code({key}, {line})])
   runs: key_name({key}) in win["held"]
+  web: stellanova_window_web.held.has(stellanova_window_web.keyName({key}, {line}))
 
 the world lives = stellanova_window::open_now, yes or no, read only
   runs: win["open"]
+  web: stellanova_window_web.isOpen
 width of the world = (double)stellanova_window::width, number, read only
   runs: float(win.get("size", (0, 0))[0])
+  web: stellanova_window_web.width
 height of the world = (double)stellanova_window::height, number, read only
   runs: float(win.get("size", (0, 0))[1])
+  web: stellanova_window_web.height
 mouse x = stellanova_window::mouse_x_now, number, read only
   runs: win["mouse"][0]
+  web: stellanova_window_web.mouseX
 mouse y = stellanova_window::mouse_y_now, number, read only
   runs: win["mouse"][1]
+  web: stellanova_window_web.mouseY
 to key pressed, given key (text), returning yes or no = (stellanova_window::pressed[stellanova_window::key_code({key}, {line})])
   runs: key_name({key}) in win["pressed"]
+  web: stellanova_window_web.pressed.has(stellanova_window_web.keyName({key}, {line}))
 mouse clicked = stellanova_window::clicked, yes or no, read only
   runs: win["clicked"]
+  web: stellanova_window_web.clicked
 frame time = stellanova_window::frame_time, number, read only
   runs: win["frame time"]
+  web: stellanova_window_web.frameTime
 mouse held = stellanova_window::mouse_down, yes or no, read only
   runs: win["down"]
+  web: stellanova_window_web.down
 
 note: 3D. The eye is where the picture is seen from. Across is horizontal, up is vertical (more is higher), away is depth.
 to place the eye at, given where (a place) = stellanova_window::place_eye({where})
   runs: place_eye({where})
+  web: stellanova_window_web.placeEye({where})
 to aim the eye, given turn (a number) and tilt (a number) = stellanova_window::aim_eye({turn}, {tilt})
   runs: aim_eye({turn}, {tilt})
+  web: stellanova_window_web.aimEye({turn}, {tilt})
 to screen place of, given where (a place), returning a flat place = (stellanova_window::need_open({line}), stellanova_window::screen_place({where}))
   runs: screen_place({where})
+  web: stellanova_window_web.screenPlace({where}, {line})
 to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = stellanova_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
   runs: block({middle}, {width}, {height}, {depth}, {colour})
+  web: await stellanova_window_web.block({middle}, {width}, {height}, {depth}, {colour}, {line})
 to etch a cube, given middle (a place) and size (a number) and colour (text) = stellanova_window::cube({middle}, {size}, {colour}, {line})
   runs: (lambda s: block({middle}, s, s, s, {colour}))({size})
+  web: await stellanova_window_web.block({middle}, {size}, {size}, {size}, {colour}, {line})
 to etch a ball, given middle (a place) and radius (a number) and colour (text) = stellanova_window::ball({middle}, {radius}, {colour}, {line})
   runs: ball({middle}, {radius}, {colour})
+  web: await stellanova_window_web.ball({middle}, {radius}, {colour}, {line})
 to etch a triangle in space, given first (a place) and second (a place) and third (a place) and colour (text) = stellanova_window::triangle3({first}, {second}, {third}, {colour}, {line})
   runs: triangle3({first}, {second}, {third}, {colour})
+  web: await stellanova_window_web.triangle3({first}, {second}, {third}, {colour}, {line})
 to etch the model, given file (text) and middle (a place) and size (a number) and turn (a number) and colour (text) = stellanova_window::etch_model({file}, {middle}, {size}, {turn}, {colour}, {line})
   runs: etch_model({file}, {middle}, {size}, {turn}, {colour})
+  web: await stellanova_window_web.etchModel({file}, {middle}, {size}, {turn}, {colour}, {line})
 to etch the picture in space, given file (text) and corner (a place) and across (a place) and down (a place) = stellanova_window::picture_in_space({file}, {corner}, {across}, {down}, {line})
   runs: picture_in_space({file}, {corner}, {across}, {down})
+  web: await stellanova_window_web.pictureInSpace({file}, {corner}, {across}, {down}, {line})
 to shine the light from, given direction (a place) = stellanova_window::shine_from({direction}, {line})
   runs: shine_from({direction})
+  web: stellanova_window_web.shineFrom({direction}, {line})
 to set the eye view to, given degrees (a number) = stellanova_window::set_view({degrees}, {line})
   runs: set_view({degrees})
+  web: stellanova_window_web.setView({degrees}, {line})
 to shade the shapes with, given shader (a command given a place and text returning text) = (stellanova_window::shader = {shader}, (void)0)
   runs: shade_with({shader})
+  web: (stellanova_window_web.shader = {shader})
 to stop shading the shapes = (stellanova_window::shader = nullptr, (void)0)
   runs: shade_with(None)
+  web: (stellanova_window_web.shader = null)
 to etch the ground, given colour (text) and other colour (text) = stellanova_window::ground({colour}, {other colour}, {line})
   runs: ground({colour}, {other colour})
+  web: await stellanova_window_web.ground({colour}, {other colour}, {line})
 the graphics card draws = stellanova_window::on_graphics_card(), yes or no, read only
   runs: graphics_card()
+  web: false
 
 note: Kept shapes: etch 3D shapes once, between 'start keeping the shapes as "land"' and 'stop keeping the shapes', and they aren't drawn yet.
 note: Then 'etch the kept shapes "land"' draws them all, every frame, much faster than etching them one by one (the graphics card keeps them).
 to start keeping the shapes as, given name (text) = stellanova_window::start_keeping({name}, {line})
   runs: start_keeping({name})
+  web: stellanova_window_web.startKeeping({name}, {line})
 to stop keeping the shapes = stellanova_window::stop_keeping({line})
   runs: stop_keeping()
+  web: stellanova_window_web.stopKeeping({line})
 to etch the kept shapes, given name (text) = stellanova_window::etch_kept({name}, {line})
   runs: etch_kept({name})
+  web: stellanova_window_web.etchKept({name}, {line})
 to forget the kept shapes, given name (text) = stellanova_window::forget_kept({name}, {line})
   runs: forget_kept({name})
+  web: stellanova_window_web.forgetKept({name}, {line})
 to set the daylight to, given amount (a number) = stellanova_window::set_daylight({amount}, {line})
   runs: set_daylight({amount})
+  web: stellanova_window_web.setDaylight({amount}, {line})
 
 note: The pointer: 'hold the pointer' hides it and keeps it in the window, for looking around; 'mouse moved across' and 'mouse moved down' say how far it was moved since the last frame, in dots.
 to hold the pointer = (stellanova_window::need_window({line}), stellanova_window::pointer_fresh = !stellanova_window::pointer_held, stellanova_window::pointer_held = true)
   runs: hold_pointer(True)
+  web: stellanova_window_web.holdPointer(true, {line})
 to let go of the pointer = (stellanova_window::need_window({line}), stellanova_window::pointer_held = false)
   runs: hold_pointer(False)
+  web: stellanova_window_web.holdPointer(false, {line})
 mouse moved across = stellanova_window::moved_x, number, read only
   runs: win["moved"][0]
+  web: stellanova_window_web.movedX
 mouse moved down = stellanova_window::moved_y, number, read only
   runs: win["moved"][1]
+  web: stellanova_window_web.movedY
 mouse right clicked = stellanova_window::right_clicked, yes or no, read only
   runs: win["right clicked"]
+  web: stellanova_window_web.rightClicked
 mouse right held = stellanova_window::right_down, yes or no, read only
   runs: win["right down"]
+  web: stellanova_window_web.rightDown
 mouse wheel turned = stellanova_window::wheel_now, number, read only
   runs: win["wheel"]
+  web: stellanova_window_web.wheel
 
 to colour from, given red (a number) and green (a number) and blue (a number), returning text = stellanova_window::mix({red}, {green}, {blue})
   runs: mix({red}, {green}, {blue})
+  web: stellanova_window_web.mix({red}, {green}, {blue})
+
+javascript:
+  const stellanova_window_web = {
+    // A window is a canvas in the page. With node (no screen) it is a window nobody sees: everything is checked, nothing is shown.
+    colours: { black: "#000000", white: "#ffffff", red: "#dc2828", green: "#28b446", blue: "#325ae6", yellow: "#f5d228", orange: "#f58c1e",
+               purple: "#8c3cc8", pink: "#f078b4", brown: "#825028", grey: "#808080", gray: "#808080" },
+    keys: new Set(["left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"]),
+    page: typeof document !== "undefined",
+    canvas: null, ctx: null, opened: false, isOpen: false, width: 0, height: 0, textSize: 16, frameTime: 1 / 60, last: 0,
+    held: new Set(), fresh: new Set(), pressed: new Set(), clickFresh: false, clicked: false, down: false,
+    rightFresh: false, rightClicked: false, rightDown: false, wheelFresh: 0, wheel: 0,
+    mouseX: 0, mouseY: 0, lastX: 0, lastY: 0, movedX: 0, movedY: 0, pointerHeld: false, lockedX: 0, lockedY: 0,
+    needWindow(line) {
+      if (!this.opened) stellanova.fail(line, 'there is no window yet. Open one first, like: open a world with "My game", 800, 600');
+    },
+    colour(name, line) {
+      const low = name.toLowerCase();
+      if (this.colours[low]) return this.colours[low];
+      if (/^#[0-9a-f]{6}$/.test(low)) return low;
+      stellanova.fail(line, `I don't know the colour "${name}". Use a name like "red" or a code like "#ff8800".`);
+    },
+    mix(r, g, b) {
+      const part = (v) => Math.floor(Math.min(255, Math.max(0, v)) + 0.5).toString(16).padStart(2, "0");
+      return "#" + part(r) + part(g) + part(b);
+    },
+    keyName(name, line) {
+      const k = name.toLowerCase();
+      if ((k.length === 1 && /[a-z0-9]/.test(k)) || this.keys.has(k)) return k;
+      stellanova.fail(line, `I don't know the key "${name}". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.`);
+    },
+    browserKey(e) {
+      const named = { arrowleft: "left", arrowright: "right", arrowup: "up", arrowdown: "down", " ": "space", enter: "enter", escape: "escape",
+                      shift: "shift", control: "control", tab: "tab", backspace: "backspace" };
+      const k = (e.key || "").toLowerCase();
+      return named[k] || k;
+    },
+    now() { return typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000; },
+    open(title, w, h, line) {
+      if (this.isOpen) stellanova.fail(line, "a window is already open.");
+      if (w < 1 || h < 1 || w > 10000 || h > 10000) stellanova.fail(line, "a window must be from 1 to 10000 dots wide and high.");
+      this.width = Math.trunc(w), this.height = Math.trunc(h);
+      this.opened = this.isOpen = true;
+      this.held.clear(), this.fresh.clear(), this.pressed.clear();
+      this.clickFresh = this.clicked = false;
+      this.last = this.now();
+      if (!this.page) return;
+      document.title = title;
+      const c = (this.canvas = document.createElement("canvas"));
+      c.width = this.width, c.height = this.height, c.tabIndex = 0;
+      c.style.display = "block", c.style.background = "#000000", c.style.outline = "none";
+      (document.getElementById("stellanova-window") || document.body).appendChild(c);
+      this.ctx = c.getContext("2d");
+      if (!this.listening) {
+        this.listening = true;
+        addEventListener("keydown", (e) => {
+          if (!this.isOpen) return;
+          const k = this.browserKey(e);
+          if (!this.held.has(k)) this.fresh.add(k);  // not the repeats a held key sends
+          this.held.add(k);
+          if (this.keys.has(k) && k !== "shift" && k !== "control") e.preventDefault();
+        });
+        addEventListener("keyup", (e) => this.held.delete(this.browserKey(e)));
+        addEventListener("blur", () => { this.held.clear(); this.down = this.rightDown = false; });
+      }
+      c.addEventListener("mousemove", (e) => {
+        if (document.pointerLockElement === c) { this.lockedX += e.movementX; this.lockedY += e.movementY; }
+        else { this.mouseX = e.offsetX; this.mouseY = e.offsetY; }
+      });
+      c.addEventListener("mousedown", (e) => {
+        c.focus();
+        if (e.button === 2) this.rightDown = this.rightFresh = true;
+        else if (e.button === 0) this.down = this.clickFresh = true;
+        if (this.pointerHeld && document.pointerLockElement !== c) c.requestPointerLock();
+      });
+      addEventListener("mouseup", (e) => { if (e.button === 2) this.rightDown = false; else if (e.button === 0) this.down = false; });
+      c.addEventListener("contextmenu", (e) => e.preventDefault());
+      c.addEventListener("wheel", (e) => { this.wheelFresh += -e.deltaY / 100; e.preventDefault(); }, { passive: false });
+      c.focus();
+    },
+    draw(line, make) {
+      this.needWindow(line);
+      this.flush3d();
+      if (this.ctx && this.isOpen) make(this.ctx);
+    },
+    clear(c, line) {
+      const col = this.colour(c, line);
+      this.draw(line, (x) => { x.fillStyle = col; x.fillRect(0, 0, this.width, this.height); });
+    },
+    box(x, y, w, h, c, line) {
+      const col = this.colour(c, line);
+      this.draw(line, (g) => { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), Math.round(x + w) - Math.round(x), Math.round(y + h) - Math.round(y)); });
+    },
+    circle(x, y, r, c, line) {
+      const col = this.colour(c, line);
+      this.draw(line, (g) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, Math.max(0, r), 0, 2 * Math.PI); g.fill(); });
+    },
+    lineBetween(x1, y1, x2, y2, c, line) {
+      const col = this.colour(c, line);
+      this.draw(line, (g) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); });
+    },
+    write(words, x, y, c, line) {
+      const col = this.colour(c, line), size = this.textSize;
+      this.draw(line, (g) => { g.fillStyle = col; g.font = `${size}px "Segoe UI", sans-serif`; g.textBaseline = "top"; g.fillText(words, Math.round(x), Math.round(y)); });
+    },
+    setTextSize(size, line) {
+      if (!(size >= 1 && size <= 500)) stellanova.fail(line, `text can be from 1 to 500 dots high, not ${stellanova.text(size)}.`);
+      this.textSize = Math.floor(size + 0.5);
+    },
+    async show(line) {
+      this.needWindow(line);
+      this.flush3d();
+      const wait = 1 / 60 - (this.now() - this.last);
+      if (this.page) await new Promise((r) => requestAnimationFrame(() => r()));
+      else if (wait > 0) await new Promise((r) => setTimeout(r, wait * 1000));
+      this.pressed = this.fresh, this.fresh = new Set();
+      this.clicked = this.clickFresh, this.clickFresh = false;
+      this.rightClicked = this.rightFresh, this.rightFresh = false;
+      this.wheel = this.wheelFresh, this.wheelFresh = 0;
+      if (this.pointerHeld) {
+        this.movedX = this.pointerFresh ? 0 : this.lockedX, this.movedY = this.pointerFresh ? 0 : this.lockedY;
+        this.pointerFresh = false;
+      } else {
+        this.movedX = this.mouseX - this.lastX, this.movedY = this.mouseY - this.lastY;
+      }
+      this.lockedX = this.lockedY = 0;
+      this.lastX = this.mouseX, this.lastY = this.mouseY;
+      const now = this.now();
+      this.frameTime = now - this.last, this.last = now;
+    },
+    close() {
+      if (!this.isOpen) return;
+      this.isOpen = false;
+      if (this.canvas) this.canvas.remove();
+      this.canvas = this.ctx = null;
+    },
+    holdPointer(holding, line) {
+      this.needWindow(line);
+      this.pointerFresh = holding && !this.pointerHeld;
+      this.pointerHeld = holding;
+      if (!this.canvas) return;
+      this.canvas.style.cursor = holding ? "none" : "";
+      if (holding) this.canvas.requestPointerLock?.();
+      else if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    },
+
+    // ---- pictures: loaded once each
+    pictures: new Map(),
+    async picture(file, line) {
+      if (this.pictures.has(file)) return this.pictures.get(file);
+      let got;
+      if (this.page) {
+        got = await new Promise((resolve) => {
+          const im = new Image();
+          im.onload = () => resolve(im);
+          im.onerror = () => resolve(null);
+          im.src = file;
+        });
+        if (!got) stellanova.fail(line, `there is no picture called "${file}".`);
+      } else {  // node: only its size, from the file's first bytes
+        const fs = require("fs");
+        let b;
+        try { b = fs.readFileSync(file); } catch { stellanova.fail(line, `there is no picture called "${file}".`); }
+        if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47) got = { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+        else if (b.length >= 10 && b.toString("latin1", 0, 3) === "GIF") got = { width: b.readUInt16LE(6), height: b.readUInt16LE(8) };
+        else stellanova.fail(line, `I couldn't read the picture "${file}" (use .png or .gif).`);
+      }
+      this.pictures.set(file, got);
+      return got;
+    },
+    async drawPicture(file, x, y, line) {
+      this.needWindow(line);
+      const im = await this.picture(file, line);
+      this.draw(line, (g) => g.drawImage(im, Math.round(x), Math.round(y)));
+    },
+    async drawPictureTurned(file, x, y, size, angle, line) {
+      this.needWindow(line);
+      if (!(size > 0 && size <= 100)) stellanova.fail(line, `a picture's size must be more than 0 and at most 100, not ${stellanova.text(size)}.`);
+      const im = await this.picture(file, line);
+      this.draw(line, (g) => {
+        g.save();
+        g.translate(Math.round(x), Math.round(y));
+        g.rotate((angle * Math.PI) / 180);
+        g.drawImage(im, (-im.width * size) / 2, (-im.height * size) / 2, im.width * size, im.height * size);
+        g.restore();
+      });
+    },
+    async drawSheetFrame(file, frame, across, down, x, y, line) {
+      this.needWindow(line);
+      if (across < 1 || down < 1 || across !== Math.trunc(across) || down !== Math.trunc(down))
+        stellanova.fail(line, "a sprite sheet is a whole number of frames across and down (at least 1 each).");
+      if (frame < 1 || frame > across * down || frame !== Math.trunc(frame))
+        stellanova.fail(line, `the sheet has frames 1 to ${stellanova.text(across * down)}, not ${stellanova.text(frame)}.`);
+      const im = await this.picture(file, line);
+      const w = Math.floor(im.width / across), h = Math.floor(im.height / down), k = frame - 1;
+      this.draw(line, (g) => g.drawImage(im, (k % across) * w, Math.floor(k / across) * h, w, h, Math.round(x), Math.round(y), w, h));
+    },
+
+    // ---- 3D: shapes wait until something flat is drawn or the frame is revealed, then are drawn far ones first
+    eye: { x: 0, y: 1.5, z: -6, turn: 0, tilt: 0 },
+    items: [], kept: new Map(), keeping: null, daylight: 1, sun: [0.371, 0.743, -0.557], angle: 60, shader: null, NEAR: 0.05,
+    parts: (p) => [p.X, p.Y, p.Z || 0],
+    focal() { return this.height / 2 / Math.tan(((this.angle / 2) * Math.PI) / 180); },
+    axes() {
+      const t = (this.eye.turn * Math.PI) / 180, a = (this.eye.tilt * Math.PI) / 180;
+      const ct = Math.cos(t), st = Math.sin(t), ca = Math.cos(a), sa = Math.sin(a);
+      return [[ct, 0, -st], [-sa * st, ca, -sa * ct], [ca * st, sa, ca * ct]];
+    },
+    view(p) {
+      const r = this.axes(), d = [p[0] - this.eye.x, p[1] - this.eye.y, p[2] - this.eye.z];
+      return r.map((row) => row[0] * d[0] + row[1] * d[1] + row[2] * d[2]);
+    },
+    rgb: (col) => [parseInt(col.slice(1, 3), 16), parseInt(col.slice(3, 5), 16), parseInt(col.slice(5, 7), 16)],
+    shade(col, k) { return this.mix(...this.rgb(col).map((v) => v * k)); },
+    lighter(col) { return "#" + this.rgb(col).map((v) => ((v + 255) >> 1).toString(16).padStart(2, "0")).join(""); },
+    async shaded(at, col, line) {
+      if (!this.shader) return col;
+      return this.colour(await this.shader(FVector(at[0], at[1], at[2]), col), line);
+    },
+    into() { return this.keeping === null ? this.items : this.kept.get(this.keeping); },
+    async polygon3(world, col, farFirst, normal, line) {
+      if (this.shader) col = await this.shaded([0, 1, 2].map((k) => world.reduce((s, w) => s + w[k], 0) / world.length), col, line);
+      this.into().push([false, world, 0, col, farFirst, normal]);
+    },
+    placeEye(p) { [this.eye.x, this.eye.y, this.eye.z] = this.parts(p); },
+    aimEye(turn, tilt) { this.eye.turn = turn, this.eye.tilt = Math.max(-89, Math.min(89, tilt)); },
+    screenPlace(p, line) {
+      if (!this.opened) stellanova.fail(line, 'there is no window yet. Open one first, like: open a world with "My game", 800, 600');
+      const v = this.view(this.parts(p));
+      if (v[2] < this.NEAR) return FVector2D(NaN, NaN);
+      const f = this.focal();
+      return FVector2D(this.width / 2 + (v[0] * f) / v[2], this.height / 2 - (v[1] * f) / v[2]);
+    },
+    needOpen(line) { if (!this.opened) stellanova.fail(line, 'there is no window yet. Open one first, like: open a world with "My game", 800, 600'); },
+    async block(middle, w, h, d, c, line) {
+      this.needOpen(line);
+      if (!(w > 0 && h > 0 && d > 0)) stellanova.fail(line, "a block's width, height and depth must all be more than 0.");
+      const col = this.colour(c, line), [mx, my, mz] = this.parts(middle);
+      const x0 = mx - w / 2, x1 = mx + w / 2, y0 = my - h / 2, y1 = my + h / 2, z0 = mz - d / 2, z1 = mz + d / 2;
+      const faces = [[[0, 0, -1], [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]],
+                     [[0, 0, 1], [x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1]],
+                     [[-1, 0, 0], [x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1]],
+                     [[1, 0, 0], [x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]],
+                     [[0, 1, 0], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]],
+                     [[0, -1, 0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]]];
+      for (const [n, a, b, cc, dd] of faces) {
+        const cx = (a[0] + cc[0]) / 2, cy = (a[1] + cc[1]) / 2, cz = (a[2] + cc[2]) / 2;
+        if (this.keeping === null && n[0] * (this.eye.x - cx) + n[1] * (this.eye.y - cy) + n[2] * (this.eye.z - cz) <= 0) continue;  // facing away
+        const lit = n[0] * this.sun[0] + n[1] * this.sun[1] + n[2] * this.sun[2];
+        await this.polygon3([a, b, cc, dd], this.shade(col, 0.6 + 0.4 * Math.max(0, lit)), 0, n, line);
+      }
+    },
+    async ball(middle, radius, c, line) {
+      this.needOpen(line);
+      if (!(radius > 0)) stellanova.fail(line, "a ball's radius must be more than 0.");
+      const at = this.parts(middle);
+      this.into().push([true, at, radius, await this.shaded(at, this.colour(c, line), line), 0, null]);
+    },
+    async face3(pts, col, line) {
+      if (pts.length < 3) return;
+      const [a, b, c] = pts, u = [0, 1, 2].map((k) => b[k] - a[k]), v = [0, 1, 2].map((k) => c[k] - a[k]);
+      const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const size = Math.hypot(...n);
+      if (size === 0) return;
+      const lit = Math.abs((n[0] * this.sun[0] + n[1] * this.sun[1] + n[2] * this.sun[2]) / size);
+      await this.polygon3(pts, this.shade(col, 0.6 + 0.4 * lit), 0, null, line);
+    },
+    async triangle3(a, b, c, col, line) {
+      this.needOpen(line);
+      await this.face3([this.parts(a), this.parts(b), this.parts(c)], this.colour(col, line), line);
+    },
+    shineFrom(d, line) {
+      const [x, y, z] = this.parts(d), size = Math.hypot(x, y, z);
+      if (size === 0) stellanova.fail(line, "the light needs a direction, not 0 horizontal 0 vertical 0 depth.");
+      this.sun = [x / size, y / size, z / size];
+    },
+    setView(degrees, line) {
+      if (!(degrees >= 10 && degrees <= 150)) stellanova.fail(line, `the eye view is 10 to 150 degrees wide, not ${stellanova.text(degrees)}.`);
+      this.angle = degrees;
+    },
+    async readText(file) {
+      if (!this.page) return require("fs").readFileSync(file, "utf8");
+      const r = await fetch(file);
+      if (!r.ok) throw new Error("missing");
+      return r.text();
+    },
+    models: new Map(),
+    async model(file, line) {
+      if (this.models.has(file)) return this.models.get(file);
+      let rows;
+      try { rows = (await this.readText(file)).split(/\r?\n/); } catch { stellanova.fail(line, `there is no model called "${file}".`); }
+      const points = [], faces = [], named = {};
+      let now = null;
+      for (const row of rows) {
+        const words = row.trim().split(/\s+/);
+        if (words[0] === "v") points.push(words.slice(1, 4).map(Number));
+        else if (words[0] === "f") {
+          const face = [];
+          for (const w of words.slice(1)) {
+            let k = parseInt(w.split("/")[0], 10);
+            k = k < 0 ? points.length + k : k - 1;
+            if (!(k >= 0 && k < points.length)) stellanova.fail(line, `the model "${file}" has a face with a corner that isn't there.`);
+            face.push(k);
+          }
+          if (face.length >= 3) faces.push([face, now]);
+        } else if (words[0] === "usemtl") now = named[words[1]] ?? null;
+        else if (words[0] === "mtllib") {
+          const folder = file.includes("/") || file.includes("\\") ? file.replace(/[^/\\]*$/, "") : "";
+          let material = null;
+          try {
+            for (const r of (await this.readText(folder + row.trim().split(/\s+/).slice(1).join(" "))).split(/\r?\n/)) {
+              const mw = r.trim().split(/\s+/);
+              if (mw[0] === "newmtl") material = mw[1];
+              else if (mw[0] === "Kd") named[material] = "#" + mw.slice(1, 4).map((x) => Math.round(Number(x) * 255).toString(16).padStart(2, "0")).join("");
+            }
+          } catch {}
+        }
+      }
+      this.models.set(file, [points, faces]);
+      return [points, faces];
+    },
+    async etchModel(file, middle, size, turn, col, line) {
+      this.needOpen(line);
+      const [points, faces] = await this.model(file, line);
+      const own = col ? this.colour(col, line) : "#c8c8c8", t = (turn * Math.PI) / 180, ct = Math.cos(t), st = Math.sin(t);
+      const [mx, my, mz] = this.parts(middle);
+      for (const [face, which] of faces) {
+        const pts = face.map((k) => [mx + size * (points[k][0] * ct + points[k][2] * st), my + size * points[k][1], mz + size * (-points[k][0] * st + points[k][2] * ct)]);
+        await this.face3(pts, !col && which ? which : own, line);
+      }
+    },
+    async pictureInSpace(file, corner, across, down, line) {
+      this.needOpen(line);
+      const im = await this.picture(file, line);
+      if (!this.page) return;  // node has no picture's dots to show
+      const w = im.width, h = im.height, nx = Math.min(w, 48), ny = Math.min(h, 48);
+      const g = document.createElement("canvas");
+      g.width = w, g.height = h;
+      const gc = g.getContext("2d");
+      gc.drawImage(im, 0, 0);
+      const dots = gc.getImageData(0, 0, w, h).data;
+      const c = this.parts(corner), a = this.parts(across), d = this.parts(down);
+      const at = (s, u) => [0, 1, 2].map((k) => c[k] + a[k] * s + d[k] * u);
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const x = Math.floor((i * w + (w >> 1)) / nx), y = Math.floor((j * h + (h >> 1)) / ny), k = 4 * (y * w + x);
+          if (dots[k + 3] < 128) continue;
+          await this.face3([at(i / nx, j / ny), at((i + 1) / nx, j / ny), at((i + 1) / nx, (j + 1) / ny), at(i / nx, (j + 1) / ny)], this.mix(dots[k], dots[k + 1], dots[k + 2]), line);
+        }
+    },
+    async ground(a, b, line) {
+      this.needOpen(line);
+      const ca = this.colour(a, line), cb = this.colour(b, line), size = 2, reach = 12;
+      const cx = Math.floor(this.eye.x / size), cz = Math.floor(this.eye.z / size);
+      for (let i = cx - reach; i < cx + reach; i++)
+        for (let j = cz - reach; j < cz + reach; j++)
+          await this.polygon3([[i * size, 0, j * size], [(i + 1) * size, 0, j * size], [(i + 1) * size, 0, (j + 1) * size], [i * size, 0, (j + 1) * size]], (i + j) & 1 ? cb : ca, 1e9, null, line);
+    },
+    startKeeping(name, line) {
+      this.needOpen(line);
+      if (this.keeping !== null) stellanova.fail(line, `shapes are already being kept as "${this.keeping}". Say 'stop keeping the shapes' first.`);
+      if (!name) stellanova.fail(line, 'kept shapes need a name, like "land".');
+      this.kept.set(name, []);
+      this.keeping = name;
+    },
+    stopKeeping(line) {
+      if (this.keeping === null) stellanova.fail(line, 'no shapes are being kept. Start with: start keeping the shapes as "land"');
+      this.keeping = null;
+    },
+    etchKept(name, line) {
+      this.needOpen(line);
+      if (!this.kept.has(name)) stellanova.fail(line, `there are no shapes kept as "${name}".`);
+      if (name === this.keeping) stellanova.fail(line, `the shapes "${name}" are still being kept. Say 'stop keeping the shapes' first.`);
+      this.items.push(["kept", name]);
+    },
+    forgetKept(name, line) {
+      if (!this.kept.has(name)) stellanova.fail(line, `there are no shapes kept as "${name}".`);
+      this.flush3d();  // anything waiting to be drawn may use them
+      if (this.keeping === name) this.keeping = null;
+      this.kept.delete(name);
+    },
+    setDaylight(amount, line) {
+      if (!(amount >= 0 && amount <= 1)) stellanova.fail(line, `the daylight is from 0 (dark) to 1 (full), not ${stellanova.text(amount)}.`);
+      this.daylight = amount;
+    },
+    facingAway(where, normal) {
+      const a = where[0];
+      return normal !== null && normal[0] * (this.eye.x - a[0]) + normal[1] * (this.eye.y - a[1]) + normal[2] * (this.eye.z - a[2]) <= 0;
+    },
+    flush3d() {
+      if (!this.items.length) return;
+      if (this.ctx && this.isOpen) {
+        const shapes = [], f = this.focal(), w = this.width, h = this.height;
+        const all = this.items.flatMap((item) => (item[0] === "kept" ? this.kept.get(item[1]) : [item]));
+        for (const [round, where, radius, col, farFirst, normal] of all) {
+          if (round) {
+            const v = this.view(where);
+            if (v[2] < this.NEAR) continue;
+            const x = w / 2 + (v[0] * f) / v[2], y = h / 2 - (v[1] * f) / v[2], r = Math.max(1, (radius * f) / v[2]);
+            shapes.push([v[2], true, [x, y, r], col]);
+            shapes.push([v[2] - 1e-9, true, [x - r * 0.35, y - r * 0.35, Math.max(1, r * 0.3)], this.lighter(col)]);
+          } else if (!this.facingAway(where, normal)) {
+            const cam = where.map((p) => this.view(p)), out = [];
+            for (let k = 0; k < cam.length; k++) {  // cut off what is behind the eye
+              const a = cam[k], b = cam[(k + 1) % cam.length], ia = a[2] >= this.NEAR, ib = b[2] >= this.NEAR;
+              if (ia) out.push(a);
+              if (ia !== ib) {
+                const s = (this.NEAR - a[2]) / (b[2] - a[2]);
+                out.push([a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, this.NEAR]);
+              }
+            }
+            if (out.length < 3) continue;
+            shapes.push([out.reduce((s, v) => s + v[2], 0) / out.length + farFirst, false, out.map((v) => [w / 2 + (v[0] * f) / v[2], h / 2 - (v[1] * f) / v[2]]), col]);
+          }
+        }
+        shapes.sort((p, q) => q[0] - p[0]);  // far ones first (the sort keeps the order of equal ones)
+        const g = this.ctx;
+        g.lineWidth = 1;
+        for (const [, round, pts, c] of shapes) {
+          const col = this.daylight < 1 ? this.shade(c, this.daylight) : c;
+          g.fillStyle = g.strokeStyle = col;
+          g.beginPath();
+          if (round) g.arc(pts[0], pts[1], pts[2], 0, 2 * Math.PI);
+          else { g.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) g.lineTo(p[0], p[1]); g.closePath(); }
+          g.fill();
+          g.stroke();
+        }
+      }
+      this.items = [];
+    },
+  };
