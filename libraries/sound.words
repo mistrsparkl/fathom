@@ -159,29 +159,149 @@ python:
 
 to play the sound, given file (text) = stellanova_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
+  web: await stellanova_sound_web.play({file}, false, false, {line})
 to play the sound and wait, given file (text) = stellanova_sound::play({file}, true, false, {line})
   runs: play({file}, True, False)
+  web: await stellanova_sound_web.play({file}, true, false, {line})
 to play the sound again and again, given file (text) = stellanova_sound::play({file}, false, true, {line})
   runs: play({file}, False, True)
+  web: await stellanova_sound_web.play({file}, false, true, {line})
 to stop the sound = stellanova_sound::stop()
   runs: stop()
+  web: stellanova_sound_web.stop()
 to play the song, given file (text) = stellanova_sound::song_play({file}, {line})
   runs: song_play({file})
+  web: await stellanova_sound_web.songPlay({file}, {line})
 to pause the song = stellanova_sound::song_say(L"pause stellanova_song")
   runs: song_say("pause stellanova_song")
+  web: stellanova_sound_web.songPause()
 to carry on the song = stellanova_sound::song_say(L"resume stellanova_song")
   runs: song_say("resume stellanova_song")
+  web: stellanova_sound_web.songResume()
 to stop the song = stellanova_sound::song_stop()
   runs: song_stop()
+  web: stellanova_sound_web.songStop()
 the song is playing = (stellanova_sound::song_status(L"mode") == L"playing"), yes or no, read only
   runs: song_status("mode") == "playing"
+  web: stellanova_sound_web.songPlaying()
 the song has ended = (stellanova_sound::song_open && stellanova_sound::song_status(L"mode") == L"stopped" && stellanova_sound::song_number(L"position") + 0.3 >= stellanova_sound::song_number(L"length")), yes or no, read only
   runs: song["open"] and song_status("mode") == "stopped" and song_number("position") + 0.3 >= song_number("length")
+  web: stellanova_sound_web.songEnded()
 song time = stellanova_sound::song_number(L"position"), number, read only
   runs: song_number("position")
+  web: stellanova_sound_web.songTime()
 song length = stellanova_sound::song_number(L"length"), number, read only
   runs: song_number("length")
+  web: stellanova_sound_web.songLength()
 to set the song time to, given seconds (a number) = stellanova_sound::song_seek({seconds})
   runs: song_seek({seconds})
+  web: stellanova_sound_web.songSeek({seconds})
 to set the song loudness to, given level (a number) = stellanova_sound::song_say(L"setaudio stellanova_song volume to " + std::to_wstring((int)(std::clamp({level}, 0.0, 1.0) * 1000)))
   runs: song_say(f"setaudio stellanova_song volume to {int(max(0, min(1, {level})) * 1000)}")
+  web: stellanova_sound_web.songLoudness({level})
+
+javascript:
+  const stellanova_sound_web = {
+    // On a web page sounds play through the browser. With node nothing is heard: files are checked, and waiting takes as long as the sound.
+    page: typeof document !== "undefined",
+    playing: [],
+    now() { return Date.now() / 1000; },
+    async check(file, line) {  // the file's length in seconds (0 if unknown)
+      let b;
+      if (this.page) {
+        const r = await fetch(file).catch(() => null);
+        if (!r || !r.ok) stellanova.fail(line, `there is no sound file called "${file}".`);
+        b = new Uint8Array(await r.arrayBuffer());
+      } else {
+        const fs = require("fs");
+        if (!fs.existsSync(file)) stellanova.fail(line, `there is no sound file called "${file}".`);
+        b = fs.readFileSync(file);  // a Buffer is bytes too
+      }
+      const ascii = (at, n) => String.fromCharCode(...b.slice(at, at + n));
+      if (ascii(0, 4) === "RIFF" && ascii(8, 4) === "WAVE") {
+        let at = 12, rate = 0, size = 0;
+        while (at + 8 <= b.length) {
+          const kind = ascii(at, 4), n = b[at + 4] | (b[at + 5] << 8) | (b[at + 6] << 16) | (b[at + 7] << 24);
+          if (kind === "fmt ") rate = (b[at + 16] | (b[at + 17] << 8) | (b[at + 18] << 16) | (b[at + 19] << 24)) >>> 0;  // bytes each second
+          if (kind === "data") { size = n >>> 0; break; }
+          at += 8 + n + (n & 1);
+        }
+        return rate ? size / rate : 0;
+      }
+      if (ascii(0, 3) === "ID3" || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return 0;
+      stellanova.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`);
+    },
+    async play(file, wait, loop, line) {
+      const seconds = await this.check(file, line);
+      if (!this.page) {
+        if (wait) await new Promise((r) => setTimeout(r, seconds * 1000));
+        return;
+      }
+      const a = new Audio(file);
+      a.loop = loop;
+      this.playing = this.playing.filter((p) => !p.ended);
+      this.playing.push(a);
+      try { await a.play(); } catch { stellanova.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`); }
+      if (wait && !loop) await new Promise((r) => (a.onended = r));
+    },
+    stop() {
+      for (const a of this.playing) a.pause();
+      this.playing = [];
+    },
+    song: null,
+    async songPlay(file, line) {
+      this.songStop();
+      const length = await this.check(file, line);
+      if (this.page) {
+        const a = new Audio(file);
+        try { await a.play(); } catch { stellanova.fail(line, `I couldn't play '${file}' (it must be a .wav or .mp3 file).`); }
+        this.song = { a };
+      } else this.song = { length, at: 0, since: this.now(), paused: false, loud: 1 };
+    },
+    songPause() {
+      const s = this.song;
+      if (!s) return;
+      if (s.a) s.a.pause();
+      else if (!s.paused) s.at = this.songTime(), s.paused = true;
+    },
+    songResume() {
+      const s = this.song;
+      if (!s) return;
+      if (s.a) s.a.play().catch(() => {});
+      else if (s.paused) s.since = this.now(), s.paused = false;
+    },
+    songStop() {
+      if (this.song && this.song.a) this.song.a.pause();
+      this.song = null;
+    },
+    songTime() {
+      const s = this.song;
+      if (!s) return 0;
+      if (s.a) return s.a.currentTime;
+      return Math.min(s.length, s.paused ? s.at : s.at + this.now() - s.since);
+    },
+    songLength() {
+      const s = this.song;
+      if (!s) return 0;
+      return s.a ? (Number.isFinite(s.a.duration) ? s.a.duration : 0) : s.length;
+    },
+    songPlaying() {
+      const s = this.song;
+      if (!s) return false;
+      return s.a ? !s.a.paused && !s.a.ended : !s.paused && this.songTime() < s.length;
+    },
+    songEnded() {
+      const s = this.song;
+      if (!s) return false;
+      return s.a ? s.a.ended : this.songTime() + 0.3 >= s.length && !s.paused;
+    },
+    songSeek(seconds) {
+      const s = this.song;
+      if (!s) return;
+      if (s.a) s.a.currentTime = Math.max(0, seconds);
+      else s.at = Math.min(s.length, Math.max(0, seconds)), s.since = this.now();
+    },
+    songLoudness(level) {
+      if (this.song && this.song.a) this.song.a.volume = Math.max(0, Math.min(1, level));
+    },
+  };

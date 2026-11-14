@@ -314,6 +314,7 @@ to the sound in the file, given file (text), returning a list of numbers = stell
   web: stellanova_making.load({file}, {line})
 to record the sound, given seconds (a number), returning a list of numbers = stellanova_making::record({seconds}, {line})
   runs: record({seconds})
+  web: await stellanova_recording.record({seconds}, {line})
 
 javascript:
   const stellanova_making = {
@@ -396,5 +397,23 @@ javascript:
         at += 8 + size + (size & 1);
       }
       stellanova.fail(line, `"${file}" has no sound in it.`);
+    },
+  };
+  const stellanova_recording = {
+    async record(seconds, line) {  // the page's microphone (the person is asked first), as 44100 numbers each second
+      if (!(seconds > 0 && seconds <= 600)) stellanova.fail(line, `a recording lasts more than 0 and at most 600 seconds, not ${stellanova.text(seconds)}.`);
+      if (typeof navigator === "undefined" || !navigator.mediaDevices) stellanova.fail(line, "recording needs a web page with a microphone (node has none).");
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { stellanova.fail(line, "I couldn't use the microphone (it may be missing, or not allowed)."); }
+      const parts = [], recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => parts.push(e.data);
+      const stopped = new Promise((r) => (recorder.onstop = r));
+      recorder.start();
+      await new Promise((r) => setTimeout(r, seconds * 1000));
+      recorder.stop();
+      await stopped;
+      for (const t of stream.getTracks()) t.stop();
+      const heard = await new AudioContext({ sampleRate: 44100 }).decodeAudioData(await new Blob(parts).arrayBuffer());
+      return Array.from(heard.getChannelData(0).slice(0, Math.round(seconds * 44100)));
     },
   };

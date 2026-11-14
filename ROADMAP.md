@@ -28,7 +28,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] 3D models (.obj), textures, shaders, lights and cameras (window library: models, pictures in space, shader commands, light, eye view)
 - [x] Compression (zip), hashing, encryption, JSON paths, email (`use: zip`, `hashing`, `encryption`, `json`, `email`)
 - [x] Desktop forms: buttons, fields, lists in a window
-- [ ] The web build gets the words it lacks (database included)
+- [x] The web build gets the words it lacks (database included): every library word works on the web (C libraries and Python packages can't)
 
 ## 4. Tools
 - [ ] Debugger: stop at a line, step, look at names (studio)

@@ -297,27 +297,158 @@ python:
 
 to open a form, given title (text) and width (a number) and height (a number) = stellanova_forms::open({title}, {width}, {height}, {line})
   runs: form_open({title}, {width}, {height})
+  web: stellanova_forms_web.open({title}, {width}, {height}, {line})
 to add a button, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("button", {name}, {words}, {x}, {y}, {width}, {height}, {line})
   runs: form_add("button", {name}, {words}, {x}, {y}, {width}, {height})
+  web: stellanova_forms_web.add("button", {name}, {words}, {x}, {y}, {width}, {height}, {line})
 to add a field, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("field", {name}, {words}, {x}, {y}, {width}, {height}, {line})
   runs: form_add("field", {name}, {words}, {x}, {y}, {width}, {height})
+  web: stellanova_forms_web.add("field", {name}, {words}, {x}, {y}, {width}, {height}, {line})
 to add a label, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("label", {name}, {words}, {x}, {y}, {width}, {height}, {line})
   runs: form_add("label", {name}, {words}, {x}, {y}, {width}, {height})
+  web: stellanova_forms_web.add("label", {name}, {words}, {x}, {y}, {width}, {height}, {line})
 to add a tick box, given name (text) and words (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("tick box", {name}, {words}, {x}, {y}, {width}, {height}, {line})
   runs: form_add("tick box", {name}, {words}, {x}, {y}, {width}, {height})
+  web: stellanova_forms_web.add("tick box", {name}, {words}, {x}, {y}, {width}, {height}, {line})
 to add a list box, given name (text) and x (a number) and y (a number) and width (a number) and height (a number) = stellanova_forms::add("list", {name}, "", {x}, {y}, {width}, {height}, {line})
   runs: form_add("list", {name}, "", {x}, {y}, {width}, {height})
+  web: stellanova_forms_web.add("list", {name}, "", {x}, {y}, {width}, {height}, {line})
 to the words in, given name (text), returning text = stellanova_forms::text_of({name}, {line})
   runs: form_text({name})
+  web: stellanova_forms_web.textOf({name}, {line})
 to set the words in, given name (text) and words (text) = stellanova_forms::set_text({name}, {words}, {line})
   runs: form_set({name}, {words})
+  web: stellanova_forms_web.setText({name}, {words}, {line})
 to put in the list, given name (text) and item (text) = stellanova_forms::add_item({name}, {item}, {line})
   runs: form_add_item({name}, {item})
+  web: stellanova_forms_web.addItem({name}, {item}, {line})
 to empty the list, given name (text) = stellanova_forms::clear({name}, {line})
   runs: form_clear({name})
+  web: stellanova_forms_web.clear({name}, {line})
 to is ticked, given name (text), returning yes or no = stellanova_forms::ticked({name}, {line})
   runs: form_ticked({name})
+  web: stellanova_forms_web.ticked({name}, {line})
 to wait for a click, returning text = stellanova_forms::wait({line})
   runs: form_wait()
+  web: (await stellanova_forms_web.wait({line}))
 to close the form = stellanova_forms::close()
   runs: form_close()
+  web: stellanova_forms_web.close()
+
+javascript:
+  const stellanova_forms_web = {
+    // On a web page a form is a box of real buttons and fields in the page. With node it is one nobody sees,
+    // which STELLANOVA_FORM_SCRIPT can still fill in and click.
+    page: typeof document !== "undefined",
+    form: null, closed: false, parts: new Map(), script: [], waiting: null,
+    need(line) {
+      if (!this.form) stellanova.fail(line, this.closed ? "the form was closed." : 'there is no form yet. Open one first, like: open a form with ("Hello", 400, 300)');
+    },
+    open(title, w, h, line) {
+      if (this.form) stellanova.fail(line, "a form is already open.");
+      this.closed = false;
+      this.parts = new Map();
+      if (this.page) {
+        const box = document.createElement("div"), bar = document.createElement("div"), x = document.createElement("button"), inside = document.createElement("div");
+        Object.assign(box.style, { position: "relative", display: "inline-block", border: "1px solid #888", background: "#fff", font: "13px 'Segoe UI', sans-serif", margin: "8px" });
+        Object.assign(bar.style, { padding: "4px 8px", background: "#eee", borderBottom: "1px solid #ccc", display: "flex", justifyContent: "space-between" });
+        bar.textContent = title;
+        x.textContent = "×";
+        x.onclick = () => this.close();
+        bar.appendChild(x);
+        Object.assign(inside.style, { position: "relative", width: w + "px", height: h + "px" });
+        box.append(bar, inside);
+        (document.getElementById("stellanova-form") || document.body).appendChild(box);
+        this.form = { box, inside };
+      } else this.form = {};
+      const file = typeof process !== "undefined" && process.env.STELLANOVA_FORM_SCRIPT;
+      if (file) this.script = require("fs").readFileSync(file, "utf8").split(/\r?\n/).filter((l) => l);
+    },
+    add(kind, name, text, x, y, w, h, line) {
+      this.need(line);
+      if (this.parts.has(name)) stellanova.fail(line, `the form already has a part called "${name}".`);
+      const p = { kind, text, items: [], chosen: -1, ticked: false, el: null };
+      if (this.page) {
+        let el;
+        if (kind === "button") { el = document.createElement("button"); el.textContent = text; el.onclick = () => this.clicked(name); }
+        else if (kind === "field") { el = document.createElement("input"); el.value = text; }
+        else if (kind === "label") { el = document.createElement("div"); el.textContent = text; }
+        else if (kind === "list") { el = document.createElement("select"); el.size = 2; }
+        else {
+          el = document.createElement("label");
+          const tick = document.createElement("input");
+          tick.type = "checkbox";
+          el.append(tick, " " + text);
+          p.tick = tick;
+        }
+        Object.assign(el.style, { position: "absolute", left: x + "px", top: y + "px", width: w + "px", height: h + "px", boxSizing: "border-box", margin: "0" });
+        this.form.inside.appendChild(el);
+        p.el = el;
+      }
+      this.parts.set(name, p);
+    },
+    part(name, line) {
+      this.need(line);
+      if (!this.parts.has(name)) stellanova.fail(line, `the form has no part called "${name}".`);
+      return this.parts.get(name);
+    },
+    isList(name, line) {
+      const p = this.part(name, line);
+      if (p.kind !== "list") stellanova.fail(line, `"${name}" isn't a list.`);
+      return p;
+    },
+    textOf(name, line) {
+      const p = this.part(name, line);
+      if (p.el) return p.kind === "field" ? p.el.value : p.kind === "list" ? (p.el.selectedIndex < 0 ? "" : p.el.options[p.el.selectedIndex].text) : p.kind === "tick box" ? p.text : p.el.textContent;
+      return p.kind === "list" ? p.items[p.chosen] ?? "" : p.text;
+    },
+    setText(name, text, line) {
+      const p = this.part(name, line);
+      p.text = text;
+      if (!p.el) return;
+      if (p.kind === "field") p.el.value = text;
+      else if (p.kind === "tick box") p.el.lastChild.textContent = " " + text;
+      else if (p.kind !== "list") p.el.textContent = text;
+    },
+    addItem(name, item, line) {
+      const p = this.isList(name, line);
+      p.items.push(item);
+      if (p.el) p.el.add(new Option(item));
+    },
+    clear(name, line) {
+      const p = this.isList(name, line);
+      p.items = [], p.chosen = -1;
+      if (p.el) p.el.length = 0;
+    },
+    ticked(name, line) {
+      const p = this.part(name, line);
+      if (p.kind !== "tick box") stellanova.fail(line, `"${name}" isn't a tick box.`);
+      return p.tick ? p.tick.checked : p.ticked;
+    },
+    clicked(name) {
+      if (this.waiting) { const w = this.waiting; this.waiting = null; w(name); }
+    },
+    async wait(line) {
+      if (!this.form && this.closed) return "";
+      this.need(line);
+      while (this.script.length) {  // acting by itself: each line until a click (or close)
+        const l = this.script.shift(), [word] = l.split(" "), rest = l.slice(word.length + 1), name = rest.split(" ")[0], value = rest.slice(name.length + 1);
+        if (word === "type") this.setText(name, value, line);
+        else if (word === "tick") { const p = this.part(name, line); p.ticked = true; if (p.tick) p.tick.checked = true; }
+        else if (word === "choose") {
+          const p = this.part(name, line), k = p.items.indexOf(value);
+          if (k >= 0) { p.chosen = k; if (p.el) p.el.selectedIndex = k; }
+        } else if (word === "click") { this.part(rest, line); return rest; }
+        else if (word === "close") { this.close(); return ""; }
+      }
+      if (!this.page) return "";  // nobody can click a form node shows
+      return new Promise((r) => (this.waiting = r));
+    },
+    close() {
+      if (!this.form) return;
+      if (this.form.box) this.form.box.remove();
+      this.form = null;
+      this.closed = true;
+      this.clicked("");
+    },
+  };
