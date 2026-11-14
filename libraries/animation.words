@@ -1,0 +1,140 @@
+note: Words for moving things smoothly: easing, tweens, waves and the frames of a sprite sheet.
+note: Use them in a program with:  use: animation
+note: Progress is a number from 0 (the start) to 1 (the end). Easing styles: "linear", "in", "out", "in out",
+note: "back" (pulls back first), "overshoot" (goes past, then settles), "bounce", "elastic".
+
+code:
+  namespace stellanova_animation
+  {
+  	inline double eased(const std::string& style, double t, int line)
+  	{
+  		const double pi = 3.14159265358979323846;
+  		t = t < 0 ? 0 : t > 1 ? 1 : t;
+  		auto bounce = [](double x) {
+  			if (x < 1 / 2.75) return 7.5625 * x * x;
+  			if (x < 2 / 2.75) { x -= 1.5 / 2.75; return 7.5625 * x * x + 0.75; }
+  			if (x < 2.5 / 2.75) { x -= 2.25 / 2.75; return 7.5625 * x * x + 0.9375; }
+  			x -= 2.625 / 2.75;
+  			return 7.5625 * x * x + 0.984375;
+  		};
+  		if (style == "linear") return t;
+  		if (style == "in") return t * t * t;
+  		if (style == "out") return 1 - std::pow(1 - t, 3);
+  		if (style == "in out") return t < 0.5 ? 4 * t * t * t : 1 - std::pow(-2 * t + 2, 3) / 2;
+  		if (style == "back") return 2.70158 * t * t * t - 1.70158 * t * t;
+  		if (style == "overshoot") return 1 + 2.70158 * std::pow(t - 1, 3) + 1.70158 * std::pow(t - 1, 2);
+  		if (style == "bounce") return bounce(t);
+  		if (style == "elastic") return t == 0 || t == 1 ? t : std::pow(2, -10 * t) * std::sin((t * 10 - 0.75) * (2 * pi / 3)) + 1;
+  		stellanova::fail(line, "there is no easing called \"" + style + "\". Easings: linear, in, out, in out, back, overshoot, bounce, elastic.");
+  	}
+  	inline double progress(double start, double seconds, double now)
+  	{
+  		if (seconds <= 0)
+  			return now >= start ? 1 : 0;
+  		double t = (now - start) / seconds;
+  		return t < 0 ? 0 : t > 1 ? 1 : t;
+  	}
+  	inline double sheet_frame(double frames, double per_second, double seconds, int line)
+  	{
+  		if (frames < 1 || frames != std::floor(frames))
+  			stellanova::fail(line, "a sprite sheet has a whole number of frames (at least 1), not " + stellanova::text(frames) + ".");
+  		double k = std::floor(seconds * per_second);
+  		return std::fmod(std::fmod(k, frames) + frames, frames) + 1;
+  	}
+  }
+
+python:
+  def eased(style, t):
+      t = min(1.0, max(0.0, t))
+      def bounce(x):
+          if x < 1 / 2.75:
+              return 7.5625 * x * x
+          if x < 2 / 2.75:
+              x -= 1.5 / 2.75
+              return 7.5625 * x * x + 0.75
+          if x < 2.5 / 2.75:
+              x -= 2.25 / 2.75
+              return 7.5625 * x * x + 0.9375
+          x -= 2.625 / 2.75
+          return 7.5625 * x * x + 0.984375
+      if style == "linear":
+          return t
+      if style == "in":
+          return t * t * t
+      if style == "out":
+          return 1 - (1 - t) ** 3
+      if style == "in out":
+          return 4 * t * t * t if t < 0.5 else 1 - (-2 * t + 2) ** 3 / 2
+      if style == "back":
+          return 2.70158 * t * t * t - 1.70158 * t * t
+      if style == "overshoot":
+          return 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2
+      if style == "bounce":
+          return bounce(t)
+      if style == "elastic":
+          return t if t in (0, 1) else 2 ** (-10 * t) * math.sin((t * 10 - 0.75) * (2 * math.pi / 3)) + 1
+      raise RunError(0, 'there is no easing called "' + style + '". Easings: linear, in, out, in out, back, overshoot, bounce, elastic.')
+  def progress(start, seconds, now):
+      if seconds <= 0:
+          return 1.0 if now >= start else 0.0
+      return min(1.0, max(0.0, (now - start) / seconds))
+  def sheet_frame(frames, per_second, seconds):
+      if frames < 1 or frames != int(frames):
+          raise RunError(0, "a sprite sheet has a whole number of frames (at least 1), not " + text(frames) + ".")
+      return float(math.floor(seconds * per_second) % int(frames) + 1)
+
+to eased, given style (text) and progress (a number), returning a number = stellanova_animation::eased({style}, {progress}, {line})
+  runs: eased({style}, {progress})
+  web: stellanova_animation.eased({style}, {progress}, {line})
+to tweened, given start (a number) and end (a number) and progress (a number) and style (text), returning a number = ({start}) + (({end}) - ({start})) * stellanova_animation::eased({style}, {progress}, {line})
+  runs: {start} + ({end} - {start}) * eased({style}, {progress})
+  web: ({start}) + (({end}) - ({start})) * stellanova_animation.eased({style}, {progress}, {line})
+to tweened place, given start (a place) and end (a place) and progress (a number) and style (text), returning a place = ({start}) + (({end}) - ({start})) * stellanova_animation::eased({style}, {progress}, {line})
+  runs: {start} + ({end} - {start}) * eased({style}, {progress})
+  web: ((s, e, k) => FVector(s.X + (e.X - s.X) * k, s.Y + (e.Y - s.Y) * k, s.Z + (e.Z - s.Z) * k))({start}, {end}, stellanova_animation.eased({style}, {progress}, {line}))
+to progress of, given start (a number) and seconds (a number) and now (a number), returning a number = stellanova_animation::progress({start}, {seconds}, {now})
+  runs: progress({start}, {seconds}, {now})
+  web: stellanova_animation.progress({start}, {seconds}, {now})
+to ping pong, given progress (a number), returning a number = (1 - std::fabs(std::fmod(std::fabs({progress}), 2.0) - 1))
+  runs: 1 - abs(abs({progress}) % 2 - 1)
+  web: (1 - Math.abs(Math.abs({progress}) % 2 - 1))
+to wave of, given seconds (a number) and every (a number), returning a number = (0.5 - 0.5 * std::cos(({seconds}) / ({every}) * 6.283185307179586))
+  runs: 0.5 - 0.5 * math.cos({seconds} / {every} * 6.283185307179586)
+  web: (0.5 - 0.5 * Math.cos(({seconds}) / ({every}) * 6.283185307179586))
+to sheet frame, given frames (a number) and per second (a number) and seconds (a number), returning a number = stellanova_animation::sheet_frame({frames}, {per second}, {seconds}, {line})
+  runs: sheet_frame({frames}, {per second}, {seconds})
+  web: stellanova_animation.sheet_frame({frames}, {per second}, {seconds}, {line})
+
+javascript:
+  const stellanova_animation = {
+    eased(style, t, line) {
+      t = Math.min(1, Math.max(0, t));
+      const bounce = (x) => {
+        if (x < 1 / 2.75) return 7.5625 * x * x;
+        if (x < 2 / 2.75) { x -= 1.5 / 2.75; return 7.5625 * x * x + 0.75; }
+        if (x < 2.5 / 2.75) { x -= 2.25 / 2.75; return 7.5625 * x * x + 0.9375; }
+        x -= 2.625 / 2.75;
+        return 7.5625 * x * x + 0.984375;
+      };
+      switch (style) {
+        case "linear": return t;
+        case "in": return t * t * t;
+        case "out": return 1 - Math.pow(1 - t, 3);
+        case "in out": return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        case "back": return 2.70158 * t * t * t - 1.70158 * t * t;
+        case "overshoot": return 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
+        case "bounce": return bounce(t);
+        case "elastic": return t === 0 || t === 1 ? t : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI / 3)) + 1;
+      }
+      stellanova.fail(line, `there is no easing called "${style}". Easings: linear, in, out, in out, back, overshoot, bounce, elastic.`);
+    },
+    progress(start, seconds, now) {
+      if (seconds <= 0) return now >= start ? 1 : 0;
+      return Math.min(1, Math.max(0, (now - start) / seconds));
+    },
+    sheet_frame(frames, perSecond, seconds, line) {
+      if (frames < 1 || frames !== Math.floor(frames)) stellanova.fail(line, `a sprite sheet has a whole number of frames (at least 1), not ${stellanova.text(frames)}.`);
+      const k = Math.floor(seconds * perSecond);
+      return ((k % frames) + frames) % frames + 1;
+    },
+  };

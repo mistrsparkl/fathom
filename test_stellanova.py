@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, folders, letters, maths, network, page, patterns, screen, server, sound, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -337,6 +337,29 @@ def program_checks():
                'and the universe said i love you\n'
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
+
+    # Animation: easing, tweens, waves, sprite sheet frames.
+    out = both(''.join([
+               'use: animation\n'
+               '\n'
+               'genesis:\n'
+               '  for each style in a list of ("linear", "in", "out", "in out", "back", "overshoot", "bounce", "elastic"):\n'
+               '    set shown to style plus ":"\n'
+               '    for each k from 0 to 4:\n'
+               '      set shown to shown plus " " plus ((eased with (style, k divided by 4)) rounded to 3 decimal places)\n'
+               '    scrawl shown\n'
+               '  scrawl tweened with (10, 20, 0.5, "linear"), " ", tweened with (0, 100, 0.25, "in out")\n'
+               '  scrawl progress of with (2, 4, 3), " ", progress of with (2, 4, 9), " ", progress of with (2, 0, 1)\n'
+               '  scrawl ping pong 0.25, " ", ping pong 1.5, " ", wave of with (1, 4)\n'
+               '  scrawl sheet frame with (4, 8, 0.25), " ", sheet frame with (4, 8, 0.4), " ", sheet frame with (4, 8, 0.5)\n'
+               '  scrawl tweened place with (0 horizontal 10 vertical 0 depth, 100 horizontal 20 vertical 4 depth, 0.5, "linear")\n'
+               '  scrawl eased with ("wobbly", 0.5)\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == ("linear: 0 0.25 0.5 0.75 1\nin: 0 0.016 0.125 0.422 1\nout: 0 0.578 0.875 0.984 1\nin out: 0 0.063 0.5 0.938 1\n"
+                          "back: 0 -0.064 -0.088 0.183 1\novershoot: 0 0.817 1.088 1.064 1\nbounce: 0 0.473 0.766 0.973 1\n"
+                          "elastic: 0 0.912 1.016 1.006 1\n15 6.25\n0.25 1 0\n0.25 0.5 0.5\n3 4 1\n50 horizontal 15 vertical 2 depth\n"), repr(out.stdout)
+    assert out.stderr.startswith('Line 14: there is no easing called "wobbly".'), repr(out.stderr)
 
     # Getting libraries: a .words file or a .zip of them, kept for every program; dropping one.
     with tempfile.TemporaryDirectory() as d:
@@ -947,7 +970,7 @@ def program_checks():
     assert out.stdout == "ok\n", repr(out.stdout)
     assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
         "I don't know 'etch a triangle with'. Words that start with 'etch': etch a ball, etch a block, etch a box, etch a circle, etch a cube, etch a line, "
-        "etch a square, etch the ground, etch the kept shapes, etch the picture, etch the picture turned, etch words.")
+        "etch a square, etch the ground, etch the kept shapes, etch the picture, etch the picture turned, etch the sheet frame, etch words.")
 
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'

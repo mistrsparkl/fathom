@@ -404,6 +404,21 @@ code:
   		g.DrawImage(image, -w / 2, -h / 2, w, h);
   	}
 
+  	inline void draw_sheet_frame(const std::string& file, double frame, double across, double down, double x, double y, int line)
+  	{
+  		need_window(line);
+  		if (across < 1 || down < 1 || across != std::floor(across) || down != std::floor(down))
+  			stellanova::fail(line, "a sprite sheet is a whole number of frames across and down (at least 1 each).");
+  		if (frame < 1 || frame > across * down || frame != std::floor(frame))
+  			stellanova::fail(line, "the sheet has frames 1 to " + stellanova::text(across * down) + ", not " + stellanova::text(frame) + ".");
+  		Gdiplus::Image* image = picture(file, line);
+  		int w = (int)(image->GetWidth() / across), h = (int)(image->GetHeight() / down);
+  		int k = (int)frame - 1, col = k % (int)across, row = k / (int)across;
+  		Gdiplus::Graphics g(canvas);
+  		g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+  		g.DrawImage(image, Gdiplus::Rect((INT)std::lround(x), (INT)std::lround(y), w, h), col * w, row * h, w, h, Gdiplus::UnitPixel);
+  	}
+
   	inline void close()
   	{
   		if (window)
@@ -1059,6 +1074,28 @@ python:
       image = turned[key]
       draw(lambda cv: cv.create_image(round(x), round(y), image=image, anchor="center"))
 
+  cells = {}
+
+  def draw_sheet_frame(file, frame, across, down, x, y):
+      need_window()
+      if across < 1 or down < 1 or across != int(across) or down != int(down):
+          raise RunError(0, "a sprite sheet is a whole number of frames across and down (at least 1 each).")
+      if frame < 1 or frame > across * down or frame != int(frame):
+          raise RunError(0, f"the sheet has frames 1 to {text(across * down)}, not {text(frame)}.")
+      image = picture(file)
+      if win["root"] is None:
+          return
+      key = (file, int(frame), int(across), int(down))
+      if key not in cells:
+          w, h = image.width() // int(across), image.height() // int(down)
+          k = int(frame) - 1
+          col, row = k % int(across), k // int(across)
+          cell = tkinter.PhotoImage(width=w, height=h)
+          cell.tk.call(cell, "copy", image, "-from", col * w, row * h, col * w + w, row * h + h, "-to", 0, 0)
+          cells[key] = cell
+      cell = cells[key]
+      draw(lambda cv: cv.create_image(round(x), round(y), image=cell, anchor="nw"))
+
   def close():
       if win["root"] is not None:
           closed()
@@ -1461,6 +1498,8 @@ to etch the picture, given file (text) and x (a number) and y (a number) = stell
   runs: draw_picture({file}, {x}, {y})
 to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = stellanova_window::draw_picture_turned({file}, {x}, {y}, {size}, {angle}, {line})
   runs: draw_picture_turned({file}, {x}, {y}, {size}, {angle})
+to etch the sheet frame, given file (text) and frame (a number) and across (a number) and down (a number) and x (a number) and y (a number) = stellanova_window::draw_sheet_frame({file}, {frame}, {across}, {down}, {x}, {y}, {line})
+  runs: draw_sheet_frame({file}, {frame}, {across}, {down}, {x}, {y})
 to width of picture, given file (text), returning a number = (double)stellanova_window::picture({file}, {line})->GetWidth()
   runs: size_of_picture({file}, 0)
 to height of picture, given file (text), returning a number = (double)stellanova_window::picture({file}, {line})->GetHeight()

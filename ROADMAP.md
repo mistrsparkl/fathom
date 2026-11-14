@@ -21,7 +21,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] A package manager: `stellanova get <library>`
 
 ## 3. Libraries
-- [ ] Animation: easing, tweens, sprite sheets
+- [x] Animation: easing, tweens, sprite sheets (`use: animation`, `etch the sheet frame`)
 - [ ] Physics: bodies, collisions, gravity
 - [ ] Sound making: tones, effects, recording
 - [ ] Pictures: load, change dots, save
