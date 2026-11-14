@@ -52,6 +52,9 @@ main { flex: 1; display: flex; min-height: 0; }
 .row { height: var(--row); white-space: pre; display: flex; }
 .row .num { width: var(--gutter); flex: none; text-align: right; padding-right: 12px; color: #6e7681; user-select: none; position: sticky; left: 0; background: var(--bg); z-index: 2; }
 .row.here .num { color: var(--text); }
+.row.stop .num { color: #fff; background: linear-gradient(90deg, transparent 0 18px, #c0392b 18px calc(100% - 6px), transparent 0); }
+.row.paused, .row.paused .num { background-color: rgba(255, 196, 0, 0.18); }
+#stepping { margin-left: 10px; }
 .row .txt { padding-left: var(--pad); padding-right: 40px; }
 .row.bad .txt { text-decoration: underline wavy var(--red); text-underline-offset: 4px; }
 #marks { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; }

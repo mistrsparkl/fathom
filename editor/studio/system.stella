@@ -113,12 +113,15 @@ and the universe said i love you
 
 whisper: ---- running: one program at a time
 
-to run, given how (text) and path (text), returning text:
+to run, given how (text) and path (text) and stops (text), returning text:
   if started: stop the program program
   set target to path
   if how is "exe":
     set target to letters 1 to ((the size of path) minus 7) of path plus ".exe"
     set program to start the program with (quoted with target, parent folder of path)
+  otherwise if how is "debug":
+    whisper: the stops are line numbers with spaces between, after the script
+    set program to start the program with (stellanova call with ("debug --studio", target) plus " " plus stops, parent folder of path)
   otherwise:
     set program to start the program with (stellanova call with (how, target), parent folder of path)
   set started to yes
@@ -186,7 +189,7 @@ to answer, given address (text), returning text:
     make the folder path
     return "made"
   if route is "/api/check": return check with (path, the web message)
-  if route is "/api/run": return run with (query value with (address, "how"), path)
+  if route is "/api/run": return run with (query value with (address, "how"), path, query value with (address, "stops"))
   if route is "/api/poll": return poll
   if route is "/api/type":
     if started: type into the program with (program, the web message)

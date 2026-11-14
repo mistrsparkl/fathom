@@ -4018,7 +4018,7 @@ def debug_pause(env, n):
     names = names_shown(env)
     while True:
         if d["studio"]:  # one marked line the studio reads (and doesn't show as printed)
-            print("\x1edebug " + json.dumps({"line": n, "where": where_, "source": SOURCE.get(n, ""), "depth": depth,
+            print("@@debug " + json.dumps({"line": n, "where": where_, "source": SOURCE.get(n, ""), "depth": depth,
                                               "names": names, "stops": sorted(d["stops"])}), flush=True)
         else:
             print(f"■ {where_}: {SOURCE.get(n, '?')}", flush=True)

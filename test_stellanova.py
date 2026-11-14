@@ -994,7 +994,7 @@ def program_checks():
                          "\u25a0 line 9: set total to total plus double with n", "12"], stops
         shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "debug", "--studio", "d.stella", "3"], input="go\nforget 3\ngo\n",
                                capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
-        marked = [json.loads(l[7:]) for l in shown.split("\n") if l.startswith("\x1edebug ")]  # (splitlines would break at the mark)
+        marked = [json.loads(l[8:]) for l in shown.splitlines() if l.startswith("@@debug ")]
         assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked
         assert shown.splitlines()[-1] == "12", shown
 

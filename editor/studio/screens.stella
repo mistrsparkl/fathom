@@ -110,6 +110,19 @@ the world remembers:
   status box (a number)
   where box (a number)
   mistake box (a number)
+  stop rows (a list of numbers)
+  paused row (a number)
+  debugging (yes or no)
+  paused (yes or no)
+  debug carry (text)
+and the universe said i love you
+
+a debug stop has:
+  line (a number)
+  where (text)
+  source (text)
+  names (a table of text)
+  stops (a list of numbers)
 and the universe said i love you
 
 whisper: ---------------------------------------------------------------- small helpers
@@ -482,6 +495,8 @@ to paint the rows:
     set look to "row"
     if r is row: set look to look plus " here"
     if mistake rows contains r: set look to look plus " bad"
+    if stop rows contains r: set look to look plus " stop"
+    if paused and r is paused row: set look to look plus " paused"
     set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus "><span class=" plus a quotation mark plus "num" plus a quotation mark plus ">" plus r plus "</span><span class=" plus a quotation mark plus "txt" plus a quotation mark plus ">" plus coloured with (item r of body) plus "</span></div>"
   set the markup with (rows box, "<div class=" plus a quotation mark plus "shown" plus a quotation mark plus " style=" plus a quotation mark plus "top:" plus ((shown start minus 1) times 20) plus "px" plus a quotation mark plus ">" plus made plus "</div>")
 and the universe said i love you
@@ -519,7 +534,7 @@ to on key, given event (a number):
   set control to control held in the event event
   set shift to shift held in the event event
   whisper: held back before any command runs: commands on a web page wait their turn, and the browser wouldn't
-  set handled to key is one of ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", "Backspace", "Delete", "Enter", "Tab", "Escape", "F5", "F6", "F7", "F8")
+  set handled to key is one of ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", "Backspace", "Delete", "Enter", "Tab", "Escape", "F5", "F6", "F7", "F8", "F9", "F10", "F11")
   if control and not (key is one of ("c", "x", "v", "C", "X", "V", "Control")): set handled to yes
   if handled: hold back the event event
   if suggesting and key is one of ("ArrowUp", "ArrowDown", "Enter", "Tab", "Escape"):
@@ -591,6 +606,13 @@ to on key, given event (a number):
     otherwise:
       put words with "  "
   otherwise if key is "Escape": go to with (row, column, no)
+  otherwise if paused and key is one of ("F5", "F10", "F11"):
+    if key is "F5" and not shift: debug say with "go"
+    otherwise if key is "F10": debug say with "over"
+    otherwise if key is "F11" and shift: debug say with "out"
+    otherwise if key is "F11": debug say with "step"
+  otherwise if key is "F9":
+    start running with "debug"
   otherwise if key is one of ("F5", "F6", "F7", "F8"):
     if shift and key is "F5": stop running
     otherwise if key is "F5": start running with "run"
@@ -611,6 +633,10 @@ to on press, given event (a number):
   if current is 0: cease
   if the nearest matching element with (the target of event, "#suggest") is not 0: cease
   hold back the event event
+  if (the pointer x coordinate of event) minus (the left edge of rows box) falls below 56:
+    set y to (the pointer y coordinate of event) minus (the top edge of rows box)
+    toggle the stop with (clamp ((round down (y divided by 20)) plus 1) between 1 and (the size of body))
+    cease
   focus on the element catcher
   set keep row to mark row
   set keep column to mark column
@@ -1125,12 +1151,16 @@ to start running, given how (text):
   set the markup with (output box, "")
   show output with ("Running " plus short name of path plus " (" plus how plus ")" plus new line, "note")
   set halted on purpose to no
+  set debugging to how is "debug"
+  set paused to no
+  set debug carry to ""
+  enable the stepping with no
   run it with (how, path)
 and the universe said i love you
 
 to run it, given how (text) and path (text):
   try:
-    set ignored to ask the system with ("/api/run?how=" plus how plus "&path=" plus web encoded path)
+    set ignored to ask the system with ("/api/run?how=" plus how plus "&path=" plus web encoded path plus "&stops=" plus web encoded stops as words)
   if that went wrong:
     show output with ("I couldn't start it: " plus the wound, "err")
     cease
@@ -1151,10 +1181,14 @@ to poll the program:
     set polling to no
     cease
   set polling to no
-  show output with (the printed of state, "")
+  show output with (without debug lines with (the printed of state), "")
   show output with (the problems of state, "err")
   if the running of state: cease
   set running to no
+  set debugging to no
+  set paused to no
+  enable the stepping with no
+  paint the rows
   enable the element with (the element "#stop", no)
   enable the element with (answer box, no)
   if after build and the code of state is 0:
@@ -1182,6 +1216,105 @@ to stop running:
   set ignored to ask the system with "/api/stop"
   set after build to no
   show output with (new line plus "Stopped.", "note")
+and the universe said i love you
+
+to toggle the stop, given r (a number):
+  set others to a list of numbers
+  for each s in stop rows:
+    if s is not r: add s to others
+  if the size of others is the size of stop rows:
+    add r to others
+    if debugging: debug say with ("stop at " plus r)
+  otherwise if debugging:
+    debug say with ("forget " plus r)
+  set stop rows to others
+  paint the rows
+and the universe said i love you
+
+to stops as words, returning text:
+  set made to ""
+  for each s in stop rows:
+    if made is not "": set made to made plus " "
+    set made to made plus s
+  return made
+and the universe said i love you
+
+to debug say, given words (text):
+  whisper: a command for the paused program, typed into it as a line
+  if not paused: cease
+  set ignored to tell the system with ("/api/type", words)
+  if words begins with "stop at" or words begins with "forget": cease
+  set paused to no
+  enable the stepping with no
+  set the text with (status box, "Running")
+  paint the rows
+and the universe said i love you
+
+to enable the stepping, given on (yes or no):
+  for each name in a list of ("#step", "#over", "#out", "#go"):
+    enable the element with (the element name, on)
+and the universe said i love you
+
+to paused at, given marked (text):
+  conjure a debug stop as halt
+  try:
+    load halt from the text marked
+  if that went wrong:
+    cease
+  set paused to yes
+  set paused row to the line of halt
+  set stop rows to the stops of halt
+  enable the stepping with yes
+  set the text with (status box, "Paused at " plus the where of halt)
+  set shown to "■ " plus the where of halt plus ": " plus the source of halt
+  for each name in the keys of the names of halt:
+    set shown to shown plus new line plus "    " plus name plus ": " plus (entry name of the names of halt)
+  show output with (shown plus new line, "note")
+  if the line of halt falls below 100000 and current is not 0:
+    set row to the line of halt
+    set column to (leading spaces of item row of body) plus 1
+    drop the mark
+    show
+and the universe said i love you
+
+to without debug lines, given words (text), returning text:
+  whisper: the marked lines a debugged program prints are stops for the studio, not output; a half line waits for the rest
+  set all to debug carry plus words
+  set debug carry to ""
+  if not (all contains "@@debug "): return all
+  set left over to ""
+  set pieces to all split by new line
+  for each k from 1 to the size of pieces:
+    set piece to item k of pieces
+    if piece begins with "@@debug ":
+      if k is the size of pieces and not (all ends with new line):
+        set debug carry to piece
+      otherwise:
+        paused at with (letters 9 to (the size of piece) of piece)
+    otherwise:
+      set left over to left over plus piece
+      if k falls below the size of pieces: set left over to left over plus new line
+  return left over
+and the universe said i love you
+
+to on step press, given event (a number):
+  debug say with "step"
+and the universe said i love you
+
+to on over press, given event (a number):
+  debug say with "over"
+and the universe said i love you
+
+to on out press, given event (a number):
+  debug say with "out"
+and the universe said i love you
+
+to on go press, given event (a number):
+  debug say with "go"
+and the universe said i love you
+
+to on debug press, given event (a number):
+  start running with "debug"
 and the universe said i love you
 
 to on answer key, given event (a number):
@@ -1223,7 +1356,16 @@ and the universe said i love you
 to on window key, given event (a number):
   set key to key of the event event
   if the focused element is catcher: cease
-  if key is one of ("F5", "F6", "F7", "F8"):
+  if paused and key is one of ("F5", "F10", "F11"):
+    hold back the event event
+    if key is "F5" and not shift held in the event event: debug say with "go"
+    otherwise if key is "F10": debug say with "over"
+    otherwise if key is "F11" and shift held in the event event: debug say with "out"
+    otherwise if key is "F11": debug say with "step"
+  otherwise if key is "F9":
+    hold back the event event
+    start running with "debug"
+  otherwise if key is one of ("F5", "F6", "F7", "F8"):
     hold back the event event
     if shift held in the event event and key is "F5": stop running
     otherwise if key is "F5": start running with "run"
@@ -1289,6 +1431,11 @@ genesis:
   hook up with ("#show-mistakes", "click", the command on mistakes tab press)
   hook up with ("#run", "click", the command on run press)
   hook up with ("#watch", "click", the command on watch press)
+  hook up with ("#debug", "click", the command on debug press)
+  hook up with ("#step", "click", the command on step press)
+  hook up with ("#over", "click", the command on over press)
+  hook up with ("#out", "click", the command on out press)
+  hook up with ("#go", "click", the command on go press)
   hook up with ("#test", "click", the command on test press)
   hook up with ("#build", "click", the command on build press)
   hook up with ("#web", "click", the command on web press)

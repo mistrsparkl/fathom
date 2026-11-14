@@ -11,10 +11,17 @@
     <span id="actions">
       <button id="run" class="go" title="Run it (F5)">Run</button>
       <button id="watch" title="Run it line by line, showing each line and the names it changes (F6)">Watch</button>
+      <button id="debug" title="Run it, stopping at the lines marked beside their numbers (click a number to mark it) (F9)">Debug</button>
       <button id="test" title="Run every 'to test ...:' command (F7)">Test</button>
       <button id="build" title="Make it into a program (.exe) and run that (F8)">Build</button>
       <button id="web" title="Make it into a web page">Web</button>
       <button id="stop" title="Stop the program running now (Shift+F5)" disabled>Stop</button>
+      <span id="stepping">
+        <button id="step" title="Run this line and stop at the next (F11)" disabled>Step</button>
+        <button id="over" title="Run this line and the commands it calls (F10)" disabled>Over</button>
+        <button id="out" title="Run until this command gives back (Shift+F11)" disabled>Out</button>
+        <button id="go" title="Run to the next stop (F5)" disabled>Go</button>
+      </span>
     </span>
   </header>
   <main>
@@ -43,7 +50,7 @@
       <div id="welcome">
         <h1>Stellanova Studio</h1>
         <p>Pick a file on the left, or make a new program with New.</p>
-        <p>Ctrl+S save &nbsp; F5 run &nbsp; F6 watch &nbsp; F7 test &nbsp; F8 build &nbsp; Ctrl+Space suggest words</p>
+        <p>Ctrl+S save &nbsp; F5 run &nbsp; F6 watch &nbsp; F9 debug &nbsp; F7 test &nbsp; F8 build &nbsp; Ctrl+Space suggest words</p>
       </div>
       <section id="bottom">
         <div id="bottom-head">

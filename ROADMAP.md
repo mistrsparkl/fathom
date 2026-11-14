@@ -31,6 +31,6 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] The web build gets the words it lacks (database included): every library word works on the web (C libraries and Python packages can't)
 
 ## 4. Tools
-- [ ] Debugger: stop at a line, step, look at names (studio)
+- [x] Debugger: stop at a line, step, look at names (studio): `stellanova debug`, and Debug in the studio
 - [ ] Profiler: which lines take the time
 - [ ] WebAssembly output; building for other systems
