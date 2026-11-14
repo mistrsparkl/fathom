@@ -514,7 +514,7 @@ genesis:
 and the universe said i love you
 ```
 
-A program with a window (`use: window`, 2D and 3D) or a screen (`use: screen`) works on a web page as it is: the window is a canvas added to the page (a screen covers the whole page) (inside the element with the id `stellanova-window`, if there is one), and keys and the mouse work as they do on the desktop. Pictures and models are loaded from the page's own address, so keep them next to it. With node there is no screen, so a window there is one nobody sees: everything is checked, but nothing is shown.
+A program with a window (`use: window`, 2D and 3D) or a screen (`use: screen`) works on a web page as it is: the window is a canvas added to the page (inside the element with the id `stellanova-window`, if there is one) and a screen is a canvas over the whole page, and keys and the mouse work as they do on the desktop. Pictures and models are loaded from the page's own address, so keep them next to it. With node there is no screen, so a window there is one nobody sees: everything is checked, but nothing is shown.
 
 Every the element of the page is a number (0 means there isn't one), so elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `listen for an event` gives a command each event the person makes, as a number that the event words read. Commands answering the page run one after another, and `wait`, `web page` and the words that wait (like `play the media`) let the page carry on meanwhile.
 
