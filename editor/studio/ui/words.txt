@@ -143,3 +143,4 @@ the json at with|A part of JSON text by its path (library json): the json at wit
 the json changed at with|JSON with one part changed (library json): the json changed at with (json, "score", "12").
 pack the zip with|Packs files and folders into a .zip (library zip): pack the zip with (a list of ("saves", "a.txt"), "backup.zip").
 unpack the zip with|Unpacks a .zip into a folder (library zip): unpack the zip with ("backup.zip", "restored").
+send an email with|Sends email (library email): send an email with ("smtp.gmail.com:587", user, password, to, subject, message).

@@ -1,0 +1,206 @@
+note: Words for sending email. Use them in a program with:  use: email
+note: 'send an email with (server, user, password, to, subject, message)'. The server is its address and port, like
+note: "smtp.gmail.com:587" (port 587 starts plain and switches to TLS; port 465 is TLS from the start). The user is
+note: the address it is sent from. Mail always goes over TLS, except to a server on this computer ("localhost:2525"),
+note: for testing. Many mail services want an app password here, not your usual one.
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <fstream>
+
+code:
+  namespace stellanova_email
+  {
+  	inline void where(const std::string& server, std::string& host, int& port, int line)
+  	{
+  		size_t colon = server.rfind(':');
+  		if (colon == std::string::npos || colon == 0 || server.find_first_not_of("0123456789", colon + 1) != std::string::npos || colon + 1 == server.size())
+  			stellanova::fail(line, "a mail server is its address and port, like \"smtp.gmail.com:587\", not \"" + server + "\".");
+  		host = server.substr(0, colon), port = std::stoi(server.substr(colon + 1));
+  	}
+  	inline bool here(const std::string& host) { return host == "localhost" || host == "127.0.0.1"; }
+  	inline std::string message_text(const std::string& from, const std::string& to, const std::string& subject, const std::string& body)
+  	{
+  		std::string text = "From: " + from + "\r\nTo: " + to + "\r\nSubject: " + subject + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n";
+  		std::string line;
+  		for (char c : body + "\n")
+  		{
+  			if (c == '\r')
+  				continue;
+  			if (c == '\n')
+  			{
+  				text += line + "\r\n";  // (curl adds the extra dot a line starting with a dot needs)
+  				line.clear();
+  			}
+  			else
+  				line += c;
+  		}
+  		return text;
+  	}
+  	inline void send(const std::string& server, const std::string& user, const std::string& password, const std::string& to,
+  	                 const std::string& subject, const std::string& body, int line)
+  	{
+  		std::string host;
+  		int port = 0;
+  		where(server, host, port, line);
+  		if (to.find('@') == std::string::npos)
+  			stellanova::fail(line, "\"" + to + "\" isn't an email address.");
+  		std::string from = user.empty() ? "stellanova@localhost" : user;
+  		char folder[MAX_PATH];
+  		GetTempPathA(MAX_PATH, folder);
+  		std::string file = std::string(folder) + "stellanova_mail_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetTickCount64()) + ".eml";
+  		{
+  			std::ofstream out(file, std::ios::binary);
+  			out << message_text(from, to, subject, body);
+  		}
+  		auto quote = [](const std::string& s) {  // for curl's config: "..." with \ and " escaped
+  			std::string out = "\"";
+  			for (char c : s)
+  				out += c == '"' || c == '\\' ? std::string("\\") + c : std::string(1, c);
+  			return out + "\"";
+  		};
+  		std::string config = "url = " + quote((port == 465 ? "smtps://" : "smtp://") + host + ":" + std::to_string(port)) + "\n"
+  		                   + "mail-from = " + quote(from) + "\nmail-rcpt = " + quote(to) + "\nupload-file = " + quote(file) + "\nsilent\nshow-error\n";
+  		if (!here(host))
+  			config += "ssl-reqd\n";
+  		if (!user.empty() && !(here(host) && password.empty()))
+  			config += "user = " + quote(user + ":" + password) + "\n";
+  		wchar_t system[MAX_PATH];
+  		GetSystemDirectoryW(system, MAX_PATH);
+  		std::wstring command = L"\"" + std::wstring(system) + L"\\curl.exe\" -K -";
+  		SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+  		HANDLE in_read, in_write, out_read, out_write;
+  		CreatePipe(&in_read, &in_write, &sa, 0);
+  		CreatePipe(&out_read, &out_write, &sa, 0);
+  		SetHandleInformation(in_write, HANDLE_FLAG_INHERIT, 0);
+  		SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0);
+  		STARTUPINFOW si{sizeof si};
+  		si.dwFlags = STARTF_USESTDHANDLES;
+  		si.hStdInput = in_read, si.hStdOutput = out_write, si.hStdError = out_write;
+  		PROCESS_INFORMATION pi{};
+  		bool started = CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+  		CloseHandle(in_read), CloseHandle(out_write);
+  		DWORD wrote = 0, code = 1;
+  		std::string said;
+  		if (started)
+  		{
+  			WriteFile(in_write, config.data(), (DWORD)config.size(), &wrote, nullptr);
+  			CloseHandle(in_write);
+  			char buffer[4096];
+  			DWORD got = 0;
+  			while (ReadFile(out_read, buffer, sizeof buffer, &got, nullptr) && got)
+  				said.append(buffer, got);
+  			WaitForSingleObject(pi.hProcess, INFINITE);
+  			GetExitCodeProcess(pi.hProcess, &code);
+  			CloseHandle(pi.hProcess), CloseHandle(pi.hThread);
+  		}
+  		else
+  			CloseHandle(in_write);
+  		CloseHandle(out_read);
+  		DeleteFileA(file.c_str());
+  		if (!started)
+  			stellanova::fail(line, "I couldn't send email: this computer has no curl.exe.");
+  		if (code != 0)
+  		{
+  			while (!said.empty() && (said.back() == '\n' || said.back() == '\r'))
+  				said.pop_back();
+  			stellanova::fail(line, "I couldn't send the email through " + server + " (" + (said.empty() ? "curl stopped with " + std::to_string(code) : said) + ").");
+  		}
+  	}
+  }
+
+python:
+  import smtplib as _smtplib
+  import ssl as _ssl
+  from email.message import EmailMessage as _EmailMessage
+  def send_email(server, user, password, to, subject, body):
+      host, _, port = server.rpartition(":")
+      if not host or not port.isdigit():
+          raise RunError(0, 'a mail server is its address and port, like "smtp.gmail.com:587", not "' + server + '".')
+      if "@" not in to:
+          raise RunError(0, '"' + to + '" isn\'t an email address.')
+      here = host in ("localhost", "127.0.0.1")
+      m = _EmailMessage()
+      m["From"], m["To"], m["Subject"] = user or "stellanova@localhost", to, subject
+      m.set_content(body)
+      try:
+          if int(port) == 465:
+              s = _smtplib.SMTP_SSL(host, int(port), context=_ssl.create_default_context(), timeout=60)
+          else:
+              s = _smtplib.SMTP(host, int(port), timeout=60)
+              if not here:
+                  s.starttls(context=_ssl.create_default_context())
+          with s:
+              if user and not (here and not password):
+                  s.login(user, password)
+              s.send_message(m)
+      except (OSError, _smtplib.SMTPException) as err:
+          raise RunError(0, "I couldn't send the email through " + server + " (" + str(err) + ").")
+
+to send an email, given server (text) and user (text) and password (text) and to (text) and subject (text) and message (text) = stellanova_email::send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
+  runs: send_email({server}, {user}, {password}, {to}, {subject}, {message})
+  web: await stellanova_email.send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
+
+javascript:
+  const stellanova_email = {
+    async send(server, user, password, to, subject, body, line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page can't send email (it works with node).");
+      const net = require("net"), tls = require("tls");
+      const m = /^(.+):(\d+)$/.exec(server);
+      if (!m) stellanova.fail(line, `a mail server is its address and port, like "smtp.gmail.com:587", not "${server}".`);
+      if (!to.includes("@")) stellanova.fail(line, `"${to}" isn't an email address.`);
+      const host = m[1], port = Number(m[2]), here = host === "localhost" || host === "127.0.0.1", from = user || "stellanova@localhost";
+      let socket = port === 465 ? tls.connect({ host, port, servername: host }) : net.connect({ host, port });
+      let kept = "", waiting = null, failed = null;
+      const listen = (s) => {
+        s.setEncoding("utf8");
+        s.on("data", (d) => { kept += d; if (waiting) waiting(); });
+        s.on("error", (e) => { failed = e; if (waiting) waiting(); });
+      };
+      listen(socket);
+      const reply = async () => {  // one whole answer: lines until one with a space after the code
+        for (;;) {
+          const lines = kept.split("\r\n");
+          const k = lines.findIndex((l) => /^\d{3} /.test(l));
+          if (k >= 0) { kept = lines.slice(k + 1).join("\r\n"); return lines[k]; }
+          if (failed) throw failed;
+          await new Promise((r) => (waiting = r));
+          waiting = null;
+        }
+      };
+      const say = async (text, want) => {
+        if (text !== null) socket.write(text + "\r\n");
+        const answer = await reply();
+        if (!answer.startsWith(want)) throw new Error(answer);
+        return answer;
+      };
+      try {
+        await say(null, "220");
+        await say("EHLO stellanova", "250");
+        if (port !== 465 && !here) {
+          await say("STARTTLS", "220");
+          socket.removeAllListeners("data");
+          socket = tls.connect({ socket, servername: host });
+          listen(socket);
+          await say("EHLO stellanova", "250");
+        }
+        if (user && !(here && !password)) {
+          await say("AUTH LOGIN", "334");
+          await say(Buffer.from(user).toString("base64"), "334");
+          await say(Buffer.from(password).toString("base64"), "235");
+        }
+        await say(`MAIL FROM:<${from}>`, "250");
+        await say(`RCPT TO:<${to}>`, "25");
+        await say("DATA", "354");
+        const text = body.replace(/\r/g, "").split("\n").map((l) => (l.startsWith(".") ? "." + l : l)).join("\r\n");
+        await say(`From: ${from}\r\nTo: ${to}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n.`, "250");
+        await say("QUIT", "221");
+      } catch (e) {
+        stellanova.fail(line, `I couldn't send the email through ${server} (${e.message || e}).`);
+      } finally {
+        socket.destroy();
+      }
+    },
+  };

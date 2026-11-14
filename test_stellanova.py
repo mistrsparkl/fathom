@@ -15,6 +15,49 @@ END = "and the universe said i love you\n"
 os.environ["STELLANOVA_GOT"] = tempfile.mkdtemp()  # libraries got while testing (none of the real ones)
 
 
+def smtp_catcher(port, got):
+    """Answers SMTP on 127.0.0.1:port; each message's text is added to got (for the email library's test)."""
+    import socket
+    import threading
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", port))
+    listener.listen()
+
+    def one(s):
+        with s:
+            f = s.makefile("rb")
+            s.sendall(b"220 here\r\n")
+            while True:
+                line = f.readline()
+                if not line:
+                    return
+                word = line.strip().upper()
+                if word.startswith(b"EHLO") or word.startswith(b"HELO"):
+                    s.sendall(b"250-here\r\n250 OK\r\n")
+                elif word.startswith(b"DATA"):
+                    s.sendall(b"354 go on\r\n")
+                    text = b""
+                    while True:
+                        row = f.readline()
+                        if row in (b".\r\n", b".\n", b""):
+                            break
+                        text += row
+                    got.append(text.decode("utf-8", "replace").replace("\r\n", "\n"))
+                    s.sendall(b"250 kept\r\n")
+                elif word.startswith(b"QUIT"):
+                    s.sendall(b"221 bye\r\n")
+                    return
+                else:
+                    s.sendall(b"250 OK\r\n")
+
+    def loop():
+        while True:
+            s, _ = listener.accept()
+            threading.Thread(target=one, args=(s,), daemon=True).start()
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def websocket_echo(port):
     """A tiny WebSocket echo server (ws://127.0.0.1:port/), for the network library's test."""
     import base64
@@ -151,7 +194,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -496,6 +539,26 @@ def program_checks():
 
     out = both('use: zip\n\ngenesis:\n  inscribe "hello zip" into file "a.txt"\n  inscribe "one more" into file "c.txt"\n  pack the zip with (a list of ("a.txt", "c.txt"), "two.zip")\n  scrawl the files in the zip "two.zip"\n  unpack the zip with ("two.zip", "out")\n  scrawl contents of file "out/a.txt", " ", contents of file "out/c.txt"\nand the universe said i love you\n')  # without the folders library, so the web (node) packs and unpacks too
     assert out.stdout == "a.txt, c.txt\nhello zip one more\n", repr(out.stdout + out.stderr)
+
+    # Email, to a server on this computer that keeps what it gets.
+    mail = []
+    smtp_catcher(47825, mail)
+    out = both(''.join([
+               'use: email\n'
+               '\n'
+               'genesis:\n'
+               '  send an email with ("localhost:47825", "me@example.com", "", "you@example.com", "Hello", "first line" plus new line plus ".dotted line")\n'
+               '  scrawl "sent"\n'
+               '  try:\n'
+               '    send an email with ("localhost", "", "", "you@example.com", "x", "y")\n'
+               '  if that went wrong:\n'
+               '    scrawl the wound\n'
+               '  send an email with ("localhost:47825", "", "", "nobody", "x", "y")\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == 'sent\na mail server is its address and port, like "smtp.gmail.com:587", not "localhost".\n', repr(out.stdout + out.stderr)
+    assert out.stderr.startswith('Line 10: "nobody" isn\'t an email address.'), repr(out.stderr)
+    assert len(mail) in (2, 3) and all("Subject: Hello" in m and "first line\n..dotted line" in m for m in mail), mail
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([
