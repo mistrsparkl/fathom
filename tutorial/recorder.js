@@ -513,8 +513,10 @@ async function film(lesson, filePort) {
           const spot = JSON.parse(await js(`(() => { const n = [...document.querySelectorAll(".row .num")].find((e) => e.textContent === ${JSON.stringify(v)}); const r = n.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width - 22, y: r.top + r.height / 2 }); })()`));
           await js(`film.cursorTo(${spot.x}, ${spot.y})`);
           await wait(600);
-          wc.sendInputEvent({ type: "mouseDown", x: Math.round(spot.x), y: Math.round(spot.y), button: "left", clickCount: 1 });
-          wc.sendInputEvent({ type: "mouseUp", x: Math.round(spot.x), y: Math.round(spot.y), button: "left", clickCount: 1 });
+          // the click, sent inside the page onto whatever is at that point (the studio reads mousedown on the code)
+          await js(`(() => { const c = document.getElementById("film-cursor"); c.classList.remove("click"); void c.offsetWidth; c.classList.add("click");
+            const at = document.elementFromPoint(${spot.x}, ${spot.y});
+            for (const type of ["mousedown", "mouseup"]) at.dispatchEvent(new MouseEvent(type, { clientX: ${spot.x}, clientY: ${spot.y}, button: 0, bubbles: true })); })()`);
           await wait(500);
           break;
         }
