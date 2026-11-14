@@ -151,7 +151,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, encryption, folders, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -471,6 +471,31 @@ def program_checks():
                ]))
     assert out.stdout == 'Oslo 12.5\n{"high":12.5,"sunny":true}\n{"high":12.5,"sunny":true}, {"high":9,"note":"rain\\nlater"}\nhigh, note no yes\n{"city":"Oslo","days":[{"high":12.5,"sunny":true},{"high":11,"note":"rain\\nlater"},null],"country":"Nor\\"way"}\n[1,2500,-0.25]\n', repr(out.stdout + out.stderr)
     assert out.stderr.startswith('Line 15: there is nothing at "days[9]" in the JSON.'), repr(out.stderr)
+
+    # Zip files: packing files and folders, listing, unpacking.
+    out = both(''.join([
+               'use: zip\n'
+               'use: folders\n'
+               '\n'
+               'genesis:\n'
+               '  make the folder "box/inner"\n'
+               '  inscribe "hello zip" into file "box/a.txt"\n'
+               '  inscribe "deeper" into file "box/inner/b.txt"\n'
+               '  inscribe "one more" into file "c.txt"\n'
+               '  pack the zip with (a list of ("box", "c.txt"), "all.zip")\n'
+               '  scrawl the files in the zip "all.zip"\n'
+               '  unpack the zip with ("all.zip", "out")\n'
+               '  scrawl contents of file "out/box/inner/b.txt", " ", contents of file "out/c.txt"\n'
+               '  erase the folder "box"\n'
+               '  erase the folder "out"\n'
+               '  pack the zip with (a list of ("nothing.txt"), "x.zip")\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == 'box/a.txt, box/inner/b.txt, c.txt\ndeeper one more\n', repr(out.stdout + out.stderr)
+    assert out.stderr.startswith('Line 15: there is no file or folder called "nothing.txt".'), repr(out.stderr)
+
+    out = both('use: zip\n\ngenesis:\n  inscribe "hello zip" into file "a.txt"\n  inscribe "one more" into file "c.txt"\n  pack the zip with (a list of ("a.txt", "c.txt"), "two.zip")\n  scrawl the files in the zip "two.zip"\n  unpack the zip with ("two.zip", "out")\n  scrawl contents of file "out/a.txt", " ", contents of file "out/c.txt"\nand the universe said i love you\n')  # without the folders library, so the web (node) packs and unpacks too
+    assert out.stdout == "a.txt, c.txt\nhello zip one more\n", repr(out.stdout + out.stderr)
 
     # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
     out = both(''.join([

@@ -1,0 +1,231 @@
+note: Words for .zip files: packing files into one, seeing what one holds, and unpacking it.
+note: Use them in a program with:  use: zip
+note: Folders can be packed too (with everything in them). Names inside are kept as they were given, like "saves/1.txt".
+
+code:
+  #define NOMINMAX
+include: <winsock2.h>
+include: <windows.h>
+include: <cstdio>
+
+code:
+  namespace stellanova_zip
+  {
+  	inline std::wstring wide(const std::string& s)
+  	{
+  		std::wstring out(MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0), L'\0');
+  		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size());
+  		return out;
+  	}
+  	inline std::string narrow(const std::wstring& s)
+  	{
+  		std::string out(WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0, nullptr, nullptr), '\0');
+  		WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), (int)out.size(), nullptr, nullptr);
+  		return out;
+  	}
+  	inline std::wstring quoted(const std::string& s) { return L"\"" + wide(s) + L"\""; }
+  	inline int tar(const std::wstring& args, std::string* said = nullptr)  // Windows' own tar.exe, which knows .zip
+  	{
+  		wchar_t system[MAX_PATH];
+  		GetSystemDirectoryW(system, MAX_PATH);
+  		std::wstring line = L"\"" + std::wstring(system) + L"\\tar.exe\" " + args;
+  		SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+  		HANDLE read = nullptr, write = nullptr;
+  		CreatePipe(&read, &write, &sa, 0);
+  		SetHandleInformation(read, HANDLE_FLAG_INHERIT, 0);
+  		STARTUPINFOW si{sizeof si};
+  		si.dwFlags = STARTF_USESTDHANDLES;
+  		si.hStdOutput = write, si.hStdError = write, si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  		PROCESS_INFORMATION pi{};
+  		if (!CreateProcessW(nullptr, line.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+  		{
+  			CloseHandle(read), CloseHandle(write);
+  			return -1;
+  		}
+  		CloseHandle(write);
+  		std::string out;
+  		char buffer[4096];
+  		DWORD got = 0;
+  		while (ReadFile(read, buffer, sizeof buffer, &got, nullptr) && got)
+  			out.append(buffer, got);
+  		CloseHandle(read);
+  		WaitForSingleObject(pi.hProcess, INFINITE);
+  		DWORD code = 1;
+  		GetExitCodeProcess(pi.hProcess, &code);
+  		CloseHandle(pi.hProcess), CloseHandle(pi.hThread);
+  		if (said)
+  			*said = out;
+  		return (int)code;
+  	}
+  	inline void pack(const std::vector<std::string>& files, const std::string& zip, int line)
+  	{
+  		if (files.empty())
+  			stellanova::fail(line, "say which files to pack into \"" + zip + "\".");
+  		std::wstring args = L"-a -c -f " + quoted(zip);
+  		for (const std::string& f : files)
+  		{
+  			if (!std::filesystem::exists(std::filesystem::u8path(f)))
+  				stellanova::fail(line, "there is no file or folder called \"" + f + "\".");
+  			args += L" " + quoted(f);
+  		}
+  		std::filesystem::remove(std::filesystem::u8path(zip));
+  		if (tar(args) != 0)
+  			stellanova::fail(line, "I couldn't pack \"" + zip + "\".");
+  	}
+  	inline std::vector<std::string> inside(const std::string& zip, int line)
+  	{
+  		if (!std::filesystem::exists(std::filesystem::u8path(zip)))
+  			stellanova::fail(line, "there is no zip file called \"" + zip + "\".");
+  		std::string said;
+  		if (tar(L"-t -f " + quoted(zip), &said) != 0)
+  			stellanova::fail(line, "\"" + zip + "\" isn't a zip file I can read.");
+  		std::vector<std::string> out;
+  		std::string name;
+  		for (char c : said + "\n")
+  		{
+  			if (c == '\r')
+  				continue;
+  			if (c == '\n')
+  			{
+  				if (!name.empty() && name.back() != '/')
+  					out.push_back(name);
+  				name.clear();
+  			}
+  			else
+  				name += c;
+  		}
+  		return out;
+  	}
+  	inline void unpack(const std::string& zip, const std::string& folder, int line)
+  	{
+  		for (const std::string& name : inside(zip, line))
+  			if (name.find("..") != std::string::npos || name[0] == '/' || name[0] == '\\' || name.find(':') != std::string::npos)
+  				stellanova::fail(line, "\"" + zip + "\" has a file that would land outside the folder (" + name + "), so I won't unpack it.");
+  		std::filesystem::create_directories(std::filesystem::u8path(folder));
+  		if (tar(L"-x -f " + quoted(zip) + L" -C " + quoted(folder)) != 0)
+  			stellanova::fail(line, "I couldn't unpack \"" + zip + "\".");
+  	}
+  }
+
+python:
+  import zipfile as _zipfile
+  def _bad(name):
+      return ".." in name or name.startswith(("/", "\\")) or ":" in name
+  def zip_pack(files, zip_):
+      if not files:
+          raise RunError(0, 'say which files to pack into "' + zip_ + '".')
+      for f in files:
+          if not os.path.exists(f):
+              raise RunError(0, 'there is no file or folder called "' + f + '".')
+      try:
+          with _zipfile.ZipFile(zip_, "w", _zipfile.ZIP_DEFLATED) as z:
+              for f in files:
+                  if os.path.isdir(f):
+                      for root, dirs, names in os.walk(f):
+                          dirs.sort()
+                          for n in sorted(names):
+                              p = os.path.join(root, n)
+                              z.write(p, p.replace("\\", "/"))
+                  else:
+                      z.write(f, f.replace("\\", "/"))
+      except OSError:
+          raise RunError(0, 'I couldn\'t pack "' + zip_ + '".')
+  def zip_inside(zip_):
+      if not os.path.exists(zip_):
+          raise RunError(0, 'there is no zip file called "' + zip_ + '".')
+      try:
+          with _zipfile.ZipFile(zip_) as z:
+              return [n for n in z.namelist() if not n.endswith("/")]
+      except _zipfile.BadZipFile:
+          raise RunError(0, '"' + zip_ + '" isn\'t a zip file I can read.')
+  def zip_unpack(zip_, folder):
+      names = zip_inside(zip_)
+      for n in names:
+          if _bad(n):
+              raise RunError(0, '"' + zip_ + '" has a file that would land outside the folder (' + n + "), so I won't unpack it.")
+      os.makedirs(folder, exist_ok=True)
+      with _zipfile.ZipFile(zip_) as z:
+          z.extractall(folder)
+
+to pack the zip, given files (a list of text) and zip (text) = stellanova_zip::pack({files}, {zip}, {line})
+  runs: zip_pack({files}, {zip})
+  web: stellanova_zip.pack({files}, {zip}, {line})
+to the files in the zip, given zip (text), returning a list of text = stellanova_zip::inside({zip}, {line})
+  runs: zip_inside({zip})
+  web: stellanova_zip.inside({zip}, {line})
+to unpack the zip, given zip (text) and folder (text) = stellanova_zip::unpack({zip}, {folder}, {line})
+  runs: zip_unpack({zip}, {folder})
+  web: stellanova_zip.unpack({zip}, {folder}, {line})
+
+javascript:
+  const stellanova_zip = {
+    node(line) {
+      if (typeof require !== "function") stellanova.fail(line, "a web page can't read or write zip files yet (it works with node).");
+      return { fs: require("fs"), zlib: require("zlib"), path: require("path") };
+    },
+    crc(b) {
+      if (!this.table) this.table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+      let c = 0xffffffff;
+      for (const x of b) c = this.table[(c ^ x) & 255] ^ (c >>> 8);
+      return (c ^ 0xffffffff) >>> 0;
+    },
+    pack(files, zip, line) {
+      const { fs, zlib, path } = this.node(line);
+      if (!files.length) stellanova.fail(line, `say which files to pack into "${zip}".`);
+      const all = [];
+      const walk = (f) => {
+        if (fs.statSync(f).isDirectory()) for (const n of fs.readdirSync(f).sort()) walk(path.join(f, n));
+        else all.push(f);
+      };
+      for (const f of files) {
+        if (!fs.existsSync(f)) stellanova.fail(line, `there is no file or folder called "${f}".`);
+        walk(f);
+      }
+      const locals = [], centrals = [];
+      let at = 0;
+      for (const f of all) {
+        const data = fs.readFileSync(f), packed = zlib.deflateRawSync(data), name = Buffer.from(f.replace(/\\/g, "/"), "utf8"), crc = this.crc(data);
+        const head = Buffer.alloc(30);
+        head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(0x800, 6); head.writeUInt16LE(8, 8);
+        head.writeUInt32LE(crc, 14); head.writeUInt32LE(packed.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(name.length, 26);
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(0x800, 8); central.writeUInt16LE(8, 10);
+        central.writeUInt32LE(crc, 16); central.writeUInt32LE(packed.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(name.length, 28);
+        central.writeUInt32LE(at, 42);
+        locals.push(head, name, packed);
+        centrals.push(central, name);
+        at += 30 + name.length + packed.length;
+      }
+      const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
+      end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(all.length, 8); end.writeUInt16LE(all.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
+      try { fs.writeFileSync(zip, Buffer.concat([...locals, dir, end])); } catch { stellanova.fail(line, `I couldn't pack "${zip}".`); }
+    },
+    entries(zip, line) {
+      const { fs } = this.node(line);
+      if (!fs.existsSync(zip)) stellanova.fail(line, `there is no zip file called "${zip}".`);
+      const d = fs.readFileSync(zip);
+      let e = d.length - 22;
+      while (e >= 0 && d.readUInt32LE(e) !== 0x06054b50) e--;
+      if (e < 0) stellanova.fail(line, `"${zip}" isn't a zip file I can read.`);
+      const out = [];
+      let at = d.readUInt32LE(e + 16);
+      for (let k = 0; k < d.readUInt16LE(e + 10); k++) {
+        const nameLength = d.readUInt16LE(at + 28), extra = d.readUInt16LE(at + 30), note = d.readUInt16LE(at + 32);
+        out.push({ name: d.toString("utf8", at + 46, at + 46 + nameLength), method: d.readUInt16LE(at + 10), size: d.readUInt32LE(at + 20), local: d.readUInt32LE(at + 42) });
+        at += 46 + nameLength + extra + note;
+      }
+      return { d, out };
+    },
+    inside(zip, line) { return this.entries(zip, line).out.map((x) => x.name).filter((n) => !n.endsWith("/")); },
+    unpack(zip, folder, line) {
+      const { fs, zlib, path } = this.node(line), { d, out } = this.entries(zip, line);
+      for (const x of out) if (x.name.includes("..") || /^[\\/]/.test(x.name) || x.name.includes(":")) stellanova.fail(line, `"${zip}" has a file that would land outside the folder (${x.name}), so I won't unpack it.`);
+      for (const x of out) {
+        const to = path.join(folder, x.name);
+        if (x.name.endsWith("/")) { fs.mkdirSync(to, { recursive: true }); continue; }
+        const start = x.local + 30 + d.readUInt16LE(x.local + 26) + d.readUInt16LE(x.local + 28), raw = d.subarray(start, start + x.size);
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.writeFileSync(to, x.method === 8 ? zlib.inflateRawSync(raw) : raw);
+      }
+    },
+  };

@@ -141,3 +141,5 @@ decrypted with|Gets an encrypted message back (library encryption): decrypted wi
 a random code of|Random bytes nobody can guess, as hexadecimal text (library encryption): a random code of 16.
 the json at with|A part of JSON text by its path (library json): the json at with (answer, "days[2].high").
 the json changed at with|JSON with one part changed (library json): the json changed at with (json, "score", "12").
+pack the zip with|Packs files and folders into a .zip (library zip): pack the zip with (a list of ("saves", "a.txt"), "backup.zip").
+unpack the zip with|Unpacks a .zip into a folder (library zip): unpack the zip with ("backup.zip", "restored").
