@@ -33,10 +33,13 @@ python:
 
 to beep, given pitch (a number) and seconds (a number) = Beep((DWORD)({pitch}), (DWORD)(1000 * {seconds}))
   runs: beep({pitch}, {seconds})
+  web: await stellanova_computer.beep({pitch}, {seconds})
 to run the command, given command (text), returning a number = (double)std::system({command}.c_str())
   runs: run_command({command})
+  web: stellanova_computer.run({command}, {line})
 to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
   runs: open_thing({thing})
+  web: stellanova_computer.open({thing})
 
 user name = stellanova_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME", "")
@@ -99,6 +102,7 @@ current folder = std::filesystem::current_path().string(), text, read only
   web: stellanova_computer::folder()
 to output of the command, given command (text), returning text = stellanova_computer::output_of({command}, {line})
   runs: output_of({command})
+  web: stellanova_computer.outputOf({command}, {line})
 to environment value of, given name (text), returning text = stellanova_computer::environment({name})
   runs: os.environ.get({name}, "")
   web: stellanova_computer::environment({name})
@@ -276,18 +280,25 @@ python:
 
 to start the program, given command (text) and folder (text), returning a number = stellanova_computer::start_program({command}, {folder}, {line})
   runs: start_program({command}, {folder})
+  web: stellanova_computer.start({command}, {folder}, {line})
 to latest output of the program, given program (a number), returning text = stellanova_computer::new_output({program}, false, {line})
   runs: new_output({program}, "out")
+  web: stellanova_computer.latest({program}, "out", {line})
 to latest errors of the program, given program (a number), returning text = stellanova_computer::new_output({program}, true, {line})
   runs: new_output({program}, "err")
+  web: stellanova_computer.latest({program}, "err", {line})
 to type into the program, given program (a number) and words (text) = stellanova_computer::type_into({program}, {words}, {line})
   runs: type_into({program}, {words})
+  web: stellanova_computer.typeInto({program}, {words}, {line})
 to the program is running, given program (a number), returning yes or no = stellanova_computer::is_running({program}, {line})
   runs: program_running({program})
+  web: await stellanova_computer.isRunning({program}, {line})
 to exit code of the program, given program (a number), returning a number = stellanova_computer::exit_code({program}, {line})
   runs: exit_code({program})
+  web: stellanova_computer.exitCode({program}, {line})
 to stop the program, given program (a number) = stellanova_computer::stop_program({program}, {line})
   runs: stop_program({program})
+  web: stellanova_computer.stop({program}, {line})
 
 javascript:
   const stellanova_computer = {
@@ -295,4 +306,77 @@ javascript:
     environment: (name) => (stellanova_computer.node ? process.env[name] || "" : ""),
     words_given: () => (stellanova_computer.node ? process.argv.slice(2) : []),
     folder: () => (stellanova_computer.node ? process.cwd() : ""),
+    need(line) {
+      if (!this.node) stellanova.fail(line, "a web page can't run programs on the computer (this works with node).");
+      return require("child_process");
+    },
+    async beep(pitch, seconds) {
+      if (!this.node) {  // a web page: a short square wave
+        const a = new AudioContext(), o = a.createOscillator();
+        o.type = "square", o.frequency.value = pitch;
+        o.connect(a.destination), o.start(), o.stop(a.currentTime + seconds);
+        await new Promise((r) => setTimeout(r, seconds * 1000));
+        return;
+      }
+      require("child_process").spawnSync("powershell", ["-NoProfile", "-Command", `[console]::beep(${Math.round(pitch)}, ${Math.round(seconds * 1000)})`], { windowsHide: true });
+    },
+    run(command, line) {
+      const done = this.need(line).spawnSync(command, { shell: true, stdio: "inherit" });
+      return done.status === null ? -1 : done.status;
+    },
+    open(thing) {
+      if (!this.node) return void window.open(thing, "_blank");
+      require("child_process").spawn("cmd", ["/c", "start", "", thing], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+    },
+    outputOf(command, line) {  // what it writes as problems shows, as when built
+      const done = this.need(line).spawnSync(command, { shell: true, stdio: ["inherit", "pipe", "inherit"] });
+      return (done.stdout || Buffer.alloc(0)).toString("utf8").replace(/\r/g, "");
+    },
+    running: [],
+    start(command, folder, line) {
+      const cp = this.need(line);
+      let p;
+      try {
+        p = cp.spawn(command, { cwd: folder || undefined, shell: true, windowsHide: true });
+      } catch {
+        stellanova.fail(line, `I couldn't start the program "${command}".`);
+      }
+      const r = { p, out: [], err: [], open: 2, code: null };
+      p.stdout.on("data", (d) => r.out.push(d));
+      p.stderr.on("data", (d) => r.err.push(d));
+      p.stdout.on("close", () => r.open--);
+      p.stderr.on("close", () => r.open--);
+      p.on("exit", (code) => (r.code = code === null ? 1 : code));
+      p.on("error", () => { r.code = 1; r.open = 0; });
+      p.stdin.on("error", () => {});
+      this.running.push(r);
+      return this.running.length;
+    },
+    get(n, line) {
+      const r = this.running[n - 1];
+      if (!r) stellanova.fail(line, `there is no program ${stellanova.text(n)} (start one with 'start the program').`);
+      return r;
+    },
+    latest(n, key, line) {
+      const r = this.get(n, line), got = Buffer.concat(r[key]);
+      r[key] = [];
+      return got.toString("utf8").replace(/\r/g, "");
+    },
+    typeInto(n, words, line) {
+      const r = this.get(n, line);
+      if (r.p.stdin.writable) r.p.stdin.write(words + "\n");
+    },
+    async isRunning(n, line) {
+      const r = this.get(n, line);
+      await new Promise((done) => setImmediate(done));  // lets its output and its end arrive
+      return r.code === null || r.open > 0;
+    },
+    exitCode(n, line) {
+      const r = this.get(n, line);
+      return r.code === null ? -1 : r.code;
+    },
+    stop(n, line) {
+      const r = this.get(n, line);
+      this.need(line).spawnSync("taskkill", ["/T", "/F", "/PID", String(r.p.pid)], { stdio: "ignore" });
+    },
   };
