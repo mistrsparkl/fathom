@@ -92,7 +92,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: computer, database, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: big numbers, computer, database, folders, letters, maths, page, patterns, screen, server, sound, spreadsheet, time, web, window")
 
     # Run real programs both ways: directly, and built into machine code (if LLVM is there).
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -179,6 +179,22 @@ def program_checks():
     assert out.stdout == "water, milk, tea, juice, cola\n12, 27, 45, 90\n15, 30\n4\n81\ntea-cake\n11\n13\n", repr(out.stdout)
     assert out.stderr == "Line 22: there is no item 9 in a list of 5 items. Items are counted from 1.\n", repr(out.stderr)
     assert perr('genesis:\n  set f to each x becomes x\n' + END)[1].startswith("Say what kind 'x' is")
+
+    # Powers, bits, and whole numbers of any size.
+    out = both('use: big numbers\ngenesis:\n  scrawl 2 to the power 10, " ", 3 times 2 to the power 3\n'
+               '  scrawl 12 bitwise and 10, " ", 12 bitwise or 10, " ", 12 bitwise exclusive or 10\n'
+               '  scrawl 1 shifted left by 40, " ", 1024 shifted right by 3, " ", -8 shifted right by 1\n'
+               '  set huge to big power with ("2", 100)\n  scrawl huge, " ", big plus with (huge, "1")\n'
+               '  scrawl big times with ("-123456789123456789", "987654321987654321")\n'
+               '  scrawl big divided by with (huge, "7"), " r ", big remainder with (huge, "7")\n'
+               '  scrawl big divided by with ("-7", "2"), " ", big remainder with ("-7", "2"), " ", big compare with ("-3", "3")\n'
+               '  try:\n    scrawl 1.5 bitwise and 1\n  if that went wrong:\n    scrawl the wound\n'
+               '  scrawl (-8) to the power 0.5\n' + END)
+    assert out.stdout == ("1024 24\n8 14 6\n1099511627776 128 -4\n"
+                          "1267650600228229401496703205376 1267650600228229401496703205377\n"
+                          "-121932631356500531347203169112635269\n181092942889747057356671886482 r 2\n-4 1 -1\n"
+                          "bits need whole numbers smaller than 9007199254740992, not 1.5.\n"), repr(out.stdout)
+    assert out.stderr == "Line 15: -8 to the power 0.5 can't be worked out (it is too big, or not a real number).\n", repr(out.stderr)
 
     # List maths, and sorting things by one of their parts (ties keep their order).
     out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +

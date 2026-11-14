@@ -654,6 +654,8 @@ extern "C"
 
 	// numbers
 	long long cn_repeats(double count) { return std::isfinite(count) ? static_cast<long long>(count) : 0; }
+	double cn_power(double a, double b, int line) { GUARDED(0.0, return stellanova::power(a, b, line);) }
+	double cn_bits(int op, double a, double b, int line) { GUARDED(0.0, return stellanova::bits(op, a, b, line);) }
 	double cn_random(double lo, double hi, int line) { GUARDED(0.0, return stellanova::random(lo, hi, line);) }
 	double cn_random_fraction() { return stellanova::random_fraction(); }
 	double cn_rounded(double x, double places, int line) { GUARDED(0.0, return stellanova::rounded(x, places, line);) }

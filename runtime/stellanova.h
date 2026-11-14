@@ -267,6 +267,29 @@ namespace stellanova
 	template <typename T>
 	T& at(std::vector<T>& items, double number, int line) { return items[index_of(items, number, line)]; }
 
+	inline double power(double a, double b, int line)
+	{
+		double out = std::pow(a, b);
+		if (std::isinf(out) || std::isnan(out))
+			fail(line, text(a) + " to the power " + text(b) + " can't be worked out (it is too big, or not a real number).");
+		return out;
+	}
+
+	inline double bits(int op, double a, double b, int line)  // and, or, exclusive or, shift left, shift right
+	{
+		const double limit = 9007199254740992.0;
+		for (double x : {a, b})
+			if (x != std::floor(x) || std::fabs(x) >= limit)
+				fail(line, "bits need whole numbers smaller than 9007199254740992, not " + text(x) + ".");
+		long long x = static_cast<long long>(a), y = static_cast<long long>(b);
+		if ((op == 3 || op == 4) && (y < 0 || y > 63))
+			fail(line, "I can shift by 0 to 63 places, not " + std::to_string(y) + ".");
+		long double out = op == 0 ? x & y : op == 1 ? x | y : op == 2 ? x ^ y : op == 3 ? static_cast<long double>(x) * std::pow(2.0L, static_cast<long double>(y)) : static_cast<long double>(x >> y);
+		if (std::fabs(out) >= limit)
+			fail(line, "that makes a number too big for bits (" + text(static_cast<double>(out)) + ").");
+		return static_cast<double>(out);
+	}
+
 	template <typename T>
 	const T& at(const std::vector<T>& items, double number, int line) { return items[index_of(items, number, line)]; }
 

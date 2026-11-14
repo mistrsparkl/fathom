@@ -339,6 +339,20 @@
     at: (items, number, line) => items[index_of(items, number, line)],
     put_at(items, number, line, v) { items[index_of(items, number, line)] = v; },
     remove_item(items, number, line) { items.splice(index_of(items, number, line), 1); },
+    power(a, b, line) {
+      const out = Math.pow(a, b);
+      if (!Number.isFinite(out)) fail(line, `${text(a)} to the power ${text(b)} can't be worked out (it is too big, or not a real number).`);
+      return out;
+    },
+    bits(op, a, b, line) {
+      const limit = 9007199254740992;
+      for (const x of [a, b]) if (x !== Math.floor(x) || Math.abs(x) >= limit) fail(line, `bits need whole numbers smaller than 9007199254740992, not ${text(x)}.`);
+      const x = BigInt(a), y = BigInt(b);
+      if ((op === 3 || op === 4) && (b < 0 || b > 63)) fail(line, `I can shift by 0 to 63 places, not ${b}.`);
+      const out = [x & y, x | y, x ^ y, x << y, x >> y][op];
+      if (out >= BigInt(limit) || out <= -BigInt(limit)) fail(line, `that makes a number too big for bits (${out}).`);
+      return Number(out);
+    },
     insert_item(items, number, x, line) { if (number === items.length + 1) items.push(x); else items.splice(index_of(items, number, line), 0, x); },
     remove_value(items, v) {
       const k = items.findIndex((x) => same(x, v));

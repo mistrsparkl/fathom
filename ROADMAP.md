@@ -8,7 +8,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] `insert x at 2 in xs`
 - [x] Commands written where they're used (`each x becomes x times 2`, for `changed by`, `kept by`, `sorted ... by`, inputs)
 - [ ] Kinds for any kind (`a pair of (a number, text)`, `a stack of anything`): kinds with a kind as an input
-- [ ] Numbers: `to the power`, bitwise `and`/`or`/`exclusive or`/shifts, whole numbers of any size
+- [x] Numbers: `to the power`, bitwise `and`/`or`/`exclusive or`/shifts, whole numbers of any size
 - [ ] Bytes: a real kind for binary data (files, network, pictures)
 - [ ] Kinds of problem: `raise a <kind> with ...`, `if that went wrong with a <kind>:`
 - [ ] Commands for a kind of thing kept as values

@@ -1,0 +1,270 @@
+note: Whole numbers of any size, kept as text: "123456789012345678901234567890". Use them with:  use: big numbers
+note: Numbers are exact up to 9007199254740992; past that, these keep every digit. Give them text, get text back.
+
+code:
+  namespace stellanova_big
+  {
+  	struct Big
+  	{
+  		bool negative = false;
+  		std::vector<unsigned> parts;  // base 1000000000, smallest part first; zero has no parts
+  	};
+  	constexpr unsigned long long BASE = 1000000000ULL;
+
+  	inline Big read(const std::string& s, int line)
+  	{
+  		Big b;
+  		size_t start = 0;
+  		if (!s.empty() && (s[0] == '-' || s[0] == '+'))
+  			b.negative = s[0] == '-', start = 1;
+  		if (start >= s.size())
+  			stellanova::fail(line, "'" + s + "' isn't a whole number.");
+  		for (size_t k = start; k < s.size(); ++k)
+  			if (s[k] < '0' || s[k] > '9')
+  				stellanova::fail(line, "'" + s + "' isn't a whole number.");
+  		for (long long end = (long long)s.size(); end > (long long)start; end -= 9)
+  		{
+  			long long from = std::max((long long)start, end - 9);
+  			b.parts.push_back((unsigned)std::stoul(s.substr((size_t)from, (size_t)(end - from))));
+  		}
+  		while (!b.parts.empty() && b.parts.back() == 0)
+  			b.parts.pop_back();
+  		if (b.parts.empty())
+  			b.negative = false;
+  		return b;
+  	}
+  	inline std::string write(const Big& b)
+  	{
+  		if (b.parts.empty())
+  			return "0";
+  		std::string out = (b.negative ? "-" : "") + std::to_string(b.parts.back());
+  		for (long long k = (long long)b.parts.size() - 2; k >= 0; --k)
+  		{
+  			std::string piece = std::to_string(b.parts[(size_t)k]);
+  			out += std::string(9 - piece.size(), '0') + piece;
+  		}
+  		return out;
+  	}
+  	inline int compare_size(const std::vector<unsigned>& a, const std::vector<unsigned>& b)
+  	{
+  		if (a.size() != b.size())
+  			return a.size() < b.size() ? -1 : 1;
+  		for (long long k = (long long)a.size() - 1; k >= 0; --k)
+  			if (a[(size_t)k] != b[(size_t)k])
+  				return a[(size_t)k] < b[(size_t)k] ? -1 : 1;
+  		return 0;
+  	}
+  	inline void trim(std::vector<unsigned>& a)
+  	{
+  		while (!a.empty() && a.back() == 0)
+  			a.pop_back();
+  	}
+  	inline std::vector<unsigned> add_sizes(const std::vector<unsigned>& a, const std::vector<unsigned>& b)
+  	{
+  		std::vector<unsigned> out;
+  		unsigned long long carry = 0;
+  		for (size_t k = 0; k < std::max(a.size(), b.size()) || carry; ++k)
+  		{
+  			unsigned long long sum = carry + (k < a.size() ? a[k] : 0) + (k < b.size() ? b[k] : 0);
+  			out.push_back((unsigned)(sum % BASE));
+  			carry = sum / BASE;
+  		}
+  		return out;
+  	}
+  	inline std::vector<unsigned> take_sizes(const std::vector<unsigned>& a, const std::vector<unsigned>& b)  // a is at least b
+  	{
+  		std::vector<unsigned> out;
+  		long long borrow = 0;
+  		for (size_t k = 0; k < a.size(); ++k)
+  		{
+  			long long d = (long long)a[k] - borrow - (k < b.size() ? (long long)b[k] : 0);
+  			borrow = d < 0;
+  			out.push_back((unsigned)(d < 0 ? d + (long long)BASE : d));
+  		}
+  		trim(out);
+  		return out;
+  	}
+  	inline Big plus(const Big& a, const Big& b)
+  	{
+  		Big out;
+  		if (a.negative == b.negative)
+  			out.parts = add_sizes(a.parts, b.parts), out.negative = a.negative;
+  		else if (compare_size(a.parts, b.parts) >= 0)
+  			out.parts = take_sizes(a.parts, b.parts), out.negative = a.negative;
+  		else
+  			out.parts = take_sizes(b.parts, a.parts), out.negative = b.negative;
+  		if (out.parts.empty())
+  			out.negative = false;
+  		return out;
+  	}
+  	inline Big negated(Big b)
+  	{
+  		if (!b.parts.empty())
+  			b.negative = !b.negative;
+  		return b;
+  	}
+  	inline Big times(const Big& a, const Big& b)
+  	{
+  		Big out;
+  		if (a.parts.empty() || b.parts.empty())
+  			return out;
+  		std::vector<unsigned long long> sums(a.parts.size() + b.parts.size() + 1, 0);
+  		for (size_t i = 0; i < a.parts.size(); ++i)
+  		{
+  			unsigned long long carry = 0;
+  			for (size_t j = 0; j < b.parts.size() || carry; ++j)
+  			{
+  				unsigned long long now = sums[i + j] + carry + (j < b.parts.size() ? (unsigned long long)a.parts[i] * b.parts[j] : 0);
+  				sums[i + j] = now % BASE;
+  				carry = now / BASE;
+  			}
+  		}
+  		for (unsigned long long s : sums)
+  			out.parts.push_back((unsigned)s);
+  		trim(out.parts);
+  		out.negative = a.negative != b.negative;
+  		return out;
+  	}
+  	inline std::vector<unsigned> times_small(const std::vector<unsigned>& a, unsigned m)
+  	{
+  		std::vector<unsigned> out;
+  		unsigned long long carry = 0;
+  		for (size_t k = 0; k < a.size() || carry; ++k)
+  		{
+  			unsigned long long now = carry + (k < a.size() ? (unsigned long long)a[k] * m : 0);
+  			out.push_back((unsigned)(now % BASE));
+  			carry = now / BASE;
+  		}
+  		trim(out);
+  		return out;
+  	}
+  	inline void divide(const Big& a, const Big& b, Big& quotient, Big& left, int line)  // rounded down, as Python does
+  	{
+  		if (b.parts.empty())
+  			stellanova::fail(line, "I can't divide by zero.");
+  		std::vector<unsigned> q(a.parts.size(), 0), r;
+  		for (long long k = (long long)a.parts.size() - 1; k >= 0; --k)
+  		{
+  			r.insert(r.begin(), a.parts[(size_t)k]);
+  			trim(r);
+  			unsigned lo = 0, hi = (unsigned)BASE - 1;
+  			while (lo < hi)  // the biggest digit d with b times d at most r
+  			{
+  				unsigned mid = lo + (hi - lo + 1) / 2;
+  				if (compare_size(times_small(b.parts, mid), r) <= 0)
+  					lo = mid;
+  				else
+  					hi = mid - 1;
+  			}
+  			q[(size_t)k] = lo;
+  			r = take_sizes(r, times_small(b.parts, lo));
+  		}
+  		trim(q);
+  		quotient.parts = q, quotient.negative = !q.empty() && a.negative != b.negative;
+  		left.parts = r, left.negative = !r.empty() && a.negative;
+  		if (!left.parts.empty() && a.negative != b.negative)  // round toward minus: the remainder takes the divider's sign
+  		{
+  			Big one;
+  			one.parts = {1};
+  			quotient = plus(quotient, negated(one));
+  			left = plus(left, b);
+  		}
+  	}
+  	inline std::string sum(const std::string& a, const std::string& b, int line) { return write(plus(read(a, line), read(b, line))); }
+  	inline std::string difference(const std::string& a, const std::string& b, int line) { return write(plus(read(a, line), negated(read(b, line)))); }
+  	inline std::string product(const std::string& a, const std::string& b, int line) { return write(times(read(a, line), read(b, line))); }
+  	inline std::string quotient(const std::string& a, const std::string& b, int line)
+  	{
+  		Big q, r;
+  		divide(read(a, line), read(b, line), q, r, line);
+  		return write(q);
+  	}
+  	inline std::string remainder(const std::string& a, const std::string& b, int line)
+  	{
+  		Big q, r;
+  		divide(read(a, line), read(b, line), q, r, line);
+  		return write(r);
+  	}
+  	inline std::string power(const std::string& a, double n, int line)
+  	{
+  		if (n < 0 || n != std::floor(n) || n > 100000)
+  			stellanova::fail(line, "'big power' needs a whole number from 0 to 100000, not " + stellanova::text(n) + ".");
+  		Big base = read(a, line), out;
+  		out.parts = {1};
+  		for (long long k = (long long)n; k > 0; k >>= 1)
+  		{
+  			if (k & 1)
+  				out = times(out, base);
+  			if (k > 1)
+  				base = times(base, base);
+  		}
+  		return write(out);
+  	}
+  	inline double compared(const std::string& a, const std::string& b, int line)
+  	{
+  		Big d = plus(read(a, line), negated(read(b, line)));
+  		return d.parts.empty() ? 0 : d.negative ? -1 : 1;
+  	}
+  }
+
+python:
+  def big_read(s):
+      t = s[1:] if s[:1] in ("-", "+") else s
+      if not t or not t.isdigit() or not t.isascii():
+          raise RunError(0, f"'{s}' isn't a whole number.")
+      return int(s)
+  def big_div(a, b, remainder):
+      a, b = big_read(a), big_read(b)
+      if b == 0:
+          raise RunError(0, "I can't divide by zero.")
+      return str(a % b if remainder else a // b)
+  def big_power(a, n):
+      if n < 0 or n != int(n) or n > 100000:
+          raise RunError(0, f"'big power' needs a whole number from 0 to 100000, not {text(n)}.")
+      return str(big_read(a) ** int(n))
+  def big_compare(a, b):
+      a, b = big_read(a), big_read(b)
+      return float((a > b) - (a < b))
+
+to big plus, given first (text) and second (text), returning text = stellanova_big::sum({first}, {second}, {line})
+  runs: str(big_read({first}) + big_read({second}))
+  web: stellanova_big.op({first}, {second}, (x, y) => x + y, {line})
+to big minus, given first (text) and second (text), returning text = stellanova_big::difference({first}, {second}, {line})
+  runs: str(big_read({first}) - big_read({second}))
+  web: stellanova_big.op({first}, {second}, (x, y) => x - y, {line})
+to big times, given first (text) and second (text), returning text = stellanova_big::product({first}, {second}, {line})
+  runs: str(big_read({first}) * big_read({second}))
+  web: stellanova_big.op({first}, {second}, (x, y) => x * y, {line})
+to big divided by, given first (text) and second (text), returning text = stellanova_big::quotient({first}, {second}, {line})
+  runs: big_div({first}, {second}, False)
+  web: stellanova_big.divide({first}, {second}, false, {line})
+to big remainder, given first (text) and second (text), returning text = stellanova_big::remainder({first}, {second}, {line})
+  runs: big_div({first}, {second}, True)
+  web: stellanova_big.divide({first}, {second}, true, {line})
+to big power, given base (text) and times (a number), returning text = stellanova_big::power({base}, {times}, {line})
+  runs: big_power({base}, {times})
+  web: stellanova_big.power({base}, {times}, {line})
+to big compare, given first (text) and second (text), returning a number = stellanova_big::compared({first}, {second}, {line})
+  runs: big_compare({first}, {second})
+  web: stellanova_big.compare({first}, {second}, {line})
+
+javascript:
+  const stellanova_big = {
+    read(s, line) {
+      if (!/^[-+]?[0-9]+$/.test(s)) stellanova.fail(line, `'${s}' isn't a whole number.`);
+      return BigInt(s);
+    },
+    op(a, b, f, line) { return f(this.read(a, line), this.read(b, line)).toString(); },
+    divide(a, b, remainder, line) {
+      const x = this.read(a, line), y = this.read(b, line);
+      if (y === 0n) stellanova.fail(line, "I can't divide by zero.");
+      let q = x / y;
+      if (x % y !== 0n && (x < 0n) !== (y < 0n)) q -= 1n;  // rounded down, as Python does
+      return (remainder ? x - q * y : q).toString();
+    },
+    power(a, n, line) {
+      if (n < 0 || n !== Math.floor(n) || n > 100000) stellanova.fail(line, `'big power' needs a whole number from 0 to 100000, not ${stellanova.text(n)}.`);
+      return (this.read(a, line) ** BigInt(n)).toString();
+    },
+    compare(a, b, line) { const x = this.read(a, line), y = this.read(b, line); return x > y ? 1 : x < y ? -1 : 0; },
+  };

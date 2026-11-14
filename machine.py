@@ -21,7 +21,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
 FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
-            "cn_list_remove_item", "cn_list_insert", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
+            "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
 
@@ -84,6 +84,8 @@ declare i64 @cn_repeats(double)
 declare double @cn_random(double, double, i32)
 declare double @cn_random_fraction()
 declare double @cn_rounded(double, double, i32)
+declare double @cn_power(double, double, i32)
+declare double @cn_bits(i32, double, double, i32)
 declare ptr @cn_box_number(double)
 declare ptr @cn_box_yesno(i1)
 declare double @cn_unbox_number(ptr)

@@ -537,6 +537,34 @@ def insert_at(items, number, x, line):
         items.insert(index_of(items, number, line), x)
 
 
+def power(a, b, line):
+    """'2 to the power 10'"""
+    try:
+        out = math.pow(a, b)
+    except (OverflowError, ValueError):
+        out = None
+    if out is None or math.isinf(out) or math.isnan(out):
+        raise RunError(line, f"{text(a)} to the power {text(b)} can't be worked out (it is too big, or not a real number).")
+    return out
+
+
+BIT_LIMIT = 2 ** 53  # whole numbers this big (either way) are exact: bits work on them
+
+
+def bits(op, a, b, line):
+    """'12 bitwise and 10', 'bitwise or', 'bitwise exclusive or', '1 shifted left by 4', 'shifted right by'"""
+    for x in (a, b):
+        if x != math.floor(x) or abs(x) >= BIT_LIMIT:
+            raise RunError(line, f"bits need whole numbers smaller than 9007199254740992, not {text(x)}.")
+    a, b = int(a), int(b)
+    if op in (3, 4) and not 0 <= b <= 63:
+        raise RunError(line, f"I can shift by 0 to 63 places, not {b}.")
+    out = (a & b, a | b, a ^ b, a << b if op == 3 else 0, a >> b if op == 4 else 0)[op]
+    if abs(out) >= BIT_LIMIT:
+        raise RunError(line, f"that makes a number too big for bits ({out}).")
+    return float(out)
+
+
 def lines_of(s):
     if not s:
         return []
@@ -1550,12 +1578,42 @@ class Expr:
             v = with_ir(Value(f"({v.cpp} {op} {r.cpp})", v.kind, run), lambda fn, op=op, l=v, r=r: number_ir(fn, op, l, r))
         return v
 
-    def product(self):
+    BIT_WORDS = ((("bitwise", "and"), 0), (("bitwise", "or"), 1), (("bitwise", "exclusive", "or"), 2),
+                 (("shifted", "left", "by"), 3), (("shifted", "right", "by"), 4))
+
+    def powered(self):
+        """'2 to the power 10' (before times and plus, as in maths)"""
         v = self.unary()
+        while self.at("to", "power"):  # 'the' is grammar, skipped already
+            self.i += 2
+            r = self.unary()
+            if v.kind != NUMBER or r.kind != NUMBER:
+                raise ScriptError(self.line, f"'to the power' needs numbers, not {kind_name(v.kind)} and {kind_name(r.kind)}.")
+            a, b, line, l = v.run, r.run, self.line, v
+            v = with_ir(Value(f"stellanova::power({v.cpp}, {r.cpp}, {line})", NUMBER, lambda env, a=a, b=b: power(a(env), b(env), line)),
+                        lambda f, l=l, r=r, line=line: f.call("double", "cn_power", ("double", machine.emit(f, l)), ("double", machine.emit(f, r)),
+                                                             ("i32", line), checked=True))
+        return v
+
+    def product(self):
+        v = self.powered()
+        while True:
+            bit = next(((words, op) for words, op in self.BIT_WORDS if self.at(*words)), None)
+            if not bit:
+                break
+            words, op = bit
+            self.i += len(words)
+            r = self.powered()
+            if v.kind != NUMBER or r.kind != NUMBER:
+                raise ScriptError(self.line, f"'{' '.join(words)}' needs whole numbers, not {kind_name(v.kind)} and {kind_name(r.kind)}.")
+            a, b, line, l = v.run, r.run, self.line, v
+            v = with_ir(Value(f"stellanova::bits({op}, {v.cpp}, {r.cpp}, {line})", NUMBER, lambda env, a=a, b=b, op=op: bits(op, a(env), b(env), line)),
+                        lambda f, l=l, r=r, op=op, line=line: f.call("double", "cn_bits", ("i32", op), ("double", machine.emit(f, l)),
+                                                                     ("double", machine.emit(f, r)), ("i32", line), checked=True))
         while self.peek() in ("times", "*", "/") or self.at("divided", "by"):
             op = "/" if self.peek() in ("/", "divided") else "*"
             self.i += 2 if self.at("divided", "by") else 1
-            r = self.unary()
+            r = self.powered()
             if r.kind != NUMBER or v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can only multiply or divide a number or a place by a number, not {kind_name(v.kind)} by {kind_name(r.kind)}.")
             a, b = v.run, r.run

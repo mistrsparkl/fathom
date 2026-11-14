@@ -98,3 +98,7 @@ a quotation mark|The " letter, for text that holds one.
 new line|A line break, as text.
 invoke|Runs a command held in a name.
 whisper|Shows a message for the person writing the program, not the one using it.
+to the power|A number to a power: 2 to the power 10.
+bitwise and|The bits of whole numbers: 12 bitwise and 10 (also bitwise or, bitwise exclusive or).
+shifted left by|Moves a whole number's bits: 1 shifted left by 4 is 16 (also shifted right by).
+big plus|Whole numbers of any size, as text (library big numbers): big plus with ("123", "456"); also big minus, big times, big divided by, big remainder, big power, big compare.
