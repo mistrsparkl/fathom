@@ -11,7 +11,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Numbers: `to the power`, bitwise `and`/`or`/`exclusive or`/shifts, whole numbers of any size
 - [x] Bytes: lists of numbers from 0 to 255 (`the bytes of the file`, `fill the file`, `the bytes of the text`, `the text of the bytes`)
 - [x] Kinds of problem: `raise a <kind> with ...`, `if that went wrong with a <kind>:`
-- [ ] Commands for a kind of thing kept as values
+- [x] Commands for a kind of thing kept as values
 
 ## 2. Reaching everything else
 - [ ] Call any C library / DLL from a program (`use the library "user32.dll"` and a word for each function)

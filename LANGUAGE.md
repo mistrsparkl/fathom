@@ -117,6 +117,8 @@ and the universe said i love you
 | `given friend (a pet)`, `(a list of pets)` | A pet as an input, or a list of them. |
 | `scrawl rex` | Shows `a pet (name: Rex, age: 3, tricks: sit)`. |
 
+**Commands for a kind of thing, as values.** `set older to the command grow` keeps a command for a pet (`to grow, for a pet, given years (a number):`) as a value too. Kept this way it is `a command given a pet and a number returning a pet`: it changes a copy of the pet it is given and gives the changed copy back, so `set tom to invoke older with (tom, 3)` keeps the change. A command that returns something (`to summary, for a pet, returning text:`) gives that back instead.
+
 **Kinds for any kind.** A kind of thing can be described once for every kind it may hold, with `anything` standing for that kind:
 
 ```

@@ -241,6 +241,44 @@ def program_checks():
                           "other: there is no item 9 in a list of 1 item. Items are counted from 1.\n"), repr(out.stdout)
     assert out.stderr == "Line 5: litres can't be less than 0\n", repr(out.stderr)
 
+    # Commands for a kind of thing, kept as values: they change a copy and give it back.
+    out = both(''.join([
+               'a pet has:\n'
+               '  name (text)\n'
+               '  age (a number)\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to speak, for a pet:\n'
+               '  scrawl name, " makes a sound"\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to grow, for a pet, given years (a number):\n'
+               '  set age to age plus years\n'
+               'and the universe said i love you\n'
+               '\n'
+               'to summary, for a pet, returning text:\n'
+               '  return name plus " is " plus age\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  set tom to conjure a pet\n'
+               '  set the name of tom to "Tom"\n'
+               '  set talk to the command speak\n'
+               '  invoke talk with tom\n'
+               '  set older to the command grow\n'
+               '  set tom to invoke older with (tom, 3)\n'
+               '  invoke older with (tom, 100)\n'
+               '  scrawl the age of tom\n'
+               '  set tell to the command summary\n'
+               '  scrawl invoke tell with tom\n'
+               '  set jobs to a list of commands given a pet returning a pet\n'
+               '  add the command speak to jobs\n'
+               '  for each job in jobs:\n'
+               '    invoke job with tom\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
+
     # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
     out = both(''.join([
                'a stack of anything has:\n'

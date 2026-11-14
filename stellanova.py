@@ -4362,6 +4362,47 @@ def call(key, args, names, n):
     return f"{cpp}({', '.join(strip_parens(a.cpp) for a in args)})", run
 
 
+def owner_command_value(c, line):
+    """'the command speak', for a command for a kind of thing: kept as a value, it works on a copy of the thing it is given
+    and gives the changed copy back (or, if it returns something, that)."""
+    thing = c.kinds[0]
+    gives = c.gives or thing
+    kind = command_kind(c.kinds, gives)
+    ins = [f"_{k}" for k in range(len(c.kinds))]
+    if JS:
+        call_ = f"await {getattr(c, 'js', c.cpp)}({', '.join(ins)})"
+        body_cpp = f"return {call_};" if c.gives else f"_0 = stellanova::dup(_0); {call_}; return _0;"
+        cpp = f"(async ({', '.join(ins)}) => {{ {body_cpp} }})"
+    else:
+        call_ = f"{c.cpp}({', '.join(ins)})"
+        body_cpp = f"return {call_};" if c.gives else f"{call_}; return _0;"
+        params = ", ".join(f"{cpp_type(k)} {x}" for x, k in zip(ins, c.kinds))
+        cpp = f"{cpp_type(kind)}([=]({params}) {{ {body_cpp} }})"
+
+    def make(env):
+        def command(first, *rest):
+            first = dup(first)
+            out = c.runner(first, *rest)
+            return out if c.gives else first
+        return command
+
+    def body_ir(f):
+        args = [f.load(x, k) for x, k in zip(ins, c.kinds)]
+        args = [args[0] if c.gives else f.copied(args[0], thing)] + [f.copied(x, k) for x, k in zip(args[1:], c.kinds[1:])]
+        given = ", ".join(f"{machine.ll_type(k)} {x}" for x, k in zip(args, c.kinds))
+        name = machine_name(c.cpp, [((), k) for k in c.kinds])
+        if c.gives:
+            out = f.op(f"call {machine.ll_type(c.gives)} @cn_user_{name}({given})")
+        else:
+            f.put(f"call void @cn_user_{name}({given})")
+            out = args[0]
+        f.check()
+        return out
+    body = with_ir(Value("", gives, None), body_ir)
+    INLINE_COUNT[0] += 1
+    return with_ir(Value(cpp, kind, make), lambda f, name=f"kept_{INLINE_COUNT[0]}": machine.closure(f, name, list(zip(ins, c.kinds)), gives, body))
+
+
 def command_value(names, tokens, e, line):
     """'the command double': the command itself, to keep in a name or a list, or give to another command."""
     key, size = match_command(names, tokens[e.i:])
@@ -4370,7 +4411,7 @@ def command_value(names, tokens, e, line):
     e.i += size
     c = names.commands[key]
     if c.versions is not None:
-        raise ScriptError(line, f"'{' '.join(key)}' is for a kind of thing (it changes the thing it is given), so it can't be kept as a value.")
+        return owner_command_value(c, line)
     kind = command_kind(c.kinds, c.gives)
     if getattr(c, "unusable", None):
         raise ScriptError(line, c.unusable)
