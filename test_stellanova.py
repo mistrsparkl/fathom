@@ -196,6 +196,12 @@ def program_checks():
                           "bits need whole numbers smaller than 9007199254740992, not 1.5.\n"), repr(out.stdout)
     assert out.stderr == "Line 15: -8 to the power 0.5 can't be worked out (it is too big, or not a real number).\n", repr(out.stderr)
 
+    # Bytes: text to the numbers 0 to 255 and back.
+    out = both('use: letters\ngenesis:\n  set b to the bytes of the text "hi!"\n  scrawl b\n  add 33 to b\n'
+               '  scrawl the text of the bytes b\n  scrawl the text of the bytes a list of (300)\n' + END)
+    assert out.stdout == "104, 105, 33\nhi!!\n", repr(out.stdout)
+    assert out.stderr == "Line 7: a byte is a whole number from 0 to 255, not 300.\n", repr(out.stderr)
+
     # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
     out = both(''.join([
                'a stack of anything has:\n'

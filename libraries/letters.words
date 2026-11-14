@@ -31,6 +31,24 @@ code:
   			out += (char)(0xF0 | (c >> 18)), out += (char)(0x80 | ((c >> 12) & 0x3F)), out += (char)(0x80 | ((c >> 6) & 0x3F)), out += (char)(0x80 | (c & 0x3F));
   		return out;
   	}
+  	inline std::vector<double> bytes_of(const std::string& s)
+  	{
+  		std::vector<double> out;
+  		for (unsigned char c : s)
+  			out.push_back((double)c);
+  		return out;
+  	}
+  	inline std::string text_of(const std::vector<double>& bytes, int line)
+  	{
+  		std::string out;
+  		for (double x : bytes)
+  		{
+  			if (x < 0 || x > 255 || x != (double)(int)x)
+  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  			out += (char)(unsigned char)x;
+  		}
+  		return out;
+  	}
   }
 
 python:
@@ -42,6 +60,11 @@ python:
       if number < 0 or number > 0x10FFFF or number != int(number) or 0xD800 <= number <= 0xDFFF:
           raise RunError(0, "there is no letter with the code " + text(number) + ".")
       return chr(int(number))
+  def text_of(numbers):
+      for x in numbers:
+          if x < 0 or x > 255 or x != int(x):
+              raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
+      return bytes(int(x) for x in numbers).decode("utf-8", "replace")
 
 to code of the letter, given letter (text), returning a number = stellanova_letters::code_of({letter}, {line})
   runs: code_of({letter})
@@ -49,6 +72,12 @@ to code of the letter, given letter (text), returning a number = stellanova_lett
 to the letter with code, given code (a number), returning text = stellanova_letters::letter_with({code}, {line})
   runs: letter_with({code})
   web: stellanova_letters::letter_with({code}, {line})
+to the bytes of the text, given words (text), returning a list of numbers = stellanova_letters::bytes_of({words})
+  runs: [float(b) for b in {words}.encode("utf-8")]
+  web: Array.from(new TextEncoder().encode({words}))
+to the text of the bytes, given bytes (a list of numbers), returning text = stellanova_letters::text_of({bytes}, {line})
+  runs: text_of({bytes})
+  web: stellanova_letters.text_of({bytes}, {line})
 
 javascript:
   const stellanova_letters = {
@@ -60,5 +89,9 @@ javascript:
       if (n < 0 || n > 0x10FFFF || n !== Math.trunc(n) || (n >= 0xD800 && n <= 0xDFFF))
         stellanova.fail(line, "there is no letter with the code " + stellanova.text(n) + ".");
       return String.fromCodePoint(n);
+    },
+    text_of(bytes, line) {
+      for (const x of bytes) if (x < 0 || x > 255 || x !== Math.trunc(x)) stellanova.fail(line, "a byte is a whole number from 0 to 255, not " + stellanova.text(x) + ".");
+      return new TextDecoder().decode(new Uint8Array(bytes));
     },
   };
