@@ -1,6 +1,6 @@
 note: Words for a whole screen of your own: a full-screen window drawn with see-through colours, smooth rounded shapes,
 note: real fonts, frosted glass, layers and line icons. For desktops, apps and anything with a look of its own.
-note: Use them in a program with:  use: screen   (Windows, running directly; it needs Pillow: py -3 -m pip install pillow)
+note: Use them in a program with:  use: screen   (running directly it needs Pillow: py -3 -m pip install pillow; on the web it is a canvas over the page)
 note: Sizes and places are in dots, counted from the top left. On a screen set to show things bigger (like 150%),
 note: a dot is bigger too, so a program looks the same everywhere and text stays sharp.
 note: Colours are "#rrggbb", or "#rrggbbaa" to see through them (aa: 00 is clear, ff is solid). 'colour of hue' makes them from a hue.
@@ -808,114 +808,587 @@ python:
 
 to open the screen, given title (text)
   runs: open_screen({title})
+  web: stellanova_screen.open({title}, {line})
 to close the screen
   runs: close_screen()
+  web: stellanova_screen.close()
 the screen lives = 0, yes or no, read only
   runs: SCREEN.get("lives", False)
+  web: stellanova_screen.lives
 the screen was asked to close = 0, yes or no, read only
   runs: SCREEN.get("asked_close", False)
+  web: stellanova_screen.askedClose
 to stop asking to close
   runs: SCREEN.update(asked_close=False)
+  web: (stellanova_screen.askedClose = false)
 screen width = 0, number, read only
   runs: SCREEN["w"] / SCREEN["k"] if SCREEN["open"] else 0
+  web: (stellanova_screen.isOpen ? stellanova_screen.w / stellanova_screen.k : 0)
 screen height = 0, number, read only
   runs: SCREEN["h"] / SCREEN["k"] if SCREEN["open"] else 0
+  web: (stellanova_screen.isOpen ? stellanova_screen.h / stellanova_screen.k : 0)
 screen sharpness = 0, number, read only
   runs: SCREEN.get("k", 1)
+  web: stellanova_screen.k
 to show the screen
   runs: show()
+  web: await stellanova_screen.show({line})
 frame seconds = 0, number, read only
   runs: SCREEN.get("dt", 1 / 60)
+  web: stellanova_screen.dt
 to save the screen picture to, given file (text)
   runs: save_picture({file})
+  web: stellanova_screen.save({file}, {line})
 note: ---- drawing
 to clear the drawing with, given colour (text)
   runs: clear({colour})
+  web: stellanova_screen.clear({colour}, {line})
 to etch a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text)
   runs: rounded_box({x}, {y}, {width}, {height}, {radius}, {colour})
+  web: stellanova_screen.roundedBox({x}, {y}, {width}, {height}, {radius}, {colour}, {line})
 to outline a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text) and thickness (a number)
   runs: outline_box({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness})
+  web: stellanova_screen.outlineBox({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness}, {line})
 to etch a fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and top colour (text) and bottom colour (text)
   runs: fading_box({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, False)
+  web: stellanova_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, false, {line})
 to etch a sideways fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and left colour (text) and right colour (text)
   runs: fading_box({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, True)
+  web: stellanova_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, true, {line})
 to etch a glow, given x (a number) and y (a number) and radius (a number) and colour (text)
   runs: glow({x}, {y}, {radius}, {colour})
+  web: stellanova_screen.glow({x}, {y}, {radius}, {colour}, {line})
 to etch a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
   runs: dot({x}, {y}, {radius}, {colour})
+  web: stellanova_screen.dot({x}, {y}, {radius}, {colour}, {line})
 to etch a stroke, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) and thickness (a number)
   runs: stroke({x}, {y}, {to x}, {to y}, {colour}, {thickness})
+  web: stellanova_screen.trace([{x}, {y}, {to x}, {to y}], {colour}, {thickness}, {line})
 to etch a shape, given points (a list of numbers) and colour (text)
   runs: shape({points}, {colour})
+  web: stellanova_screen.shape({points}, {colour}, {line})
 to etch a fading shape, given points (a list of numbers) and top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
   runs: fading_shape({points}, {top colour}, {bottom colour}, {top}, {bottom})
+  web: stellanova_screen.fadingShape({points}, {top colour}, {bottom colour}, {top}, {bottom}, {line})
 to trace a shape, given points (a list of numbers) and colour (text) and thickness (a number)
   runs: trace({points}, {colour}, {thickness})
+  web: stellanova_screen.trace({points}, {colour}, {thickness}, {line})
 to etch text, given words (text) and x (a number) and y (a number) and size (a number) and style (text) and colour (text)
   runs: text({words}, {x}, {y}, {size}, {style}, {colour})
+  web: stellanova_screen.text({words}, {x}, {y}, {size}, {style}, {colour}, {line})
 to width of text, given words (text) and size (a number) and style (text), returning a number
   runs: text_width({words}, {size}, {style})
+  web: stellanova_screen.textWidth({words}, {size}, {style})
 to use the font, given style (text) and file (text)
   runs: use_font({style}, {file})
+  web: await stellanova_screen.useFont({style}, {file}, {line})
 to etch a picture, given file (text) and x (a number) and y (a number) and width (a number) and height (a number) and opacity (a number)
   runs: draw_picture({file}, {x}, {y}, {width}, {height}, {opacity})
+  web: await stellanova_screen.drawPicture({file}, {x}, {y}, {width}, {height}, {opacity}, {line})
 to picture width of, given file (text), returning a number
   runs: picture_size({file}, 0)
+  web: (await stellanova_screen.picture({file}, {line})).width / stellanova_screen.k
 to picture height of, given file (text), returning a number
   runs: picture_size({file}, 1)
+  web: (await stellanova_screen.picture({file}, {line})).height / stellanova_screen.k
 to etch an icon, given markup (text) and x (a number) and y (a number) and size (a number) and colour (text)
   runs: icon({markup}, {x}, {y}, {size}, {colour})
+  web: await stellanova_screen.icon({markup}, {x}, {y}, {size}, {colour}, {line})
 to etch frosted glass, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and tint (text)
   runs: frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint})
+  web: stellanova_screen.frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint}, {line})
 to etch a shadow, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and colour (text)
   runs: shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour})
+  web: stellanova_screen.shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour}, {line})
 to colour of hue, given hue (a number) and saturation (a number) and lightness (a number) and opacity (a number), returning text
   runs: hue_colour({hue}, {saturation}, {lightness}, {opacity})
+  web: stellanova_screen.hue({hue}, {saturation}, {lightness}, {opacity})
 note: ---- layers: drawn once, then put on the screen as often as you like (fast); clips keep drawing inside a box
 to begin the layer, given name (text) and width (a number) and height (a number)
   runs: begin_layer({name}, {width}, {height})
+  web: stellanova_screen.beginLayer({name}, {width}, {height}, {line})
 to end the layer
   runs: end_layer()
+  web: stellanova_screen.endLayer({line})
 to etch the layer, given name (text) and x (a number) and y (a number) and opacity (a number) and size (a number)
   runs: put_layer({name}, {x}, {y}, {opacity}, {size})
+  web: stellanova_screen.putLayer({name}, {x}, {y}, {opacity}, {size}, {line})
 to forget the layer, given name (text)
   runs: forget_layer({name})
+  web: stellanova_screen.layers.delete({name})
 to begin clipping, given x (a number) and y (a number) and width (a number) and height (a number)
   runs: begin_clip({x}, {y}, {width}, {height})
+  web: stellanova_screen.beginClip({x}, {y}, {width}, {height}, {line})
 to end clipping
   runs: end_clip()
+  web: stellanova_screen.endClip({line})
 note: ---- what the person does (each frame)
 pointer x = 0, number, read only
   runs: SCREEN.get("mx", 0)
+  web: stellanova_screen.mx
 pointer y = 0, number, read only
   runs: SCREEN.get("my", 0)
+  web: stellanova_screen.my
 the pointer went down = 0, yes or no, read only
   runs: "left" in SCREEN.get("down", ())
+  web: stellanova_screen.down.has("left")
 the pointer went up = 0, yes or no, read only
   runs: "left" in SCREEN.get("up", ())
+  web: stellanova_screen.up.has("left")
 the pointer is held = 0, yes or no, read only
   runs: "left" in SCREEN.get("held", ())
+  web: stellanova_screen.held.has("left")
 the right button went down = 0, yes or no, read only
   runs: "right" in SCREEN.get("down", ())
+  web: stellanova_screen.down.has("right")
 the pointer double clicked = 0, yes or no, read only
   runs: SCREEN.get("double", False)
+  web: stellanova_screen.double
 the wheel turned = 0, number, read only
   runs: SCREEN.get("wheel", 0.0)
+  web: stellanova_screen.wheel
 the keys pressed = 0, a list of text, read only
   runs: list(SCREEN.get("keys", []))
+  web: [...stellanova_screen.keys]
 to the key went down, given key (text), returning yes or no
   runs: key_went({key})
+  web: stellanova_screen.keys.includes({key})
 the typed letters = 0, text, read only
   runs: SCREEN.get("typed", "")
+  web: stellanova_screen.typed
 control is held = 0, yes or no, read only
   runs: SCREEN.get("ctrl", False)
+  web: stellanova_screen.ctrl
 shift is held = 0, yes or no, read only
   runs: SCREEN.get("shift", False)
+  web: stellanova_screen.shift
 alt is held = 0, yes or no, read only
   runs: SCREEN.get("alt", False)
+  web: stellanova_screen.alt
 to set the pointer look to, given look (text)
   runs: set_cursor({look})
+  web: stellanova_screen.setCursor({look}, {line})
 the clipboard text = 0, text, read only
   runs: clipboard_text()
+  web: (await stellanova_screen.clipboard())
 to copy to the clipboard, given words (text)
   runs: copy_text({words})
+  web: stellanova_screen.copy({words}, {line})
+
+javascript:
+  const stellanova_screen = {
+    // On a web page the screen is a canvas over the whole page. With node there is no screen: it is one nobody sees
+    // (STELLANOVA_SCREEN_SIZE and STELLANOVA_SCREEN_PLAY work as they do directly), checked but not drawn.
+    page: typeof document !== "undefined",
+    isOpen: false, lives: false, askedClose: false, w: 0, h: 0, k: 1, dt: 1 / 60, last: 0,
+    mx: 0, my: 0, held: new Set(), down: new Set(), up: new Set(), double: false, wheel: 0, keys: [], typed: "",
+    ctrl: false, shift: false, alt: false, play: null, playAt: 0, targets: [], layers: new Map(),
+    need(line) { if (!this.isOpen) stellanova.fail(line, "open the screen first, with 'open the screen with \"My app\"'."); },
+    now() { return typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000; },
+    colours: new Map(),
+    colour(c, line) {
+      if (this.colours.has(c)) return this.colours.get(c);
+      const named = { black: "#000000", white: "#ffffff", red: "#ff0000", green: "#00a000", blue: "#0000ff", clear: "#00000000" };
+      let s = c.trim().toLowerCase();
+      s = named[s] || s;
+      let h = s.startsWith("#") ? s.slice(1) : "";
+      if (h.length === 3 || h.length === 4) h = [...h].map((ch) => ch + ch).join("");
+      if (h.length === 6) h += "ff";
+      if (h.length !== 8 || !/^[0-9a-f]{8}$/.test(h))
+        stellanova.fail(line, `'${c}' isn't a colour I know. Write colours like "#0fb5ae", or "#0fb5ae80" to see through them.`);
+      const v = [0, 2, 4, 6].map((i) => parseInt(h.slice(i, i + 2), 16));
+      v.css = `rgba(${v[0]},${v[1]},${v[2]},${v[3] / 255})`;
+      this.colours.set(c, v);
+      return v;
+    },
+    hue(h, s, l, a) {
+      const even = (x) => { const f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2) ? f + 1 : f; };  // Python's round
+      const L = Math.max(0, Math.min(100, l)) / 100, S = Math.max(0, Math.min(100, s)) / 100, H = (((h % 360) + 360) % 360) / 360;
+      const m2 = L <= 0.5 ? L * (1 + S) : L + S - L * S, m1 = 2 * L - m2;
+      const v = (t) => { t = ((t % 1) + 1) % 1; return t < 1 / 6 ? m1 + (m2 - m1) * t * 6 : t < 0.5 ? m2 : t < 2 / 3 ? m1 + (m2 - m1) * (2 / 3 - t) * 6 : m1; };
+      const rgb = S === 0 ? [L, L, L] : [v(H + 1 / 3), v(H), v(H - 1 / 3)];
+      return "#" + [...rgb.map((x) => even(x * 255)), even(Math.max(0, Math.min(1, a)) * 255)].map((p) => p.toString(16).padStart(2, "0")).join("");
+    },
+    canvas(w, h) {
+      if (!this.page) return null;
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, w), c.height = Math.max(1, h);
+      return c;
+    },
+    open(title, line) {
+      if (this.isOpen) return;
+      const names = { " ": "Space" };
+      if (this.page) {
+        document.title = title;
+        this.k = Math.max(1, devicePixelRatio || 1);
+        this.w = Math.round(innerWidth * this.k), this.h = Math.round(innerHeight * this.k);
+        const c = this.canvas(this.w, this.h);
+        Object.assign(c.style, { position: "fixed", left: "0", top: "0", width: innerWidth + "px", height: innerHeight + "px", background: "#000", outline: "none" });
+        c.tabIndex = 0;
+        document.body.appendChild(c);
+        this.screen = c;
+        const where = (e) => { this.mx = e.offsetX, this.my = e.offsetY; };
+        const button = (e) => (e.button === 2 ? "right" : e.button === 0 ? "left" : null);
+        c.addEventListener("mousemove", where);
+        c.addEventListener("mousedown", (e) => { where(e); const b = button(e); if (b) this.held.add(b), this.down.add(b); c.focus(); });
+        addEventListener("mouseup", (e) => { const b = button(e); if (b) this.held.delete(b), this.up.add(b); });
+        c.addEventListener("dblclick", () => (this.double = true));
+        c.addEventListener("contextmenu", (e) => e.preventDefault());
+        c.addEventListener("wheel", (e) => { this.wheel += e.deltaY / 100; e.preventDefault(); }, { passive: false });
+        addEventListener("keydown", (e) => {
+          this.ctrl = e.ctrlKey, this.shift = e.shiftKey, this.alt = e.altKey;
+          this.keys.push(names[e.key] || (e.key.length === 1 ? e.key.toLowerCase() : e.key));
+          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) this.typed += e.key;
+          if (e.key === "Tab" || e.key === "Backspace" || e.key === " " || e.key.startsWith("Arrow")) e.preventDefault();
+        });
+        addEventListener("keyup", (e) => { this.ctrl = e.ctrlKey, this.shift = e.shiftKey, this.alt = e.altKey; });
+        c.focus();
+      } else {
+        const size = (process.env.STELLANOVA_SCREEN_SIZE || "1600x900").toLowerCase().split("x").map(Number);
+        this.k = Number(process.env.STELLANOVA_SCREEN_SCALE) || 1;
+        [this.w, this.h] = size;
+        const play = process.env.STELLANOVA_SCREEN_PLAY;
+        if (play) {
+          this.play = require("fs").readFileSync(play, "utf8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+          this.playAt = this.now();
+        }
+      }
+      this.isOpen = this.lives = true;
+      this.askedClose = false;
+      this.last = this.now();
+      this.targets = [{ c: this.screen || null, g: this.screen ? this.screen.getContext("2d") : null, ox: 0, oy: 0, px: 0, py: 0, main: true }];
+    },
+    close() {
+      if (!this.isOpen) return;
+      this.lives = this.isOpen = false;
+      if (this.screen) this.screen.remove();
+      this.screen = null;
+    },
+    playSteps() {  // steps for checking a program without a person: wait, move, click, down, up, double, right, wheel, key, type, shot, quit
+      const steps = this.play, now = this.now();
+      while (steps.length && now >= this.playAt) {
+        const [what, ...rest] = steps.shift().split(" ");
+        if (what === "wait") this.playAt = now + Number(rest[0]);
+        else if (["move", "click", "down", "up", "double", "right"].includes(what)) {
+          this.mx = Number(rest[0]), this.my = Number(rest[1]);
+          if (what === "click" || what === "down" || what === "double") {
+            this.held.add("left"), this.down.add("left");
+            if (what !== "down") steps.unshift("release");
+            if (what === "double") this.double = true;
+            return;
+          }
+          if (what === "up") this.held.delete("left"), this.up.add("left");
+          if (what === "right") this.down.add("right"), this.up.add("right");
+        } else if (what === "release") { this.held.delete("left"), this.up.add("left"); return; }
+        else if (what === "wheel") this.wheel += Number(rest[0]);
+        else if (what === "key") {
+          this.ctrl = rest.slice(1).includes("ctrl"), this.shift = rest.slice(1).includes("shift"), this.alt = rest.slice(1).includes("alt");
+          this.keys.push(rest[0]);
+          steps.unshift("lift");
+          return;
+        } else if (what === "lift") this.ctrl = this.shift = this.alt = false;
+        else if (what === "type") { this.typed += rest.join(" "); return; }
+        else if (what === "quit") this.askedClose = true, this.lives = false;
+      }
+    },
+    async show(line) {
+      this.need(line);
+      if (this.targets.length > 1) stellanova.fail(line, "a layer or a clip is still open: finish it ('end the layer' or 'end clipping') before showing the screen.");
+      this.down = new Set(), this.up = new Set(), this.double = false, this.wheel = 0, this.keys = [], this.typed = "";
+      if (this.play) this.playSteps();
+      if (this.page) await new Promise((r) => requestAnimationFrame(() => r()));
+      else {
+        const left = 1 / 60 - (this.now() - this.last);
+        if (left > 0) await new Promise((r) => setTimeout(r, left * 1000));
+      }
+      const now = this.now();
+      this.dt = Math.min(0.25, now - this.last), this.last = now;
+    },
+    setCursor(look, line) {
+      this.need(line);
+      const names = { arrow: "default", hand: "pointer", text: "text", move: "move", across: "ew-resize", "up and down": "ns-resize",
+                      corner: "nwse-resize", "other corner": "nesw-resize", wait: "wait" };
+      if (this.screen) this.screen.style.cursor = names[look] || "default";
+    },
+    async clipboard() {
+      if (!this.page || !navigator.clipboard) return "";
+      return navigator.clipboard.readText().catch(() => "");
+    },
+    copy(words, line) {
+      this.need(line);
+      if (this.page && navigator.clipboard) navigator.clipboard.writeText(words).catch(() => {});
+    },
+
+    // ---- where drawing goes: the screen, a layer, or a clip inside them
+    target() { return this.targets[this.targets.length - 1]; },
+    px(t, x, y) { return [Math.round((x - t.ox) * this.k), Math.round((y - t.oy) * this.k)]; },
+    size(w) { return Math.max(0, Math.round(w * this.k)); },
+    paint(line, make) {  // the target's drawing, or nothing with node
+      this.need(line);
+      const t = this.target();
+      if (t.g) { t.g.save(); make(t.g, t); t.g.restore(); }
+    },
+    rounded(g, X, Y, W, H, R) {
+      g.beginPath();
+      g.roundRect(X, Y, W, H, Math.max(0, Math.min(R, W / 2, H / 2)));
+    },
+    clear(c, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        if (!t.main) g.clearRect(0, 0, t.c.width, t.c.height);
+        g.fillStyle = t.main ? `rgb(${col[0]},${col[1]},${col[2]})` : col.css;
+        g.fillRect(0, 0, t.c.width, t.c.height);
+      });
+    },
+    roundedBox(x, y, w, h, r, c, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y), W = this.size(w), H = this.size(h);
+        if (W <= 0 || H <= 0 || col[3] === 0) return;
+        g.fillStyle = col.css;
+        if (r <= 0) g.fillRect(X, Y, W, H);
+        else { this.rounded(g, X, Y, W, H, this.size(r)); g.fill(); }
+      });
+    },
+    outlineBox(x, y, w, h, r, c, width, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y), W = this.size(w), H = this.size(h), R = this.size(r), L = Math.max(1, this.size(width));
+        if (W <= 2 * L || H <= 2 * L) return;
+        g.beginPath();
+        g.roundRect(X, Y, W, H, Math.min(R, W / 2, H / 2));
+        g.roundRect(X + L, Y + L, W - 2 * L, H - 2 * L, Math.max(0, Math.min(R - L, (W - 2 * L) / 2, (H - 2 * L) / 2)));
+        g.fillStyle = col.css;
+        g.fill("evenodd");
+      });
+    },
+    fadingBox(x, y, w, h, r, c1, c2, sideways, line) {
+      const a = this.colour(c1, line), b = this.colour(c2, line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y), W = this.size(w), H = this.size(h);
+        if (W <= 0 || H <= 0) return;
+        const f = sideways ? g.createLinearGradient(X, 0, X + W, 0) : g.createLinearGradient(0, Y, 0, Y + H);
+        f.addColorStop(0, a.css), f.addColorStop(1, b.css);
+        g.fillStyle = f;
+        this.rounded(g, X, Y, W, H, this.size(r));
+        g.fill();
+      });
+    },
+    glow(x, y, radius, c, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const R = this.size(radius), [X, Y] = this.px(t, x, y);
+        if (R <= 0) return;
+        const f = g.createRadialGradient(X, Y, 0, X, Y, R);
+        for (let k = 0; k <= 8; k++) f.addColorStop(k / 8, `rgba(${col[0]},${col[1]},${col[2]},${(col[3] / 255) * (1 - k / 8) ** 2})`);
+        g.fillStyle = f;
+        g.fillRect(X - R, Y - R, 2 * R, 2 * R);
+      });
+    },
+    dot(x, y, radius, c, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const R = radius * this.k, [X, Y] = this.px(t, x, y);
+        if (R <= 0) return;
+        g.fillStyle = col.css;
+        g.beginPath();
+        g.arc(X, Y, Math.max(1, Math.round(R * 2)) / 2, 0, 2 * Math.PI);
+        g.fill();
+      });
+    },
+    points(t, pts, line) {
+      if (pts.length % 2) stellanova.fail(line, "the points of a shape come in pairs: x, y, x, y...");
+      const out = [];
+      for (let i = 0; i < pts.length; i += 2) out.push(this.px(t, pts[i], pts[i + 1]));
+      return out;
+    },
+    path(g, ps, close) {
+      g.beginPath();
+      ps.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
+      if (close) g.closePath();
+    },
+    shape(pts, c, line) {
+      this.need(line);
+      const ps = this.points(this.target(), pts, line), col = this.colour(c, line);
+      this.paint(line, (g) => { if (ps.length >= 3) { this.path(g, ps, true); g.fillStyle = col.css; g.fill(); } });
+    },
+    fadingShape(pts, c1, c2, top, bottom, line) {
+      this.need(line);
+      const ps = this.points(this.target(), pts, line), a = this.colour(c1, line), b = this.colour(c2, line);
+      this.paint(line, (g, t) => {
+        if (ps.length < 3) return;
+        const T = this.px(t, 0, top)[1], B = this.px(t, 0, bottom)[1], f = g.createLinearGradient(0, T, 0, B === T ? T + 1 : B);
+        f.addColorStop(0, a.css), f.addColorStop(1, b.css);
+        this.path(g, ps, true);
+        g.fillStyle = f;
+        g.fill();
+      });
+    },
+    trace(pts, c, width, line) {
+      this.need(line);
+      const ps = this.points(this.target(), pts, line), col = this.colour(c, line);
+      this.paint(line, (g) => {
+        if (ps.length < 2) return;
+        this.path(g, ps, false);
+        g.strokeStyle = col.css, g.lineWidth = Math.max(1, this.size(width)), g.lineJoin = "round";
+        g.stroke();
+      });
+    },
+
+    // ---- words
+    fonts: {},
+    font(size, style) {
+      const own = this.fonts[style];
+      if (own) return `${size * this.k}px "${own}"`;
+      const look = { regular: "400", medium: "400", semibold: "600", bold: "700", display: "600", mono: "400", "mono bold": "700" }[style] || "400";
+      const family = style.startsWith("mono") ? 'Consolas, "Cascadia Mono", monospace' : '"Segoe UI", system-ui, sans-serif';
+      return `${look} ${size * this.k}px ${family}`;
+    },
+    async useFont(style, file, line) {
+      if (!this.page) return;
+      const name = "stellanova " + style;
+      try {
+        const face = new FontFace(name, `url("${encodeURI(file)}")`);
+        document.fonts.add(await face.load());
+      } catch {
+        stellanova.fail(line, `I couldn't read the font '${file}'.`);
+      }
+      this.fonts[style] = name;
+    },
+    text(words, x, y, size, style, c, line) {
+      this.need(line);
+      if (!words) return;
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y);
+        g.font = this.font(size, style), g.textBaseline = "alphabetic", g.fillStyle = col.css;
+        g.fillText(words, X, Y + g.measureText(words).fontBoundingBoxAscent);  // y is the top of the font's ascender, as directly
+      });
+    },
+    measurer: null,
+    textWidth(words, size, style) {
+      if (!this.page) return words.length * size * 0.55;  // shortcut: node has no fonts, so this is a guess there; a page measures it
+      this.measurer ||= document.createElement("canvas").getContext("2d");
+      this.measurer.font = this.font(size, style);
+      return this.measurer.measureText(words).width / this.k;
+    },
+
+    // ---- pictures and icons
+    pictures: new Map(),
+    async picture(file, line) {
+      if (this.pictures.has(file)) return this.pictures.get(file);
+      let got = null;
+      if (this.page) {
+        got = await new Promise((resolve) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => resolve(null); im.src = file; });
+      } else {
+        try {
+          const b = require("fs").readFileSync(file);
+          if (b.readUInt32BE(0) === 0x89504e47) got = { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+          else if (b.toString("latin1", 0, 3) === "GIF") got = { width: b.readUInt16LE(6), height: b.readUInt16LE(8) };
+          else got = { width: 0, height: 0 };  // shortcut: node only reads the sizes of .png and .gif pictures
+        } catch {}
+      }
+      if (!got) stellanova.fail(line, `I couldn't open the picture "${file}".`);
+      this.pictures.set(file, got);
+      return got;
+    },
+    async drawPicture(file, x, y, w, h, opacity, line) {
+      this.need(line);
+      const im = await this.picture(file, line);
+      this.paint(line, (g, t) => {
+        const W = this.size(w), H = this.size(h), [X, Y] = this.px(t, x, y);
+        if (W <= 0 || H <= 0) return;
+        g.globalAlpha = Math.max(0, Math.min(1, opacity));
+        g.drawImage(im, X, Y, W, H);
+      });
+    },
+    icons: new Map(),
+    async icon(markup, x, y, size, c, line) {
+      this.need(line);
+      const col = this.colour(c, line), P = this.size(size);
+      if (P <= 0 || !this.page) return;
+      const key = markup + "\u0000" + col.css + "\u0000" + P;
+      if (!this.icons.has(key)) {
+        let svg = markup.replace(/currentColor/g, `rgb(${col[0]},${col[1]},${col[2]})`);
+        if (!/xmlns=/.test(svg)) svg = svg.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        svg = svg.replace(/<svg\b([^>]*)>/, (all, attrs) => {
+          let a = attrs.replace(/\s(width|height)\s*=\s*['"][^'"]*['"]/g, "");
+          if (!/viewBox/.test(a)) a += ' viewBox="0 0 24 24"';
+          if (!/\sfill\s*=/.test(a)) a += ' fill="none"';
+          if (!/\sstroke\s*=/.test(a)) a += ` stroke="rgb(${col[0]},${col[1]},${col[2]})"`;
+          if (!/stroke-width/.test(a)) a += ' stroke-width="1.8"';
+          return `<svg${a} width="${P}" height="${P}" stroke-linecap="round" stroke-linejoin="round">`;
+        });
+        const im = await new Promise((resolve) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = () => resolve(null); i.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+        if (this.icons.size > 600) this.icons.clear();
+        this.icons.set(key, im);
+      }
+      const im = this.icons.get(key);
+      if (im) this.paint(line, (g, t) => { const [X, Y] = this.px(t, x, y); g.globalAlpha = col[3] / 255; g.drawImage(im, X, Y, P, P); });
+    },
+
+    // ---- glass, shadows, layers and clips
+    frosted(x, y, w, h, r, blur, c, line) {
+      this.need(line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y), W = this.size(w), H = this.size(h);
+        if (W < 4 || H < 4) return;
+        const copy = this.canvas(t.c.width, t.c.height);
+        copy.getContext("2d").drawImage(t.c, 0, 0);
+        this.rounded(g, X, Y, W, H, this.size(r));
+        g.clip();
+        g.filter = `blur(${Math.max(0.5, blur * this.k)}px)`;
+        g.drawImage(copy, 0, 0);
+      });
+      this.roundedBox(x, y, w, h, r, c, line);
+    },
+    shadow(x, y, w, h, r, blur, c, line) {
+      const col = this.colour(c, line);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y), W = this.size(w), H = this.size(h), B = Math.max(1, Math.round(blur * this.k));
+        g.filter = `blur(${B / 2}px)`;
+        g.fillStyle = col.css;
+        this.rounded(g, X, Y, W, H, this.size(r));
+        g.fill();
+      });
+    },
+    beginLayer(name, w, h, line) {
+      this.need(line);
+      const c = this.canvas(Math.max(1, this.size(w)), Math.max(1, this.size(h)));
+      this.targets.push({ c, g: c && c.getContext("2d"), ox: 0, oy: 0, px: 0, py: 0, name });
+    },
+    endLayer(line) {
+      this.need(line);
+      if (this.targets.length < 2 || this.target().name === undefined) stellanova.fail(line, "there is no layer to end: start one with 'begin the layer'.");
+      const t = this.targets.pop();
+      this.layers.set(t.name, t.c);
+    },
+    putLayer(name, x, y, opacity, grow, line) {
+      this.need(line);
+      if (!this.layers.has(name)) stellanova.fail(line, `there is no layer called "${name}" yet.`);
+      const im = this.layers.get(name);
+      this.paint(line, (g, t) => {
+        const [X, Y] = this.px(t, x, y);
+        g.globalAlpha = Math.max(0, Math.min(1, opacity));
+        g.drawImage(im, X, Y, Math.max(1, Math.round(im.width * grow)), Math.max(1, Math.round(im.height * grow)));
+      });
+    },
+    beginClip(x, y, w, h, line) {
+      this.need(line);
+      const parent = this.target(), [X, Y] = this.px(parent, x, y), c = this.canvas(Math.max(1, this.size(w)), Math.max(1, this.size(h)));
+      this.targets.push({ c, g: c && c.getContext("2d"), ox: parent.ox + x, oy: parent.oy + y, px: X, py: Y, clip: true });
+    },
+    endClip(line) {
+      this.need(line);
+      if (this.targets.length < 2 || !this.target().clip) stellanova.fail(line, "there is no clip to end: start one with 'begin clipping'.");
+      const t = this.targets.pop();
+      this.paint(line, (g) => g.drawImage(t.c, t.px, t.py));
+    },
+    save(file, line) {
+      this.need(line);
+      if (!this.screen) return;  // node has no picture of the screen
+      const a = document.createElement("a");
+      a.href = this.screen.toDataURL("image/png"), a.download = file.replace(/^.*[\\/]/, "");
+      a.click();
+    },
+  };
