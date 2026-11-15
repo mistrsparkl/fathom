@@ -1,48 +1,104 @@
-note: Words for the computer itself (Windows). Use them in a program with:  use: computer
+note: Words for the computer itself (Windows or Linux). Use them in a program with:  use: computer
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <shellapi.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <shellapi.h>
+  #else
+  #include <fcntl.h>
+  #include <signal.h>
+  #include <spawn.h>
+  #include <sys/wait.h>
+  #include <unistd.h>
+  extern char** environ;
+  #endif
 include: <cstdlib>
+include: <thread>
 link: shell32
 
 code:
   namespace stellanova_computer
   {
-  	inline std::string user_name()
+  	inline std::string environment(const std::string& name)
   	{
+  #ifdef _WIN32
   		char* found = nullptr;
   		size_t size = 0;
-  		std::string name = _dupenv_s(&found, &size, "USERNAME") == 0 && found ? found : "";
+  		std::string value = _dupenv_s(&found, &size, name.c_str()) == 0 && found ? found : "";
   		std::free(found);
-  		return name;
+  		return value;
+  #else
+  		const char* found = std::getenv(name.c_str());
+  		return found ? found : "";
+  #endif
   	}
+  	inline std::string user_name()
+  	{
+  		std::string name = environment("USERNAME");
+  		return name.empty() ? environment("USER") : name;  // (Linux calls it USER)
+  	}
+  #ifdef _WIN32
+  	inline void beep(double pitch, double seconds) { Beep((DWORD)pitch, (DWORD)(1000 * seconds)); }
+  	inline double run_command(const std::string& command) { return (double)std::system(command.c_str()); }
+  	inline void open_thing(const std::string& thing) { ShellExecuteA(nullptr, "open", thing.c_str(), nullptr, nullptr, SW_SHOWNORMAL); }
+  #else
+  	inline void beep(double, double seconds)  // a terminal only rings its bell
+  	{
+  		std::fputs("\a", stdout);
+  		std::fflush(stdout);
+  		std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+  	}
+  	inline double run_command(const std::string& command)
+  	{
+  		std::fflush(stdout);
+  		int status = std::system(command.c_str());
+  		return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+  	}
+  	inline void open_thing(const std::string& thing)
+  	{
+  		const char* words[] = {"xdg-open", thing.c_str(), nullptr};
+  		pid_t pid;
+  		if (posix_spawnp(&pid, "xdg-open", nullptr, nullptr, const_cast<char**>(words), environ) == 0)
+  			std::thread([pid] { waitpid(pid, nullptr, 0); }).detach();
+  	}
+  #endif
   }
 
 python:
   import ctypes
+  import time
+  LINUX = sys.platform.startswith("linux")
   def beep(pitch, seconds):
+      if LINUX:  # a terminal only rings its bell
+          sys.stdout.write("\a")
+          sys.stdout.flush()
+          time.sleep(seconds)
+          return
       ctypes.windll.kernel32.Beep(int(pitch), int(seconds * 1000))
   def run_command(command):
       sys.stdout.flush()
-      return float(subprocess.call(command, shell=True))
+      code = subprocess.call(command, shell=True)
+      return float(-1 if code < 0 else code)
   def open_thing(thing):
-      os.startfile(thing)
+      if LINUX:
+          subprocess.Popen(["xdg-open", thing], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+      else:
+          os.startfile(thing)
 
-to beep, given pitch (a number) and seconds (a number) = Beep((DWORD)({pitch}), (DWORD)(1000 * {seconds}))
+to beep, given pitch (a number) and seconds (a number) = stellanova_computer::beep({pitch}, {seconds})
   runs: beep({pitch}, {seconds})
   web: await stellanova_computer.beep({pitch}, {seconds})
-to run the command, given command (text), returning a number = (double)std::system({command}.c_str())
+to run the command, given command (text), returning a number = stellanova_computer::run_command({command})
   runs: run_command({command})
   web: stellanova_computer.run({command}, {line})
-to open, given thing (text) = ShellExecuteA(nullptr, "open", {thing}.c_str(), nullptr, nullptr, SW_SHOWNORMAL)
+to open, given thing (text) = stellanova_computer::open_thing({thing})
   runs: open_thing({thing})
   web: stellanova_computer.open({thing})
 
 user name = stellanova_computer::user_name(), text, read only
-  runs: os.environ.get("USERNAME", "")
+  runs: os.environ.get("USERNAME") or os.environ.get("USER", "")
   web: stellanova_computer::environment("USERNAME")
 
 include: <cstdio>
@@ -54,27 +110,27 @@ code:
   	inline std::string output_of(const std::string& command, int line)
   	{
   		std::fflush(stdout);
+  #ifdef _WIN32
   		FILE* pipe = _popen(command.c_str(), "rb");
+  #else
+  		FILE* pipe = popen(command.c_str(), "r");
+  #endif
   		if (!pipe)
   			stellanova::fail(line, "I couldn't run the command \"" + command + "\".");
   		std::string all;
   		char chunk[4096];
   		for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, pipe)) > 0;)
   			all.append(chunk, got);
+  #ifdef _WIN32
   		_pclose(pipe);
+  #else
+  		pclose(pipe);
+  #endif
   		std::string tidy;
   		for (char c : all)
   			if (c != '\r')
   				tidy += c;
   		return tidy;
-  	}
-  	inline std::string environment(const std::string& name)
-  	{
-  		char* found = nullptr;
-  		size_t size = 0;
-  		std::string value = _dupenv_s(&found, &size, name.c_str()) == 0 && found ? found : "";
-  		std::free(found);
-  		return value;
   	}
   	[[noreturn]] inline void end_program(double code)
   	{
@@ -118,6 +174,126 @@ include: <mutex>
 include: <thread>
 
 code:
+  #ifndef _WIN32
+  namespace stellanova_computer
+  {
+  	struct Running
+  	{
+  		pid_t pid = 0;  // also its process group: stopping it stops what it started too
+  		int typing = -1, code = -1;
+  		bool ended = false;
+  		std::string out, err;
+  		bool out_done = false, err_done = false;
+  		std::mutex lock;
+  	};
+  	inline std::map<int, std::shared_ptr<Running>>& programs() { static std::map<int, std::shared_ptr<Running>> all; return all; }
+  	inline std::mutex& programs_lock() { static std::mutex m; return m; }
+  	inline std::shared_ptr<Running> program(double id, int line)
+  	{
+  		std::lock_guard<std::mutex> hold(programs_lock());
+  		auto it = programs().find((int)id);
+  		if (it == programs().end())
+  			stellanova::fail(line, "there is no program " + stellanova::text(id) + " (start one with 'start the program').");
+  		return it->second;
+  	}
+  	inline void read_into(int from, std::shared_ptr<Running> r, bool errors)
+  	{
+  		char chunk[4096];
+  		for (ssize_t got; (got = read(from, chunk, sizeof chunk)) > 0;)
+  		{
+  			std::lock_guard<std::mutex> hold(r->lock);
+  			for (ssize_t k = 0; k < got; ++k)
+  				if (chunk[k] != '\r')
+  					(errors ? r->err : r->out) += chunk[k];
+  		}
+  		close(from);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		(errors ? r->err_done : r->out_done) = true;
+  	}
+  	inline double start_program(const std::string& command, const std::string& folder, int line)
+  	{
+  		signal(SIGPIPE, SIG_IGN);  // typing into a program that ended mustn't end this one
+  		int out[2], err[2], in[2];
+  		if (pipe2(out, O_CLOEXEC) || pipe2(err, O_CLOEXEC) || pipe2(in, O_CLOEXEC))
+  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  		posix_spawn_file_actions_t acts;
+  		posix_spawn_file_actions_init(&acts);
+  		posix_spawn_file_actions_adddup2(&acts, out[1], 1);
+  		posix_spawn_file_actions_adddup2(&acts, err[1], 2);
+  		posix_spawn_file_actions_adddup2(&acts, in[0], 0);
+  		if (!folder.empty())
+  			posix_spawn_file_actions_addchdir_np(&acts, folder.c_str());
+  		posix_spawnattr_t attr;
+  		posix_spawnattr_init(&attr);
+  		posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+  		posix_spawnattr_setpgroup(&attr, 0);
+  		const char* words[] = {"/bin/sh", "-c", command.c_str(), nullptr};
+  		auto r = std::make_shared<Running>();
+  		int bad = posix_spawn(&r->pid, "/bin/sh", &acts, &attr, const_cast<char**>(words), environ);
+  		posix_spawn_file_actions_destroy(&acts);
+  		posix_spawnattr_destroy(&attr);
+  		close(out[1]);
+  		close(err[1]);
+  		close(in[0]);
+  		if (bad)
+  		{
+  			for (int fd : {out[0], err[0], in[1]})
+  				close(fd);
+  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  		}
+  		r->typing = in[1];
+  		std::thread(read_into, out[0], r, false).detach();
+  		std::thread(read_into, err[0], r, true).detach();
+  		std::lock_guard<std::mutex> hold(programs_lock());
+  		static int next = 0;
+  		programs()[++next] = r;
+  		return next;
+  	}
+  	inline void check_ended(Running& r)  // (r.lock held)
+  	{
+  		int status = 0;
+  		if (!r.ended && waitpid(r.pid, &status, WNOHANG) == r.pid)
+  		{
+  			r.ended = true;
+  			r.code = WIFEXITED(status) ? WEXITSTATUS(status) : -WTERMSIG(status);  // as Python says it
+  		}
+  	}
+  	inline std::string new_output(double id, bool errors, int line)
+  	{
+  		auto r = program(id, line);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		std::string got;
+  		std::swap(got, errors ? r->err : r->out);
+  		return got;
+  	}
+  	inline void type_into(double id, const std::string& words, int line)
+  	{
+  		auto r = program(id, line);
+  		std::string sent = words + "\n";
+  		if (r->typing >= 0 && write(r->typing, sent.data(), sent.size()) < 0)
+  			return;
+  	}
+  	inline bool is_running(double id, int line)  // until it has ended and everything it wrote has been read
+  	{
+  		auto r = program(id, line);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		check_ended(*r);
+  		return !r->ended || !r->out_done || !r->err_done;
+  	}
+  	inline double exit_code(double id, int line)
+  	{
+  		auto r = program(id, line);
+  		std::lock_guard<std::mutex> hold(r->lock);
+  		check_ended(*r);
+  		return r->ended ? r->code : -1;
+  	}
+  	inline void stop_program(double id, int line)
+  	{
+  		auto r = program(id, line);
+  		kill(-r->pid, SIGKILL);
+  	}
+  }
+  #else
   namespace stellanova_computer
   {
   	struct Running
@@ -231,6 +407,7 @@ code:
   		TerminateJobObject(r->job, 1);
   	}
   }
+  #endif
 
 python:
   import threading
@@ -239,7 +416,7 @@ python:
       sys.stdout.flush()
       try:
           p = subprocess.Popen(command, cwd=folder or None, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), shell=LINUX, start_new_session=LINUX)
       except OSError:
           raise RunError(0, "I couldn't start the program \"" + command + "\".")
       r = {"p": p, "out": [], "err": [], "lock": threading.Lock()}
@@ -276,6 +453,12 @@ python:
       return -1.0 if code is None else float(code)
   def stop_program(n):
       p = running_program(n)["p"]
+      if LINUX:  # its process group: what it started stops too
+          try:
+              os.killpg(p.pid, 9)
+          except OSError:
+              pass
+          return
       subprocess.call(["taskkill", "/T", "/F", "/PID", str(p.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 to start the program, given command (text) and folder (text), returning a number = stellanova_computer::start_program({command}, {folder}, {line})

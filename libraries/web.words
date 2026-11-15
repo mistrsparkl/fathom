@@ -1,15 +1,84 @@
 note: Words for the internet. Use them in a program with:  use: web
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <urlmon.h>
-include: <wininet.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <urlmon.h>
+  #include <wininet.h>
+  #else
+  #include <fcntl.h>
+  #include <spawn.h>
+  #include <sys/wait.h>
+  #include <unistd.h>
+  extern char** environ;
+  #endif
 link: urlmon
 link: wininet
 
 code:
+  #ifndef _WIN32
+  namespace stellanova_web
+  {
+  	// Linux: the system's curl does the asking (its words given straight to it, never through a shell).
+  	inline bool curl(std::vector<std::string> words, std::string* out)
+  	{
+  		words.insert(words.begin(), {"curl", "-sSfL", "-A", "Stellanova", "--max-time", "60"});
+  		std::vector<char*> argv;
+  		for (auto& w : words)
+  			argv.push_back(w.data());
+  		argv.push_back(nullptr);
+  		int pipe_ends[2];
+  		if (pipe(pipe_ends))
+  			return false;
+  		posix_spawn_file_actions_t acts;
+  		posix_spawn_file_actions_init(&acts);
+  		posix_spawn_file_actions_adddup2(&acts, pipe_ends[1], 1);
+  		posix_spawn_file_actions_addopen(&acts, 2, "/dev/null", O_WRONLY, 0);
+  		posix_spawn_file_actions_addclose(&acts, pipe_ends[0]);
+  		pid_t pid;
+  		int bad = posix_spawnp(&pid, "curl", &acts, nullptr, argv.data(), environ);
+  		posix_spawn_file_actions_destroy(&acts);
+  		close(pipe_ends[1]);
+  		char chunk[4096];
+  		for (ssize_t got; (got = read(pipe_ends[0], chunk, sizeof chunk)) > 0;)
+  			if (out)
+  				out->append(chunk, got);
+  		close(pipe_ends[0]);
+  		int status = 0;
+  		if (bad || waitpid(pid, &status, 0) < 0)
+  			return false;
+  		return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  	}
+  	inline std::string get(const std::string& address, int line)
+  	{
+  		std::string all;
+  		if (!curl({"--", address}, &all))
+  			stellanova::fail(line, "I couldn't get the web page \"" + address + "\".");
+  		return all;
+  	}
+  	inline void download(const std::string& address, const std::string& name, int line)
+  	{
+  		if (!curl({"-o", name, "--", address}, nullptr))
+  			stellanova::fail(line, "I couldn't download \"" + address + "\".");
+  	}
+  	inline std::string send(const std::string& address, const std::string& body, int line)
+  	{
+  		char held[] = "/tmp/stellanova_sendXXXXXX";
+  		int fd = mkstemp(held);
+  		bool wrote = fd >= 0 && write(fd, body.data(), body.size()) == (ssize_t)body.size();
+  		if (fd >= 0)
+  			close(fd);
+  		std::string all;
+  		bool ok = wrote && curl({"-H", "Content-Type: text/plain; charset=utf-8", "--data-binary", std::string("@") + held, "--", address}, &all);
+  		unlink(held);
+  		if (!ok)
+  			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
+  		return all;
+  	}
+  }
+  #else
   namespace stellanova_web
   {
   	inline std::string get(const std::string& address, int line)
@@ -81,6 +150,7 @@ code:
   		return all;
   	}
   }
+  #endif
 
 python:
   import urllib.request

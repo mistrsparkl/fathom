@@ -853,7 +853,7 @@ def make_exe(ll_text_, exe, work, units=None):
         link = [f for f in target_flags() if "include" not in f and f != "-isystem"] + ["-nodefaultlibs", f"-L{root / 'lib' / 'wasm32-wasip1' / 'eh'}", "-lc++", "-lc++abi", "-lunwind", "-lc",
                 str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608"]
     elif TARGET == "linux":
-        link = ["-pthread"]
+        link = ["-pthread"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True)
     if done.returncode:

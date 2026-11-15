@@ -35,5 +35,6 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Profiler: which lines take the time (`stellanova profile`)
 - [x] WebAssembly output (`stellanova wasm`: WASI, run by node or wasmtime; the libraries that use Windows itself, and `meanwhile`, not yet)
 - [x] Linux: `stellanova build` run on Linux (WSL Ubuntu, clang) makes a Linux program; the language passes the built-vs-direct checks
-- [ ] Linux libraries: computer, database, email, forms, network, pictures, screen, server, sound, sound making, web, window still use Windows code
+- [x] Linux libraries without a screen: computer, database, email, network, server, web
+- [ ] Linux libraries with a screen or speakers: forms, pictures, screen, sound, sound making, window
 - [ ] macOS: needs its sysroot, and a Mac to test on

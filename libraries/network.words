@@ -5,9 +5,7 @@ note: On the web, only the WebSocket words work (a web page can't open other con
 
 code:
   #define NOMINMAX
-include: <winsock2.h>
-include: <ws2tcpip.h>
-include: <windows.h>
+include: "sockets.h"
 include: <map>
 include: <mutex>
 include: <random>

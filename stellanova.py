@@ -2408,6 +2408,7 @@ def load_words(name, line):
 LIBRARY_HELP = """A library is <name>.words, next to the script or in Stellanova's libraries folder. Its lines:
   include: <cmath>                    a C++ header to include
   link: shell32                       a system library to link with
+  linux link: :libsqlite3.so.0        the same on Linux (given to the linker as -l)
   code:                               C++ lines (indented below) the words can use
   python:                             Python lines (indented below) the 'runs:' lines can use
   pi = 3.14159, number, read only     a word for a value
@@ -2733,6 +2734,9 @@ def load_library(name, line, names, rows=None):
         elif stripped.startswith("link:"):
             if not JS:
                 out.append(f'#pragma comment(lib, "{stripped[5:].strip()}")')
+        elif stripped.startswith("linux link:"):
+            if not JS:
+                out.append(f"// linux link: {stripped[11:].strip()}")  # (read by machine.make_exe)
         elif stripped in ("code:", "python:", "javascript:"):
             block = []
             while k < len(rows) and (not rows[k].strip() or rows[k][:1].isspace()):

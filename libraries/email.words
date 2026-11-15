@@ -5,9 +5,17 @@ note: the address it is sent from. Mail always goes over TLS, except to a server
 note: for testing. Many mail services want an app password here, not your usual one.
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #else
+  #include <chrono>
+  #include <spawn.h>
+  #include <sys/wait.h>
+  #include <unistd.h>
+  extern char** environ;
+  #endif
 include: <fstream>
 
 code:
@@ -48,9 +56,14 @@ code:
   		if (to.find('@') == std::string::npos)
   			stellanova::fail(line, "\"" + to + "\" isn't an email address.");
   		std::string from = user.empty() ? "stellanova@localhost" : user;
+  #ifdef _WIN32
   		char folder[MAX_PATH];
   		GetTempPathA(MAX_PATH, folder);
   		std::string file = std::string(folder) + "stellanova_mail_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetTickCount64()) + ".eml";
+  #else
+  		std::string file = "/tmp/stellanova_mail_" + std::to_string(getpid()) + "_"
+  		                 + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".eml";
+  #endif
   		{
   			std::ofstream out(file, std::ios::binary);
   			out << message_text(from, to, subject, body);
@@ -67,6 +80,7 @@ code:
   			config += "ssl-reqd\n";
   		if (!user.empty() && !(here(host) && password.empty()))
   			config += "user = " + quote(user + ":" + password) + "\n";
+  #ifdef _WIN32
   		wchar_t system[MAX_PATH];
   		GetSystemDirectoryW(system, MAX_PATH);
   		std::wstring command = L"\"" + std::wstring(system) + L"\\curl.exe\" -K -";
@@ -100,8 +114,45 @@ code:
   			CloseHandle(in_write);
   		CloseHandle(out_read);
   		DeleteFileA(file.c_str());
+  #else
+  		int in[2], out[2];
+  		bool started = !pipe(in) && !pipe(out);
+  		int code = 1;
+  		std::string said;
+  		if (started)
+  		{
+  			posix_spawn_file_actions_t acts;  // curl reads its settings (and so the password) from here, never from its command line
+  			posix_spawn_file_actions_init(&acts);
+  			posix_spawn_file_actions_adddup2(&acts, in[0], 0);
+  			posix_spawn_file_actions_adddup2(&acts, out[1], 1);
+  			posix_spawn_file_actions_adddup2(&acts, out[1], 2);
+  			posix_spawn_file_actions_addclose(&acts, in[1]);
+  			posix_spawn_file_actions_addclose(&acts, out[0]);
+  			const char* words[] = {"curl", "-K", "-", nullptr};
+  			pid_t pid;
+  			started = posix_spawnp(&pid, "curl", &acts, nullptr, const_cast<char**>(words), environ) == 0;
+  			posix_spawn_file_actions_destroy(&acts);
+  			close(in[0]), close(out[1]);
+  			if (started)
+  			{
+  				if (write(in[1], config.data(), config.size()) < 0)
+  					said = "couldn't give curl its settings";
+  				close(in[1]);
+  				char buffer[4096];
+  				for (ssize_t got; (got = read(out[0], buffer, sizeof buffer)) > 0;)
+  					said.append(buffer, got);
+  				int status = 0;
+  				waitpid(pid, &status, 0);
+  				code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+  			}
+  			else
+  				close(in[1]);
+  			close(out[0]);
+  		}
+  		unlink(file.c_str());
+  #endif
   		if (!started)
-  			stellanova::fail(line, "I couldn't send email: this computer has no curl.exe.");
+  			stellanova::fail(line, "I couldn't send email: this computer has no curl.");
   		if (code != 0)
   		{
   			while (!said.empty() && (said.back() == '\n' || said.back() == '\r'))
