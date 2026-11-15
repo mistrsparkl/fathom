@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
-FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_last", "cn_list_put", "cn_list_random",
+FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
@@ -36,7 +36,7 @@ TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm"
 WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
 
 
-NO_VALUES = re.compile(r"call (?:void|double|i1) @cn_user_")
+NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\()")  # (adding a number to a list keeps it in the list)
 
 
 def makes_nothing(lines):
@@ -119,6 +119,9 @@ declare i1 @cn_equal(ptr, ptr)
 declare ptr @cn_list_new()
 declare ptr @cn_table_new()
 declare void @cn_list_add(ptr, ptr)
+declare void @cn_list_add_number(ptr, double)
+declare double @cn_list_number(ptr, i64)
+declare double @cn_list_at_number(ptr, double, i32)
 declare ptr @cn_list_at(ptr, double, i32)
 declare ptr @cn_list_item(ptr, i64)
 declare void @cn_list_put(ptr, double, ptr, i32)
@@ -394,10 +397,9 @@ class Fn:
         return value  # a command is already a value: its machine code, and the names it keeps
 
     def unbox(self, value, kind):
-        if kind == NUMBER:
-            return self.op(f"call double @cn_unbox_number(ptr {value})")
-        if kind == YESNO:
-            return self.op(f"call i1 @cn_unbox_yesno(ptr {value})")
+        if kind in (NUMBER, YESNO):  # a value's number is 8 bytes in (machine.h's V)
+            d = self.op(f"load double, ptr {self.op(f'getelementptr inbounds i8, ptr {value}, i64 8')}")
+            return d if kind == NUMBER else self.op(f"fcmp une double {d}, 0.0")
         return value
 
     def copied(self, value, kind):
@@ -600,7 +602,9 @@ def each_in(f, cpp, kind, seq, body):
         more, out = f.label("item"), f.label("noitem")
         f.branch(go, more, out)
         f.place(more)
-        f.put(f"store {ll_type(kind)} {f.unbox(f.op(f'call ptr @cn_list_item(ptr {items}, i64 {now})'), kind)}, ptr {f.slot(cpp, kind)}")
+        got = f.op(f"call double @cn_list_number(ptr {items}, i64 {now})") if kind == NUMBER else \
+            f.unbox(f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})"), kind)
+        f.put(f"store {ll_type(kind)} {got}, ptr {f.slot(cpp, kind)}")
         f.jump(out)
         f.place(out)
         return f.op(f"phi i1 [ true, %{more} ], [ false, %{test.before} ]")
@@ -640,8 +644,11 @@ def by_command(f, seq, command, item, gives, keep, line):
     now = f.op(f"load i64, ptr {k}")
     f.branch(f.op(f"icmp slt i64 {now}, {size}"), inside, out_label)
     f.place(inside)
-    boxed = f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})")
-    x = f.unbox(boxed, item)
+    if item == NUMBER:
+        x = boxed = f.op(f"call double @cn_list_number(ptr {items}, i64 {now})")
+    else:
+        boxed = f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})")
+        x = f.unbox(boxed, item)
     target = f.call("ptr", "cn_command_or_fail", ("ptr", command), ("i32", line))  # each time: it says which names it keeps
     answer = f.op(f"call {ll_type(gives)} {target}({ll_type(item)} {f.copied(x, item)})")
     f.check()
@@ -649,11 +656,13 @@ def by_command(f, seq, command, item, gives, keep, line):
         yes, after = f.label("keep"), f.label("kept")
         f.branch(answer, yes, after)
         f.place(yes)
-        f.put(f"call void @cn_list_add(ptr {holder}, ptr {f.copied(boxed, item)})")
+        f.put(f"call void @cn_list_add_number(ptr {holder}, double {x})" if item == NUMBER else
+              f"call void @cn_list_add(ptr {holder}, ptr {f.copied(boxed, item)})")
         f.jump(after)
         f.place(after)
     else:
-        f.put(f"call void @cn_list_add(ptr {holder}, ptr {f.box(answer, gives)})")
+        f.put(f"call void @cn_list_add_number(ptr {holder}, double {answer})" if gives == NUMBER else
+              f"call void @cn_list_add(ptr {holder}, ptr {f.box(answer, gives)})")
     f.put(f"store i64 {f.op(f'add i64 {now}, 1')}, ptr {k}")
     f.jump(top)
     f.place(out_label)

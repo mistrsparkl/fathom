@@ -1960,8 +1960,10 @@ class Expr:
                 items[index_of(items, at(env), line)] = dup(x)
             v = Value(f"stellanova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
-            v.ir = lambda f: f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
-                                            ("i32", line), checked=True), v.kind)
+            v.ir = lambda f: f.call("double", "cn_list_at_number", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
+                                    ("i32", line), checked=True) if v.kind == NUMBER else \
+                f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
+                               ("i32", line), checked=True), v.kind)
             if seq.writable:
                 v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
                                                  ("ptr", f.box(x, v.kind)), ("i32", line), checked=True)
@@ -4369,7 +4371,8 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
         added = with_ir(lambda env: seq(env).append(dup(get(env))),
-                        lambda f: f.put(f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
+                        lambda f: f.put(f"call void @cn_list_add_number(ptr {machine.emit(f, target)}, double {machine.emit(f, v)})" if v.kind == NUMBER else
+                                        f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         if JS:
             return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None
         return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], added, None

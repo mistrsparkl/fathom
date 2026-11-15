@@ -708,6 +708,16 @@ def program_checks():
     assert out.stdout == "inside the lock\nthe other one has it\n60000\n", repr(out.stdout + out.stderr)
     assert "can't leave it partway" in perr('to f:\n  holding the lock "a":\n    return\n' + END + 'genesis:\n  f\n' + END)[1]
 
+    # Lists of numbers (kept as plain numbers in built programs): every list word still works on them.
+    out = both('genesis:\n  set xs to a list of numbers\n  for each n from 1 to 5:\n    add n times 2 to xs\n  insert 7 at 2 in xs\n'
+               '  remove item 1 from xs\n  set item 1 of xs to 0.5\n'
+               '  scrawl xs, " ", the size of xs, " ", item 3 of xs, " ", last item of xs, " ", sum of xs\n  set ys to xs\n  add 100 to ys\n'
+               '  scrawl xs contains 100, " ", ys contains 100, " ", ys contains 8\n  remove 6 from xs\n  scrawl xs\n'
+               '  scrawl xs changed by each n becomes n plus 1\n  scrawl xs kept by each n becomes n exceeds 5\n  set total to 0\n'
+               '  for each x in ys:\n    set total to total plus x\n  scrawl total\n  set item 9 of xs to 1\n' + END)
+    assert out.stdout == "0.5, 4, 6, 8, 10 5 6 10 28.5\nno yes yes\n0.5, 4, 8, 10\n1.5, 5, 9, 11\n8, 10\n128.5\n", repr(out.stdout)
+    assert out.stderr == "Line 20: there is no item 9 in a list of 4 items. Items are counted from 1.\n", repr(out.stderr)
+
     # Text growing in place ('set s to s plus ...'): every other holder still sees what it had.
     out = both(''.join([
                'to shout, given words (text), returning text:\n'

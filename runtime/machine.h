@@ -24,7 +24,9 @@ struct Full : V  // every other value: text, lists, tables, places, things and c
 {
 	double x = 0, y = 0, z = 0;  // a place
 	std::string s;  // text
-	std::vector<V*> items;  // a list's items, or a thing's parts (in the order they were described)
+	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items
+	std::vector<double> nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set)
+	bool numbers = false;
 	std::map<std::string, V*> table;
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
@@ -35,6 +37,7 @@ inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value t
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
+std::vector<V*>& cn_items(const V* v);  // a list's or thing's items, boxed (a list of plain numbers is boxed first)
 namespace stellanova { struct Problem; }
 void cn_set_problem(const stellanova::Problem& p);
 
@@ -84,7 +87,10 @@ T cn_to_cpp(V* v)
 	else if constexpr (cn_is_vector<T>::value)
 	{
 		T out;
-		for (V* x : full(v)->items)
+		if constexpr (std::is_same_v<T, std::vector<double>>)
+			if (full(v)->numbers)
+				return full(v)->nums;
+		for (V* x : cn_items(v))
 			out.push_back(cn_to_cpp<typename cn_is_vector<T>::item>(x));
 		return out;
 	}

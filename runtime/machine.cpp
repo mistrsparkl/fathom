@@ -186,7 +186,7 @@ namespace gc
 			work.pop_back();
 			if (is_small(v->tag))
 				continue;
-			for (V* x : full(v)->items)
+			for (V* x : full(v)->boxed)
 				reach(x);
 			for (const auto& [key, x] : full(v)->table)
 				reach(x);
@@ -209,9 +209,11 @@ namespace gc
 				if (f->s.capacity() > 4096)
 					std::string().swap(f->s);
 				f->s.clear();
-				if (f->items.capacity() > 1024)
-					std::vector<V*>().swap(f->items);
-				f->items.clear();
+				if (f->boxed.capacity() > 1024)
+					std::vector<V*>().swap(f->boxed);
+				f->boxed.clear();
+				f->nums.clear();
+				f->numbers = false;
 				f->table.clear();
 				f->kind = nullptr;
 				f->command = nullptr;
@@ -362,8 +364,10 @@ extern "C"
 	}
 	void cn_hold_push(V* list, V* x)  // a library word filling a list (it may be parked while the collector looks)
 	{
+		if (full(list)->numbers && full(list)->nums.empty())
+			full(list)->numbers = false;  // (a library word's lists are new: boxing one here would wait on the lock it holds)
 		std::lock_guard<std::mutex> hold(gc::lock);
-		full(list)->items.push_back(x);
+		full(list)->boxed.push_back(x);
 	}
 	void cn_hold_put(V* table, const char* key, V* x)
 	{
@@ -426,7 +430,7 @@ static std::string thing_name(const V* v);
 static std::string show(const V* v);
 static std::string part(const V* v)
 {
-	bool group = v && ((v->tag == 'l' && !full(v)->items.empty()) || (v->tag == 'm' && !full(v)->table.empty()));
+	bool group = v && ((v->tag == 'l' && !cn_items(v).empty()) || (v->tag == 'm' && !full(v)->table.empty()));
 	return group ? "(" + show(v) + ")" : show(v);
 }
 static std::string show(const V* v)
@@ -443,11 +447,11 @@ static std::string show(const V* v)
 	case 'c': return "a command";
 	case 'l':
 	{
-		if (full(v)->items.empty())
+		if (cn_items(v).empty())
 			return "(nothing)";
 		std::string out;
-		for (size_t k = 0; k < full(v)->items.size(); ++k)
-			out += (k ? ", " : "") + part(full(v)->items[k]);
+		for (size_t k = 0; k < cn_items(v).size(); ++k)
+			out += (k ? ", " : "") + part(cn_items(v)[k]);
 		return out;
 	}
 	case 'm':
@@ -462,8 +466,8 @@ static std::string show(const V* v)
 	case 'k':
 	{
 		std::string out = "a " + full(v)->kind->name + " (";
-		for (size_t k = 0; k < full(v)->items.size(); ++k)
-			out += (k ? ", " : "") + full(v)->kind->fields[k] + ": " + show(full(v)->items[k]);
+		for (size_t k = 0; k < cn_items(v).size(); ++k)
+			out += (k ? ", " : "") + full(v)->kind->fields[k] + ": " + show(cn_items(v)[k]);
 		return out + ")";
 	}
 	}
@@ -486,10 +490,10 @@ static bool same(const V* a, const V* b)
 			return false;
 		[[fallthrough]];
 	case 'l':
-		if (full(a)->items.size() != full(b)->items.size())
+		if (cn_items(a).size() != cn_items(b).size())
 			return false;
-		for (size_t k = 0; k < full(a)->items.size(); ++k)
-			if (!same(full(a)->items[k], full(b)->items[k]))
+		for (size_t k = 0; k < cn_items(a).size(); ++k)
+			if (!same(cn_items(a)[k], cn_items(b)[k]))
 				return false;
 		return true;
 	case 'm':
@@ -515,7 +519,7 @@ static V* copy_of(const V* v)
 	V* out = fresh(v->tag);
 	*full(out) = *full(v);
 	out->marked = false;
-	for (auto& x : full(out)->items)
+	for (auto& x : full(out)->boxed)
 		x = copy_of(x);
 	for (auto& [key, x] : full(out)->table)
 		x = copy_of(x);
@@ -528,7 +532,7 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 	std::string out;
 	if (!v)
 		return "null";
-	const V* inner = shape && !is_small(shape->tag) && shape->tag == 'l' && !full(shape)->items.empty() ? full(shape)->items[0] : nullptr;
+	const V* inner = shape && !is_small(shape->tag) && shape->tag == 'l' && !cn_items(shape).empty() ? cn_items(shape)[0] : nullptr;
 	switch (v->tag)
 	{
 	case 'n': stellanova::save(out, v->d, line); break;
@@ -539,8 +543,8 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 	case 'c': stellanova::fail(line, "I can't save a command in a file."); break;
 	case 'l':
 		out += "[";
-		for (size_t k = 0; k < full(v)->items.size(); ++k)
-			out += (k ? ", " : "") + saved_of(full(v)->items[k], inner, line);
+		for (size_t k = 0; k < cn_items(v).size(); ++k)
+			out += (k ? ", " : "") + saved_of(cn_items(v)[k], inner, line);
 		out += "]";
 		break;
 	default:  // a table, or a thing
@@ -571,8 +575,8 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 					auto it = able->second.find(full(v)->kind->name);
 					own = it == able->second.end() ? nullptr : it->second;
 				}
-			for (size_t k = 0; k < full(v)->items.size(); ++k)
-				part(full(v)->kind->fields[k], full(v)->items[k], own && k < full(own)->items.size() ? full(own)->items[k] : nullptr);
+			for (size_t k = 0; k < cn_items(v).size(); ++k)
+				part(full(v)->kind->fields[k], cn_items(v)[k], own && k < cn_items(own).size() ? cn_items(own)[k] : nullptr);
 		}
 		out += "}";
 	}
@@ -589,8 +593,8 @@ static V* empty_like(const V* shape)
 		return copy_of(shape);
 	V* v = fresh('k');  // part by part, not copy_of: a shape may hold itself (a spot's list of spots)
 	full(v)->kind = full(shape)->kind;
-	for (const V* x : full(shape)->items)
-		full(v)->items.push_back(empty_like(x));
+	for (const V* x : cn_items(shape))
+		cn_items(v).push_back(empty_like(x));
 	return v;
 }
 
@@ -621,9 +625,9 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 		for (const D& x : d.items)
 		{
 			V* item = nullptr;
-			if (!loaded_into(x, full(shape)->items[0], item))
+			if (!loaded_into(x, cn_items(shape)[0], item))
 				return false;
-			full(out)->items.push_back(item);
+			cn_items(out).push_back(item);
 		}
 		return true;
 	case 'm':
@@ -654,7 +658,7 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 			return false;
 		out = empty_like(shape);  // a part the data doesn't have stays empty
 		for (size_t k = 0; k < full(shape)->kind->fields.size(); ++k)
-			if (const D* p = d.part(full(shape)->kind->fields[k]); p && p->type != D::Nothing && !loaded_into(*p, full(shape)->items[k], full(out)->items[k]))
+			if (const D* p = d.part(full(shape)->kind->fields[k]); p && p->type != D::Nothing && !loaded_into(*p, cn_items(shape)[k], cn_items(out)[k]))
 				return false;
 		return true;
 	default:
@@ -662,12 +666,30 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 	}
 }
 
+// A list's or thing's items, boxed: a list of plain numbers is boxed first (and stays boxed).
+std::vector<V*>& cn_items(const V* v)
+{
+	Full* f = const_cast<Full*>(full(v));
+	if (f->numbers)
+	{
+		std::vector<double> nums = std::move(f->nums);
+		f->nums.clear();
+		f->numbers = false;
+		f->boxed.reserve(nums.size());
+		for (double d : nums)
+			f->boxed.push_back(cn_box_number(d));
+	}
+	return f->boxed;
+}
+static size_t count_of(const V* list) { return full(list)->numbers ? full(list)->nums.size() : full(list)->boxed.size(); }
+
 // A list's item number: counted from 1, as people count.
 static size_t index_of(const V* list, double number, int line)
 {
-	if (number != std::floor(number) || number < 1 || number > static_cast<double>(full(list)->items.size()))
-		stellanova::fail(line, "there is no item " + stellanova::text(number) + " in a list of " + stellanova::text(static_cast<double>(full(list)->items.size()))
-			+ " item" + (full(list)->items.size() == 1 ? "" : "s") + ". Items are counted from 1.");
+	size_t size = count_of(list);
+	if (number != std::floor(number) || number < 1 || number > static_cast<double>(size))
+		stellanova::fail(line, "there is no item " + stellanova::text(number) + " in a list of " + stellanova::text(static_cast<double>(size))
+			+ " item" + (size == 1 ? "" : "s") + ". Items are counted from 1.");
 	return static_cast<size_t>(number) - 1;
 }
 
@@ -816,31 +838,107 @@ extern "C"
 	// lists and tables
 	V* cn_list_new() { return fresh('l'); }
 	V* cn_table_new() { return fresh('m'); }
-	void cn_list_add(V* list, V* item) { full(list)->items.push_back(copy_of(item)); }
-	V* cn_list_at(V* list, double number, int line) { GUARDED(cn_box_number(0), return full(list)->items[index_of(list, number, line)];) }
-	V* cn_list_item(V* list, long long k) { return full(list)->items[static_cast<size_t>(k)]; }  // for 'for each': k is always there
-	void cn_list_put(V* list, double number, V* item, int line) { GUARDED(, full(list)->items[index_of(list, number, line)] = copy_of(item);) }
-	void cn_list_remove_item(V* list, double number, int line) { GUARDED(, full(list)->items.erase(full(list)->items.begin() + static_cast<long long>(index_of(list, number, line)));) }
+	// A list stays plain numbers (nums) while it holds only numbers: its first item decides.
+	void cn_list_add_number(V* list, double d)
+	{
+		Full* f = full(list);
+		if (f->numbers || f->boxed.empty())
+		{
+			f->numbers = true;
+			f->nums.push_back(d);
+		}
+		else
+			f->boxed.push_back(cn_box_number(d));
+	}
+	void cn_list_add(V* list, V* item)
+	{
+		if (item && item->tag == 'n' && (full(list)->numbers || full(list)->boxed.empty()))
+			cn_list_add_number(list, item->d);
+		else
+			cn_items(list).push_back(copy_of(item));
+	}
+	double cn_list_number(V* list, long long k)  // for 'for each' over numbers
+	{
+		const Full* f = full(list);
+		return f->numbers ? f->nums[static_cast<size_t>(k)] : f->boxed[static_cast<size_t>(k)]->d;
+	}
+	double cn_list_at_number(V* list, double number, int line)
+	{
+		GUARDED(0.0,
+			size_t k = index_of(list, number, line);
+			const Full* f = full(list);
+			return f->numbers ? f->nums[k] : f->boxed[k]->d;)
+	}
+	V* cn_list_at(V* list, double number, int line)
+	{
+		GUARDED(cn_box_number(0),
+			size_t k = index_of(list, number, line);
+			return full(list)->numbers ? cn_box_number(full(list)->nums[k]) : full(list)->boxed[k];)
+	}
+	V* cn_list_item(V* list, long long k)  // for 'for each': k is always there
+	{
+		const Full* f = full(list);
+		return f->numbers ? cn_box_number(f->nums[static_cast<size_t>(k)]) : f->boxed[static_cast<size_t>(k)];
+	}
+	void cn_list_put(V* list, double number, V* item, int line)
+	{
+		GUARDED(,
+			size_t k = index_of(list, number, line);
+			if (full(list)->numbers && item && item->tag == 'n')
+				full(list)->nums[k] = item->d;
+			else
+				cn_items(list)[k] = copy_of(item);)
+	}
+	void cn_list_remove_item(V* list, double number, int line)
+	{
+		GUARDED(,
+			size_t k = index_of(list, number, line);
+			if (full(list)->numbers)
+				full(list)->nums.erase(full(list)->nums.begin() + static_cast<long long>(k));
+			else
+				full(list)->boxed.erase(full(list)->boxed.begin() + static_cast<long long>(k));)
+	}
 	void cn_list_insert(V* list, double number, V* item, int line)
 	{
-		auto& items = full(list)->items;
+		if (full(list)->numbers && item && item->tag == 'n')
+		{
+			auto& nums = full(list)->nums;
+			if (number == static_cast<double>(nums.size()) + 1) { nums.push_back(item->d); return; }
+			GUARDED(, nums.insert(nums.begin() + static_cast<long long>(index_of(list, number, line)), item->d);)
+			return;
+		}
+		auto& items = cn_items(list);
 		if (number == static_cast<double>(items.size()) + 1) { items.push_back(copy_of(item)); return; }
 		GUARDED(, items.insert(items.begin() + static_cast<long long>(index_of(list, number, line)), copy_of(item));)
 	}
 	void cn_list_remove_value(V* list, V* item)
 	{
-		for (size_t k = 0; k < full(list)->items.size(); ++k)
-			if (same(full(list)->items[k], item))
+		if (full(list)->numbers)
+		{
+			auto& nums = full(list)->nums;
+			if (item && item->tag == 'n')
+				for (size_t k = 0; k < nums.size(); ++k)
+					if (nums[k] == item->d)
+					{
+						nums.erase(nums.begin() + static_cast<long long>(k));
+						return;
+					}
+			return;
+		}
+		for (size_t k = 0; k < cn_items(list).size(); ++k)
+			if (same(cn_items(list)[k], item))
 			{
-				full(list)->items.erase(full(list)->items.begin() + static_cast<long long>(k));
+				cn_items(list).erase(cn_items(list).begin() + static_cast<long long>(k));
 				return;
 			}
 	}
-	double cn_count(V* v) { return static_cast<double>(v->tag == 'm' ? full(v)->table.size() : full(v)->items.size()); }
-	long long cn_count_whole(V* v) { return static_cast<long long>(full(v)->items.size()); }
+	double cn_count(V* v) { return static_cast<double>(v->tag == 'm' ? full(v)->table.size() : count_of(v)); }
+	long long cn_count_whole(V* v) { return static_cast<long long>(count_of(v)); }
 	bool cn_list_contains(V* list, V* item)
 	{
-		for (V* x : full(list)->items)
+		if (full(list)->numbers)
+			return item && item->tag == 'n' && std::find(full(list)->nums.begin(), full(list)->nums.end(), item->d) != full(list)->nums.end();
+		for (V* x : cn_items(list))
 			if (same(x, item))
 				return true;
 		return false;
@@ -850,27 +948,32 @@ extern "C"
 	V* cn_list_random(V* list, int line)
 	{
 		GUARDED(cn_box_number(0),
-			if (full(list)->items.empty())
+			if (count_of(list) == 0)
 				stellanova::fail(line, "the list is empty, so I can't pick a random item.");
-			return full(list)->items[static_cast<size_t>(stellanova::random(1, static_cast<double>(full(list)->items.size()), line)) - 1];)
+			size_t k = static_cast<size_t>(stellanova::random(1, static_cast<double>(count_of(list)), line)) - 1;
+			return full(list)->numbers ? cn_box_number(full(list)->nums[k]) : full(list)->boxed[k];)
 	}
 	V* cn_list_last(V* list, int line)
 	{
 		GUARDED(cn_box_number(0),
-			if (full(list)->items.empty())
+			if (count_of(list) == 0)
 				stellanova::fail(line, "the list is empty, so it has no last item.");
-			return full(list)->items.back();)
+			return full(list)->numbers ? cn_box_number(full(list)->nums.back()) : full(list)->boxed.back();)
 	}
 	double cn_list_stat(int which, V* list, int line)  // 0 sum, 1 average, 2 biggest, 3 smallest
 	{
 		static const char* names[] = {"sum", "average", "biggest", "smallest"};
 		GUARDED(0.0,
-			if (full(list)->items.empty() && which != 0)
+			size_t size = count_of(list);
+			if (size == 0 && which != 0)
 				stellanova::fail(line, std::string("the list is empty, so it has no ") + names[which] + ".");
 			double out = which == 2 ? -INFINITY : which == 3 ? INFINITY : 0;
-			for (V* x : full(list)->items)  // one at a time, in order, as Python does
-				out = which == 2 ? std::max(out, x->d) : which == 3 ? std::min(out, x->d) : out + x->d;
-			return which == 1 ? out / static_cast<double>(full(list)->items.size()) : out;)
+			for (size_t k = 0; k < size; ++k)  // one at a time, in order, as Python does
+			{
+				double x = cn_list_number(list, static_cast<long long>(k));
+				out = which == 2 ? std::max(out, x) : which == 3 ? std::min(out, x) : out + x;
+			}
+			return which == 1 ? out / static_cast<double>(size) : out;)
 	}
 	V* cn_entry(V* table, V* key, int line)
 	{
@@ -891,7 +994,7 @@ extern "C"
 	{
 		V* out = fresh('l');
 		for (const auto& [key, x] : full(table)->table)
-			full(out)->items.push_back(cn_make_text(key));
+			cn_items(out).push_back(cn_make_text(key));
 		return out;
 	}
 
@@ -944,7 +1047,7 @@ extern "C"
 		}
 		V* v = fresh('k');
 		full(v)->kind = kind;
-		full(v)->items.resize(kind->fields.size());
+		cn_items(v).resize(kind->fields.size());
 		return v;
 	}
 	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
@@ -970,12 +1073,12 @@ extern "C"
 	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
 	{
 		V* out = copy_of(list);
-		for (const V* x : full(out)->items)
+		for (const V* x : cn_items(out))
 			if (!x)
 				{ GUARDED(out, stellanova::fail(line, "a list sorted by a part can't hold nothing.");) }
-		std::stable_sort(full(out)->items.begin(), full(out)->items.end(), [k](const V* a, const V* b) {
-			const V* x = full(a)->items[static_cast<size_t>(k)];
-			const V* y = full(b)->items[static_cast<size_t>(k)];
+		std::stable_sort(cn_items(out).begin(), cn_items(out).end(), [k](const V* a, const V* b) {
+			const V* x = cn_items(a)[static_cast<size_t>(k)];
+			const V* y = cn_items(b)[static_cast<size_t>(k)];
 			return x->tag == 't' ? full(x)->s < full(y)->s : x->d < y->d;
 		});
 		return out;
@@ -988,7 +1091,7 @@ extern "C"
 		for (size_t k = 0; k < full(v)->kind->fields.size(); k++)
 			for (size_t j = 0; j < full(thing)->kind->fields.size(); j++)
 				if (full(thing)->kind->fields[j] == full(v)->kind->fields[k])
-					full(v)->items[k] = copy_of(full(thing)->items[j]);
+					cn_items(v)[k] = copy_of(cn_items(thing)[j]);
 		return v;
 	}
 	V* cn_something(V* thing, const char* spec, int k, int line)  // a thing whose part is wanted: an error if it is nothing
@@ -1015,12 +1118,12 @@ extern "C"
 		const std::string& name = full(thing)->kind->name;
 		return std::strncmp(spec, name.c_str(), name.size()) == 0 && (spec[name.size()] == '\x01' || spec[name.size()] == 0);
 	}
-	V* cn_field(V* thing, int k) { return full(thing)->items[static_cast<size_t>(k)]; }
+	V* cn_field(V* thing, int k) { return cn_items(thing)[static_cast<size_t>(k)]; }
 	// A shape's pieces are shared, not copied: a shape may hold itself (a spot's list of spots) before it is finished.
-	void cn_field_shape(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = x; }
-	void cn_shape_item(V* list, V* x) { full(list)->items.push_back(x); }
+	void cn_field_shape(V* thing, int k, V* x) { cn_items(thing)[static_cast<size_t>(k)] = x; }
+	void cn_shape_item(V* list, V* x) { cn_items(list).push_back(x); }
 	void cn_shape_entry(V* table, V* x) { full(table)->table[""] = x; }
-	void cn_field_put(V* thing, int k, V* x) { full(thing)->items[static_cast<size_t>(k)] = copy_of(x); }
+	void cn_field_put(V* thing, int k, V* x) { cn_items(thing)[static_cast<size_t>(k)] = copy_of(x); }
 	void cn_replace(V* thing, V* with)  // 'set ball to ...' inside a command for a ball: the caller's ball itself changes
 	{
 		V* fresh_copy = copy_of(with);
