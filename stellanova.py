@@ -942,6 +942,18 @@ def py_loop(head, then, tab):
         (None, tab + "    except _Leave:"), (None, tab + "        break"), (None, tab + "    except _Next:"), (None, tab + "        pass")]
 
 
+def py_copy(x, kind):  # Python text keeping x: lists, places and things are copied
+    return x if kind in (NUMBER, YESNO, TEXT) else f"_dup({x})"
+
+
+def py_item(items, number, line):
+    return items[index_of(items, number, line)]
+
+
+def py_put_item(items, number, line, x):
+    items[index_of(items, number, line)] = x
+
+
 def py_empty_list(env):
     return []
 
@@ -997,7 +1009,8 @@ def py_command(name, params, zeros, gives_zero, run):
         (0, "    return _zero()")]
     lines = [m or 0 for m, _ in src]
     space = {"_F": PY_PARTS, "_Z": [(lambda k=k: py_zero(k, THINGS)) for _, k in zeros], "_P": params, "_zero": gives_zero,
-             "_count": py_count, "_each": py_each, "_Stop": Stop, "_Give": GiveBack, "_Flow": Flow,
+             "_count": py_count, "_each": py_each, "_item": py_item, "_put_item": py_put_item, "_something": something,
+             "_Place": Place, "_Thing": Thing, "_THINGS": THINGS, "_Stop": Stop, "_Give": GiveBack, "_Flow": Flow,
              "_Leave": LeaveLoop, "_Next": NextRound, "_fix": py_fix, "_L": lines, "_dup": dup, "_divide": divide,
              "_reps": py_reps, "_text": text}
     try:
@@ -1484,7 +1497,7 @@ class Names:
         def put(env, x):
             env[cpp] = dup(x)
         get.pyf = lambda: f"env[{cpp!r}]"
-        put.py_name = cpp
+        put.py_store = lambda x: f"env[{cpp!r}] = {py_copy(x, kind)}"
         v = with_ir(Value(cpp, kind, get, None if read_only else put), lambda f: f.load(cpp, kind))
         v.ir_store = lambda f, x: f.store(cpp, kind, x)
         v.local_name = cpp
@@ -1816,8 +1829,10 @@ class Expr:
             if len(done) == 3:
                 return f.op(f"call ptr @cn_place(double {done[0]}, double {done[1]}, double {done[2]})")
             return f.op(f"call ptr @cn_flat(double {done[0]}, double {done[1]})")
-        return with_ir(Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
-                             lambda env: Place(*[f(env) for f in runs])), write)
+        v = with_ir(Value(f"{cpp}({', '.join(strip_parens(x.cpp) for x in parts)})", PLACE if len(parts) == 3 else FLAT,
+                          lambda env: Place(*[f(env) for f in runs])), write)
+        v.pyf = lambda: f"_Place({', '.join(py_expr(f) for f in runs)})"
+        return v
 
     def single(self):
         if self.peek() in ("-", "minus"):
@@ -1828,7 +1843,9 @@ class Expr:
             a = v.run
             if JS and v.kind != NUMBER:
                 return Value(f"stellanova::negative({v.cpp})", v.kind, lambda env: -a(env))
-            return with_ir(Value(f"(-{v.cpp})", v.kind, lambda env: -a(env)), lambda f: number_ir(f, "neg", v, None))
+            out = with_ir(Value(f"(-{v.cpp})", v.kind, lambda env: -a(env)), lambda f: number_ir(f, "neg", v, None))
+            out.pyf = lambda: f"(-{py_expr(a)})"
+            return out
         v = self.primary()
         while self.at("of"):  # 'existence of horizontal': a part named after the place or thing
             key = next((tuple(self.t[self.i + 1:self.i + 1 + n]) for n in range(min(6, len(self.t) - self.i - 1), 0, -1)
@@ -1886,8 +1903,10 @@ class Expr:
         if self.at("as", "text"):
             self.i += 2
             a = v.run
-            return with_ir(Value(f"stellanova::text({v.cpp})", TEXT, lambda env: text(a(env))),
-                           lambda f: f.as_text(machine.emit(f, v), v.kind))
+            out = with_ir(Value(f"stellanova::text({v.cpp})", TEXT, lambda env: text(a(env))),
+                          lambda f: f.as_text(machine.emit(f, v), v.kind))
+            out.pyf = lambda: f"_text({py_expr(a)})"
+            return out
         if self.at("rounded", "to"):
             self.i += 2
             self.need(v, NUMBER, "rounded to")
@@ -2024,12 +2043,16 @@ class Expr:
         for words, mark, cpp in ((("quote", "mark"), '"', '"\\""'), (("new", "line"), "\n", '"\\n"')):
             if self.at(*words):  # text can't hold these between its own quote marks
                 self.i += 2
-                return with_ir(Value(cpp if JS else f"std::string({cpp})", TEXT, lambda env, mark=mark: mark),
-                               lambda f, mark=mark: f.text_const(mark))
+                v = with_ir(Value(cpp if JS else f"std::string({cpp})", TEXT, lambda env, mark=mark: mark),
+                            lambda f, mark=mark: f.text_const(mark))
+                v.pyf = lambda mark=mark: repr(mark)
+                return v
         if tok.startswith('"'):
             self.i += 1
             s = tok[1:-1]
-            return with_ir(Value(cpp_text(tok), TEXT, lambda env: s), lambda f: f.text_const(s))
+            v = with_ir(Value(cpp_text(tok), TEXT, lambda env: s), lambda f: f.text_const(s))
+            v.pyf = lambda: repr(s)
+            return v
         if self.at("random", "item", "of") or self.at("a", "random", "item", "of"):
             self.i += 4 if tok == "a" else 3
             v = self.operand()
@@ -2093,6 +2116,8 @@ class Expr:
             def put(env, x):
                 items = get(env)
                 items[index_of(items, at(env), line)] = dup(x)
+            item.pyf = lambda: f"_item({py_expr(get)}, {py_expr(at)}, {line})"
+            put.py_store = lambda x: f"_put_item({py_expr(get)}, {py_expr(at)}, {line}, {py_copy(x, element(seq.kind))})"
             v = Value(f"stellanova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
             v.ir = lambda f: f.call("double", "cn_list_at_number", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
@@ -2230,7 +2255,9 @@ class Expr:
         if tok in ("yes", "no"):
             self.i += 1
             b = tok == "yes"
-            return with_ir(Value("true" if b else "false", YESNO, lambda env: b), lambda f: "true" if b else "false")
+            v = with_ir(Value("true" if b else "false", YESNO, lambda env: b), lambda f: "true" if b else "false")
+            v.pyf = lambda: repr(b)
+            return v
         if self.at("clamp"):
             self.i += 1
             v = self.need(self.sum(), NUMBER, "clamp")
@@ -2239,7 +2266,9 @@ class Expr:
             self.take("and")
             hi = self.need(self.sum(), NUMBER, "clamp")
             x, a, b = v.run, lo.run, hi.run
-            return builtin("FMath::Clamp({a0}, {a1}, {a2})", NUMBER, lambda env: min(max(x(env), a(env)), b(env)), [v, lo, hi])
+            out = builtin("FMath::Clamp({a0}, {a1}, {a2})", NUMBER, lambda env: min(max(x(env), a(env)), b(env)), [v, lo, hi])
+            out.pyf = lambda: f"min(max({py_expr(x)}, {py_expr(a)}), {py_expr(b)})"
+            return out
         for word, fn, f in (("smaller", "Min", min), ("larger", "Max", max)):
             if self.at(word, "of"):
                 self.i += 2
@@ -2421,8 +2450,10 @@ class Expr:
                 return with_ir(Value(f"stellanova::letters({v.cpp})", NUMBER, lambda env: letters(a(env))),
                                lambda f: f.op(f"call double @cn_letters(ptr {machine.emit(f, v)})"))
             if is_list(v.kind) or is_table(v.kind):
-                return with_ir(Value(f"stellanova::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env)))),
-                               lambda f: f.op(f"call double @cn_count(ptr {machine.emit(f, v)})"))
+                out = with_ir(Value(f"stellanova::count({v.cpp})" if JS else f"double(({v.cpp}).size())", NUMBER, lambda env: float(len(a(env)))),
+                              lambda f: f.op(f"call double @cn_count(ptr {machine.emit(f, v)})"))
+                out.pyf = lambda: f"float(len({py_expr(a)}))"
+                return out
             raise ScriptError(line, f"{kind_name(v.kind)} has no size.")
         if self.at("flat"):
             self.i += 1
@@ -2465,8 +2496,10 @@ class Expr:
                     if name in THINGS:
                         self.i += n
                         things = THINGS
-                        return with_ir(Value(js_zero("thing " + name) if JS else f"{cpp_type('thing ' + name)}{{}}", "thing " + name,
-                                             lambda env: Thing(name, things)), lambda f, name=name: f.zero("thing " + name))
+                        out = with_ir(Value(js_zero("thing " + name) if JS else f"{cpp_type('thing ' + name)}{{}}", "thing " + name,
+                                            lambda env: Thing(name, things)), lambda f, name=name: f.zero("thing " + name))
+                        out.pyf = lambda name=name: f"_Thing({name!r}, _THINGS)"
+                        return out
                 raise ScriptError(self.line, f"There is no kind of thing called '{' '.join(self.t[self.i:self.i + 2])}'."
                                   + (f" Kinds of things: {', '.join(THINGS)}." if THINGS else ""))
         for lead in (("a", "table", "of"), ("an", "empty", "table", "of"), ("table", "of"), ("empty", "table", "of")):
@@ -2505,8 +2538,10 @@ class Expr:
                         for v in items:
                             f.put(f"call void @cn_list_add(ptr {made_list}, ptr {f.box(machine.emit(f, v), v.kind)})")
                         return made_list
-                    return with_ir(Value(f"[{listed}]" if JS else f"{cpp_type(kind)}{{{listed}}}", kind,
-                                         lambda env: [dup(f(env)) for f in runs]), write)
+                    out = with_ir(Value(f"[{listed}]" if JS else f"{cpp_type(kind)}{{{listed}}}", kind,
+                                        lambda env: [dup(f(env)) for f in runs]), write)
+                    out.pyf = lambda: f"[{', '.join(py_copy(py_expr(f), element(kind)) for f in runs)}]"
+                    return out
                 for n in range(min(16, len(self.t) - self.i), 0, -1):
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
@@ -2569,12 +2604,15 @@ def part_of(owner, key, line=0):
     if is_thing(owner.kind):  # it may be nothing
         whose, part, plain = owner.kind, " ".join(key), owner.run
         get = lambda env: something(plain(env), whose, part, line)
+        get.pyf = lambda: f"_something({py_expr(plain)}, {whose!r}, {part!r}, {line})"
         if JS:
             cpp = f"stellanova::something({strip_parens(owner.cpp)}, {json.dumps(whose[6:])}, {json.dumps(part)}, {line}).{member}"
 
     def put(env, x):
         get(env).fields[member] = dup(x)
+    put.py_store = lambda x: f"{py_expr(get)}.fields[{member!r}] = {py_copy(x, kind)}"
     v = Value(cpp, kind, lambda env: get(env).fields[member], put if owner.writable else None)
+    v.pyf = lambda: f"{py_expr(get)}.fields[{member!r}]"
     if owner.kind in (PLACE, FLAT):
         k = "XYZ".index(member)
         v.ir = lambda f: f.op(f"call double @cn_part(ptr {machine.emit(f, owner)}, i32 {k})")
@@ -3466,6 +3504,8 @@ def remember(rows, names):
 
         def put(env, x, cpp=cpp):
             SHARED[cpp] = dup(x)
+        get.pyf = lambda get=get: f"{py_part(get)}(None)"
+        put.py_store = lambda x, put=put: f"{py_part(put)}(None, {x})"
         names.add(words, cpp, kind, False, (get, put))
         WORLD_KINDS[cpp] = kind
         out.append(f"let {cpp} = {js_zero(kind)};" if JS else f"inline {cpp_type(kind)} {cpp} = {zero(kind)};")
@@ -3699,7 +3739,9 @@ def function(head, line, body, names, info, command=None):
 
             def put_all(env, x, own=own):
                 env[own].fields = dup(x).fields  # change the caller's thing itself, not a copy
-            local.add(in_words, own, kind, False, (lambda env, own=own: env[own], put_all))
+            own_get = lambda env, own=own: env[own]
+            own_get.pyf = lambda own=own: f"env[{own!r}]"
+            local.add(in_words, own, kind, False, (own_get, put_all))
             OWNER_PARAMS.add(own)
             OWNER_KINDS[own] = kind
             for part_words, part_kind in THINGS[kind[6:]]:
@@ -3707,9 +3749,11 @@ def function(head, line, body, names, info, command=None):
 
                 def get(env, own=own, member=member):
                     return env[own].fields[member]
+                get.pyf = lambda own=own, member=member: f"env[{own!r}].fields[{member!r}]"
 
                 def put(env, x, own=own, member=member):
                     env[own].fields[member] = dup(x)
+                put.py_store = lambda x, own=own, member=member, part_kind=part_kind: f"env[{own!r}].fields[{member!r}] = {py_copy(x, part_kind)}"
                 local.add(part_words, f"{own}.{member}", part_kind, False, (get, put))
         else:
             local.add(in_words, snake(in_words), kind, read_only=True)
@@ -4682,7 +4726,10 @@ def statement(n, text_, inner, names, declared, depth):
         if JS:
             assign = js_set(target)
         write = (lambda f: target.ir_store(f, machine.emit(f, v))) if target.ir_store else None
-        return [f"{tab}{assign}{js_copy(v.cpp, v.kind)}{getattr(target, 'cpp_close', '')};"], with_ir(lambda env: put(env, get(env)), write), None
+        run = with_ir(lambda env: put(env, get(env)), write)
+        if getattr(put, "py_store", None):
+            run.pyl = lambda tab: [(None, tab + put.py_store(py_expr(v)))]
+        return [f"{tab}{assign}{js_copy(v.cpp, v.kind)}{getattr(target, 'cpp_close', '')};"], run, None
     if tokens[0] == "set":
         key, size = names.match(tokens, 1)
         if key and tokens[1 + size:2 + size] == ["to"]:
@@ -4720,9 +4767,8 @@ def statement(n, text_, inner, names, declared, depth):
                     else:
                         plain(f)
             run = with_ir(lambda env: put(env, get(env)), write)
-            if getattr(put, "py_name", None):
-                simple = kind in (NUMBER, YESNO, TEXT)
-                run.pyl = lambda tab: [(None, f"{tab}env[{put.py_name!r}] = {py_expr(v) if simple else '_dup(' + py_expr(v) + ')'}")]
+            if getattr(put, "py_store", None):
+                run.pyl = lambda tab: [(None, tab + put.py_store(py_expr(v)))]
             return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], run, None
         hint = library_hint(tokens)
         if hint:
@@ -4757,8 +4803,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             env[cpp] = dup(get(env))
-        simple = v.kind in (NUMBER, YESNO, TEXT)
-        run.pyl = lambda tab: [(None, f"{tab}env[{cpp!r}] = {py_expr(v) if simple else '_dup(' + py_expr(v) + ')'}")]
+        run.pyl = lambda tab: [(None, f"{tab}env[{cpp!r}] = {py_copy(py_expr(v), v.kind)}")]
         with_ir(run, lambda f: f.store(cpp, v.kind, machine.emit(f, v)))
         return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], run, None
     if tokens[0] == "move":
