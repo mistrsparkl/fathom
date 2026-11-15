@@ -38,4 +38,5 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Linux libraries without a screen: computer, database, email, network, server, web
 - [x] Linux libraries with a screen or speakers: sound, sound making, window (X11, FreeType, libpng, GLX)
 - [x] Linux: forms (GTK 3), pictures (libpng), screen (Tkinter + Pillow)
+- [x] Speed: built lists of numbers hold plain numbers; direct runs write each command as one Python function (`STELLANOVA_NO_FAST=1` runs them the old way)
 - [ ] macOS: needs its sysroot, and a Mac to test on
