@@ -841,7 +841,7 @@ def sysroot():
 
 def target_flags():
     if TARGET == "linux":
-        return []
+        return ["-I/usr/include/freetype2"]  # (where FreeType keeps its headers, for the window library)
     if TARGET != "wasm":
         return ["-fms-extensions"]
     root = sysroot()
