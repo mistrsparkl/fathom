@@ -1315,14 +1315,15 @@ def program_checks():
     # The computer library: commands' output, the environment, ending with an exit number; maths words.
     out = both('genesis:\n  scrawl the size of the words given\n  scrawl the output of the command "echo hello there"\n'
                '  scrawl environment value of "OS"\n  scrawl the size of current folder exceeds 2\n  end the program with 3\n  scrawl "never"\n' + END)
-    assert (out.stdout, out.returncode) == ("0\nhello there\n\nWindows_NT\nyes\n", 3), repr((out.stdout, out.returncode))
+    assert (out.stdout, out.returncode) == ("0\nhello there\n\n" + os.environ.get("OS", "") + "\nyes\n", 3), repr((out.stdout, out.returncode))
     # Programs running alongside: what they print and their errors as they go, their exit number, stopping them.
-    out = both('use: computer\ngenesis:\n  set p to start the program with ("cmd /c echo hello& echo oops 1>&2& exit 3", "")\n'
+    talker, sleeper = ("echo hello; echo oops 1>&2; exit 3", "sleep 30") if sys.platform.startswith("linux") else ("cmd /c echo hello& echo oops 1>&2& exit 3", "ping -n 30 127.0.0.1")
+    out = both('use: computer\ngenesis:\n  set p to start the program with ("' + talker + '", "")\n'
                '  set said to ""\n  set problems to ""\n  as long as the program is running p:\n'
                '    set said to said plus latest output of the program p\n    set problems to problems plus latest errors of the program p\n'
                '  set said to said plus latest output of the program p\n  set problems to problems plus latest errors of the program p\n'
                '  scrawl trimmed said, " ", trimmed problems, " ", exit code of the program p\n'
-               '  set q to start the program with ("ping -n 30 127.0.0.1", "")\n  stop the program q\n'
+               '  set q to start the program with ("' + sleeper + '", "")\n  stop the program q\n'
                '  as long as the program is running q:\n    set problems to ""\n  scrawl "stopped"\n  scrawl latest output of the program 9\n' + END)
     assert out.stdout == "hello oops 3\nstopped\n", repr(out.stdout)
     assert out.stderr == "Line 17: there is no program 9 (start one with 'start the program').\n", repr(out.stderr)
