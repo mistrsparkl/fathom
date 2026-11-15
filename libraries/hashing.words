@@ -3,38 +3,18 @@ note: Use them in a program with:  use: hashing
 note: Kinds of hash: "sha256" (the usual one), "sha512", "sha1" and "md5" (old: fine for spotting changes, not for safety).
 note: Hashes come back as text in hexadecimal, like "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".
 
-code:
-  #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <bcrypt.h>
-link: bcrypt
+include: "digest.h"
 
 code:
   namespace stellanova_hashing
   {
-  	inline const wchar_t* algorithm(const std::string& kind, int line)
-  	{
-  		if (kind == "sha256") return BCRYPT_SHA256_ALGORITHM;
-  		if (kind == "sha512") return BCRYPT_SHA512_ALGORITHM;
-  		if (kind == "sha1") return BCRYPT_SHA1_ALGORITHM;
-  		if (kind == "md5") return BCRYPT_MD5_ALGORITHM;
-  		stellanova::fail(line, "there is no kind of hash called \"" + kind + "\". Kinds: sha256, sha512, sha1, md5.");
-  	}
   	inline std::string hash(const std::string& kind, const std::string& data, const std::string* key, int line)
   	{
-  		BCRYPT_ALG_HANDLE alg = nullptr;
-  		if (BCryptOpenAlgorithmProvider(&alg, algorithm(kind, line), nullptr, key ? BCRYPT_ALG_HANDLE_HMAC_FLAG : 0) != 0)
-  			stellanova::fail(line, "this computer can't make " + kind + " hashes.");
-  		DWORD size = 0, got = 0;
-  		BCryptGetProperty(alg, BCRYPT_HASH_LENGTH, (PUCHAR)&size, sizeof size, &got, 0);
-  		std::vector<unsigned char> out(size);
-  		BCRYPT_HASH_HANDLE h = nullptr;
-  		BCryptCreateHash(alg, &h, nullptr, 0, key ? (PUCHAR)key->data() : nullptr, key ? (ULONG)key->size() : 0, 0);
-  		BCryptHashData(h, (PUCHAR)data.data(), (ULONG)data.size(), 0);
-  		BCryptFinishHash(h, out.data(), size, 0);
-  		BCryptDestroyHash(h);
-  		BCryptCloseAlgorithmProvider(alg, 0);
+  		if (kind != "sha256" && kind != "sha512" && kind != "sha1" && kind != "md5")
+  			stellanova::fail(line, "there is no kind of hash called \"" + kind + "\". Kinds: sha256, sha512, sha1, md5.");
+  		auto bytes = [](const std::string& s) { return reinterpret_cast<const uint8_t*>(s.data()); };
+  		std::vector<uint8_t> out = key ? stellanova_digest::hmac(kind, bytes(*key), key->size(), bytes(data), data.size())
+  									   : stellanova_digest::digest(kind, bytes(data), data.size());
   		static const char* digits = "0123456789abcdef";
   		std::string hex;
   		for (unsigned char c : out)

@@ -108,6 +108,8 @@ to check, given path (text) and words (text), returning text:
   inscribe words into file draft
   set said to the output of the command (stellanova call with ("check", draft) plus " 2>&1")
   erase the file draft
+  whisper: a program still being written has no genesis yet: Run says so, typing doesn't need to
+  if said contains "A program needs a 'genesis:' command": return ""
   return said
 and the universe said i love you
 

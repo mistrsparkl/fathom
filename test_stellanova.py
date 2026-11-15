@@ -1051,6 +1051,18 @@ def program_checks():
             assert translate.wasm(Path(d) / "m.stella") == ("m.stella can't be built into WebAssembly yet: 'meanwhile' (a WebAssembly "
                                                             "program has only one thread) isn't in machine code. It still runs directly (stellanova m.stella).")
 
+    # stellanova check: a program for a web page is checked as one (and a real mistake in it is still found)
+    with tempfile.TemporaryDirectory() as d:
+        page = 'use: page\n\ngenesis:\n  set the text with (the element "#count", "Hi")\nand the universe said i love you\n'
+        (Path(d) / "c.stella").write_text(page, encoding="utf-8")
+        said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "c.stella"], capture_output=True, text=True,
+                              encoding="utf-8", cwd=d).stdout
+        assert said == "c.stella: no mistakes found.\n", said
+        (Path(d) / "c.stella").write_text(page.replace('"Hi")', '"Hi")\n  scrawl nope'), encoding="utf-8")
+        said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "c.stella"], capture_output=True, text=True,
+                              encoding="utf-8", cwd=d).stdout
+        assert "nope" in said and "no mistakes" not in said, said
+
     # an if line counts every time it is tried, not only when its test is yes
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "p.stella").write_text('genesis:\n  for each k from 1 to 10:\n    if k exceeds 8: scrawl k\nand the universe said i love you\n', encoding="utf-8")

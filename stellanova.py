@@ -5398,8 +5398,15 @@ def main(argv):
             print(f"There is no script called {args[1]}.")
             return 2
         except ScriptError as err:
-            print(f"{where(err.line)}: {err.message}")
-            return 1
+            if "only works in a program made for the web" not in err.message:
+                print(f"{where(err.line)}: {err.message}")
+                return 1
+            # a program for a web page: check it the way it will be made
+            with tempfile.TemporaryDirectory(prefix="stellanova_check_") as made:
+                problem = web(Path(args[1]), made)
+            if problem:
+                print(problem)
+                return 1
         print(f"{Path(args[1]).name}: no mistakes found.")
         return 0
     if args[0] == "web" and len(args) in (2, 3):
@@ -5411,7 +5418,7 @@ def main(argv):
         if problem:
             print(problem)
             return 1
-        print(f"Made {Path(args[2] if len(args) == 3 else script.parent) / (script.stem + '.js')}")
+        print(f"Made {Path(args[2]) / (script.stem + '.js') if len(args) == 3 else script.stem + '.js'}")  # (no whole paths: they hold the user's name)
         return 0
     if len(args) == 2 and args[0] == "unreal":
         script = Path(args[1])
@@ -5433,7 +5440,7 @@ def main(argv):
         if problem:
             print(problem)
             return 1
-        print(f"Built {script.with_suffix('.wasm')} (run it: node {script.with_suffix('.mjs').name})")
+        print(f"Built {script.stem}.wasm (run it: node {script.stem}.mjs)")
         return 0
     if len(args) == 2 and args[0] in ("run", "build"):
         script = Path(args[1])
@@ -5454,7 +5461,7 @@ def main(argv):
         if problem:
             print(problem)
             return 1
-        print(f"Built {exe}")
+        print(f"Built {exe.name}")
         return 0
     if len(args) != 2:
         print(USAGE)

@@ -4,13 +4,9 @@ note: turns it back, and any change to it is noticed. (ChaCha20-Poly1305, with a
 note: PBKDF2-SHA256, 100000 rounds, and a fresh random salt each time.) Text encrypted any way (directly, built,
 note: with node) can be decrypted any other way.
 
-code:
-  #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <bcrypt.h>
 include: <cstring>
-link: bcrypt
+include: <random>
+include: "digest.h"
 
 code:
   namespace stellanova_encryption
@@ -109,10 +105,14 @@ code:
   	}
   	inline void key_of(const std::string& password, const u8 salt[16], u8 key[32])
   	{
-  		BCRYPT_ALG_HANDLE alg = nullptr;
-  		BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
-  		BCryptDeriveKeyPBKDF2(alg, (PUCHAR)password.data(), (ULONG)password.size(), (PUCHAR)salt, 16, 100000, key, 32, 0);
-  		BCryptCloseAlgorithmProvider(alg, 0);
+  		std::vector<uint8_t> made = stellanova_digest::pbkdf2_sha256(password, salt, 16, 100000, 32);
+  		std::memcpy(key, made.data(), 32);
+  	}
+  	inline void random_bytes(u8* out, size_t n)  // the system's own randomness (Windows', or WASI's)
+  	{
+  		std::random_device system;
+  		for (size_t k = 0; k < n; ++k)
+  			out[k] = (u8)(system() & 255);
   	}
   	inline std::string base64(const std::string& s)
   	{
@@ -147,8 +147,8 @@ code:
   	inline std::string encrypt(const std::string& message, const std::string& password)
   	{
   		u8 salt[16], nonce[12], key[32], tag[16];
-  		BCryptGenRandom(nullptr, salt, 16, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-  		BCryptGenRandom(nullptr, nonce, 12, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  		random_bytes(salt, 16);
+  		random_bytes(nonce, 12);
   		key_of(password, salt, key);
   		std::string sealed = chacha(key, nonce, message);
   		tag_of(key, nonce, sealed, tag);
@@ -176,7 +176,7 @@ code:
   		if (n < 1 || n > 1024 || n != std::floor(n))
   			stellanova::fail(line, "a random code is 1 to 1024 bytes long, not " + stellanova::text(n) + ".");
   		std::vector<u8> b((size_t)n);
-  		BCryptGenRandom(nullptr, b.data(), (ULONG)b.size(), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  		random_bytes(b.data(), b.size());
   		static const char* digits = "0123456789abcdef";
   		std::string out;
   		for (u8 c : b)

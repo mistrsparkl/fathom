@@ -38,7 +38,7 @@ indented two spaces; a block starting with an empty line starts a new line first
 | `zoom: lines 2-6`, `zoom: output`, `zoom: out` | Move the camera onto lines or an element, or back. |
 | `spot: line 3`, `spot: lines 3-4`, `spot: off` | A frame around lines, to point at them. |
 | `point: #run`, `click: #run`, `hide cursor` | Move the pointer there, click there, hide it. |
-| `run`, `watch`, `test`, `build`, `web`, `profile`, `debug` | Press that button and wait until it finishes, or (debugging) pauses (`run: and keep going` doesn't wait; anything else after the colon is a note). |
+| `run`, `watch`, `test`, `build`, `web`, `wasm`, `profile`, `debug` | Press that button and wait until it finishes, or (debugging) pauses (`run: and keep going` doesn't wait; anything else after the colon is a note). |
 | `stop at: 4`, `until paused` | Click beside a line's number to put a stop there (or take it away), and wait until the program pauses or ends. |
 | `answer: Sam`, `until finished`, `focus` | Type an answer for `ask`, wait for the program to finish, give the code back the keys. |
 | `game: hop.stella \| hop.keys \| Hop!` | Play the game (filmed ahead with those keys) in a window over the studio; the lesson goes on meanwhile, and `until game ends` waits for it. |

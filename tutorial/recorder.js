@@ -497,7 +497,7 @@ async function film(lesson, filePort) {
         case "point": await js(`film.pointAt(${JSON.stringify(v)})`); await wait(800); break;
         case "click": await press(v); break;
         case "hide cursor": await js("film.hideCursor()"); break;
-        case "run": case "watch": case "test": case "build": case "web": case "profile": case "debug": {
+        case "run": case "watch": case "test": case "build": case "web": case "wasm": case "profile": case "debug": {
           await press(`#${step.what}`);
           if (v !== "and keep going") {
             for (let k = 0; k < 1200; k++) {

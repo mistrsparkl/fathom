@@ -64,6 +64,19 @@ say:
 wait
 zoom: out
 
+card: Chapter 11 | WebAssembly | Machine code that runs anywhere
+say:
+  There's one more way. WebAssembly is machine code that isn't for any one kind of computer, so the same file runs on Windows, Mac and Linux, and in browsers and servers.
+uncard
+open: count.stella
+wasm
+zoom: output
+say:
+  The Wasm button builds the same machine code as an exe, but as WebAssembly: count dot wasm. Node, or any WebAssembly runner, runs it, with node count dot m j s.
+  It can read and write files, ask, and do everything the language itself does. Windows' own libraries, like windows and sound, don't work there yet.
+wait
+zoom: out
+
 card: Chapter 11 | Grammar for people | Reading like English
 say:
   Stellanova is written for people to read. So in a few places, it asks for grammar, even though the computer skips it.
