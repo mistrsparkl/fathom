@@ -142,9 +142,11 @@ namespace gc
 		t->state = 0;
 	}
 
+	static size_t sorted = 0;  // all[0, sorted) are in order (what the last sweep kept): only newer ones need sorting
 	static void mark_and_sweep()
 	{
-		std::sort(all.begin(), all.end());
+		std::sort(all.begin() + std::min(sorted, all.size()), all.end());
+		std::inplace_merge(all.begin(), all.begin() + std::min(sorted, all.size()), all.end());
 		std::vector<V*> work;
 		auto reach = [&](V* c) {
 			if (c && !c->marked)
@@ -198,10 +200,7 @@ namespace gc
 			}
 			else if (is_small(v->tag))
 			{
-				if (spare_small.size() < (1 << 20))
-					spare_small.push_back(v);
-				else
-					delete v;
+				spare_small.push_back(v);  // (from a block: never deleted)
 			}
 			else if (spare.size() < (1 << 20))
 			{
@@ -221,6 +220,7 @@ namespace gc
 			else
 				delete full(v);
 		all.resize(kept);
+		sorted = kept;
 		made_since = 0;
 		limit = std::getenv("STELLANOVA_COLLECT_OFTEN") ? least : std::max(least, kept);
 	}
@@ -254,6 +254,18 @@ namespace gc
 		stop_cv.notify_all();
 	}
 
+	static V* small_value()  // numbers and yes/no come from big blocks, not one allocation each (they are never deleted, only used again)
+	{
+		static V* block = nullptr;
+		static size_t left = 0;
+		if (!left)
+		{
+			left = 4096;
+			block = new V[left];
+		}
+		return &block[--left];
+	}
+
 	static V* track(char tag)  // a new value (a freed one used again when there is one)
 	{
 		Thread* t = me();
@@ -270,7 +282,7 @@ namespace gc
 				ready.pop_back();
 			}
 			else if (is_small(tag))
-				v = new V;
+				v = small_value();
 			else
 				v = new Full;
 			v->tag = tag;
