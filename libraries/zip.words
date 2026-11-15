@@ -175,6 +175,81 @@ code:
   		}
   	};
 
+  	// ---- deflate: repeats found with a hash of 3 bytes, written with the fixed codes (RFC 1951)
+  	// shortcut: fixed codes only, a few percent bigger than zip tools' own; add dynamic codes if size matters
+  	inline Bytes deflate(const Bytes& in)
+  	{
+  		Bytes out;
+  		uint32_t acc = 0;
+  		int used = 0;
+  		auto put = [&](uint32_t v, int n) {
+  			acc |= v << used, used += n;
+  			while (used >= 8)
+  				out.push_back(uint8_t(acc)), acc >>= 8, used -= 8;
+  		};
+  		auto code = [&](uint32_t c, int n) {  // Huffman codes go in highest bit first
+  			uint32_t r = 0;
+  			for (int k = 0; k < n; ++k)
+  				r = r << 1 | ((c >> k) & 1);
+  			put(r, n);
+  		};
+  		auto literal = [&](int s) {
+  			if (s < 144) code(0x30 + s, 8);
+  			else if (s < 256) code(0x190 + s - 144, 9);
+  			else if (s < 280) code(s - 256, 7);
+  			else code(0xc0 + s - 280, 8);
+  		};
+  		static const short base[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
+  		static const short extra[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
+  		static const int dbase[] = {1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073,
+  									4097, 6145, 8193, 12289, 16385, 24577};
+  		static const short dextra[] = {0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
+  		put(1, 1), put(1, 2);  // one last block, fixed codes
+  		std::vector<int> head(1 << 15, -1), prev(in.size(), -1);
+  		auto hash = [&](size_t i) { return ((in[i] << 10) ^ (in[i + 1] << 5) ^ in[i + 2]) & 0x7fff; };
+  		size_t i = 0;
+  		while (i < in.size())
+  		{
+  			int best = 0, back = 0;
+  			if (i + 3 <= in.size())
+  			{
+  				int h = hash(i), tries = 64;
+  				for (int j = head[h]; j >= 0 && i - j <= 32768 && tries--; j = prev[j])
+  				{
+  					int n = 0, most = int(std::min<size_t>(258, in.size() - i));
+  					while (n < most && in[j + n] == in[i + n])
+  						++n;
+  					if (n > best)
+  						best = n, back = int(i - j);
+  				}
+  			}
+  			size_t step = best >= 3 ? best : 1;
+  			for (size_t k = i; k < i + step && k + 3 <= in.size(); ++k)  // remember where these bytes were
+  			{
+  				int h = hash(k);
+  				prev[k] = head[h], head[h] = int(k);
+  			}
+  			if (best < 3)
+  				literal(in[i]);
+  			else
+  			{
+  				int s = 28;
+  				while (base[s] > best)
+  					--s;
+  				literal(257 + s), put(best - base[s], extra[s]);
+  				int d = 29;
+  				while (dbase[d] > back)
+  					--d;
+  				code(d, 5), put(back - dbase[d], dextra[d]);
+  			}
+  			i += step;
+  		}
+  		literal(256);
+  		if (used)
+  			out.push_back(uint8_t(acc));
+  		return out;
+  	}
+
   	inline Bytes read_all(const std::string& name, int line, const std::string& missing)
   	{
   		std::ifstream f(path(name), std::ios::binary);
@@ -200,7 +275,6 @@ code:
   		for (const auto& f : folders) walk(f, all);
   	}
 
-  	// shortcut: files are stored, not squeezed (every zip tool reads them); a deflater would make them smaller
   	inline void pack(const std::vector<std::string>& files, const std::string& zip, int line)
   	{
   		if (files.empty())
@@ -218,17 +292,21 @@ code:
   			Bytes data = read_all(name_of(p), line, "I couldn't pack \"" + zip + "\".");
   			std::string name = name_of(p);
   			uint32_t sum = crc(data), at = uint32_t(out.size());
+  			Bytes packed = deflate(data);
+  			bool squeezed = packed.size() < data.size();
+  			if (!squeezed)
+  				packed = data;
   			for (Bytes* b : {&out, &central})
   			{
   				bool local = b == &out;
   				put32(*b, local ? 0x04034b50 : 0x02014b50);
   				if (!local) put16(*b, 20);  // made by
-  				put16(*b, 20), put16(*b, 0x800), put16(*b, 0), put16(*b, 0), put16(*b, 0x21);  // needs, UTF-8 names, stored, time, date
-  				put32(*b, sum), put32(*b, uint32_t(data.size())), put32(*b, uint32_t(data.size())), put16(*b, uint16_t(name.size())), put16(*b, 0);
+  				put16(*b, 20), put16(*b, 0x800), put16(*b, squeezed ? 8 : 0), put16(*b, 0), put16(*b, 0x21);  // needs, UTF-8 names, how, time, date
+  				put32(*b, sum), put32(*b, uint32_t(packed.size())), put32(*b, uint32_t(data.size())), put16(*b, uint16_t(name.size())), put16(*b, 0);
   				if (!local) put16(*b, 0), put16(*b, 0), put16(*b, 0), put32(*b, 0), put32(*b, at);  // note, disk, inside, outside, where
   				b->insert(b->end(), name.begin(), name.end());
   			}
-  			out.insert(out.end(), data.begin(), data.end());
+  			out.insert(out.end(), packed.begin(), packed.end());
   		}
   		uint32_t dir = uint32_t(out.size());
   		out.insert(out.end(), central.begin(), central.end());
