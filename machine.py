@@ -36,6 +36,15 @@ TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm"
 WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
 
 
+NO_VALUES = re.compile(r"call (?:void|double|i1) @cn_user_")
+
+
+def makes_nothing(lines):
+    """True when these lines make no values of their own: they call nothing, or only commands of the program's own
+    that give back a number, yes or no, or nothing (those free what they make themselves, and look for a collector)."""
+    return all("call " not in l or (TARGET != "wasm" and NO_VALUES.search(l)) for l in lines)
+
+
 def emit(f, x, what="a part of the language"):
     """Writes x's LLVM code into f (x is a Value or a statement's run); returns where its answer is."""
     write = getattr(x, "ir", None)
@@ -154,6 +163,8 @@ declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
 declare void @cn_meanwhile(ptr, ptr, i64)
 declare void @cn_statement()
+@cn_stopping = external global i8
+@cn_failed_flag = external thread_local global i8
 declare void @cn_root(ptr, i64)
 declare void @cn_wait_for_others()
 declare ptr @malloc(i64)
@@ -281,7 +292,10 @@ class Fn:
 
     def check(self):
         """If a problem happened, go to the 'if that went wrong:' lines, or leave this command."""
-        bad = self.op("call i1 @cn_failed()")
+        if TARGET == "wasm":
+            bad = self.op("call i1 @cn_failed()")
+        else:  # (read straight from memory: no call)
+            bad = self.op(f"trunc i8 {self.op('load i8, ptr @cn_failed_flag')} to i1")
         go = self.label("ok")
         self.branch(bad, self.handlers[-1] if self.handlers else self.leave_label(), go)
         self.place(go)
@@ -447,6 +461,10 @@ class Fn:
             self.place(self.leave)
             self.finish_with(f"ret {gives} {zero_const(self.gives)}" if self.gives else "ret void")
         body = ["entry:"] + self.entry + ["  br label %start", "start:"] + self.lines
+        if TARGET != "wasm" and self.name != "main":  # a command may only call itself, so it looks for a collector as it begins
+            body[len(self.entry) + 1:len(self.entry) + 3] = [
+                "  %waiting = load atomic i8, ptr @cn_stopping monotonic, align 1", "  %wanted = icmp ne i8 %waiting, 0",
+                "  br i1 %wanted, label %wait, label %start", "wait:", "  call void @cn_statement()", "  br label %start", "start:"]
         if TARGET == "wasm":  # see cn_enter in runtime/machine.cpp: what the collector can't see in WebAssembly's locals
             slots = [l.split(" = ")[0].strip() for l in self.entry if l.endswith("= alloca ptr")]
             body[1 + len(self.entry):1 + len(self.entry)] = ["  call void @cn_enter()"] + [f"  call void @cn_slot(ptr {s})" for s in slots]
@@ -506,6 +524,7 @@ def loop(f, test, body, step=None):
     """A loop: test() writes the yes-or-no to keep going; step runs after each round."""
     top, inside, nxt, out = f.label("loop"), f.label("body"), f.label("next"), f.label("out")
     f.place(top)
+    head = len(f.lines)
     f.put("call void @cn_statement()")  # each round: what the last round made may be freed
     cond = test()
     f.branch(cond, inside, out)
@@ -516,6 +535,15 @@ def loop(f, test, body, step=None):
     f.place(nxt)
     if step:
         step()
+    if f.lines[head] == "  call void @cn_statement()" and makes_nothing(f.lines[head + 1:]):
+        del f.lines[head]  # a loop that calls nothing makes nothing to free: it only looks whether a collector waits
+        poll, wait = f.label("poll"), f.label("wait")
+        f.jump(poll)
+        f.place(poll)
+        waiting = f.op("load atomic i8, ptr @cn_stopping monotonic, align 1")
+        f.branch(f.op(f"icmp ne i8 {waiting}, 0"), wait, top)
+        f.place(wait)
+        f.put("call void @cn_statement()")
     f.jump(top)
     f.place(out)
 

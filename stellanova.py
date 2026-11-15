@@ -3949,8 +3949,11 @@ def block(runs):
 
     def write(f):
         for r in runs:
+            at = len(f.lines)
             f.put("call void @cn_statement()")  # what the line before made may be freed
             machine.emit(f, r)
+            if f.lines[at] == "  call void @cn_statement()" and machine.makes_nothing(f.lines[at + 1:]):
+                del f.lines[at]  # a line that makes nothing leaves nothing to free
     return with_ir(run, write)
 
 

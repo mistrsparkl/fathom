@@ -30,6 +30,8 @@ extern "C" char __stack_high;  // where WebAssembly's stack starts (set by the l
 // 'a speaker is anything that can speak': ability -> each kind that can (by name) -> its shape, for saving and loading
 static std::map<std::string, std::map<std::string, V*>> able_kinds;
 
+extern "C" std::atomic<bool> cn_stopping{false};  // a collector waits for every thread (loops look at it without a call)
+
 namespace gc
 {
 	struct Thread
@@ -59,7 +61,7 @@ namespace gc
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 18;  // set it to test the collector hard
 	static size_t made_since = 0, limit = least;
 	static std::mutex collecting;
-	static std::atomic<bool> stopping{false};
+	static std::atomic<bool>& stopping = cn_stopping;
 
 	struct Mine
 	{
@@ -385,7 +387,8 @@ V* cn_make_text(std::string s)
 // ---------------------------------------------------------------- problems
 // A problem doesn't jump anywhere: it is kept here, and the machine code checks cn_failed() after each step that may fail,
 // then goes to the 'if that went wrong:' lines, or leaves the command (and so on, up to the program, which reports it).
-static thread_local bool failed = false;  // each command going alongside ('meanwhile') has its own
+extern "C" thread_local bool cn_failed_flag = false;  // each command going alongside ('meanwhile') has its own (machine code reads it)
+#define failed cn_failed_flag
 static thread_local stellanova::Problem pending;
 
 void cn_set_problem(const stellanova::Problem& p)

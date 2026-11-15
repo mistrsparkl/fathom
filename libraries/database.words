@@ -7,7 +7,7 @@ note: On the web this works with node (its own SQLite); a web page has no databa
 code:
   #ifdef _WIN32
   #include <winsqlite/winsqlite3.h>
-  #else
+  #elif defined(__linux__)
   // Linux: the system's own SQLite (libsqlite3.so.0), whose header may not be there
   extern "C"
   {
