@@ -91,6 +91,10 @@ code:
   		WSADATA data;
   		WSAStartup(MAKEWORD(2, 2), &data);
   		SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  #ifndef _WIN32
+  		int again = 1;  // Linux: the port again straight after another server closed it (as Python's server does)
+  		setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &again, sizeof again);
+  #endif
   		sockaddr_in where{};
   		where.sin_family = AF_INET;
   		where.sin_port = htons((u_short)port);

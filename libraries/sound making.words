@@ -4,14 +4,20 @@ note: A sound is a list of numbers from -1 to 1, 44100 of them for each second (
 note: Save one with 'save the sound', then play it with the sound library's 'play the sound'.
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <mmsystem.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <mmsystem.h>
+  #elif defined(__linux__)
+  #include <pulse/simple.h>
+  #endif
 include: <cmath>
 include: <fstream>
 include: <random>
 link: winmm
+linux link: pulse-simple
+linux link: pulse
 
 code:
   namespace stellanova_making
@@ -146,6 +152,22 @@ code:
   	{
   		if (!(seconds > 0 && seconds <= 600))
   			stellanova::fail(line, "a recording lasts more than 0 and at most 600 seconds, not " + stellanova::text(seconds) + ".");
+  #ifdef __linux__
+  		pa_sample_spec format{PA_SAMPLE_S16LE, 44100, 1};
+  		int why = 0;
+  		pa_simple* mic = pa_simple_new(nullptr, "Stellanova", PA_STREAM_RECORD, nullptr, "recording", &format, nullptr, nullptr, &why);
+  		if (!mic)
+  			stellanova::fail(line, "I couldn't open a microphone.");
+  		std::vector<int16_t> data((size_t)(seconds * 44100));
+  		bool heard = pa_simple_read(mic, data.data(), data.size() * 2, &why) == 0;
+  		pa_simple_free(mic);
+  		if (!heard)
+  			stellanova::fail(line, "I couldn't record from the microphone.");
+  		std::vector<double> out;
+  		for (int16_t x : data)
+  			out.push_back(x / 32768.0);
+  		return out;
+  #else
   		WAVEFORMATEX format{WAVE_FORMAT_PCM, 1, 44100, 88200, 2, 16, 0};
   		HWAVEIN in = nullptr;
   		if (waveInOpen(&in, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR)
@@ -165,6 +187,7 @@ code:
   		for (size_t k = 0; k < header.dwBytesRecorded / 2; ++k)
   			out.push_back(data[k] / 32768.0);
   		return out;
+  #endif
   	}
   }
 
@@ -259,9 +282,32 @@ python:
       raise RunError(0, '"' + file + '" has no sound in it.')
   def record(seconds):
       import ctypes, time as _time
-      from ctypes import wintypes
       if not 0 < seconds <= 600:
           raise RunError(0, "a recording lasts more than 0 and at most 600 seconds, not " + text(seconds) + ".")
+      if sys.platform.startswith("linux"):  # PulseAudio, as built programs use
+          class SPEC(ctypes.Structure):
+              _fields_ = [("format", ctypes.c_int), ("rate", ctypes.c_uint32), ("channels", ctypes.c_uint8)]
+          try:
+              pulse = ctypes.CDLL("libpulse-simple.so.0")
+          except OSError:
+              raise RunError(0, "I couldn't open a microphone.")
+          pulse.pa_simple_new.restype = ctypes.c_void_p
+          pulse.pa_simple_new.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+                                          ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+          pulse.pa_simple_read.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
+          pulse.pa_simple_free.argtypes = [ctypes.c_void_p]
+          spec = SPEC(3, 44100, 1)  # PA_SAMPLE_S16LE
+          mic = pulse.pa_simple_new(None, b"Stellanova", 2, None, b"recording", ctypes.byref(spec), None, None, None)  # PA_STREAM_RECORD
+          if not mic:
+              raise RunError(0, "I couldn't open a microphone.")
+          buffer = ctypes.create_string_buffer(int(seconds * 44100) * 2)
+          heard = pulse.pa_simple_read(mic, buffer, len(buffer), None) == 0
+          pulse.pa_simple_free(mic)
+          if not heard:
+              raise RunError(0, "I couldn't record from the microphone.")
+          raw = buffer.raw
+          return [_struct.unpack("<h", raw[k:k + 2])[0] / 32768.0 for k in range(0, len(raw) - 1, 2)]
+      from ctypes import wintypes
       class FORMAT(ctypes.Structure):
           _fields_ = [("tag", wintypes.WORD), ("channels", wintypes.WORD), ("rate", wintypes.DWORD), ("bytes", wintypes.DWORD),
                       ("align", wintypes.WORD), ("bits", wintypes.WORD), ("extra", wintypes.WORD)]

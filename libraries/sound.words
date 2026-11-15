@@ -1,15 +1,278 @@
-note: Words for sound (Windows). Use them in a program with:  use: sound
+note: Words for sound (Windows or Linux). Use them in a program with:  use: sound
 note: Sound files can be .wav or .mp3 files. Paths are from the folder the program runs in.
 note: Sounds play on top of each other, so a game can have many at once.
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <mmsystem.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <mmsystem.h>
+  #elif defined(__linux__)
+  #include <pulse/simple.h>
+  #include <condition_variable>
+  #include <fstream>
+  #include <memory>
+  #include <mutex>
+  #include <thread>
+  #include <cstring>
+  #include <sys/types.h>
+  extern "C"  // the system's MP3 reader (libmpg123.so.0), whose header may not be there
+  {
+  	struct mpg123_handle_struct;
+  	int mpg123_init();
+  	mpg123_handle_struct* mpg123_new(const char*, int*);
+  	int mpg123_open(mpg123_handle_struct*, const char*);
+  	int mpg123_getformat(mpg123_handle_struct*, long*, int*, int*);
+  	int mpg123_format_none(mpg123_handle_struct*);
+  	int mpg123_format(mpg123_handle_struct*, long, int, int);
+  	int mpg123_read(mpg123_handle_struct*, void*, size_t, size_t*);
+  	int mpg123_close(mpg123_handle_struct*);
+  	void mpg123_delete(mpg123_handle_struct*);
+  	int mpg123_param(mpg123_handle_struct*, int, long, double);
+  	void cn_park();  // (machine code's: waiting here mustn't hold up the collector)
+  	void cn_unpark();
+  }
+  #endif
 link: winmm
+linux link: pulse-simple
+linux link: pulse
+linux link: :libmpg123.so.0
 
 code:
+  #ifdef __linux__
+  namespace stellanova_sound
+  {
+  	// Linux: every sound playing, and the song, mixed into one PulseAudio stream (44100 frames a second, two sides).
+  	struct Clip { std::vector<float> frames; };  // left, right, left, right...
+  	struct Voice
+  	{
+  		std::shared_ptr<Clip> clip;
+  		size_t at = 0;  // the frame it is up to
+  		bool loop = false, paused = false, done = false;
+  		float loudness = 1;
+  	};
+  	inline std::mutex lock;
+  	inline std::condition_variable changed;
+  	inline std::vector<std::shared_ptr<Voice>> voices;
+  	inline std::shared_ptr<Voice> song;
+  	inline bool song_open = false;
+
+  	inline std::shared_ptr<Clip> stereo(const std::vector<float>& in, int channels, long rate)  // to two sides at 44100
+  	{
+  		auto clip = std::make_shared<Clip>();
+  		size_t frames = channels ? in.size() / channels : 0;
+  		size_t out = rate > 0 ? (size_t)(frames * 44100.0 / rate) : 0;
+  		clip->frames.resize(out * 2);
+  		for (size_t k = 0; k < out; ++k)
+  		{
+  			double where = k * (double)rate / 44100.0;
+  			size_t a = (size_t)where, b = std::min(a + 1, frames - 1);
+  			double t = where - a;
+  			for (int side = 0; side < 2; ++side)
+  			{
+  				int c = std::min(side, channels - 1);
+  				clip->frames[k * 2 + side] = (float)(in[a * channels + c] * (1 - t) + in[b * channels + c] * t);
+  			}
+  		}
+  		return clip;
+  	}
+  	inline std::shared_ptr<Clip> read_wav(const std::string& all)
+  	{
+  		if (all.size() < 12 || all.compare(0, 4, "RIFF") || all.compare(8, 4, "WAVE"))
+  			return nullptr;
+  		auto word = [&](size_t at, int n) { uint32_t v = 0; for (int k = n - 1; k >= 0; --k) v = v << 8 | (unsigned char)all[at + k]; return v; };
+  		int format = 0, channels = 0, bits = 0;
+  		long rate = 0;
+  		for (size_t at = 12; at + 8 <= all.size();)
+  		{
+  			std::string kind = all.substr(at, 4);
+  			size_t size = word(at + 4, 4);
+  			if (kind == "fmt " && at + 24 <= all.size())
+  				format = word(at + 8, 2), channels = word(at + 10, 2), rate = word(at + 12, 4), bits = word(at + 22, 2);
+  			if (kind == "data" && channels > 0 && (format == 1 || format == 3 || format == 0xFFFE))
+  			{
+  				size_t end = std::min(all.size(), at + 8 + size), bytes = bits / 8;
+  				if (bytes < 1 || bytes > 4)
+  					return nullptr;
+  				std::vector<float> in;
+  				for (size_t k = at + 8; k + bytes <= end; k += bytes)
+  				{
+  					uint32_t v = word(k, (int)bytes);
+  					if (format == 3 && bytes == 4) { float f; std::memcpy(&f, &v, 4); in.push_back(f); }
+  					else if (bytes == 1) in.push_back(((int)v - 128) / 128.0f);
+  					else { int shift = 32 - 8 * (int)bytes; in.push_back((float)((int32_t)(v << shift) / 2147483648.0)); }
+  				}
+  				return stereo(in, channels, rate);
+  			}
+  			at += 8 + size + (size & 1);
+  		}
+  		return nullptr;
+  	}
+  	inline std::shared_ptr<Clip> read_mp3(const std::string& file)
+  	{
+  		static bool started = mpg123_init() == 0;
+  		if (!started)
+  			return nullptr;
+  		mpg123_handle_struct* mh = mpg123_new(nullptr, nullptr);
+  		if (!mh)
+  			return nullptr;
+  		mpg123_param(mh, 2, 0x20, 0);  // MPG123_ADD_FLAGS, MPG123_QUIET: say nothing about files that aren't MP3s
+  		long rate = 0;
+  		int channels = 0, encoding = 0;
+  		std::shared_ptr<Clip> clip;
+  		if (mpg123_open(mh, file.c_str()) == 0 && mpg123_getformat(mh, &rate, &channels, &encoding) == 0)
+  		{
+  			mpg123_format_none(mh);
+  			mpg123_format(mh, rate, channels, 0x200);  // MPG123_ENC_FLOAT_32
+  			std::vector<float> in;
+  			float chunk[4096];
+  			size_t got = 0;
+  			int said;
+  			while ((said = mpg123_read(mh, chunk, sizeof chunk, &got)) == 0 || said == -11 || got)  // -11: the format changed
+  			{
+  				in.insert(in.end(), chunk, chunk + got / sizeof(float));
+  				if (said != 0 && said != -11)
+  					break;
+  			}
+  			if (!in.empty())
+  				clip = stereo(in, channels, rate);
+  			mpg123_close(mh);
+  		}
+  		mpg123_delete(mh);
+  		return clip;
+  	}
+  	inline std::shared_ptr<Clip> clip(const std::string& file, int line)
+  	{
+  		static std::map<std::string, std::shared_ptr<Clip>> loaded;
+  		{
+  			std::lock_guard<std::mutex> hold(lock);
+  			if (loaded.count(file))
+  				return loaded[file];
+  		}
+  		std::ifstream in(file, std::ios::binary);
+  		if (!in)
+  			stellanova::fail(line, "there is no sound file called \"" + file + "\".");
+  		std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  		auto made = read_wav(all);
+  		if (!made)
+  			made = read_mp3(file);
+  		if (!made)
+  			stellanova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  		std::lock_guard<std::mutex> hold(lock);
+  		return loaded[file] = made;
+  	}
+  	inline void mixing()  // the thread that feeds the speakers
+  	{
+  		pa_sample_spec spec{PA_SAMPLE_FLOAT32LE, 44100, 2};
+  		pa_buffer_attr wanted{(uint32_t)-1, 44100 * 2 * 4 / 20, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1};  // a 20th of a second ahead
+  		pa_simple* out = pa_simple_new(nullptr, "Stellanova", PA_STREAM_PLAYBACK, nullptr, "sound", &spec, nullptr, &wanted, nullptr);
+  		std::vector<float> mix(1024 * 2);
+  		for (;;)
+  		{
+  			std::fill(mix.begin(), mix.end(), 0.0f);
+  			{
+  				std::lock_guard<std::mutex> hold(lock);
+  				auto add = [&](Voice& v) {
+  					const auto& f = v.clip->frames;
+  					size_t frames = f.size() / 2;
+  					for (size_t k = 0; k < 1024 && !v.done && !v.paused; ++k)
+  					{
+  						if (v.at >= frames)
+  						{
+  							if (!v.loop || !frames) { v.done = true; break; }
+  							v.at = 0;
+  						}
+  						mix[k * 2] += f[v.at * 2] * v.loudness;
+  						mix[k * 2 + 1] += f[v.at * 2 + 1] * v.loudness;
+  						++v.at;
+  					}
+  					if (v.at >= frames && !v.loop)
+  						v.done = true;
+  				};
+  				for (auto& v : voices)
+  					add(*v);
+  				if (song)
+  					add(*song);
+  				voices.erase(std::remove_if(voices.begin(), voices.end(), [](const auto& v) { return v->done; }), voices.end());
+  			}
+  			changed.notify_all();
+  			for (float& x : mix)
+  				x = std::clamp(x, -1.0f, 1.0f);
+  			if (!out || pa_simple_write(out, mix.data(), mix.size() * sizeof(float), nullptr) < 0)
+  				std::this_thread::sleep_for(std::chrono::milliseconds(23));  // no speakers: time still passes
+  		}
+  	}
+  	inline void start()
+  	{
+  		static bool going = [] { std::thread(mixing).detach(); return true; }();
+  		(void)going;
+  	}
+
+  	inline void play(const std::string& file, bool wait, bool loop, int line)
+  	{
+  		auto v = std::make_shared<Voice>();
+  		v->clip = clip(file, line);
+  		v->loop = loop;
+  		start();
+  		std::unique_lock<std::mutex> hold(lock);
+  		voices.push_back(v);
+  		if (wait)
+  		{
+  			cn_park();
+  			changed.wait(hold, [&] { return v->done; });
+  			hold.unlock();
+  			cn_unpark();
+  		}
+  	}
+  	inline void stop()
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		voices.clear();
+  	}
+  	inline void song_stop()
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		song = nullptr;
+  		song_open = false;
+  	}
+  	inline void song_play(const std::string& file, int line)
+  	{
+  		song_stop();
+  		auto v = std::make_shared<Voice>();
+  		v->clip = clip(file, line);
+  		start();
+  		std::lock_guard<std::mutex> hold(lock);
+  		song = v;
+  		song_open = true;
+  	}
+  	inline void song_pause(bool paused)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		if (song && !song->done)
+  			song->paused = paused;
+  	}
+  	inline bool song_playing() { std::lock_guard<std::mutex> hold(lock); return song && !song->paused && !song->done; }
+  	inline bool song_ended() { std::lock_guard<std::mutex> hold(lock); return song && song->done; }
+  	inline double song_time() { std::lock_guard<std::mutex> hold(lock); return song ? song->at / 44100.0 : 0; }
+  	inline double song_length() { std::lock_guard<std::mutex> hold(lock); return song ? song->clip->frames.size() / 2 / 44100.0 : 0; }
+  	inline void song_seek(double seconds)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		if (!song)
+  			return;
+  		size_t frames = song->clip->frames.size() / 2;
+  		song->at = std::min(frames, (size_t)(std::max(0.0, seconds) * 44100));
+  		song->done = song->at >= frames;
+  	}
+  	inline void song_loudness(double level)
+  	{
+  		std::lock_guard<std::mutex> hold(lock);
+  		if (song)
+  			song->loudness = (float)std::clamp(level, 0.0, 1.0);
+  	}
+  }
+  #else
   namespace stellanova_sound
   {
   	inline std::wstring wide(const std::string& s)
@@ -97,65 +360,270 @@ code:
   		if (was)
   			song_say(L"play stellanova_song");
   	}
+  	inline void song_pause(bool paused) { song_say(paused ? L"pause stellanova_song" : L"resume stellanova_song"); }
+  	inline bool song_playing() { return song_status(L"mode") == L"playing"; }
+  	inline bool song_ended() { return song_open && song_status(L"mode") == L"stopped" && song_number(L"position") + 0.3 >= song_number(L"length"); }
+  	inline double song_time() { return song_number(L"position"); }
+  	inline double song_length() { return song_number(L"length"); }
+  	inline void song_loudness(double level) { song_say(L"setaudio stellanova_song volume to " + std::to_wstring((int)(std::clamp(level, 0.0, 1.0) * 1000))); }
   }
+  #endif
 
 python:
   import ctypes
-  mci = ctypes.windll.winmm.mciSendStringW
-  playing = []
-  made = [0]
-  def done(alias):
-      mode = ctypes.create_unicode_buffer(64)
-      mci(f"status {alias} mode", mode, 64, None)
-      return mode.value != "playing"
-  def play(file, wait, loop):
-      if not os.path.exists(file):
-          raise RunError(0, f'there is no sound file called "{file}".')
-      for alias in [a for a in playing if done(a)]:  # close the ones that have finished
-          mci(f"close {alias}", None, 0, None)
-          playing.remove(alias)
-      made[0] += 1
-      alias = f"stellanova_sound_{made[0]}"
-      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias {alias}', None, 0, None) != 0:
-          raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
-      playing.append(alias)
-      mci(f"play {alias}" + (" repeat" if loop else "") + (" wait" if wait else ""), None, 0, None)
-  def stop():
-      for alias in playing:
-          mci(f"close {alias}", None, 0, None)
-      playing.clear()
-  song = {"open": False}
-  def song_status(what):
-      said = ctypes.create_unicode_buffer(128)
-      if song["open"]:
-          mci(f"status stellanova_song {what}", said, 128, None)
-      return said.value
-  def song_stop():
-      if song["open"]:
-          mci("close stellanova_song", None, 0, None)
-      song["open"] = False
-  def song_play(file):
-      song_stop()
-      if not os.path.exists(file):
-          raise RunError(0, f'there is no sound file called "{file}".')
-      if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias stellanova_song', None, 0, None) != 0:
-          raise RunError(0, f"I couldn't play '{file}' (it must be a .wav or .mp3 file).")
-      song["open"] = True
-      mci("set stellanova_song time format milliseconds", None, 0, None)
-      mci("play stellanova_song", None, 0, None)
-  def song_say(what):
-      if song["open"]:
-          mci(what, None, 0, None)
-  def song_number(what):
-      try:
-          return float(song_status(what) or 0) / 1000
-      except ValueError:
-          return 0.0
-  def song_seek(seconds):
-      was = song_status("mode") == "playing"
-      song_say(f"seek stellanova_song to {int(max(0, seconds) * 1000)}")
-      if was:
-          song_say("play stellanova_song")
+  if sys.platform.startswith("linux"):  # the same mixer as built programs: one PulseAudio stream
+      import array as _array, struct as _struct, threading as _threading, time as _time
+      _lock = _threading.Condition()
+      _voices, _song, _loaded = [], {"v": None}, {}
+      def _stereo(samples, channels, rate):
+          frames = len(samples) // channels if channels else 0
+          out = int(frames * 44100 / rate) if rate > 0 else 0
+          made = _array.array("f", bytes(out * 8))
+          for k in range(out):
+              where = k * rate / 44100
+              a = int(where); b = min(a + 1, frames - 1); t = where - a
+              for side in (0, 1):
+                  c = min(side, channels - 1)
+                  made[k * 2 + side] = samples[a * channels + c] * (1 - t) + samples[b * channels + c] * t
+          return made
+      def _read_wav(data):
+          if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+              return None
+          at, fmt, channels, rate, bits = 12, 0, 0, 0, 0
+          while at + 8 <= len(data):
+              kind, size = data[at:at + 4], _struct.unpack("<I", data[at + 4:at + 8])[0]
+              if kind == b"fmt " and at + 24 <= len(data):
+                  fmt, channels, rate = _struct.unpack("<HHI", data[at + 8:at + 16])
+                  bits = _struct.unpack("<H", data[at + 22:at + 24])[0]
+              if kind == b"data" and channels and fmt in (1, 3, 0xFFFE):
+                  body, n = data[at + 8:at + 8 + size], bits // 8
+                  if not 1 <= n <= 4:
+                      return None
+                  body = body[:len(body) - len(body) % n]
+                  if fmt == 3 and n == 4:
+                      samples = _array.array("f", body)
+                  elif n == 1:
+                      samples = [(x - 128) / 128 for x in body]
+                  elif n == 2:
+                      samples = [x / 32768 for x in _array.array("h", body)]
+                  elif n == 4:
+                      samples = [x / 2147483648 for x in _array.array("i", body)]
+                  else:
+                      samples = [int.from_bytes(body[k:k + 3], "little", signed=True) / 8388608 for k in range(0, len(body), 3)]
+                  return _stereo(samples, channels, rate)
+              at += 8 + size + (size & 1)
+          return None
+      def _read_mp3(file):
+          try:
+              lib = ctypes.CDLL("libmpg123.so.0")
+          except OSError:
+              return None
+          lib.mpg123_new.restype = ctypes.c_void_p
+          lib.mpg123_new.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
+          for name in ("mpg123_open", "mpg123_getformat", "mpg123_format_none", "mpg123_format", "mpg123_read", "mpg123_close"):
+              getattr(lib, name).restype = ctypes.c_int
+          lib.mpg123_open.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+          lib.mpg123_getformat.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+          lib.mpg123_format_none.argtypes = [ctypes.c_void_p]
+          lib.mpg123_format.argtypes = [ctypes.c_void_p, ctypes.c_long, ctypes.c_int, ctypes.c_int]
+          lib.mpg123_read.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
+          lib.mpg123_close.argtypes = lib.mpg123_delete.argtypes = [ctypes.c_void_p]
+          lib.mpg123_param.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_long, ctypes.c_double]
+          lib.mpg123_init()
+          mh = lib.mpg123_new(None, None)
+          if not mh:
+              return None
+          lib.mpg123_param(mh, 2, 0x20, 0)  # MPG123_ADD_FLAGS, MPG123_QUIET: say nothing about files that aren't MP3s
+          rate, channels, enc = ctypes.c_long(), ctypes.c_int(), ctypes.c_int()
+          made = None
+          if lib.mpg123_open(mh, file.encode()) == 0 and lib.mpg123_getformat(mh, ctypes.byref(rate), ctypes.byref(channels), ctypes.byref(enc)) == 0:
+              lib.mpg123_format_none(mh)
+              lib.mpg123_format(mh, rate.value, channels.value, 0x200)  # MPG123_ENC_FLOAT_32
+              chunk, got, samples = ctypes.create_string_buffer(16384), ctypes.c_size_t(), _array.array("f")
+              while True:
+                  said = lib.mpg123_read(mh, chunk, len(chunk), ctypes.byref(got))
+                  samples.frombytes(chunk.raw[:got.value - got.value % 4])
+                  if said not in (0, -11) or (said == 0 and not got.value):
+                      break
+              if samples:
+                  made = _stereo(samples, channels.value, rate.value)
+              lib.mpg123_close(mh)
+          lib.mpg123_delete(mh)
+          return made
+      def _clip(file):
+          if file in _loaded:
+              return _loaded[file]
+          try:
+              with open(file, "rb") as f:
+                  data = f.read()
+          except OSError:
+              raise RunError(0, f'there is no sound file called "{file}".')
+          made = _read_wav(data)
+          if made is None:
+              made = _read_mp3(file)
+          if made is None:
+              raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
+          _loaded[file] = made
+          return made
+      def _mixing():
+          class SPEC(ctypes.Structure):
+              _fields_ = [("format", ctypes.c_int), ("rate", ctypes.c_uint32), ("channels", ctypes.c_uint8)]
+          class ATTR(ctypes.Structure):
+              _fields_ = [(n, ctypes.c_uint32) for n in ("maxlength", "tlength", "prebuf", "minreq", "fragsize")]
+          out = None
+          try:
+              pulse = ctypes.CDLL("libpulse-simple.so.0")
+              pulse.pa_simple_new.restype = ctypes.c_void_p
+              pulse.pa_simple_new.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+                                              ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+              pulse.pa_simple_write.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
+              spec, attr = SPEC(5, 44100, 2), ATTR(0xFFFFFFFF, 44100 * 2 * 4 // 20, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)  # FLOAT32LE
+              out = pulse.pa_simple_new(None, b"Stellanova", 1, None, b"sound", ctypes.byref(spec), None, ctypes.byref(attr), None)
+          except OSError:
+              pass
+          while True:
+              mix = [0.0] * 2048
+              with _lock:
+                  for v in _voices + ([_song["v"]] if _song["v"] else []):
+                      frames, f = len(v["clip"]) // 2, v["clip"]
+                      k = 0
+                      while k < 1024 and not v["done"] and not v["paused"]:
+                          if v["at"] >= frames:
+                              if not v["loop"] or not frames:
+                                  v["done"] = True
+                                  break
+                              v["at"] = 0
+                          take = min(1024 - k, frames - v["at"])
+                          g, at = v["loud"], v["at"] * 2
+                          for j in range(take * 2):
+                              mix[k * 2 + j] += f[at + j] * g
+                          k += take
+                          v["at"] += take
+                      if v["at"] >= frames and not v["loop"]:
+                          v["done"] = True
+                  _voices[:] = [v for v in _voices if not v["done"]]
+                  _lock.notify_all()
+              block = _array.array("f", (max(-1.0, min(1.0, x)) for x in mix)).tobytes()
+              if not out or pulse.pa_simple_write(out, block, len(block), None) < 0:
+                  _time.sleep(1024 / 44100)
+      _going = []
+      def _start():
+          if not _going:
+              _going.append(_threading.Thread(target=_mixing, daemon=True))
+              _going[0].start()
+      def _voice(file, loop):
+          return {"clip": _clip(file), "at": 0, "loop": loop, "paused": False, "done": False, "loud": 1.0}
+      def play(file, wait, loop):
+          v = _voice(file, loop)
+          _start()
+          with _lock:
+              _voices.append(v)
+              while wait and not v["done"]:
+                  _lock.wait()
+      def stop():
+          with _lock:
+              _voices.clear()
+      def song_stop():
+          with _lock:
+              _song["v"] = None
+      def song_play(file):
+          song_stop()
+          v = _voice(file, False)
+          _start()
+          with _lock:
+              _song["v"] = v
+      def song_pause(paused):
+          with _lock:
+              if _song["v"] and not _song["v"]["done"]:
+                  _song["v"]["paused"] = paused
+      def song_playing():
+          v = _song["v"]
+          return bool(v) and not v["paused"] and not v["done"]
+      def song_ended():
+          return bool(_song["v"]) and _song["v"]["done"]
+      def song_time():
+          return _song["v"]["at"] / 44100 if _song["v"] else 0.0
+      def song_length():
+          return len(_song["v"]["clip"]) / 2 / 44100 if _song["v"] else 0.0
+      def song_seek(seconds):
+          with _lock:
+              v = _song["v"]
+              if v:
+                  frames = len(v["clip"]) // 2
+                  v["at"] = min(frames, int(max(0, seconds) * 44100))
+                  v["done"] = v["at"] >= frames
+      def song_loudness(level):
+          with _lock:
+              if _song["v"]:
+                  _song["v"]["loud"] = max(0.0, min(1.0, level))
+  else:
+      mci = ctypes.windll.winmm.mciSendStringW
+      playing = []
+      made = [0]
+      def done(alias):
+          mode = ctypes.create_unicode_buffer(64)
+          mci(f"status {alias} mode", mode, 64, None)
+          return mode.value != "playing"
+      def play(file, wait, loop):
+          if not os.path.exists(file):
+              raise RunError(0, f'there is no sound file called "{file}".')
+          for alias in [a for a in playing if done(a)]:  # close the ones that have finished
+              mci(f"close {alias}", None, 0, None)
+              playing.remove(alias)
+          made[0] += 1
+          alias = f"stellanova_sound_{made[0]}"
+          if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias {alias}', None, 0, None) != 0:
+              raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
+          playing.append(alias)
+          mci(f"play {alias}" + (" repeat" if loop else "") + (" wait" if wait else ""), None, 0, None)
+      def stop():
+          for alias in playing:
+              mci(f"close {alias}", None, 0, None)
+          playing.clear()
+      song = {"open": False}
+      def song_status(what):
+          said = ctypes.create_unicode_buffer(128)
+          if song["open"]:
+              mci(f"status stellanova_song {what}", said, 128, None)
+          return said.value
+      def song_stop():
+          if song["open"]:
+              mci("close stellanova_song", None, 0, None)
+          song["open"] = False
+      def song_play(file):
+          song_stop()
+          if not os.path.exists(file):
+              raise RunError(0, f'there is no sound file called "{file}".')
+          if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias stellanova_song', None, 0, None) != 0:
+              raise RunError(0, f"I couldn't play '{file}' (it must be a .wav or .mp3 file).")
+          song["open"] = True
+          mci("set stellanova_song time format milliseconds", None, 0, None)
+          mci("play stellanova_song", None, 0, None)
+      def song_say(what):
+          if song["open"]:
+              mci(what, None, 0, None)
+      def song_number(what):
+          try:
+              return float(song_status(what) or 0) / 1000
+          except ValueError:
+              return 0.0
+      def song_seek(seconds):
+          was = song_status("mode") == "playing"
+          song_say(f"seek stellanova_song to {int(max(0, seconds) * 1000)}")
+          if was:
+              song_say("play stellanova_song")
+      def song_pause(paused):
+          song_say("pause stellanova_song" if paused else "resume stellanova_song")
+      def song_playing():
+          return song_status("mode") == "playing"
+      def song_ended():
+          return song["open"] and song_status("mode") == "stopped" and song_number("position") + 0.3 >= song_number("length")
+      def song_time():
+          return song_number("position")
+      def song_length():
+          return song_number("length")
+      def song_loudness(level):
+          song_say(f"setaudio stellanova_song volume to {int(max(0, min(1, level)) * 1000)}")
 
 to play the sound, given file (text) = stellanova_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
@@ -172,32 +640,32 @@ to stop the sound = stellanova_sound::stop()
 to play the song, given file (text) = stellanova_sound::song_play({file}, {line})
   runs: song_play({file})
   web: await stellanova_sound_web.songPlay({file}, {line})
-to pause the song = stellanova_sound::song_say(L"pause stellanova_song")
-  runs: song_say("pause stellanova_song")
+to pause the song = stellanova_sound::song_pause(true)
+  runs: song_pause(True)
   web: stellanova_sound_web.songPause()
-to carry on the song = stellanova_sound::song_say(L"resume stellanova_song")
-  runs: song_say("resume stellanova_song")
+to carry on the song = stellanova_sound::song_pause(false)
+  runs: song_pause(False)
   web: stellanova_sound_web.songResume()
 to stop the song = stellanova_sound::song_stop()
   runs: song_stop()
   web: stellanova_sound_web.songStop()
-the song is playing = (stellanova_sound::song_status(L"mode") == L"playing"), yes or no, read only
-  runs: song_status("mode") == "playing"
+the song is playing = stellanova_sound::song_playing(), yes or no, read only
+  runs: song_playing()
   web: stellanova_sound_web.songPlaying()
-the song has ended = (stellanova_sound::song_open && stellanova_sound::song_status(L"mode") == L"stopped" && stellanova_sound::song_number(L"position") + 0.3 >= stellanova_sound::song_number(L"length")), yes or no, read only
-  runs: song["open"] and song_status("mode") == "stopped" and song_number("position") + 0.3 >= song_number("length")
+the song has ended = stellanova_sound::song_ended(), yes or no, read only
+  runs: song_ended()
   web: stellanova_sound_web.songEnded()
-song time = stellanova_sound::song_number(L"position"), number, read only
-  runs: song_number("position")
+song time = stellanova_sound::song_time(), number, read only
+  runs: song_time()
   web: stellanova_sound_web.songTime()
-song length = stellanova_sound::song_number(L"length"), number, read only
-  runs: song_number("length")
+song length = stellanova_sound::song_length(), number, read only
+  runs: song_length()
   web: stellanova_sound_web.songLength()
 to set the song time to, given seconds (a number) = stellanova_sound::song_seek({seconds})
   runs: song_seek({seconds})
   web: stellanova_sound_web.songSeek({seconds})
-to set the song loudness to, given level (a number) = stellanova_sound::song_say(L"setaudio stellanova_song volume to " + std::to_wstring((int)(std::clamp({level}, 0.0, 1.0) * 1000)))
-  runs: song_say(f"setaudio stellanova_song volume to {int(max(0, min(1, {level})) * 1000)}")
+to set the song loudness to, given level (a number) = stellanova_sound::song_loudness({level})
+  runs: song_loudness({level})
   web: stellanova_sound_web.songLoudness({level})
 
 javascript:
