@@ -892,7 +892,119 @@ def looped(then):
             pass
         return True
     step.inner = then  # so a missing piece is named by what it really is
+    step.loop_body = True
     return with_ir(step, getattr(then, "ir", None))  # machine.loop makes 'break free' and 'move on' jumps
+
+
+# ---------------------------------------------------------------- direct runs as Python
+# Each command run directly becomes one Python function, written out as Python text: its lines and sums inline, with
+# real returns. A piece with no Python text of its own (pyf for a value, pyl for a line) is called as its run(env).
+PY_PARTS = []  # what the written Python calls: runs without Python text of their own, and commands
+FAST = not os.environ.get("STELLANOVA_NO_FAST")  # set it to run directly the old way (each piece a Python call)
+
+
+def py_part(x):
+    PY_PARTS.append(x)
+    return f"_F[{len(PY_PARTS) - 1}]"
+
+
+def py_expr(v):
+    """A value's Python text (env holds the names)."""
+    for x in (v, getattr(v, "run", None)):
+        make = getattr(x, "pyf", None)
+        if make:
+            return make()
+    return f"{py_part(v.run if isinstance(v, Value) else v)}(env)"
+
+
+def py_lines(run, tab):
+    """A line's Python: (its line number, or None for the line around it, and the text) for each Python line."""
+    x, out = run, None
+    while out is None:
+        if getattr(x, "pyl", None):
+            out = x.pyl(tab)
+        elif getattr(x, "pyf", None):
+            out = [(None, tab + x.pyf())]
+        elif getattr(x, "inner", None) is not None and not getattr(x, "loop_body", False):
+            x = x.inner
+        else:
+            out = [(None, f"{tab}{py_part(run)}(env)")]
+    n = getattr(run, "line_n", None)
+    return [(m if m is not None else n, t) for m, t in out]
+
+
+def py_loop(head, then, tab):
+    """A loop's lines: 'stop the loop' and 'skip to the next one' inside a run of the old way still work."""
+    inner = py_lines(then.inner, tab + "        ")
+    if not any("_F[" in t for _, t in inner):
+        return [(None, tab + head)] + [(m, t[4:]) for m, t in inner]
+    return [(None, tab + head), (None, tab + "    try:")] + inner + [
+        (None, tab + "    except _Leave:"), (None, tab + "        break"), (None, tab + "    except _Next:"), (None, tab + "        pass")]
+
+
+def py_empty_list(env):
+    return []
+
+
+py_empty_list.pyf = lambda: "[]"
+
+
+def py_count(x, last, by=1.0):  # 'for each n from 1 to 10 by 2'
+    while (by > 0 and x <= last) or (by < 0 and x >= last):
+        yield x
+        x += by
+
+
+def py_each(items, simple):  # 'for each x in xs': a copy, so changing xs inside doesn't change the rounds
+    return list(items) if simple else copy.deepcopy(items)
+
+
+def py_reps(c):
+    return range(int(c) if math.isfinite(c) else 0)
+
+
+def py_fix(err, lines):
+    """A surprise inside written Python, as the old way says it (with the line it happened on)."""
+    tb = err.__traceback__
+    n = lines[tb.tb_lineno - 1] if tb and 0 < tb.tb_lineno <= len(lines) else 0
+    if isinstance(err, RunError):
+        if not err.line:
+            err.line = n
+        return err
+    if isinstance(err, RecursionError):
+        return RunError(n, "commands called each other too many times in a row (they may never stop).")
+    return RunError(n, f"something went wrong inside Stellanova: {err}")
+
+
+PY_ZERO = {NUMBER: "0.0", YESNO: "False", TEXT: "''"}
+PY_NAME = re.compile(r"env\['(\w+)'\]")
+
+
+def py_command(name, params, zeros, gives_zero, run):
+    """The Python function for a command (or None when it can't be written)."""
+    body = py_lines(run, "        ")
+    start = [f"{c!r}: {PY_ZERO.get(k) or f'_Z[{j}]()'}" for j, (c, k) in enumerate(zeros)] + [f"{c!r}: _a{j}" for j, c in enumerate(params)]
+    head = [(0, f"def command({', '.join(f'_a{j}' for j in range(len(params)))}):"), (0, f"    env = {{{', '.join(start)}}}")]
+    plain = [(m, PY_NAME.sub(r"v_\1", t)) for m, t in body]
+    if not any(re.search(r"\benv\b", t) for _, t in plain):  # nothing needs env itself: each name is a Python name
+        body = plain
+        head = head[:1] + [(0, f"    v_{c} = {PY_ZERO.get(k) or f'_Z[{j}]()'}") for j, (c, k) in enumerate(zeros)] + \
+            [(0, f"    v_{c} = _a{j}") for j, c in enumerate(params)]
+    src = head + [(0, "    try:")] + body + [
+        (0, "    except _Stop:"), (0, "        return None"), (0, "    except _Give as g:"), (0, "        return g.value"),
+        (0, "    except (_Flow, SystemExit, KeyboardInterrupt):"), (0, "        raise"),
+        (0, "    except BaseException as err:"), (0, "        raise _fix(err, _L) from None"),
+        (0, "    return _zero()")]
+    lines = [m or 0 for m, _ in src]
+    space = {"_F": PY_PARTS, "_Z": [(lambda k=k: py_zero(k, THINGS)) for _, k in zeros], "_P": params, "_zero": gives_zero,
+             "_count": py_count, "_each": py_each, "_Stop": Stop, "_Give": GiveBack, "_Flow": Flow,
+             "_Leave": LeaveLoop, "_Next": NextRound, "_fix": py_fix, "_L": lines, "_dup": dup, "_divide": divide,
+             "_reps": py_reps, "_text": text}
+    try:
+        exec(compile("\n".join(t for _, t in src), f"<{name}>", "exec"), space)
+    except SyntaxError:  # (a mistake here: the old way still works)
+        return None
+    return space["command"]
 
 
 def not_here(line, what):
@@ -1152,6 +1264,14 @@ class Value:
     def writable(self):
         return self.store is not None
 
+    @property
+    def pyf(self):  # its Python text, for direct runs (kept on run, which is what sums of values hold)
+        return getattr(self.run, "pyf", None)
+
+    @pyf.setter
+    def pyf(self, make):
+        self.run.pyf = make
+
 
 def with_ir(x, write):
     """x (a Value or a statement's run), able to write its own machine code with write(f)."""
@@ -1363,6 +1483,8 @@ class Names:
 
         def put(env, x):
             env[cpp] = dup(x)
+        get.pyf = lambda: f"env[{cpp!r}]"
+        put.py_name = cpp
         v = with_ir(Value(cpp, kind, get, None if read_only else put), lambda f: f.load(cpp, kind))
         v.ir_store = lambda f, x: f.store(cpp, kind, x)
         v.local_name = cpp
@@ -1439,6 +1561,7 @@ class Expr:
             a, b = self.need(v, YESNO, "or").run, self.need(r, YESNO, "or").run
             v = with_ir(Value(f"({v.cpp} || {r.cpp})", YESNO, lambda env, a=a, b=b: a(env) or b(env)),
                         lambda f, l=v, r=r: machine.short_circuit(f, l, r, True))
+            v.pyf = lambda a=a, b=b: f"({py_expr(a)} or {py_expr(b)})"
         return v
 
     def logic_and(self):
@@ -1449,6 +1572,7 @@ class Expr:
             a, b = self.need(v, YESNO, "and").run, self.need(r, YESNO, "and").run
             v = with_ir(Value(f"({v.cpp} && {r.cpp})", YESNO, lambda env, a=a, b=b: a(env) and b(env)),
                         lambda f, l=v, r=r: machine.short_circuit(f, l, r, False))
+            v.pyf = lambda a=a, b=b: f"({py_expr(a)} and {py_expr(b)})"
         return v
 
     def logic_not(self):
@@ -1456,8 +1580,10 @@ class Expr:
             self.i += 1
             v = self.need(self.logic_not(), YESNO, "not")
             a = v.run
-            return with_ir(Value(f"!{v.cpp}", YESNO, lambda env: not a(env)),
-                           lambda f: f.op(f"xor i1 {machine.emit(f, v)}, true"))
+            out = with_ir(Value(f"!{v.cpp}", YESNO, lambda env: not a(env)),
+                          lambda f: f.op(f"xor i1 {machine.emit(f, v)}, true"))
+            out.pyf = lambda: f"(not {py_expr(a)})"
+            return out
         return self.compare()
 
     COMPARE = [(("is", "more", "than"), ">"), (("is", "less", "than"), "<"), (("is", "at", "least"), ">="),
@@ -1573,8 +1699,10 @@ class Expr:
                 a, b, f = v.run, r.run, COMPARE_RUN[op]
                 if JS and is_deep(v.kind):  # JavaScript's == only asks whether they are the very same list
                     return Value(f"({'!' if op == '!=' else ''}stellanova::same({v.cpp}, {r.cpp}))", YESNO, lambda env: f(a(env), b(env)))
-                return with_ir(Value(f"({v.cpp} {op} {r.cpp})", YESNO, lambda env: f(a(env), b(env))),
-                               lambda fn, op=op, l=v, r=r: compare_ir(fn, op, l, r))
+                out = with_ir(Value(f"({v.cpp} {op} {r.cpp})", YESNO, lambda env: f(a(env), b(env))),
+                              lambda fn, op=op, l=v, r=r: compare_ir(fn, op, l, r))
+                out.pyf = lambda: f"({py_expr(a)} {op} {py_expr(b)})"
+                return out
         return v
 
     def sum(self):
@@ -1588,6 +1716,7 @@ class Expr:
                 left = v
                 v = with_ir(Value(f"(stellanova::text({v.cpp}) + stellanova::text({r.cpp}))", TEXT,
                                   lambda env, a=a, b=b: text(a(env)) + text(b(env))), lambda fn, l=v, r=r: join_ir(fn, [l, r]))
+                v.pyf = lambda a=a, b=b: f"(_text({py_expr(a)}) + _text({py_expr(b)}))"
                 v.joined = getattr(left, "joined", [left]) + [r]  # every part, left to right (for cn_append)
                 continue
             if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
@@ -1598,6 +1727,7 @@ class Expr:
                 v = Value(f"stellanova::{'plus' if op == '+' else 'minus'}({v.cpp}, {r.cpp})", v.kind, run)
                 continue
             v = with_ir(Value(f"({v.cpp} {op} {r.cpp})", v.kind, run), lambda fn, op=op, l=v, r=r: number_ir(fn, op, l, r))
+            v.pyf = lambda a=a, b=b, op=op: f"({py_expr(a)} {op} {py_expr(b)})"
         return v
 
     BIT_WORDS = ((("bitwise", "and"), 0), (("bitwise", "or"), 1), (("bitwise", "exclusive", "or"), 2),
@@ -1645,6 +1775,7 @@ class Expr:
                 v = Value(f"stellanova::{'over' if op == '/' else 'times'}({v.cpp}, {r.cpp})", v.kind, run)
                 continue
             v = with_ir(Value(f"({v.cpp} {op} {r.cpp})", v.kind, run), lambda fn, op=op, l=v, r=r: number_ir(fn, op, l, r))
+            v.pyf = (lambda a=a, b=b: f"_divide({py_expr(a)}, {py_expr(b)})") if op == "/" else (lambda a=a, b=b: f"({py_expr(a)} * {py_expr(b)})")
         return v
 
     def signed(self):
@@ -1656,7 +1787,9 @@ class Expr:
         if x.kind != NUMBER:
             raise ScriptError(self.line, f"Only a number can be negative, not {kind_name(x.kind)}.")
         a = x.run
-        return with_ir(Value(f"(-{x.cpp})", NUMBER, lambda env: -a(env)), lambda f: f.op(f"fneg double {machine.emit(f, x)}"))
+        out = with_ir(Value(f"(-{x.cpp})", NUMBER, lambda env: -a(env)), lambda f: f.op(f"fneg double {machine.emit(f, x)}"))
+        out.pyf = lambda: f"(-{py_expr(a)})"
+        return out
 
     def unary(self):
         v = self.single()
@@ -1885,7 +2018,9 @@ class Expr:
             while self.peek() in UNITS:
                 self.i += 1
             number = float(tok)
-            return with_ir(Value(tok if "." in tok else tok + ".0", NUMBER, lambda env: number), lambda f: machine.number(number))
+            v = with_ir(Value(tok if "." in tok else tok + ".0", NUMBER, lambda env: number), lambda f: machine.number(number))
+            v.pyf = lambda: repr(number)
+            return v
         for words, mark, cpp in ((("quote", "mark"), '"', '"\\""'), (("new", "line"), "\n", '"\\n"')):
             if self.at(*words):  # text can't hold these between its own quote marks
                 self.i += 2
@@ -2376,7 +2511,7 @@ class Expr:
                     k = parse_kind(" ".join(self.t[self.i:self.i + n]))
                     if k:
                         self.i += n
-                        return with_ir(Value("[]" if JS else f"{cpp_type('list of ' + k)}()", "list of " + k, lambda env: []),
+                        return with_ir(Value("[]" if JS else f"{cpp_type('list of ' + k)}()", "list of " + k, py_empty_list),
                                        lambda f: f.op("call ptr @cn_list_new()"))
                 raise ScriptError(self.line, f"Say what the list holds, like 'a list of numbers'. Kinds are: {kind_words()}.")
         self.i = start
@@ -3599,6 +3734,9 @@ def function(head, line, body, names, info, command=None):
             return py_zero(gives, things) if gives else None
         made = command or names.commands[tuple(words)]
         made.runner = runner
+        if FAST and not (WATCHING or DEBUG is not None or PROFILE is not None or MAKING_CPP or JS):
+            zeros = [(c, k) for c, k in declared.values() if c not in param_names]
+            made.runner = py_command(name, param_names, zeros, lambda: py_zero(gives, things) if gives else None, run) or runner
         # what machine.py needs to write this command (a command for a kind of thing can't be made into machine code yet)
         made.machine = (machine_name(name, inputs), [(snake(w), k) for w, k in inputs], gives, run)
     if JS:
@@ -3706,6 +3844,7 @@ def statements(body, names, declared, depth):
             if which == "if":
                 chain = [(cond, run)]
                 pick = choose(chain)
+                pick.line_n = n
                 # the whole choice is the if line's (its test too), so it stops and is timed even when the test is no
                 if DEBUG is not None:
                     pick = debugged(pick, n)
@@ -3939,6 +4078,14 @@ def choose(chain):
             if cond is None or cond(env):
                 then(env)
                 return
+
+    def pyl(tab):
+        out = []
+        for k, (cond, then) in enumerate(chain):
+            head = "else:" if cond is None else f"{'elif' if k else 'if'} {py_expr(cond)}:"
+            out += [(None, tab + head)] + py_lines(then, tab + "    ")
+        return out
+    run.pyl = pyl
     return with_ir(run, lambda f: machine.choose(f, chain))
 
 
@@ -3948,6 +4095,7 @@ def block(runs):
     def run(env):
         for f in runs:
             f(env)
+    run.pyl = lambda tab: [x for r in runs for x in py_lines(r, tab)] or [(None, tab + "pass")]
 
     def write(f):
         for r in runs:
@@ -4153,6 +4301,7 @@ def guard(run, n):
         except Exception as err:
             raise RunError(n, f"something went wrong inside Stellanova: {err}")
     guarded.inner = run  # so a missing piece is named by what it really is
+    guarded.line_n = n
     return with_ir(guarded, getattr(run, "ir", None))
 
 
@@ -4196,6 +4345,7 @@ def statement(n, text_, inner, names, declared, depth):
                 while cond(env):
                     if not then(env):
                         break
+            run.pyl = lambda tab: py_loop(f"while {py_expr(v)}:", then, tab)
             with_ir(run, lambda f: machine.loop(f, lambda: machine.emit(f, v), then))
             return [f"{tab}while ({strip_parens(v.cpp)})", tab + "{"] + lines + [tab + "}"], run, None
         if tokens[-1:] != ["times"]:
@@ -4212,6 +4362,7 @@ def statement(n, text_, inner, names, declared, depth):
             for _ in range(int(c) if math.isfinite(c) else 0):
                 if not then(env):
                     break
+        run.pyl = lambda tab: py_loop(f"for _ in _reps({py_expr(count)}):", then, tab)
         with_ir(run, lambda f: machine.repeat(f, count, then))
         if JS:
             head = f"{tab}for (let {k} = 0, {k}_end = stellanova::repeats({strip_parens(count.cpp)}); {k} < {k}_end; ++{k})"
@@ -4250,6 +4401,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             raise LeaveLoop() if leave else NextRound()
+        run.pyl = lambda tab: [(None, tab + ("break" if leave else "continue"))]
         with_ir(run, lambda f: f.jump(f.loops[-1][1 if leave else 0]))
         return [f"{tab}{'break' if leave else 'continue'};"], run, None
     if tokens == ["stop"]:
@@ -4258,6 +4410,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             raise Stop()
+        run.pyl = lambda tab: [(None, tab + "return None")]
         with_ir(run, lambda f: f.finish_with("ret void"))
         return [f"{tab}return;"], run, None
     if tokens == ["wait", "for", "the", "others"]:
@@ -4331,6 +4484,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             raise GiveBack(get(env))
+        run.pyl = lambda tab: [(None, f"{tab}return {py_expr(v)}")]
         with_ir(run, lambda f: f.finish_with(f"ret {machine.ll_type(v.kind)} {machine.emit(f, v)}"))
         return [f"{tab}return {strip_parens(v.cpp)};"], run, None
     if tokens[0] in ("add", "write") and "to" in tokens and tokens[len(tokens) - tokens[::-1].index("to"):][:1] == ["file"]:
@@ -4373,6 +4527,7 @@ def statement(n, text_, inner, names, declared, depth):
         added = with_ir(lambda env: seq(env).append(dup(get(env))),
                         lambda f: f.put(f"call void @cn_list_add_number(ptr {machine.emit(f, target)}, double {machine.emit(f, v)})" if v.kind == NUMBER else
                                         f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
+        added.pyl = lambda tab: [(None, f"{tab}{py_expr(target)}.append({py_expr(v) if v.kind in (NUMBER, YESNO, TEXT) else '_dup(' + py_expr(v) + ')'})")]
         if JS:
             return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None
         return [f"{tab}({target.cpp}).push_back({strip_parens(v.cpp)});"], added, None
@@ -4446,6 +4601,7 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             print("".join(text(g(env)) for g in gets))
+        run.pyl = lambda tab: [(None, f"{tab}print({' + '.join('_text(' + py_expr(g) + ')' for g in gets)})")]
         with_ir(run, lambda f: f.put(f"call void @cn_say(ptr {join_ir(f, parts)})"))
         shown = ', '.join('stellanova::text(' + strip_parens(p.cpp) + ')' for p in parts)
         return [f"{tab}stellanova::say([{shown}]);" if JS else f"{tab}stellanova::say({{{shown}}});"], run, None
@@ -4507,7 +4663,9 @@ def statement(n, text_, inner, names, declared, depth):
         cpp, run = call(key, args, names, n)
         if getattr(run, "ir", None):
             write = run.ir
+            inner = run
             run = with_ir(lambda env, run=run: run(env), lambda f: write(f) and None)
+            run.inner = inner
         return [f"{tab}{cpp};"], run, None
     if tokens[0] == "set" and "to" in tokens and ("of" in tokens[1:tokens.index("to")] or tokens[1:2] in (["item"], ["entry"])):
         cut = tokens.index("to")
@@ -4561,7 +4719,11 @@ def statement(n, text_, inner, names, declared, depth):
                         f.append(cpp, v.joined[1:])
                     else:
                         plain(f)
-            return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], with_ir(lambda env: put(env, get(env)), write), None
+            run = with_ir(lambda env: put(env, get(env)), write)
+            if getattr(put, "py_name", None):
+                simple = kind in (NUMBER, YESNO, TEXT)
+                run.pyl = lambda tab: [(None, f"{tab}env[{put.py_name!r}] = {py_expr(v) if simple else '_dup(' + py_expr(v) + ')'}")]
+            return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], run, None
         hint = library_hint(tokens)
         if hint:
             raise ScriptError(n, f"I don't know '{' '.join(tokens[:tokens.index('to') + 1] if 'to' in tokens else tokens)}'." + hint)
@@ -4595,6 +4757,8 @@ def statement(n, text_, inner, names, declared, depth):
 
         def run(env):
             env[cpp] = dup(get(env))
+        simple = v.kind in (NUMBER, YESNO, TEXT)
+        run.pyl = lambda tab: [(None, f"{tab}env[{cpp!r}] = {py_expr(v) if simple else '_dup(' + py_expr(v) + ')'}")]
         with_ir(run, lambda f: f.store(cpp, v.kind, machine.emit(f, v)))
         return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], run, None
     if tokens[0] == "move":
@@ -4695,6 +4859,10 @@ def for_each(n, head, body, names, declared, depth):
             if not then(env):
                 break
     if tokens[cut] == "from":
+        run.pyl = lambda tab: py_loop(f"for env[{cpp!r}] in _count({py_expr(lo)}, {py_expr(hi)}{', ' + py_expr(step) if step else ''}):", then, tab)
+    else:
+        run.pyl = lambda tab: py_loop(f"for env[{cpp!r}] in _each({py_expr(seq)}, {simple}):", then, tab)
+    if tokens[cut] == "from":
         with_ir(run, lambda f: machine.count_from(f, cpp, lo, hi, then, step))
     else:
         with_ir(run, lambda f: machine.each_in(f, cpp, kind, seq, then))
@@ -4783,6 +4951,7 @@ def call(key, args, names, n):
             if not err.line:  # from a library word: point at the line that used it
                 err.line = n
             raise
+    run.pyf = lambda: f"{py_part(command)}.runner({', '.join(py_expr(g) for g in gets)})"
     cpp = command.cpp
     if command.inputs is None:  # one of the script's own commands: after it, look whether a problem happened in it
         def write(f, command=command, args=args):
