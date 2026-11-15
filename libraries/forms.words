@@ -6,15 +6,262 @@ note: For tests and demos, the environment value STELLANOVA_FORM_SCRIPT can name
 note: one for each wait: "type <part> <text>", "choose <part> <item>", "tick <part>", "click <part>" or "close".
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #endif
 include: <map>
+include: <memory>
 include: <fstream>
 link: user32
 link: gdi32
+linux link: :libgtk-3.so.0
+linux link: :libgobject-2.0.so.0
 
 code:
+  #ifdef __linux__
+  // Linux: GTK 3's own parts (its functions declared here, so only the library itself is needed)
+  extern "C"
+  {
+  	int gtk_init_check(int*, char***);
+  	void* gtk_window_new(int);
+  	void gtk_window_set_title(void*, const char*);
+  	void gtk_window_set_default_size(void*, int, int);
+  	void gtk_window_set_resizable(void*, int);
+  	void* gtk_fixed_new();
+  	void gtk_fixed_put(void*, void*, int, int);
+  	void gtk_container_add(void*, void*);
+  	void gtk_widget_set_size_request(void*, int, int);
+  	void gtk_widget_show_all(void*);
+  	void gtk_widget_destroy(void*);
+  	void* gtk_button_new_with_label(const char*);
+  	const char* gtk_button_get_label(void*);
+  	void gtk_button_set_label(void*, const char*);
+  	void* gtk_check_button_new_with_label(const char*);
+  	int gtk_toggle_button_get_active(void*);
+  	void gtk_toggle_button_set_active(void*, int);
+  	void* gtk_entry_new();
+  	const char* gtk_entry_get_text(void*);
+  	void gtk_entry_set_text(void*, const char*);
+  	void* gtk_label_new(const char*);
+  	const char* gtk_label_get_text(void*);
+  	void gtk_label_set_text(void*, const char*);
+  	void gtk_label_set_xalign(void*, float);
+  	void* gtk_scrolled_window_new(void*, void*);
+  	void* gtk_list_box_new();
+  	void gtk_list_box_insert(void*, void*, int);
+  	void* gtk_list_box_get_row_at_index(void*, int);
+  	void* gtk_list_box_get_selected_row(void*);
+  	void gtk_list_box_select_row(void*, void*);
+  	void* gtk_bin_get_child(void*);
+  	int gtk_events_pending();
+  	int gtk_main_iteration_do(int);
+  	unsigned long g_signal_connect_data(void*, const char*, void (*)(), void*, void*, int);
+  }
+  namespace stellanova_forms
+  {
+  	struct Part
+  	{
+  		void* widget = nullptr;  // the button, field, label, tick box or list itself
+  		void* placed = nullptr;  // what sits in the form (a list sits in a scrolled box)
+  	};
+  	inline void* form = nullptr;
+  	inline std::map<std::string, Part> parts;
+  	inline std::map<std::string, std::string> kinds;
+  	inline std::string clicked;
+  	inline bool closed = false;
+  	inline std::vector<std::string> script;
+  	inline size_t script_at = 0;
+  	inline void need(int line)
+  	{
+  		if (!form)
+  			stellanova::fail(line, closed ? "the form was closed." : "there is no form yet. Open one first, like: open a form with (\"Hello\", 400, 300)");
+  	}
+  	inline void on_click(void*, void* name) { clicked = *(const std::string*)name; }
+  	inline int on_close(void*, void*, void*)
+  	{
+  		closed = true;
+  		form = nullptr;
+  		return 0;  // and GTK takes the window away
+  	}
+  	inline void settle()  // GTK does what is waiting
+  	{
+  		while (gtk_events_pending())
+  			gtk_main_iteration_do(0);
+  	}
+  	inline void open(const std::string& title, double w, double h, int line)
+  	{
+  		if (form)
+  			stellanova::fail(line, "a form is already open.");
+  		static bool ready = gtk_init_check(nullptr, nullptr);
+  		if (!ready)
+  			stellanova::fail(line, "I couldn't open a form: there is no screen (DISPLAY isn't set).");
+  		form = gtk_window_new(0);
+  		gtk_window_set_title(form, title.c_str());
+  		gtk_window_set_default_size(form, (int)w, (int)h);
+  		gtk_window_set_resizable(form, 0);
+  		gtk_container_add(form, gtk_fixed_new());
+  		g_signal_connect_data(form, "delete-event", (void (*)())on_close, nullptr, nullptr, 0);
+  		gtk_widget_show_all(form);
+  		closed = false;
+  		parts.clear(), kinds.clear();
+  		if (const char* file = std::getenv("STELLANOVA_FORM_SCRIPT"))
+  		{
+  			std::ifstream in(file);
+  			for (std::string l; std::getline(in, l);)
+  				if (!l.empty())
+  					script.push_back(l);
+  		}
+  		settle();
+  	}
+  	inline void add(const std::string& kind, const std::string& name, const std::string& text, double x, double y, double w, double h, int line)
+  	{
+  		need(line);
+  		if (parts.count(name))
+  			stellanova::fail(line, "the form already has a part called \"" + name + "\".");
+  		Part p;
+  		if (kind == "field")
+  		{
+  			p.widget = gtk_entry_new();
+  			gtk_entry_set_text(p.widget, text.c_str());
+  		}
+  		else if (kind == "label")
+  		{
+  			p.widget = gtk_label_new(text.c_str());
+  			gtk_label_set_xalign(p.widget, 0);
+  		}
+  		else if (kind == "list")
+  		{
+  			p.widget = gtk_list_box_new();
+  			p.placed = gtk_scrolled_window_new(nullptr, nullptr);
+  			gtk_container_add(p.placed, p.widget);
+  		}
+  		else if (kind == "tick box")
+  			p.widget = gtk_check_button_new_with_label(text.c_str());
+  		else
+  		{
+  			p.widget = gtk_button_new_with_label(text.c_str());
+  			static std::map<std::string, std::unique_ptr<std::string>> names;  // kept for the click to name
+  			auto& kept = names[name];
+  			if (!kept)
+  				kept = std::make_unique<std::string>(name);
+  			g_signal_connect_data(p.widget, "clicked", (void (*)())on_click, kept.get(), nullptr, 0);
+  		}
+  		if (!p.placed)
+  			p.placed = p.widget;
+  		gtk_widget_set_size_request(p.placed, (int)w, (int)h);
+  		gtk_fixed_put(gtk_bin_get_child(form), p.placed, (int)x, (int)y);
+  		gtk_widget_show_all(p.placed);
+  		parts[name] = p, kinds[name] = kind;
+  		settle();
+  	}
+  	inline void* part(const std::string& name, int line)
+  	{
+  		need(line);
+  		auto at = parts.find(name);
+  		if (at == parts.end())
+  			stellanova::fail(line, "the form has no part called \"" + name + "\".");
+  		return at->second.widget;
+  	}
+  	inline std::string text_of(const std::string& name, int line)
+  	{
+  		void* c = part(name, line);
+  		const std::string& kind = kinds[name];
+  		const char* s = nullptr;
+  		if (kind == "list")
+  		{
+  			void* row = gtk_list_box_get_selected_row(c);
+  			s = row ? gtk_label_get_text(gtk_bin_get_child(row)) : "";
+  		}
+  		else if (kind == "field")
+  			s = gtk_entry_get_text(c);
+  		else if (kind == "label")
+  			s = gtk_label_get_text(c);
+  		else
+  			s = gtk_button_get_label(c);
+  		return s ? s : "";
+  	}
+  	inline void set_text(const std::string& name, const std::string& text, int line)
+  	{
+  		void* c = part(name, line);
+  		const std::string& kind = kinds[name];
+  		if (kind == "field")
+  			gtk_entry_set_text(c, text.c_str());
+  		else if (kind == "label")
+  			gtk_label_set_text(c, text.c_str());
+  		else if (kind != "list")
+  			gtk_button_set_label(c, text.c_str());
+  		settle();
+  	}
+  	inline void add_item(const std::string& name, const std::string& item, int line)
+  	{
+  		void* c = part(name, line);
+  		if (kinds[name] != "list")
+  			stellanova::fail(line, "\"" + name + "\" isn't a list.");
+  		void* label = gtk_label_new(item.c_str());
+  		gtk_label_set_xalign(label, 0);
+  		gtk_list_box_insert(c, label, -1);
+  		gtk_widget_show_all(c);
+  		settle();
+  	}
+  	inline void clear(const std::string& name, int line)
+  	{
+  		void* c = part(name, line);
+  		if (kinds[name] != "list")
+  			stellanova::fail(line, "\"" + name + "\" isn't a list.");
+  		while (void* row = gtk_list_box_get_row_at_index(c, 0))
+  			gtk_widget_destroy(row);
+  		settle();
+  	}
+  	inline bool ticked(const std::string& name, int line)
+  	{
+  		void* c = part(name, line);
+  		if (kinds[name] != "tick box")
+  			stellanova::fail(line, "\"" + name + "\" isn't a tick box.");
+  		return gtk_toggle_button_get_active(c) != 0;
+  	}
+  	inline void close()
+  	{
+  		if (form)
+  		{
+  			gtk_widget_destroy(form);
+  			closed = true;
+  		}
+  		form = nullptr;
+  		settle();
+  	}
+  	inline std::string wait(int line)
+  	{
+  		if (!form && closed)
+  			return "";
+  		need(line);
+  		clicked.clear();
+  		while (script_at < script.size())  // acting by itself: each line until a click (or close)
+  		{
+  			std::string l = script[script_at++], word = l.substr(0, l.find(' ')), rest = l.find(' ') == std::string::npos ? "" : l.substr(l.find(' ') + 1);
+  			std::string name = rest.substr(0, rest.find(' ')), value = rest.find(' ') == std::string::npos ? "" : rest.substr(rest.find(' ') + 1);
+  			if (word == "type") set_text(name, value, line);
+  			else if (word == "tick") gtk_toggle_button_set_active(part(name, line), 1);
+  			else if (word == "choose")
+  			{
+  				void* c = part(name, line);
+  				for (int k = 0; void* row = gtk_list_box_get_row_at_index(c, k); ++k)
+  					if (gtk_label_get_text(gtk_bin_get_child(row)) == value)
+  					{
+  						gtk_list_box_select_row(c, row);
+  						break;
+  					}
+  			}
+  			else if (word == "click") { part(rest, line); return rest; }
+  			else if (word == "close") { close(); return ""; }
+  		}
+  		while (clicked.empty() && form)
+  			gtk_main_iteration_do(1);
+  		return form ? clicked : "";
+  	}
+  }
+  #else
   namespace stellanova_forms
   {
   	inline HWND form = nullptr;
@@ -181,6 +428,7 @@ code:
   			SendMessageW(form, WM_CLOSE, 0, 0);
   	}
   }
+  #endif
 
 python:
   import tkinter as _tk

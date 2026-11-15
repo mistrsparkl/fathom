@@ -11,7 +11,9 @@ runs only
 
 python:
   import os, sys, time, math, re, ctypes
-  from ctypes import wintypes
+  WINDOWS = sys.platform == "win32"
+  if WINDOWS:
+      from ctypes import wintypes
   try:
       from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
   except ImportError:
@@ -81,7 +83,12 @@ python:
           root.attributes("-fullscreen", True)
       if hidden:
           root.withdraw()
-      frame = tkinter.Frame(root, width=w, height=h, bg="#000000", cursor="arrow")
+      if WINDOWS:
+          frame = tkinter.Frame(root, width=w, height=h, bg="#000000", cursor="arrow")
+      else:  # elsewhere each frame is shown as the label's picture
+          from PIL import ImageTk
+          SCREEN["shown"] = ImageTk.PhotoImage(Image.new("RGB", (w, h), (0, 0, 0)))
+          frame = tkinter.Label(root, image=SCREEN["shown"], bg="#000000", cursor="arrow", borderwidth=0, highlightthickness=0)
       frame.pack(fill="both", expand=True)
       try:
           dpi = ctypes.windll.user32.GetDpiForSystem()
@@ -144,6 +151,8 @@ python:
       root.bind("<KeyPress>", key)
       root.bind("<KeyRelease>", mods)
       root.bind("<MouseWheel>", wheel)
+      root.bind("<Button-4>", lambda e: SCREEN.update(wheel=SCREEN["wheel"] - 1))  # (the wheel on X11)
+      root.bind("<Button-5>", lambda e: SCREEN.update(wheel=SCREEN["wheel"] + 1))
       root.bind("<Alt-F4>", lambda e: (close_asked(), "break")[1])
       root.protocol("WM_DELETE_WINDOW", close_asked)
       root.update()
@@ -161,6 +170,9 @@ python:
       if SCREEN["hidden"]:
           return
       img = SCREEN["image"]
+      if not WINDOWS:
+          SCREEN["shown"].paste(img)
+          return
       w, h = img.size
       data = img.tobytes("raw", "BGRX")
 
@@ -462,6 +474,9 @@ python:
   FONTS = {}
 
   def font_file(style):
+      if not WINDOWS and not SCREEN.get("fonts", {}).get(style):
+          dejavu = "/usr/share/fonts/truetype/dejavu/DejaVuSans"
+          return dejavu + {"semibold": "-Bold", "bold": "-Bold", "display": "-Bold", "mono": "Mono", "mono bold": "Mono-Bold"}.get(style, "") + ".ttf"
       return SCREEN.get("fonts", {}).get(style) or {
           "regular": "C:/Windows/Fonts/segoeui.ttf", "medium": "C:/Windows/Fonts/segoeui.ttf", "semibold": "C:/Windows/Fonts/seguisb.ttf",
           "bold": "C:/Windows/Fonts/segoeuib.ttf", "display": "C:/Windows/Fonts/seguisb.ttf", "mono": "C:/Windows/Fonts/consola.ttf",

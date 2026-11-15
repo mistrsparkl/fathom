@@ -4,14 +4,19 @@ note: Colours are "#rrggbb" (or "#rrggbbaa", with how solid: ff is solid, 00 is 
 note: red, green, blue, yellow, grey or clear. Pictures are read from and saved to .png files.
 
 code:
+  #ifdef _WIN32
   #define NOMINMAX
-include: <winsock2.h>
-include: <windows.h>
-include: <gdiplus.h>
+  #include <winsock2.h>
+  #include <windows.h>
+  #include <gdiplus.h>
+  #elif defined(__linux__)
+  #include <png.h>
+  #endif
 include: <array>
 include: <map>
 include: <mutex>
 link: gdiplus
+linux link: png16
 
 code:
   namespace stellanova_pictures
@@ -81,6 +86,38 @@ code:
   			p.dots[k] = rgba[k % 4];
   		return add(std::move(p));
   	}
+  #ifdef __linux__
+  	// Linux: .png files through libpng
+  	inline double load(const std::string& file, int line)
+  	{
+  		if (!std::filesystem::exists(std::filesystem::u8path(file)))
+  			stellanova::fail(line, "there is no picture called \"" + file + "\".");
+  		png_image png{};
+  		png.version = PNG_IMAGE_VERSION;
+  		Picture p;
+  		bool ok = png_image_begin_read_from_file(&png, file.c_str());
+  		if (ok)
+  		{
+  			png.format = PNG_FORMAT_RGBA;
+  			p.width = (int)png.width, p.height = (int)png.height;
+  			p.dots.resize((size_t)p.width * p.height * 4);
+  			ok = png_image_finish_read(&png, nullptr, p.dots.data(), 0, nullptr);
+  		}
+  		png_image_free(&png);
+  		if (!ok)
+  			stellanova::fail(line, "I couldn't read the picture \"" + file + "\".");
+  		return add(std::move(p));
+  	}
+  	inline void save(double n, const std::string& file, int line)
+  	{
+  		Picture& p = get(n, line);
+  		png_image png{};
+  		png.version = PNG_IMAGE_VERSION;
+  		png.width = p.width, png.height = p.height, png.format = PNG_FORMAT_RGBA;
+  		if (!png_image_write_to_file(&png, file.c_str(), 0, p.dots.data(), 0, nullptr))
+  			stellanova::fail(line, "I couldn't save the picture \"" + file + "\".");
+  	}
+  #else
   	inline void gdiplus()
   	{
   		static ULONG_PTR token = [] { ULONG_PTR t; Gdiplus::GdiplusStartupInput in; Gdiplus::GdiplusStartup(&t, &in, nullptr); return t; }();
@@ -136,6 +173,7 @@ code:
   		if (image.Save(wide(file).c_str(), &png, nullptr) != Gdiplus::Ok)
   			stellanova::fail(line, "I couldn't save the picture \"" + file + "\".");
   	}
+  #endif
   	inline unsigned char* dot(Picture& p, double x, double y, int line)
   	{
   		if (x < 0 || y < 0 || x >= p.width || y >= p.height || x != std::floor(x) || y != std::floor(y))

@@ -37,5 +37,5 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Linux: `stellanova build` run on Linux (WSL Ubuntu, clang) makes a Linux program; the language passes the built-vs-direct checks
 - [x] Linux libraries without a screen: computer, database, email, network, server, web
 - [x] Linux libraries with a screen or speakers: sound, sound making, window (X11, FreeType, libpng, GLX)
-- [ ] Linux: forms, pictures, screen
+- [x] Linux: forms (GTK 3), pictures (libpng), screen (Tkinter + Pillow)
 - [ ] macOS: needs its sysroot, and a Mac to test on
