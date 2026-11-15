@@ -16,6 +16,7 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 {
 	char tag = 'n';  // n number, y yes or no, t text, l list, m table, p place, f flat place, k thing, c command
 	bool marked = false;  // the collector reached it
+	bool owned = false;  // text only one name holds (cn_append): it may grow in place
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 

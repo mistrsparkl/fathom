@@ -272,6 +272,7 @@ namespace gc
 			else
 				v = new Full;
 			v->tag = tag;
+			v->owned = false;
 			all.push_back(v);
 			t->young.push_back(v);
 			full = ++made_since > limit;
@@ -718,6 +719,23 @@ extern "C"
 	V* cn_text_yesno(bool b) { return cn_make_text(b ? "yes" : "no"); }
 	V* cn_show(V* v) { return cn_make_text(show(v)); }
 	V* cn_join(V* a, V* b) { return cn_make_text(full(a)->s + full(b)->s); }
+	void cn_share(V* v)  // a text name was read: what it holds may be held elsewhere now
+	{
+		if (v)
+			v->owned = false;
+	}
+	void cn_append(V** slot, V* b)  // 'set s to s plus b': in place when only s holds it, so a growing text isn't copied each time
+	{
+		V* a = *slot;
+		if (a && a->owned)
+		{
+			full(a)->s += full(b)->s;
+			return;
+		}
+		V* grown = cn_make_text((a ? full(a)->s : std::string()) + full(b)->s);
+		grown->owned = true;
+		*slot = grown;
+	}
 	bool cn_same_text(V* a, V* b) { return full(a)->s == full(b)->s; }
 	void cn_say(V* t) { stellanova::say({full(t)->s}); }
 	V* cn_ask_text(V* question)

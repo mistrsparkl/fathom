@@ -708,6 +708,34 @@ def program_checks():
     assert out.stdout == "inside the lock\nthe other one has it\n60000\n", repr(out.stdout + out.stderr)
     assert "can't leave it partway" in perr('to f:\n  holding the lock "a":\n    return\n' + END + 'genesis:\n  f\n' + END)[1]
 
+    # Text growing in place ('set s to s plus ...'): every other holder still sees what it had.
+    out = both(''.join([
+               'to shout, given words (text), returning text:\n'
+               '  set said to words\n'
+               '  set said to said plus "!"\n'
+               '  return said\n'
+               'and the universe said i love you\n'
+               '\n'
+               'genesis:\n'
+               '  set s to "a"\n'
+               '  set t to s\n'
+               '  set s to s plus "b"\n'
+               '  set s to s plus "c"\n'
+               '  set xs to a list of text\n'
+               '  add s to xs\n'
+               '  set s to s plus "d"\n'
+               '  set loud to shout with s\n'
+               '  set s to s plus "e"\n'
+               '  scrawl t, " ", item 1 of xs, " ", loud, " ", s\n'
+               '  set s to s plus s\n'
+               '  set u to "x"\n'
+               '  for each n from 1 to 3:\n'
+               '    set u to u plus n plus "-"\n'
+               '  scrawl s, " ", u\n'
+               'and the universe said i love you\n'
+               ]))
+    assert out.stdout == "a abc abcd! abcde\nabcdeabcde x1-2-3-\n", repr(out.stdout + out.stderr)
+
     # The network: TCP (with a server going alongside), UDP, and WebSockets.
     out = both(''.join([
                'use: network\n'

@@ -1365,6 +1365,7 @@ class Names:
             env[cpp] = dup(x)
         v = with_ir(Value(cpp, kind, get, None if read_only else put), lambda f: f.load(cpp, kind))
         v.ir_store = lambda f, x: f.store(cpp, kind, x)
+        v.local_name = cpp
         return v
 
 
@@ -1584,8 +1585,10 @@ class Expr:
             r = self.product()
             a, b = v.run, r.run
             if v.kind == TEXT and op == "+":
+                left = v
                 v = with_ir(Value(f"(stellanova::text({v.cpp}) + stellanova::text({r.cpp}))", TEXT,
                                   lambda env, a=a, b=b: text(a(env)) + text(b(env))), lambda fn, l=v, r=r: join_ir(fn, [l, r]))
+                v.joined = getattr(left, "joined", [left]) + [r]  # every part, left to right (for cn_append)
                 continue
             if v.kind != r.kind or v.kind not in (NUMBER, PLACE, FLAT):
                 raise ScriptError(self.line, f"I can't {'add' if op == '+' else 'subtract'} {kind_name(r.kind)} {'to' if op == '+' else 'from'} {kind_name(v.kind)}.")
@@ -4546,6 +4549,12 @@ def statement(n, text_, inner, names, declared, depth):
                 return [f"{tab}stellanova::replace_thing({cpp}, {strip_parens(v.cpp)});"], lambda env: put(env, get(env)), None
             target = names.value(key)
             write = (lambda f: target.ir_store(f, machine.emit(f, v))) if target.ir_store else None
+            if write and kind == TEXT and getattr(getattr(v, "joined", [None])[0], "local_name", None) == cpp:
+                def write(f, plain=write):  # 'set s to s plus ...': added onto s (a name this command keeps)
+                    if cpp in f.slots and cpp not in f.module.shared:
+                        f.append(cpp, v.joined[1:])
+                    else:
+                        plain(f)
             return [f"{tab}{cpp} = {js_copy(v.cpp, v.kind)};"], with_ir(lambda env: put(env, get(env)), write), None
         hint = library_hint(tokens)
         if hint:

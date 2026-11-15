@@ -79,6 +79,8 @@ declare ptr @cn_text_number(double)
 declare ptr @cn_text_yesno(i1)
 declare ptr @cn_show(ptr)
 declare ptr @cn_join(ptr, ptr)
+declare void @cn_share(ptr)
+declare void @cn_append(ptr, ptr)
 declare i1 @cn_same_text(ptr, ptr)
 declare void @cn_say(ptr)
 declare ptr @cn_ask_text(ptr)
@@ -405,7 +407,16 @@ class Fn:
         return f"@g.{cpp}" if cpp in self.module.shared else self.slot(cpp, kind)
 
     def load(self, cpp, kind):
-        return self.op(f"load {ll_type(kind)}, ptr {self.where(cpp, kind)}")
+        value = self.op(f"load {ll_type(kind)}, ptr {self.where(cpp, kind)}")
+        if kind == TEXT and cpp not in self.module.shared:  # (see cn_append)
+            self.put(f"call void @cn_share(ptr {value})")
+        return value
+
+    def append(self, cpp, parts):
+        """'set s to s plus a plus b' for a text name of this command: a and b added onto s, in place when only s holds it."""
+        texts = [self.as_text(emit(self, v), v.kind) for v in parts]
+        for t in texts:
+            self.put(f"call void @cn_append(ptr {self.where(cpp, TEXT)}, ptr {t})")
 
     def store(self, cpp, kind, value):
         self.put(f"store {ll_type(kind)} {self.copied(value, kind)}, ptr {self.where(cpp, kind)}")
