@@ -76,7 +76,7 @@ struct FVector2D
 };
 inline const FVector2D FVector2D::ZeroVector{};
 
-#ifndef __wasm__
+#if !defined(__wasm__) && !defined(__linux__)
 extern "C" __declspec(dllimport) int __stdcall SetConsoleOutputCP(unsigned int);
 extern "C" __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int);
 #endif
@@ -95,7 +95,7 @@ namespace stellanova
 		files = scripts;
 		for (int k = 1; k < count; ++k)
 			arguments.push_back(given[k]);
-#if !defined(STELLANOVA_IN_UNREAL) && !defined(__wasm__)
+#if !defined(STELLANOVA_IN_UNREAL) && !defined(__wasm__) && !defined(__linux__)
 		SetConsoleOutputCP(65001);
 		SetConsoleCP(65001);
 #endif
@@ -543,17 +543,9 @@ namespace stellanova
 		bool yes = false;
 		std::string words;
 		std::vector<SavedData> items;
-		std::vector<std::pair<std::string, SavedData>> parts;
-		const SavedData* part(const std::string& key) const
-		{
-			for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // the last one wins, as in Python
-				if (it->first == key)
-					return &it->second;
-			for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // a web service's "windSpeed" or "wind_speed" is 'wind speed'
-				if (loose(it->first) == loose(key))
-					return &it->second;
-			return nullptr;
-		}
+		struct Part;
+		std::vector<Part> parts;  // (not std::pair: Linux's C++ library needs SavedData whole for a pair of it)
+		const SavedData* part(const std::string& key) const;
 		static std::string loose(const std::string& key)
 		{
 			std::string out;
@@ -563,6 +555,21 @@ namespace stellanova
 			return out;
 		}
 	};
+	struct SavedData::Part
+	{
+		std::string first;
+		SavedData second;
+	};
+	inline const SavedData* SavedData::part(const std::string& key) const
+	{
+		for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // the last one wins, as in Python
+			if (it->first == key)
+				return &it->second;
+		for (auto it = parts.rbegin(); it != parts.rend(); ++it)  // a web service's "windSpeed" or "wind_speed" is 'wind speed'
+			if (loose(it->first) == loose(key))
+				return &it->second;
+		return nullptr;
+	}
 
 	struct SavedReader
 	{

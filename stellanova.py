@@ -5102,18 +5102,18 @@ def build(script, exe):
     try:
         ll = machine_code(program)
     except machine.Unsupported as missing:
-        made = "WebAssembly" if machine.TARGET == "wasm" else "an .exe"
+        made = {"wasm": "WebAssembly", "linux": "a program"}.get(machine.TARGET, "an .exe")
         return f"{script.name} can't be built into {made} yet: {missing} isn't in machine code. It still runs directly (stellanova {script.name})."
     return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS)
 
 
 def wasm(script):
     """Builds the program into WebAssembly (WASI): <name>.wasm, and <name>.mjs to run it with node. Returns an error message, or None."""
-    machine.TARGET = "wasm"
+    native, machine.TARGET = machine.TARGET, "wasm"
     try:
         problem = build(script, script.with_suffix(".wasm"))
     finally:
-        machine.TARGET = "windows"
+        machine.TARGET = native
     if not problem:
         runner = (HERE / "runtime" / "wasi.mjs").read_text(encoding="utf-8").replace("PROGRAM", script.stem)
         script.with_suffix(".mjs").write_text(runner, encoding="utf-8")
@@ -5456,7 +5456,7 @@ def main(argv):
             sys.stderr.flush()
             # Exit straight away: a library's leftovers (like a closed window) must not be tidied up from the wrong thread.
             os._exit(code)
-        exe = script.with_suffix(".exe")
+        exe = script.with_suffix("" if machine.TARGET == "linux" else ".exe")
         problem = build(script, exe)
         if problem:
             print(problem)

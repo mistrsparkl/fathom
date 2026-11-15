@@ -6,7 +6,10 @@
 #include "stellanova.h"
 #include "machine.h"
 
-#ifndef __wasm__
+#ifdef __linux__
+#include <pthread.h>
+#include <setjmp.h>
+#elif !defined(__wasm__)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <winsock2.h>
@@ -35,6 +38,8 @@ namespace gc
 #ifdef __wasm__
 		struct { char none; } regs{};  // WebAssembly's registers can't be looked at: see marks
 		std::vector<size_t> marks;  // where each command now running began in young (cn_enter)
+#elif defined(__linux__)
+		jmp_buf regs{};
 #else
 		CONTEXT regs{};
 #endif
@@ -80,6 +85,14 @@ namespace gc
 			Thread* t = new Thread;
 #ifdef __wasm__
 			t->top = &__stack_high;
+#elif defined(__linux__)
+			pthread_attr_t attr;
+			void* low;
+			size_t size;
+			pthread_getattr_np(pthread_self(), &attr);
+			pthread_attr_getstack(&attr, &low, &size);
+			pthread_attr_destroy(&attr);
+			t->top = static_cast<char*>(low) + size;
 #else
 			ULONG_PTR low, high;
 			GetCurrentThreadStackLimits(&low, &high);
@@ -98,6 +111,14 @@ namespace gc
 	// be seen, so the values each command running now made stay young until it gives back (cn_enter, cn_leave).
 	[[clang::noinline]] static void keep_registers(Thread* t)
 	{
+		volatile char here = 0;
+		t->sp = const_cast<char*>(&here);
+	}
+#elif defined(__linux__)
+	[[clang::noinline]] static void keep_registers(Thread* t)
+	{
+		__builtin_unwind_init();  // every callee-saved register onto the stack too
+		setjmp(t->regs);
 		volatile char here = 0;
 		t->sp = const_cast<char*>(&here);
 	}

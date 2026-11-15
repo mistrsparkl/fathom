@@ -11,7 +11,9 @@ A problem doesn't jump: the library keeps it, and the code checks cn_failed() af
 import os
 import re
 import struct
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -30,7 +32,7 @@ class Unsupported(Exception):
     """This part of the language can't be made into machine code yet."""
 
 
-TARGET = "windows"  # or "wasm": WebAssembly (WASI), for 'stellanova wasm'
+TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm": WebAssembly (WASI), for 'stellanova wasm'
 WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
 
 
@@ -771,9 +773,11 @@ def unit_file(unit, head, wrappers):
 # ---------------------------------------------------------------- making the .exe
 
 def find_clang():
-    for place in [os.environ.get("STELLANOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe"]:
+    for place in [os.environ.get("STELLANOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe", shutil.which("clang++")]:
         if place and Path(place).exists():
             return place
+    if sys.platform.startswith("linux"):
+        raise RuntimeError("I can't find clang. Install it (sudo apt install clang).")
     raise RuntimeError("I can't find LLVM's clang. Install LLVM (winget install LLVM.LLVM).")
 
 
@@ -797,6 +801,8 @@ def sysroot():
 
 
 def target_flags():
+    if TARGET == "linux":
+        return []
     if TARGET != "wasm":
         return ["-fms-extensions"]
     root = sysroot()
@@ -805,7 +811,7 @@ def target_flags():
 
 
 def object_suffix():
-    return ".wasm.o" if TARGET == "wasm" else ".obj"
+    return {"wasm": ".wasm.o", "linux": ".o"}.get(TARGET, ".obj")
 
 
 def runtime_object():
@@ -832,7 +838,12 @@ def make_exe(ll_text_, exe, work, units=None):
                 except RuntimeError:
                     return f"The {unit} words can't be used in a WebAssembly program yet."
                 continue
-            objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+            try:
+                objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+            except RuntimeError:
+                if TARGET != "linux":
+                    raise
+                return f"The {unit} words can't be used in a Linux program yet."
         clang = find_clang()
     except RuntimeError as err:
         return str(err)
@@ -841,6 +852,8 @@ def make_exe(ll_text_, exe, work, units=None):
         root = sysroot()
         link = [f for f in target_flags() if "include" not in f and f != "-isystem"] + ["-nodefaultlibs", f"-L{root / 'lib' / 'wasm32-wasip1' / 'eh'}", "-lc++", "-lc++abi", "-lunwind", "-lc",
                 str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608"]
+    elif TARGET == "linux":
+        link = ["-pthread"]
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True)
     if done.returncode:
