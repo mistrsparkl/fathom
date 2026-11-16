@@ -56,3 +56,22 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Dates and moments: `date in words`, `date plus months`, `seconds at`, `date at`, `time at` (dates stay text, so they sort and save)
 - [x] XML and HTML reading (`use: markup.stella`)
 - [x] Command-line tools: `--loud` and `--size=3` from `the words given` (`use: options.stella`)
+
+# Roadmap 3: everyday jobs, in plain words
+
+Every word added here must read plainly to someone who has never programmed: one obvious way to do each thing,
+a one-line example in LANGUAGE.md, and a mistake message that says how to fix it.
+
+## 8. Files and folders
+- [ ] Facts about a file: `the size of the file "notes.txt"` (in bytes), `when the file "notes.txt" changed` (a moment)
+- [ ] Parts of a path: `the name of the path`, `the extension of the path`, `the folder of the path`
+
+## 9. Text and lists
+- [ ] `"ab" repeated 3 times`
+- [ ] `flattened xs`: a list of lists as one list
+
+## 10. The web
+- [ ] Any web request: `ask the web with (address, "POST", message)` gives a `web answer` with its `status`, `text` and `headers`
+
+## 11. Reading easily
+- [ ] Mistake messages checked for plain words: no C++, Python or JavaScript words reach the person writing
