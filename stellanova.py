@@ -1959,7 +1959,10 @@ class Expr:
                     raise RunError(line, f"'repeated' needs a whole number of times, 0 or more, not {text(n)}.")
                 x = a(env)
                 return x * int(n) if isinstance(x, str) else [dup(y) for _ in range(int(n)) for y in x]
-            return builtin("stellanova::repeated({s0}, {s1}, {line})", v.kind, run, [v, count], line)
+            out = builtin("stellanova::repeated({s0}, {s1}, {line})", v.kind, run, [v, count], line)
+            return with_ir(out, lambda f, v=v, count=count, line=line:  # any kind of item, things too
+                           f.call("ptr", "cn_repeated", ("ptr", machine.emit(f, v)), ("double", machine.emit(f, count)), ("i32", str(line)),
+                                  checked=True))
         if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"
             self.i += 2
             self.need(v, NUMBER, "padded to")
@@ -2423,7 +2426,8 @@ class Expr:
             if not (is_list(v.kind) and is_list(element(v.kind))):
                 raise ScriptError(line, f"'flattened' needs a list of lists, like 'flattened rows', but this is {kind_name(v.kind)}.")
             a = v.run
-            return builtin("stellanova::flattened({a0})", element(v.kind), lambda env: [dup(x) for xs in a(env) for x in xs], [v])
+            out = builtin("stellanova::flattened({a0})", element(v.kind), lambda env: [dup(x) for xs in a(env) for x in xs], [v])
+            return with_ir(out, lambda f, v=v: f.op(f"call ptr @cn_flattened(ptr {machine.emit(f, v)})"))  # any kind of item
         for word in ("sorted", "reversed"):
             if self.at(word):
                 self.i += 1
@@ -2433,7 +2437,10 @@ class Expr:
                     raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
                 a = v.run
                 run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
-                return builtin(f"stellanova::{word}({{a0}})", v.kind, run, [v])
+                out = builtin(f"stellanova::{word}({{a0}})", v.kind, run, [v])
+                if word == "reversed":  # any kind of item, things too
+                    out = with_ir(out, lambda f, v=v: f.op(f"call ptr @cn_reversed(ptr {machine.emit(f, v)})"))
+                return out
         if tok == "items" and self.peek(1) not in ITEM_NOT_INDEX and not self.names.match(self.t, self.i)[0]:
             self.i += 1  # 'items 2 to 5 of names'
             first = self.need(self.sum(), NUMBER, "items")

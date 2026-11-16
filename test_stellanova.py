@@ -1239,6 +1239,10 @@ def program_checks():
     out = both('genesis:\n  scrawl "[", "ab" repeated 3 times, "] [", "x" repeated 0 times, "]"\n  set row to a list of (0, 1) repeated 2 times\n  scrawl row\n  set rows to a list of lists of numbers\n  add a list of (1, 2) to rows\n  add a list of (3) to rows\n  scrawl flattened rows, " ", the size of flattened rows\n  set names to flattened a list of (a list of ("a", "b"), a list of ("c"))\n  scrawl names\n  try:\n    scrawl "a" repeated (0 minus 1) times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "[ababab] []\n0, 1, 0, 1\n1, 2, 3 3\na, b, c\n'repeated' needs a whole number of times, 0 or more, not -1.\n", repr(out.stdout)
 
+    # reversed, repeated and flattened on lists of things build too (they once made C++ that named a kind it didn't know)
+    out = both('a pet has:\n  name (text)\nand the universe said i love you\n\ngenesis:\n  conjure a pet as rex\n  set the name of rex to "Rex"\n  conjure a pet as tom\n  set the name of tom to "Tom"\n  set pets to a list of pets\n  add rex to pets\n  add tom to pets\n  scrawl reversed pets\n  scrawl pets repeated 2 times\n  set groups to a list of lists of pets\n  add pets to groups\n  add reversed pets to groups\n  scrawl flattened groups\n  scrawl reversed a list of (1, 2, 3), " ", "ab" repeated 2 times, " ", flattened a list of (a list of (1), a list of (2, 3))\n  try:\n    scrawl pets repeated 0.5 times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
+    assert out.stdout == "a pet (name: Tom), a pet (name: Rex)\na pet (name: Rex), a pet (name: Tom), a pet (name: Rex), a pet (name: Tom)\na pet (name: Rex), a pet (name: Tom), a pet (name: Tom), a pet (name: Rex)\n3, 2, 1 abab 1, 2, 3\n'repeated' needs a whole number of times, 0 or more, not 0.5.\n", repr(out.stdout)
+
     # parts of a path, and when a file last changed
     out = both('use: folders\nuse: time\n\ngenesis:\n  for each p in a list of ("saves/slot 1.json", "notes", "a\\b\\.hidden", "x.tar.gz"):\n'
                '    scrawl "[", file name of p, "] [", extension of p, "] [", folder holding p, "]"\n'

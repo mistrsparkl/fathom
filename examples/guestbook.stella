@@ -1,0 +1,53 @@
+whisper: A guest book web service, kept in guests.json.
+whisper:   stellanova guestbook.stella        then open http://127.0.0.1:8080/
+whisper:   /sign sends a message (the text sent along is "name: words"); /book gives every entry as saved text.
+
+use: server
+use: time
+
+an entry has:
+  name (text)
+  words (text)
+  when (text)
+and the universe said i love you
+
+the world remembers:
+  book (a list of entries)
+and the universe said i love you
+
+to page, returning text:
+  set out to "<h1>Guest book</h1>"
+  for each e in reversed book:
+    set out to out plus "<p><b>" plus (safe the name of e) plus "</b> (" plus the when of e plus "): " plus (safe the words of e) plus "</p>"
+  return out
+and the universe said i love you
+
+to safe, given words (text), returning text:
+  set out to replace "&" with "&amp;" in words
+  set out to replace "<" with "&lt;" in out
+  return replace ">" with "&gt;" in out
+and the universe said i love you
+
+to answer, given address (text), returning text:
+  if address is "/": return page
+  if address is "/book": return book as saved text
+  if address is "/sign":
+    set sent to the web message
+    if not (sent contains ": "): return "Send it as 'name: words'."
+    set cut to position of ": " in sent
+    conjure an entry as e
+    set the name of e to trimmed (letters 1 to (cut minus 1) of sent)
+    set the words of e to trimmed (letters (cut plus 2) to (the size of sent) of sent)
+    set the when of e to today plus " " plus the time now
+    if the name of e is "" or the words of e is "": return "Send it as 'name: words'."
+    add e to book
+    save book to file "guests.json"
+    return "Thank you, " plus the name of e plus "."
+  return "There is no page " plus address plus "."
+and the universe said i love you
+
+genesis:
+  if file "guests.json" exists: load book from file "guests.json"
+  scrawl "Guest book at http://127.0.0.1:8080/"
+  serve the web with (8080, the command answer)
+and the universe said i love you

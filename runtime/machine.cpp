@@ -1092,6 +1092,43 @@ extern "C"
 		});
 		return out;
 	}
+	V* cn_reversed(V* list)  // a copy, back to front: any kind of item
+	{
+		V* out = copy_of(list);
+		Full* f = full(out);
+		if (f->numbers)
+			std::reverse(f->nums.begin(), f->nums.end());
+		else
+			std::reverse(f->boxed.begin(), f->boxed.end());
+		return out;
+	}
+	V* cn_repeated(V* x, double n, int line)  // '"ab" repeated 3 times', or a list
+	{
+		GUARDED(x, stellanova::need_times(n, line);)
+		if (x->tag == 't')
+		{
+			std::string out;
+			for (double k = 0; k < n; ++k)
+				out += full(x)->s;
+			return cn_make_text(out);
+		}
+		V* out = cn_list_new();
+		for (double k = 0; k < n; ++k)
+			for (size_t j = 0; j < count_of(x); ++j)
+				cn_list_add(out, cn_items(x)[j]);
+		return out;
+	}
+	V* cn_flattened(V* lists)  // a list of lists as one list
+	{
+		V* out = cn_list_new();
+		for (size_t k = 0; k < count_of(lists); ++k)
+		{
+			V* xs = cn_items(lists)[k];
+			for (size_t j = 0; j < count_of(xs); ++j)
+				cn_list_add(out, cn_items(xs)[j]);
+		}
+		return out;
+	}
 	V* cn_as_kind(V* thing, const char* spec)  // a dog given where a pet is wanted: a copy with just a pet's parts
 	{
 		if (!thing)

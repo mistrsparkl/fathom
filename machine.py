@@ -132,6 +132,9 @@ declare double @cn_count(ptr)
 declare i64 @cn_count_whole(ptr)
 declare i1 @cn_list_contains(ptr, ptr)
 declare i1 @cn_is_kind_of(ptr, ptr)
+declare ptr @cn_reversed(ptr)
+declare ptr @cn_repeated(ptr, double, i32)
+declare ptr @cn_flattened(ptr)
 declare i1 @cn_text_contains(ptr, ptr)
 declare i1 @cn_table_has(ptr, ptr)
 declare ptr @cn_list_random(ptr, i32)
@@ -881,6 +884,8 @@ def compile_once(src, out, newer_than):
         done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-Wno-everything", *target_flags(),
                                "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True)
         if done.returncode:
+            if src.name.startswith("w_"):  # a kept wrapper that can't compile would break every later build: start that file again
+                src.unlink(missing_ok=True)
             raise RuntimeError(f"Stellanova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
     return out
 

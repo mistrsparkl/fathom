@@ -1,0 +1,75 @@
+whisper: A to-do list kept in todo.json next to where it runs.
+whisper:   stellanova todo.stella add buy milk
+whisper:   stellanova todo.stella list          (add --all to see finished ones too)
+whisper:   stellanova todo.stella done 1
+whisper:   stellanova todo.stella clear         (forgets the finished ones)
+
+use: options.stella
+use: folders
+use: time
+
+a task has:
+  words (text)
+  added (text)
+  finished (yes or no)
+and the universe said i love you
+
+the world remembers:
+  tasks (a list of tasks)
+and the universe said i love you
+
+to keep the tasks:
+  save tasks to file "todo.json"
+and the universe said i love you
+
+to show the tasks:
+  set shown to 0
+  for each n from 1 to the size of tasks:
+    set t to item n of tasks
+    if not the finished of t or has option "all":
+      set mark to " "
+      if the finished of t: set mark to "x"
+      scrawl "[", mark, "] ", n, ". ", the words of t, "  (", the added of t, ")"
+      set shown to shown plus 1
+  if shown is 0: scrawl "Nothing to do."
+and the universe said i love you
+
+genesis:
+  if file "todo.json" exists: load tasks from file "todo.json"
+  set words to plain words
+  if the size of words is 0:
+    show the tasks
+    cease
+  set what to item 1 of words
+  depending on what:
+    "add":
+      if the size of words is 1:
+        scrawl "Say what to add, like: add buy milk"
+        end the program with 1
+      conjure a task as t
+      set the words of t to join items 2 to (the size of words) of words with " "
+      set the added of t to today
+      add t to tasks
+      keep the tasks
+      scrawl "Added ", the size of tasks, ". ", the words of t
+    "list":
+      show the tasks
+    "done":
+      if the size of words is not 2:
+        scrawl "Say which one is done, like: done 2"
+        end the program with 1
+      set n to item 2 of words as a number
+      if n falls below 1 or n exceeds the size of tasks:
+        scrawl "There is no task ", n, "."
+        end the program with 1
+      set the finished of item n of tasks to yes
+      keep the tasks
+      scrawl "Done: ", the words of item n of tasks
+    "clear":
+      set tasks to tasks kept by each t becomes not the finished of t
+      keep the tasks
+      scrawl "Finished tasks cleared."
+    anything else:
+      scrawl "I know add, list, done and clear, not '", what, "'."
+      end the program with 1
+and the universe said i love you
