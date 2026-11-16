@@ -1679,6 +1679,26 @@ class Expr:
             gap = (lambda x, y: abs(x - y)) if v.kind == NUMBER else (lambda x, y: (x - y).size())
             return with_ir(Value(f"stellanova::within({v.cpp}, {r.cpp}, {reach.cpp})", YESNO, lambda env: gap(a(env), b(env)) <= c(env)),
                            lambda f: within_ir(f, v, r, reach))
+        if is_thing(v.kind) and self.at("is"):
+            negated = self.peek(1) == "not"
+            start = self.i + (2 if negated else 1)
+            target = next((" ".join(self.t[start:end]) for end in range(len(self.t), start, -1)
+                           if " ".join(self.t[start:end]) in THINGS and tuple(self.t[start:end]) not in self.names.known), None)
+            if target:  # 'if pet is a dog': which kind it really is (a puppy is a dog too)
+                self.i = start + len(target.split())
+                names = [k for k in THINGS if is_kind_of("thing " + k, "thing " + target)]
+                a, wanted = v.run, set(names)
+                test = lambda env: ((o := a(env)) is not None and o.name in wanted) != negated
+                if JS:
+                    cpp = f"({'!' if negated else ''}stellanova::is_kind({v.cpp}, {json.dumps(names)}))"
+                else:  # C++ text: a thing is only ever its own kind there
+                    cpp = "true" if is_kind_of(v.kind, "thing " + target) != negated else "false"
+                marks = "|" + "|".join(names) + "|"
+                def ir(f, v=v, marks=marks):
+                    const, _ = f.module.text(marks)
+                    found = f.op(f"call i1 @cn_is_kind_of(ptr {machine.emit(f, v)}, ptr {const})")
+                    return f.op(f"xor i1 {found}, true") if negated else found
+                return with_ir(Value(cpp, YESNO, test), ir)
         if is_thing(v.kind) and (self.at("is", "nothing") or self.at("is", "something")):  # 'if target is nothing'
             there = self.peek(1) == "something"
             self.i += 2

@@ -568,7 +568,7 @@ and the universe said i love you
 
 Saving a speaker (or a list of them) writes which kind of thing each one is, like `{"is a": "dog", "name": "Rex"}`, so `load` makes a dog again. Loading fails if `"is a"` is missing or names a kind that can't speak. A dog saved as a dog is written without it.
 
-A speaker can only do what it was described with (`anything that can speak and sing` for more). A speaker name starts as nothing, and `conjure` makes a dog or a robot, not a speaker.
+A speaker can only do what it was described with (`anything that can speak and sing` for more). `s is a dog` (or `s is not a dog`) asks which kind of thing it really is; a puppy is a dog too, and nothing is no kind at all. A speaker name starts as nothing, and `conjure` makes a dog or a robot, not a speaker.
 
 **Nothing.** A name for a kind of thing can hold nothing: `set best to no enemy`. `if best is nothing` and `if best is something` ask which. Asking for a part of nothing (`the health of best`) stops with `this enemy is nothing, so it has no health.` Nothing shows as `nothing` and saves as `null`. It is handy for a command that may not find anything:
 

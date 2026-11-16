@@ -104,6 +104,7 @@
     for (const k of Object.keys(v)) made[k] = dup(v[k]);
     return made;
   }
+  function is_kind(thing, names) { return thing != null && names.includes(thing.constructor.title); }
   function same(a, b) {
     if (a === b) return typeof a !== "number" || !Number.isNaN(a);
     if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
@@ -284,7 +285,7 @@
   const ascii = (s, from, to) => s.replace(from, (c) => String.fromCharCode(c.charCodeAt(0) + to));
 
   const stellanova = {
-    Problem, fail, text, dup, same, count, kinds, problem_text, problem_kind, lock, unlock, report,
+    Problem, fail, text, dup, same, is_kind, count, kinds, problem_text, problem_kind, lock, unlock, report,
     on_say: null, on_problem: null,
     table: () => new Map(),
     kind(Kind, title, spec) {

@@ -948,6 +948,10 @@ extern "C"
 				return true;
 		return false;
 	}
+	bool cn_is_kind_of(V* thing, const char* names)  // 'pet is a dog': names is "|dog|puppy|", the kind and every kind of it
+	{
+		return thing && std::string(names).find("|" + full(thing)->kind->name + "|") != std::string::npos;
+	}
 	bool cn_text_contains(V* t, V* part) { return full(t)->s.find(full(part)->s) != std::string::npos; }
 	bool cn_table_has(V* table, V* key) { return full(table)->table.count(full(key)->s) > 0; }
 	V* cn_list_random(V* list, int line)

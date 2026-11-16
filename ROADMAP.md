@@ -40,3 +40,19 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Linux: forms (GTK 3), pictures (libpng), screen (Tkinter + Pillow)
 - [x] Speed: built lists of numbers hold plain numbers; direct runs write each command as one Python function (`STELLANOVA_NO_FAST=1` runs them the old way)
 - [ ] macOS: needs its sysroot, and a Mac to test on
+
+# Roadmap 2: easier to write, bigger programs
+
+## 5. The language
+- [x] Asking which kind a thing is: `if s is a dog:` (kinds of a dog count too)
+- [ ] Parts only a kind's own commands can change (`secret` parts)
+
+## 6. Writing programs
+- [ ] VS Code: problems shown while typing (`stellanova check` on every save), word completion and help on hover
+- [ ] `stellanova tidy`: puts a script's spacing and indenting right
+- [ ] Messages for every mistake say the line and the fix (a test for each message in LANGUAGE.md)
+
+## 7. Libraries
+- [ ] Dates as values: `a date`, its parts, adding days, comparing, showing it any way
+- [ ] XML and HTML reading (`use: markup`)
+- [ ] Command-line tools: options and flags from `the words given` (`use: options`)

@@ -1223,6 +1223,15 @@ def program_checks():
     assert perr(able + 'to purr, for a dog:\n  cease\n' + END + 'genesis:\n  set s to no speaker\n  purr s\n' + END)[1] == \
         "A speaker can only speak and shout twice, not 'purr'."
 
+    # 'is a dog': which kind a thing really is (kinds of a dog count too)
+    out = both(able + 'a puppy is a kind of dog that has:\n  toy (text)\n' + END + 'to speak, for a puppy, returning text:\n  return "Yip"\n' + END
+               + 'to shout twice, for a puppy, given word (text):\n  scrawl word\n' + END
+               + 'genesis:\n  conjure a dog as rex\n  conjure a robot as robo\n  conjure a puppy as bit\n  set crowd to a list of speakers\n'
+               '  add rex to crowd\n  add robo to crowd\n  add bit to crowd\n  add no speaker to crowd\n'
+               '  for each s in crowd:\n    scrawl s is a dog, " ", s is a robot, " ", s is not a puppy\n'
+               '  scrawl rex is a dog, " ", bit is a dog, " ", rex is a puppy\n' + END)
+    assert out.stdout == "yes no yes\nno yes yes\nyes no no\nno no yes\nyes yes no\n", repr(out.stdout)
+
     # saving and loading speakers: each says which kind of thing it is ("is a")
     out = both('a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\na stage has:\n  title (text)\n  star (a speaker)\n  cast (a list of speakers)\nand the universe said i love you\n\ngenesis:\n  conjure a dog as rex\n  set the name of rex to "Rex"\n  conjure a robot as robo\n  set the serial of robo to 42\n  set crowd to a list of speakers\n  add rex to crowd\n  add robo to crowd\n  add no speaker to crowd\n  save crowd to file "crowd.json"\n  scrawl contents of file "crowd.json"\n  set back to a list of speakers\n  load back from file "crowd.json"\n  scrawl back is crowd\n  for each s in back:\n    if s is something: scrawl speak s\n  conjure a stage as show\n  set the title of show to "Tonight"\n  set the star of show to robo\n  set the cast of show to crowd\n  scrawl show as saved text\n  conjure a stage as again\n  load again from the text (show as saved text)\n  scrawl speak the star of again, " ", the size of the cast of again\n  scrawl rex as saved text\n  set odd to a list of speakers\n  try:\n    load odd from the text "[{[[]]}]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == ('[{"is a": "dog", "name": "Rex"}, {"is a": "robot", "serial": 42}, null]\n\nyes\nWoof, I am Rex\nBeep 42\n'
