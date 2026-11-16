@@ -45,7 +45,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 
 ## 5. The language
 - [x] Asking which kind a thing is: `if s is a dog:` (kinds of a dog count too)
-- [ ] Parts only a kind's own commands can change (`secret` parts)
+- [x] Parts only a kind's own commands can use: `balance (a number, hidden)`
 
 ## 6. Writing programs
 - [ ] VS Code: problems shown while typing (`stellanova check` on every save), word completion and help on hover

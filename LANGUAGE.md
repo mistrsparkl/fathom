@@ -182,6 +182,8 @@ a puppy is a kind of dog:
 and the universe said i love you
 ```
 
+A part written like `balance (a number, hidden)` is hidden: only commands for that kind of thing (and for kinds of it) can use or change it. Anywhere else, `the balance of acct` is an error, so the kind's own commands decide how it changes.
+
 A dog has a name and an age (because every pet has) and tricks. Commands for a pet (`to speak, for a pet:`) work on dogs and puppies too. A dog can have its own version, `to speak, for a dog:`, which dogs (and puppies) use instead; every version takes the same other inputs. A dog can also go anywhere a pet is wanted: an input `(a pet)`, a list of pets, a name holding a pet, or `return` in a command returning a pet. It goes there as a pet: a copy with just a pet's parts (its tricks stay behind). A pet can't go where a dog is wanted.
 
 ## A part of something else, top to bottom

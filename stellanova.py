@@ -71,6 +71,8 @@ UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of runn
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
+SECRET_PARTS = {}  # (thing kind, field words tuple) -> the kind that hid it: only its commands (and its kinds' commands) use it
+OWNER_NOW = [None]  # the kind of thing the command being read is for
 
 KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound return returning raise whether horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
@@ -2620,6 +2622,10 @@ def place_part(kind, key):
 def part_of(owner, key, line=0):
     """One part of a thing ('name of rex') or of a place ('existence of horizontal')."""
     member, kind = (PLACE_PARTS[key], NUMBER) if place_part(owner.kind, key) else FIELDS[key][owner.kind]
+    hider = SECRET_PARTS.get((owner.kind, tuple(key)))
+    if hider and not (OWNER_NOW[0] and is_kind_of(OWNER_NOW[0], hider)):
+        one = ("an " if hider[6] in "aeiou" else "a ") + hider[6:]
+        raise ScriptError(line, f"The {' '.join(key)} of {one} is hidden: only commands for {one} can use it.")
     get, cpp = owner.run, f"({owner.cpp}).{member}"
     if is_thing(owner.kind):  # it may be nothing
         whose, part, plain = owner.kind, " ".join(key), owner.run
@@ -3233,6 +3239,7 @@ def read_one(path, auto):
     THINGS = {}
     OWNERS.clear()
     PARENTS.clear()
+    SECRET_PARTS.clear()
     ABLE.clear()
     machine.ABLE.clear()
     reset_fields()
@@ -3540,11 +3547,13 @@ def describe_things(things):
         if name in PARENTS:
             for words, kind in THINGS[PARENTS[name]]:
                 THINGS[name].append((words, kind))
+                if ("thing " + PARENTS[name], tuple(words)) in SECRET_PARTS:
+                    SECRET_PARTS["thing " + name, tuple(words)] = SECRET_PARTS["thing " + PARENTS[name], tuple(words)]
                 FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
         elif not fields and name not in ABLE:
             raise ScriptError(n, f"Say what a {name} has, one thing per indented line, like: name (text)")
         for fn, text_ in fields:
-            m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+)\)", text_.lower())
+            m = re.fullmatch(r"([a-z][a-z ]*?)\s*\(([a-z ]+?)(\s*,\s*hidden)?\)", text_.lower())
             kind = m and parse_kind(m.group(2))
             if not kind:
                 raise ScriptError(fn, f"Each thing a {name} has looks like 'name (text)'. Kinds are: {kind_words()}.")
@@ -3559,6 +3568,8 @@ def describe_things(things):
                 raise ScriptError(fn, f"A {name} already has a part called '{' '.join(words)}'" + (f" (every {PARENTS[name]} has one)." if name in PARENTS else "."))
             THINGS[name].append((words, kind))
             FIELDS.setdefault(tuple(words), {})["thing " + name] = (snake(words), kind)
+            if m.group(3):  # 'balance (a number, hidden)'
+                SECRET_PARTS["thing " + name, tuple(words)] = "thing " + name
         if any(w == ["birth"] for w, _ in THINGS[name]) and not any(w == ["existence"] for w, _ in THINGS[name]):
             kind = next(k for w, k in THINGS[name] if w == ["birth"])  # where it is now, next to where it started
             THINGS[name].insert(next(i for i, (w, _) in enumerate(THINGS[name]) if w == ["birth"]) + 1, (["existence"], kind))
@@ -3751,6 +3762,7 @@ def function(head, line, body, names, info, command=None):
     local.known = dict(names.known)
     local.commands = names.commands
     local.gives = gives
+    OWNER_NOW[0] = inputs[0][1] if name in OWNERS and inputs and is_thing(inputs[0][1]) else None
     if any(cpp_type("thing " + t) == name for t in THINGS):
         raise ScriptError(line, f"The command '{' '.join(words)}' has the same name as a kind of thing. Give one of them another name.")
     for k, (in_words, kind) in enumerate(inputs):

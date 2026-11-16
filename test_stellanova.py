@@ -1232,6 +1232,16 @@ def program_checks():
                '  scrawl rex is a dog, " ", bit is a dog, " ", rex is a puppy\n' + END)
     assert out.stdout == "yes no yes\nno yes yes\nyes no no\nno no yes\nyes yes no\n", repr(out.stdout)
 
+    # hidden parts: only commands for that kind (and kinds of it) use them
+    bank = ('an account has:\n  owner (text)\n  balance (a number, hidden)\n' + END + 'a savings is a kind of account that has:\n  rate (a number)\n' + END
+            + 'to pay in, for an account, given amount (a number):\n  add amount to balance\n' + END
+            + 'to grow, for a savings:\n  set the balance of the savings to the balance of the savings times (1 plus rate)\n' + END
+            + 'to money in, for an account, returning a number:\n  return balance\n' + END)
+    out = both(bank + 'genesis:\n  conjure a savings as s\n  set the rate of s to 0.5\n  pay in with (s, 10)\n  grow s\n  scrawl money in s\n  scrawl s\n' + END)
+    assert out.stdout == "15\na savings (owner: , balance: 15, rate: 0.5)\n", repr(out.stdout)
+    assert perr(bank + 'genesis:\n  conjure an account as acct\n  set the balance of acct to 5\n' + END)[1] == \
+        "The balance of an account is hidden: only commands for an account can use it."
+
     # saving and loading speakers: each says which kind of thing it is ("is a")
     out = both('a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\na stage has:\n  title (text)\n  star (a speaker)\n  cast (a list of speakers)\nand the universe said i love you\n\ngenesis:\n  conjure a dog as rex\n  set the name of rex to "Rex"\n  conjure a robot as robo\n  set the serial of robo to 42\n  set crowd to a list of speakers\n  add rex to crowd\n  add robo to crowd\n  add no speaker to crowd\n  save crowd to file "crowd.json"\n  scrawl contents of file "crowd.json"\n  set back to a list of speakers\n  load back from file "crowd.json"\n  scrawl back is crowd\n  for each s in back:\n    if s is something: scrawl speak s\n  conjure a stage as show\n  set the title of show to "Tonight"\n  set the star of show to robo\n  set the cast of show to crowd\n  scrawl show as saved text\n  conjure a stage as again\n  load again from the text (show as saved text)\n  scrawl speak the star of again, " ", the size of the cast of again\n  scrawl rex as saved text\n  set odd to a list of speakers\n  try:\n    load odd from the text "[{[[]]}]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == ('[{"is a": "dog", "name": "Rex"}, {"is a": "robot", "serial": 42}, null]\n\nyes\nWoof, I am Rex\nBeep 42\n'
