@@ -59,6 +59,28 @@ def smtp_catcher(port, got):
     threading.Thread(target=loop, daemon=True).start()
 
 
+def web_stub(port):
+    """A tiny web server that says back the way, path, X-Pet and Content-Type headers and message; /missing is a 404."""
+    import http.server
+    import threading
+
+    class Said(http.server.BaseHTTPRequestHandler):
+        def go(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode()
+            said = (f"{self.command} {self.path} [{self.headers.get('X-Pet', '')}] [{self.headers.get('Content-Type', '')}] "
+                    f"[{body}]").encode()
+            self.send_response(404 if self.path == "/missing" else 201 if self.command == "POST" else 200)
+            self.send_header("Content-Length", str(len(said)))
+            self.end_headers()
+            self.wfile.write(said)
+        do_GET = do_POST = do_PUT = do_DELETE = go
+
+        def log_message(self, *_):
+            pass
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Said)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+
 def websocket_echo(port):
     """A tiny WebSocket echo server (ws://127.0.0.1:port/), for the network library's test."""
     import base64
@@ -1355,6 +1377,19 @@ def program_checks():
     # Files from a folder, what was sent with a request, and text inside addresses.
     out = both('to answer, given address (text), returning text:\n  if address begins with "/echo": return "got " plus the web message\n  if address is "/f": answer with the file "site/index.html"\n  return "page " plus web decoded (letters 2 to the size of address of address)\nand the universe said i love you\n\ngenesis:\n  make the folder "site"\n  inscribe "body {}" into file "site/look.css"\n  inscribe "<p>home</p>" into file "site/index.html"\n  meanwhile serve the web from the folder with (8766, "site", the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8766/look.css"\n  scrawl web page "http://127.0.0.1:8766/"\n  scrawl web page "http://127.0.0.1:8766/a%20b+c"\n  scrawl web page "http://127.0.0.1:8766/f"\n  scrawl send to the web page with ("http://127.0.0.1:8766/echo", "héllo there")\n  scrawl web encoded "a b/é", " ", web decoded (web encoded "a b/é")\n  end the program with 0\nand the universe said i love you\n')
     assert out.stdout == 'body {}\n<p>home</p>\npage a b c\n<p>home</p>\ngot héllo there\na%20b%2F%C3%A9 a b/é\n', repr(out.stdout)
+
+    # Any web request: the way (GET, POST, PUT, DELETE...), a message and headers; a 404 is an answer, with its status
+    web_stub(8792)
+    out = both('use: web\n\ngenesis:\n'
+               '  scrawl ask the web with ("http://127.0.0.1:8792/a?b=1", "GET"), " ", the last web status\n'
+               '  scrawl ask the web with ("http://127.0.0.1:8792/pets", "POST", "Rex"), " ", the last web status\n'
+               '  scrawl ask the web with ("http://127.0.0.1:8792/pets/1", "PUT", "{}", "X-Pet: dog" plus new line plus '
+               '"Content-Type: application/json"), " ", the last web status\n'
+               '  scrawl ask the web with ("http://127.0.0.1:8792/missing", "DELETE"), " ", the last web status\n'
+               '  try:\n    scrawl ask the web with ("http://127.0.0.1:1/", "GET")\n  if that went wrong:\n    scrawl the wound\n' + END)
+    assert out.stdout == ('GET /a?b=1 [] [] [] 200\nPOST /pets [] [text/plain; charset=utf-8] [Rex] 201\n'
+                          'PUT /pets/1 [dog] [application/json] [{}] 200\nDELETE /missing [] [] [] 404\n'
+                          'I couldn\'t reach the web page "http://127.0.0.1:1/".\n'), repr(out.stdout)
 
     # Saved text: any value as JSON text, and back (for the web, or other programs).
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set the name of p to "Rex " plus a quotation mark plus "the dog" plus a quotation mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus a quotation mark plus "name" plus a quotation mark plus ": " plus a quotation mark plus "Jo" plus a quotation mark plus ", " plus a quotation mark plus "age" plus a quotation mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')

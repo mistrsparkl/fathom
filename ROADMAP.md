@@ -71,7 +71,7 @@ a one-line example in LANGUAGE.md, and a mistake message that says how to fix it
 - [x] `flattened xs`: a list of lists as one list
 
 ## 10. The web
-- [ ] Any web request: `ask the web with (address, "POST", message)` gives a `web answer` with its `status`, `text` and `headers`
+- [x] Any web request: `ask the web with (address, "POST", message, headers)` gives the answer; `the last web status` is its number (library words can now have inputs that are usually left out)
 
 ## 11. Reading easily
 - [ ] Mistake messages checked for plain words: no C++, Python or JavaScript words reach the person writing

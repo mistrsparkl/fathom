@@ -2987,6 +2987,7 @@ def load_library(name, line, names, rows=None):
                 if "{" + in_name + "}" not in cpp:
                     raise ScriptError(line, where + f"the C++ doesn't use the input '{in_name}' (write it as {{{in_name}}}).")
             command = Command(cpp.strip(), [kd for _, kd in inputs], gives, in_names)
+            command.usual = USUAL.get("".join(w.capitalize() for w in words), {})  # inputs that may be left out
             command.library = name
             word = " ".join(words)
             if cpp.strip().startswith("c:"):

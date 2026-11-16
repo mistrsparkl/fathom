@@ -22,9 +22,9 @@ code:
   namespace stellanova_web
   {
   	// Linux: the system's curl does the asking (its words given straight to it, never through a shell).
-  	inline bool curl(std::vector<std::string> words, std::string* out)
+  	inline bool curl(std::vector<std::string> words, std::string* out, bool fail_on_error = true)
   	{
-  		words.insert(words.begin(), {"curl", "-sSfL", "-A", "Stellanova", "--max-time", "60"});
+  		words.insert(words.begin(), {"curl", fail_on_error ? "-sSfL" : "-sSL", "-A", "Stellanova", "--max-time", "60"});
   		std::vector<char*> argv;
   		for (auto& w : words)
   			argv.push_back(w.data());
@@ -76,6 +76,41 @@ code:
   		if (!ok)
   			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
   		return all;
+  	}
+  	inline double last_status = 0;
+  	inline std::string ask(const std::string& address, const std::string& way, const std::string& message, const std::string& headers, int line)
+  	{
+  		std::vector<std::string> words = {"-X", way, "-w", "\n%{http_code}"};
+  		bool typed = false;
+  		std::istringstream lines(headers);
+  		for (std::string h; std::getline(lines, h);)
+  			if (!h.empty())
+  			{
+  				typed = typed || h.rfind("Content-Type", 0) == 0 || h.rfind("content-type", 0) == 0;
+  				words.insert(words.end(), {"-H", h});
+  			}
+  		char held[] = "/tmp/stellanova_askXXXXXX";
+  		bool sending = !message.empty(), wrote = true;
+  		if (sending)
+  		{
+  			int fd = mkstemp(held);
+  			wrote = fd >= 0 && write(fd, message.data(), message.size()) == (ssize_t)message.size();
+  			if (fd >= 0)
+  				close(fd);
+  			if (!typed)
+  				words.insert(words.end(), {"-H", "Content-Type: text/plain; charset=utf-8"});
+  			words.insert(words.end(), {"--data-binary", std::string("@") + held});
+  		}
+  		words.insert(words.end(), {"--", address});
+  		std::string all;
+  		bool ok = wrote && curl(words, &all, false);
+  		if (sending)
+  			unlink(held);
+  		size_t cut = all.rfind('\n');
+  		if (!ok || cut == std::string::npos)
+  			stellanova::fail(line, "I couldn't reach the web page \"" + address + "\".");
+  		last_status = std::atof(all.c_str() + cut + 1);
+  		return all.substr(0, cut);
   	}
   }
   #else
@@ -149,6 +184,55 @@ code:
   			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
   		return all;
   	}
+  	inline double last_status = 0;
+  	inline std::string ask(const std::string& address, const std::string& way, const std::string& message, const std::string& headers, int line)
+  	{
+  		URL_COMPONENTSW parts{sizeof parts};
+  		wchar_t host[256] = {}, path[2048] = {}, extra[2048] = {};
+  		parts.lpszHostName = host;
+  		parts.dwHostNameLength = 256;
+  		parts.lpszUrlPath = path;
+  		parts.dwUrlPathLength = 2048;
+  		parts.lpszExtraInfo = extra;  // the ?query after the path
+  		parts.dwExtraInfoLength = 2048;
+  		std::wstring sent;
+  		bool typed = false;
+  		std::istringstream lines(headers);
+  		for (std::string h; std::getline(lines, h);)
+  			if (!h.empty())
+  			{
+  				typed = typed || h.rfind("Content-Type", 0) == 0 || h.rfind("content-type", 0) == 0;
+  				sent += wide(h) + L"\r\n";
+  			}
+  		if (!message.empty() && !typed)
+  			sent += L"Content-Type: text/plain; charset=utf-8\r\n";
+  		std::string all;
+  		bool ok = false;
+  		if (InternetCrackUrlW(wide(address).c_str(), 0, 0, &parts))
+  		{
+  			std::wstring target = std::wstring(path) + extra;
+  			HINTERNET net = InternetOpenW(L"Stellanova", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+  			HINTERNET site = net ? InternetConnectW(net, host, parts.nPort, nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0) : nullptr;
+  			DWORD flags = INTERNET_FLAG_RELOAD | (parts.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0);
+  			HINTERNET ask = site ? HttpOpenRequestW(site, wide(way).c_str(), target.c_str(), nullptr, nullptr, nullptr, flags, 0) : nullptr;
+  			if (ask && HttpSendRequestW(ask, sent.empty() ? nullptr : sent.c_str(), (DWORD)-1, (void*)message.data(), (DWORD)message.size()))
+  			{
+  				DWORD status = 0, size = sizeof status;
+  				HttpQueryInfoW(ask, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status, &size, nullptr);
+  				char chunk[4096];
+  				for (DWORD got = 0; InternetReadFile(ask, chunk, sizeof chunk, &got) && got > 0;)
+  					all.append(chunk, got);
+  				last_status = status;
+  				ok = true;
+  			}
+  			for (HINTERNET h : {ask, site, net})
+  				if (h)
+  					InternetCloseHandle(h);
+  		}
+  		if (!ok)
+  			stellanova::fail(line, "I couldn't reach the web page \"" + address + "\".");
+  		return all;
+  	}
   }
   #endif
 
@@ -176,6 +260,24 @@ python:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t send to the web page "{address}".')
+  last_status = [0.0]
+  def ask(address, way, message, headers):
+      sent = {"User-Agent": "Stellanova"}
+      for h in headers.splitlines():
+          if ":" in h:
+              sent[h.split(":", 1)[0].strip()] = h.split(":", 1)[1].strip()
+      if message and not any(k.lower() == "content-type" for k in sent):
+          sent["Content-Type"] = "text/plain; charset=utf-8"
+      request = urllib.request.Request(address, data=message.encode("utf-8") if message else None, method=way, headers=sent)
+      try:
+          with urllib.request.urlopen(request, timeout=30) as reply:
+              last_status[0] = float(reply.status)
+              return reply.read().decode("utf-8", errors="replace")
+      except urllib.error.HTTPError as reply:  # 404 and the like are answers too
+          last_status[0] = float(reply.code)
+          return reply.read().decode("utf-8", errors="replace")
+      except Exception:
+          raise RunError(0, f'I couldn\'t reach the web page "{address}".')
 
 to web page, given address (text), returning text = stellanova_web::get({address}, {line})
   runs: get({address})
@@ -186,6 +288,12 @@ to download, given address (text) and file (text) = stellanova_web::download({ad
 to send to the web page, given address (text) and message (text), returning text = stellanova_web::send({address}, {message}, {line})
   runs: send({address}, {message})
   web: (await stellanova_web::send({address}, {message}, {line}))
+to ask the web, given address (text) and way (text) and message (text, usually "") and headers (text, usually ""), returning text = stellanova_web::ask({address}, {way}, {message}, {headers}, {line})
+  runs: ask({address}, {way}, {message}, {headers})
+  web: (await stellanova_web::ask({address}, {way}, {message}, {headers}, {line}))
+the last web status = stellanova_web::last_status, number, read only
+  runs: last_status[0]
+  web: stellanova_web.status
 
 javascript:
   const stellanova_web = {
@@ -202,6 +310,20 @@ javascript:
     async send(address, message, line) {
       const options = { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8" }, body: message };
       return (await stellanova_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
+    },
+    status: 0,
+    async ask(address, way, message, headers, line) {
+      const sent = {};
+      for (const h of headers.split(/\r?\n/)) if (h.includes(":")) sent[h.slice(0, h.indexOf(":")).trim()] = h.slice(h.indexOf(":") + 1).trim();
+      if (message && !Object.keys(sent).some((k) => k.toLowerCase() === "content-type")) sent["Content-Type"] = "text/plain; charset=utf-8";
+      let reply;
+      try {
+        reply = await fetch(address, { method: way, headers: sent, body: message || undefined });
+      } catch {
+        stellanova.fail(line, `I couldn't reach the web page "${address}".`);
+      }
+      stellanova_web.status = reply.status;
+      return reply.text();
     },
     async download(address, file, line) {
       const problem = `I couldn't download "${address}".`;
