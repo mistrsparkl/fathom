@@ -55,4 +55,4 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 ## 7. Libraries
 - [x] Dates and moments: `date in words`, `date plus months`, `seconds at`, `date at`, `time at` (dates stay text, so they sort and save)
 - [ ] XML and HTML reading (`use: markup`)
-- [ ] Command-line tools: options and flags from `the words given` (`use: options`)
+- [x] Command-line tools: `--loud` and `--size=3` from `the words given` (`use: options.stella`)

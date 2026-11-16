@@ -401,6 +401,17 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Options, written in Stellanova (libraries/options.stella): '--name' and '--name=value' after the script, plain words, '--' ending options
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "o.stella").write_text('use: options.stella\n\ngenesis:\n  scrawl has option "loud", " ", has option "quiet", " [", option value "size", '
+                                          '"] [", option value with ("name", "nobody"), "] [", option value "loud", "]"\n  scrawl plain words\n' + END, encoding="utf-8")
+        typed = ["--size=3", "--loud", "a.txt", "--", "--quiet", "b"]
+        said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", "o.stella", *typed], capture_output=True, text=True, cwd=d).stdout
+        assert said == "yes no [3] [nobody] []\na.txt, --quiet, b\n", said
+        if compiler:
+            assert translate.build(Path(d) / "o.stella", Path(d) / "o.exe") is None
+            assert subprocess.run([str(Path(d) / "o.exe"), *typed], capture_output=True, text=True, cwd=d).stdout == said
+
     # Physics, written in Stellanova (libraries/physics.stella): a box falls, bounces off a wall and lands.
     out = both(''.join([
                'use: physics.stella\n'
