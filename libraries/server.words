@@ -9,6 +9,10 @@ code:
 include: "sockets.h"
 include: <filesystem>
 include: <fstream>
+include: <thread>
+include: <mutex>
+include: <condition_variable>
+include: <deque>
 link: ws2_32
 
 code:
@@ -17,6 +21,20 @@ code:
   	inline std::string message;  // what was sent with the request being answered ('the web message')
   	inline std::string file_asked;  // 'answer with the file': sent instead of the answer's text
   	inline std::string way;  // 'the web way': GET, POST...
+  	inline std::string request_head;  // the request's header lines, for 'the web header'
+  	inline std::string header(const std::string& name)
+  	{
+  		std::istringstream lines(request_head);
+  		std::string want = stellanova::lower(name) + ":";
+  		for (std::string h; std::getline(lines, h);)
+  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			{
+  				std::string v = h.substr(want.size());
+  				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
+  				return a == std::string::npos ? "" : v.substr(a, b - a + 1);
+  			}
+  		return "";
+  	}
   	inline double status = 200;  // 'answer with the status 404'
 
   	inline std::string status_words(double code)
@@ -105,6 +123,54 @@ code:
   		return true;
   	}
 
+  	struct Asking  // one request, read in full by a thread of its own
+  	{
+  		SOCKET client;
+  		std::string asked, message;
+  	};
+
+  	inline void read_request(Asking& r)
+  	{
+  		char chunk[4096];
+  		while (r.asked.find("\r\n\r\n") == std::string::npos)
+  		{
+  			int got = recv(r.client, chunk, sizeof chunk, 0);
+  			if (got <= 0)
+  				break;
+  			r.asked.append(chunk, got);
+  		}
+  		size_t head_end = r.asked.find("\r\n\r\n");
+  		size_t length = 0;
+  		std::string low = stellanova::lower(r.asked.substr(0, head_end));
+  		size_t at = low.find("content-length:");
+  		if (at != std::string::npos)
+  			length = (size_t)std::strtoul(low.c_str() + at + 15, nullptr, 10);
+  		r.message = head_end == std::string::npos ? "" : r.asked.substr(head_end + 4);
+  		r.asked = r.asked.substr(0, head_end);
+  		while (r.message.size() < length)
+  		{
+  			int got = recv(r.client, chunk, sizeof chunk, 0);
+  			if (got <= 0)
+  				break;
+  			r.message.append(chunk, got);
+  		}
+  	}
+
+  	inline void send_reply(SOCKET client, std::string reply)
+  	{
+  		for (size_t sent = 0; sent < reply.size();)
+  		{
+  			int put = send(client, reply.data() + sent, (int)(reply.size() - sent), 0);
+  			if (put <= 0)
+  				break;
+  			sent += put;
+  		}
+  		shutdown(client, SD_SEND);
+  		closesocket(client);
+  	}
+
+  	// Requests are read and replies sent by threads of their own, so a slow one doesn't hold up the rest;
+  	// the program's answer command runs on this thread, one request at a time, so its names stay safe without locks.
   	inline void serve_from(double port, const std::string& folder, const std::function<std::string(std::string)>& answer, int line)
   	{
   		WSADATA data;
@@ -118,39 +184,40 @@ code:
   		where.sin_family = AF_INET;
   		where.sin_port = htons((u_short)port);
   		where.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // this computer only, so Windows doesn't ask about its firewall
-  		if (listener == INVALID_SOCKET || bind(listener, (sockaddr*)&where, sizeof where) != 0 || listen(listener, 16) != 0)
+  		if (listener == INVALID_SOCKET || bind(listener, (sockaddr*)&where, sizeof where) != 0 || listen(listener, 64) != 0)
   			stellanova::fail(line, "I couldn't serve the web on port " + stellanova::text(port) + " (is something else using it?).");
+  		static std::mutex held;
+  		static std::condition_variable ready;
+  		static std::deque<Asking> waiting;
+  		std::thread([listener] {
+  			for (;;)
+  			{
+  				SOCKET client = accept(listener, nullptr, nullptr);
+  				if (client == INVALID_SOCKET)
+  					continue;
+  				std::thread([client] {
+  					Asking r{client, "", ""};
+  					read_request(r);
+  					std::lock_guard<std::mutex> hold(held);
+  					waiting.push_back(std::move(r));
+  					ready.notify_one();
+  				}).detach();
+  			}
+  		}).detach();
   		for (;;)
   		{
-  			SOCKET client = accept(listener, nullptr, nullptr);
-  			if (client == INVALID_SOCKET)
-  				continue;
-  			std::string asked;
-  			char chunk[4096];
-  			while (asked.find("\r\n\r\n") == std::string::npos)
+  			Asking r;
   			{
-  				int got = recv(client, chunk, sizeof chunk, 0);
-  				if (got <= 0)
-  					break;
-  				asked.append(chunk, got);
+  				std::unique_lock<std::mutex> hold(held);
+  				ready.wait(hold, [] { return !waiting.empty(); });
+  				r = std::move(waiting.front());
+  				waiting.pop_front();
   			}
-  			size_t head_end = asked.find("\r\n\r\n");
-  			size_t length = 0;
-  			std::string low = stellanova::lower(asked.substr(0, head_end));
-  			size_t at = low.find("content-length:");
-  			if (at != std::string::npos)
-  				length = (size_t)std::strtoul(low.c_str() + at + 15, nullptr, 10);
-  			message = head_end == std::string::npos ? "" : asked.substr(head_end + 4);
-  			while (message.size() < length)
-  			{
-  				int got = recv(client, chunk, sizeof chunk, 0);
-  				if (got <= 0)
-  					break;
-  				message.append(chunk, got);
-  			}
-  			size_t a = asked.find(' '), b = a == std::string::npos ? a : asked.find(' ', a + 1);
-  			std::string path = b == std::string::npos ? "/" : asked.substr(a + 1, b - a - 1);
-  			way = a == std::string::npos ? "GET" : asked.substr(0, a);
+  			message = r.message;
+  			size_t a = r.asked.find(' '), b = a == std::string::npos ? a : r.asked.find(' ', a + 1);
+  			std::string path = b == std::string::npos ? "/" : r.asked.substr(a + 1, b - a - 1);
+  			way = a == std::string::npos ? "GET" : r.asked.substr(0, a);
+  			request_head = r.asked;
   			status = 200;
   			std::string page, kind = kind_of_page(path == "/" && !folder.empty() ? "/index.html" : path);
   			if (!file_for(folder, path, page))
@@ -168,15 +235,7 @@ code:
   			}
   			std::string reply = "HTTP/1.1 " + std::to_string((int)status) + " " + status_words(status) + "\r\nContent-Type: " + kind +
   				"\r\nCache-Control: no-store\r\nContent-Length: " + std::to_string(page.size()) + "\r\nConnection: close\r\n\r\n" + page;
-  			for (size_t sent = 0; sent < reply.size();)
-  			{
-  				int put = send(client, reply.data() + sent, (int)(reply.size() - sent), 0);
-  				if (put <= 0)
-  					break;
-  				sent += put;
-  			}
-  			shutdown(client, SD_SEND);
-  			closesocket(client);
+  			std::thread(send_reply, r.client, std::move(reply)).detach();
   		}
   	}
   	inline void answer_with(const std::string& name, int line)
@@ -200,6 +259,7 @@ python:
   MESSAGE = [""]
   FILE_ASKED = [""]
   WAY = ["GET"]
+  HEADERS = [{}]
   STATUS = [200]
   def answer_with_status(code):
       if code != int(code) or not 100 <= code <= 599:
@@ -230,25 +290,30 @@ python:
           return None
       with open(file, "rb") as f:
           return f.read()
+  ANSWERING = __import__("threading").Lock()  # requests are read and sent side by side; answers are worked out one at a time
   def serve_from(port, folder, answer):
       class Handler(http.server.BaseHTTPRequestHandler):
           def do_GET(self):
               length = int(self.headers.get("Content-Length") or 0)
-              MESSAGE[0] = self.rfile.read(length).decode("utf-8", "replace") if length else ""
-              page = file_for(folder, self.path)
-              kind = kind_of_page("/index.html" if self.path == "/" and folder else self.path)
-              WAY[0], STATUS[0] = self.command, 200
-              if page is None:
-                  FILE_ASKED[0] = ""
-                  said = answer(self.path)
-                  if kind.startswith("text/html") and looks_like_data(said):
-                      kind = "application/json; charset=utf-8"
-                  page = said.encode("utf-8", "surrogateescape")
-                  if FILE_ASKED[0]:
-                      with open(FILE_ASKED[0], "rb") as f:
-                          page = f.read()
-                      kind = kind_of_page(FILE_ASKED[0])
-              self.send_response(STATUS[0])
+              message = self.rfile.read(length).decode("utf-8", "replace") if length else ""
+              with ANSWERING:
+                  MESSAGE[0] = message
+                  page = file_for(folder, self.path)
+                  kind = kind_of_page("/index.html" if self.path == "/" and folder else self.path)
+                  WAY[0], STATUS[0] = self.command, 200
+                  HEADERS[0] = {k.lower(): v for k, v in self.headers.items()}
+                  if page is None:
+                      FILE_ASKED[0] = ""
+                      said = answer(self.path)
+                      if kind.startswith("text/html") and looks_like_data(said):
+                          kind = "application/json; charset=utf-8"
+                      page = said.encode("utf-8", "surrogateescape")
+                      if FILE_ASKED[0]:
+                          with open(FILE_ASKED[0], "rb") as f:
+                              page = f.read()
+                          kind = kind_of_page(FILE_ASKED[0])
+                  status = STATUS[0]
+              self.send_response(status)
               self.send_header("Content-Type", kind)
               self.send_header("Cache-Control", "no-store")
               self.send_header("Content-Length", str(len(page)))
@@ -259,7 +324,7 @@ python:
           def log_message(self, *args):
               pass
       try:
-          server = http.server.HTTPServer(("127.0.0.1", int(port)), Handler)
+          server = http.server.ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
       except OSError:
           raise RunError(0, "I couldn't serve the web on port " + text(port) + " (is something else using it?).")
       server.serve_forever()
@@ -276,6 +341,9 @@ the web message = stellanova_server::message, text, read only
 the web way = stellanova_server::way, text, read only
   runs: WAY[0]
   web: stellanova_server_web.way
+to the web header, given name (text), returning text = stellanova_server::header({name})
+  runs: HEADERS[0].get({name}.lower(), "")
+  web: stellanova_server_web.header({name})
 to answer with the status, given code (a number) = stellanova_server::answer_with_status({code}, {line})
   runs: answer_with_status({code})
   web: stellanova_server_web.answerWithStatus({code}, {line})
@@ -294,6 +362,8 @@ javascript:
     message: "",
     asked: "",
     way: "GET",
+    headers: {},
+    header(name) { return String(this.headers[name.toLowerCase()] ?? ""); },
     status: 200,
     answerWithStatus(code, line) {
       if (Math.floor(code) !== code || code < 100 || code > 599)
@@ -340,6 +410,7 @@ javascript:
           turn = turn.then(async () => {
             this.message = Buffer.concat(parts).toString("utf8");
             this.way = request.method;
+            this.headers = request.headers;
             this.status = 200;
             let page = this.fileFor(folder, request.url), kind = this.kindOf(request.url === "/" && folder ? "/index.html" : request.url);
             if (page === null) {

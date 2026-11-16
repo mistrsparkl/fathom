@@ -2429,6 +2429,32 @@ class Expr:
             start = self.i
             self.i += 1
             v = self.operand()
+            if self.at("by", "each") and is_list(v.kind):  # 'sorted names by each n becomes the size of n': by what each works out to
+                self.i += 1
+                item = element(v.kind)
+                f = self.inline_command([item])
+                ins, gives = SIGNATURES.get(f.kind, (None, None))
+                if gives not in (NUMBER, TEXT):
+                    raise ScriptError(line, f"'sorted ... by each' needs to work out a number or text for each item, not {kind_name(gives)}.")
+                a, g = v.run, f.run
+                if JS:
+                    keys = Value(f"(await stellanova::changed_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line}))", "list of " + gives,
+                                 lambda env: (lambda fn: [invoke_value(fn, [x], line) for x in a(env)])(g(env)))
+                else:
+                    keys = with_ir(Value(f"stellanova::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})",
+                                         "list of " + gives, lambda env: (lambda fn: [invoke_value(fn, [x], line) for x in a(env)])(g(env))),
+                                   lambda fn, v=v, f=f: machine.by_command(fn, machine.emit(fn, v), machine.emit(fn, f), item, gives, False, line))
+                down = self.biggest_first()
+                if down:  # as for parts: back to front, sorted, back to front, so equal ones keep their order
+                    v, keys = reversed_list(v), reversed_list(keys)
+                a, k = v.run, keys.run
+
+                def run(env):
+                    xs, ks = a(env), k(env)
+                    return [dup(xs[j]) for j in sorted(range(len(xs)), key=lambda j: ks[j])]
+                out = with_ir(Value(f"stellanova::sorted_by_keys({strip_parens(v.cpp)}, {strip_parens(keys.cpp)})", v.kind, run),
+                              lambda fn, v=v, keys=keys: fn.op(f"call ptr @cn_sorted_by_keys(ptr {machine.emit(fn, v)}, ptr {machine.emit(fn, keys)})"))
+                return reversed_list(out) if down else out
             if self.at("by") and is_list(v.kind) and is_thing(element(v.kind)):
                 self.i += 1
                 thing = element(v.kind)

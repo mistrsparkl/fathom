@@ -78,9 +78,27 @@ code:
   		return all;
   	}
   	inline double last_status = 0;
+  	inline std::string last_headers;
+  	inline std::string header_in(const std::string& raw, const std::string& name)  // one header's value, any capitals
+  	{
+  		std::istringstream lines(raw);
+  		std::string want = stellanova::lower(name) + ":";
+  		for (std::string h; std::getline(lines, h);)
+  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			{
+  				std::string v = h.substr(want.size());
+  				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
+  				return a == std::string::npos ? "" : v.substr(a, b - a + 1);
+  			}
+  		return "";
+  	}
   	inline std::string ask(const std::string& address, const std::string& way, const std::string& message, const std::string& headers, int line)
   	{
-  		std::vector<std::string> words = {"-X", way, "-w", "\n%{http_code}"};
+  		char heads[] = "/tmp/stellanova_headsXXXXXX";
+  		int hfd = mkstemp(heads);
+  		if (hfd >= 0)
+  			close(hfd);
+  		std::vector<std::string> words = {"-X", way, "-w", "\n%{http_code}", "-D", heads};
   		bool typed = false;
   		std::istringstream lines(headers);
   		for (std::string h; std::getline(lines, h);)
@@ -106,6 +124,12 @@ code:
   		bool ok = wrote && curl(words, &all, false);
   		if (sending)
   			unlink(held);
+  		std::ifstream came(heads, std::ios::binary);
+  		std::ostringstream read_heads;
+  		read_heads << came.rdbuf();
+  		came.close();
+  		unlink(heads);
+  		last_headers = read_heads.str();
   		size_t cut = all.rfind('\n');
   		if (!ok || cut == std::string::npos)
   			stellanova::fail(line, "I couldn't reach the web page \"" + address + "\".");
@@ -185,6 +209,20 @@ code:
   		return all;
   	}
   	inline double last_status = 0;
+  	inline std::string last_headers;
+  	inline std::string header_in(const std::string& raw, const std::string& name)  // one header's value, any capitals
+  	{
+  		std::istringstream lines(raw);
+  		std::string want = stellanova::lower(name) + ":";
+  		for (std::string h; std::getline(lines, h);)
+  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			{
+  				std::string v = h.substr(want.size());
+  				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
+  				return a == std::string::npos ? "" : v.substr(a, b - a + 1);
+  			}
+  		return "";
+  	}
   	inline std::string ask(const std::string& address, const std::string& way, const std::string& message, const std::string& headers, int line)
   	{
   		URL_COMPONENTSW parts{sizeof parts};
@@ -219,6 +257,12 @@ code:
   			{
   				DWORD status = 0, size = sizeof status;
   				HttpQueryInfoW(ask, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &status, &size, nullptr);
+  				DWORD head_size = 0;
+  				HttpQueryInfoA(ask, HTTP_QUERY_RAW_HEADERS_CRLF, nullptr, &head_size, nullptr);
+  				last_headers.assign(head_size, '\0');
+  				if (!head_size || !HttpQueryInfoA(ask, HTTP_QUERY_RAW_HEADERS_CRLF, last_headers.data(), &head_size, nullptr))
+  					last_headers.clear();
+  				last_headers.resize(head_size);
   				char chunk[4096];
   				for (DWORD got = 0; InternetReadFile(ask, chunk, sizeof chunk, &got) && got > 0;)
   					all.append(chunk, got);
@@ -261,6 +305,9 @@ python:
       except Exception:
           raise RunError(0, f'I couldn\'t send to the web page "{address}".')
   last_status = [0.0]
+  last_headers = [{}]
+  def last_header(name):
+      return last_headers[0].get(name.lower(), "")
   def ask(address, way, message, headers):
       sent = {"User-Agent": "Stellanova"}
       for h in headers.splitlines():
@@ -272,9 +319,11 @@ python:
       try:
           with urllib.request.urlopen(request, timeout=30) as reply:
               last_status[0] = float(reply.status)
+              last_headers[0] = {k.lower(): v for k, v in reply.headers.items()}
               return reply.read().decode("utf-8", errors="replace")
       except urllib.error.HTTPError as reply:  # 404 and the like are answers too
           last_status[0] = float(reply.code)
+          last_headers[0] = {k.lower(): v for k, v in reply.headers.items()}
           return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t reach the web page "{address}".')
@@ -294,6 +343,9 @@ to ask the web, given address (text) and way (text) and message (text, usually "
 the last web status = stellanova_web::last_status, number, read only
   runs: last_status[0]
   web: stellanova_web.status
+to the last web header, given name (text), returning text = stellanova_web::header_in(stellanova_web::last_headers, {name})
+  runs: last_header({name})
+  web: stellanova_web.header({name})
 
 javascript:
   const stellanova_web = {
@@ -312,6 +364,8 @@ javascript:
       return (await stellanova_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
     },
     status: 0,
+    headers: new Map(),
+    header: (name) => stellanova_web.headers.get(name) ?? "",
     async ask(address, way, message, headers, line) {
       const sent = {};
       for (const h of headers.split(/\r?\n/)) if (h.includes(":")) sent[h.slice(0, h.indexOf(":")).trim()] = h.slice(h.indexOf(":") + 1).trim();
@@ -323,6 +377,7 @@ javascript:
         stellanova.fail(line, `I couldn't reach the web page "${address}".`);
       }
       stellanova_web.status = reply.status;
+      stellanova_web.headers = reply.headers;
       return reply.text();
     },
     async download(address, file, line) {

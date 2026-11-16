@@ -89,9 +89,9 @@ From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. S
 
 # Roadmap 5: the rest (speed last)
 
-- [ ] Sorting by a worked-out value: `sorted names by each n becomes the size of n`
-- [ ] Headers: `the web header "X-Pet"` in a server's answer, `the last web header "Content-Type"` after `ask the web`
-- [ ] The web server answers several people at once
+- [x] Sorting by a worked-out value: `sorted names by each n becomes the size of n`
+- [x] Headers: `the web header "X-Pet"` in a server's answer, `the last web header "Content-Type"` after `ask the web`
+- [x] The web server answers several people at once (reading and sending side by side; `answer` one at a time, so no locks are needed)
 - [ ] Markup: `<li>`, `<p>`, `<td>` and the like end when the next one starts, as browsers do
 - [ ] Every library word works on the web, apart from C libraries and Python packages
 - [ ] `meanwhile` in WebAssembly

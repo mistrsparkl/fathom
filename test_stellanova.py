@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -1249,6 +1250,9 @@ def program_checks():
     # sorted ..., biggest first (equal ones keep their order)
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set pets to a list of pets\n  for each n in a list of ("Rex", "Tom", "Bo", "Max"):\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  scrawl sorted pets by age, biggest first\n  scrawl sorted pets by age\n  scrawl sorted a list of (3, 1, 2), biggest first, " ", sorted a list of ("b", "a")\n  scrawl reversed a list of (1, 2)\nand the universe said i love you\n')
     assert out.stdout == 'a pet (name: Rex, age: 3), a pet (name: Tom, age: 3), a pet (name: Max, age: 3), a pet (name: Bo, age: 2)\na pet (name: Bo, age: 2), a pet (name: Rex, age: 3), a pet (name: Tom, age: 3), a pet (name: Max, age: 3)\n3, 2, 1 a, b\n2, 1\n', repr(out.stdout)
+    # sorted by what each works out to
+    out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set names to a list of ("Rex", "Al", "Tomas", "Bo", "Max")\n  scrawl sorted names by each n becomes the size of n\n  scrawl sorted names by each n becomes the size of n, biggest first\n  scrawl sorted a list of (3, -5, 1) by each x becomes x times x\n  set pets to a list of pets\n  for each n in names:\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  scrawl sorted pets by each p becomes letter 2 of the name of p\nand the universe said i love you\n')
+    assert out.stdout == 'Al, Bo, Rex, Max, Tomas\nTomas, Rex, Max, Al, Bo\n1, 3, -5\na pet (name: Max, age: 3), a pet (name: Rex, age: 3), a pet (name: Al, age: 2), a pet (name: Tomas, age: 5), a pet (name: Bo, age: 2)\n', repr(out.stdout)
     # text padded to a width
     out = both('genesis:\n  scrawl "[", "food" padded to 8 letters, "] [", "café" padded to 6 letters, "] [", "toolong" padded to 3 letters, "] [", 7 padded to 3 digits, "]"\n  try:\n    scrawl "a" padded to 1.5 letters\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "[food    ] [café  ] [toolong] [007]\nI can't pad to 1.5 letters: it must be a whole number, 0 or more.\n", repr(out.stdout)
@@ -1408,6 +1412,29 @@ def program_checks():
     # the web server: how it was asked, a status for the answer
     out = both('use: server\nuse: web\n\nto answer, given address (text), returning text:\n  if address is "/gone":\n    answer with the status 404\n    return "no"\n  return the web way plus " " plus the web message\n' + END + 'genesis:\n  meanwhile serve the web with (8767, the command answer)\n  wait 0.5\n  scrawl ask the web with ("http://127.0.0.1:8767/", "PUT", "hi"), " ", the last web status\n  scrawl ask the web with ("http://127.0.0.1:8767/gone", "GET"), " ", the last web status\n  end the program with 0\n' + END)
     assert out.stdout == 'PUT hi 200\nno 404\n', repr(out.stdout)
+
+    # headers: the ones sent with a request, and the ones an answer came back with
+    out = both('use: server\nuse: web\n\nto answer, given address (text), returning text:\n  return "pet is " plus the web header "X-Pet" plus "; " plus the web header "x-none"\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8768, the command answer)\n  wait 0.5\n  scrawl ask the web with ("http://127.0.0.1:8768/", "GET", "", "X-Pet: dog")\n  scrawl the last web header "content-type", " [", the last web header "X-Nothing", "] ", the last web header "Content-Length"\n  scrawl ask the web with ("http://127.0.0.1:8768/data", "GET")\n  end the program with 0\nand the universe said i love you\n')
+    assert out.stdout == 'pet is dog; \ntext/html; charset=utf-8 [] 12\npet is ; \n', repr(out.stdout)
+
+    # a slow visitor (one that never finishes asking) doesn't hold up the others
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / 'sv.stella').write_text('use: server\n\nto answer, given address (text), returning text:\n  return "got " plus address\nand the universe said i love you\n\ngenesis:\n  serve the web with (8771, the command answer)\nand the universe said i love you\n', encoding='utf-8')
+        (Path(d) / 'slow.py').write_text('"""A slow client holds a connection open; a quick one must still be answered."""\nimport socket, sys, time, urllib.request\nslow = socket.create_connection(("127.0.0.1", 8771))\nslow.sendall(b"GET /slow HTTP/1.1\\r\\nHost: x\\r\\n")  # never finishes its request\nt = time.time()\nsaid = urllib.request.urlopen("http://127.0.0.1:8771/quick", timeout=5).read().decode()\nprint(said, "quick" if time.time() - t < 2 else "slow")\nslow.close()\n', encoding='utf-8')
+        ways = [[sys.executable, str(HERE / 'stellanova.py'), 'run', 'sv.stella']]
+        if compiler and translate.build(Path(d) / 'sv.stella', Path(d) / 'sv.exe') is None:
+            ways.append([str(Path(d) / 'sv.exe')])
+        if node and translate.web(Path(d) / 'sv.stella') is None:
+            ways.append([node, 'sv.js'])
+        for how in ways:
+            server = subprocess.Popen(how, cwd=d, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                time.sleep(2.5)
+                said = subprocess.run([sys.executable, 'slow.py'], cwd=d, capture_output=True, text=True, timeout=20).stdout
+                assert said == 'got /quick quick\n', (how, said)
+            finally:
+                server.kill()
+                server.wait()
 
     # Saved text: any value as JSON text, and back (for the web, or other programs).
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set the name of p to "Rex " plus a quotation mark plus "the dog" plus a quotation mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus a quotation mark plus "name" plus a quotation mark plus ": " plus a quotation mark plus "Jo" plus a quotation mark plus ", " plus a quotation mark plus "age" plus a quotation mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')

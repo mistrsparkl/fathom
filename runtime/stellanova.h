@@ -1180,6 +1180,19 @@ namespace stellanova
 		return out;
 	}
 
+	template <typename T, typename K>
+	std::vector<T> sorted_by_keys(const std::vector<T>& items, const std::vector<K>& keys)
+	{
+		std::vector<size_t> order(items.size());
+		for (size_t k = 0; k < order.size(); ++k)
+			order[k] = k;
+		std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return keys[a] < keys[b]; });
+		std::vector<T> out;
+		for (size_t k : order)
+			out.push_back(items[k]);
+		return out;
+	}
+
 	template <typename T>
 	std::vector<T> flattened(const std::vector<std::vector<T>>& lists)
 	{

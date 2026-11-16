@@ -1092,6 +1092,20 @@ extern "C"
 		});
 		return out;
 	}
+	V* cn_sorted_by_keys(V* list, V* keys)  // 'sorted names by each n becomes ...': in order of keys (numbers or text), ties kept in order
+	{
+		std::vector<size_t> order(count_of(list));
+		for (size_t k = 0; k < order.size(); ++k)
+			order[k] = k;
+		std::vector<V*> ks(cn_items(keys).begin(), cn_items(keys).end());
+		std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+			return ks[a]->tag == 't' ? full(ks[a])->s < full(ks[b])->s : ks[a]->d < ks[b]->d;
+		});
+		V* out = cn_list_new();
+		for (size_t k : order)
+			cn_list_add(out, cn_items(list)[k]);
+		return out;
+	}
 	V* cn_reversed(V* list)  // a copy, back to front: any kind of item
 	{
 		V* out = copy_of(list);

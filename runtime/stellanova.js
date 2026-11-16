@@ -346,6 +346,9 @@
       for (const x of items) made.push(dup(await stellanova.invoke(f, line, x)));
       return made;
     },
+    sorted_by_keys(items, keys) {  // in order of keys (numbers or text), ties kept in order (JavaScript's sort keeps them)
+      return items.map((x, k) => k).sort((a, b) => order(keys[a], keys[b])).map((k) => dup(items[k]));
+    },
     async kept_by(items, f, line) {
       const made = [];
       for (const x of items) if (await stellanova.invoke(f, line, x)) made.push(dup(x));
