@@ -1143,6 +1143,40 @@ namespace stellanova
 		return items;
 	}
 
+	inline void need_times(double n, int line)
+	{
+		if (n < 0 || std::floor(n) != n)
+			fail(line, "'repeated' needs a whole number of times, 0 or more, not " + text(n) + ".");
+	}
+
+	inline std::string repeated(const std::string& s, double n, int line)
+	{
+		need_times(n, line);
+		std::string out;
+		for (double k = 0; k < n; ++k)
+			out += s;
+		return out;
+	}
+
+	template <typename T>
+	std::vector<T> repeated(const std::vector<T>& items, double n, int line)
+	{
+		need_times(n, line);
+		std::vector<T> out;
+		for (double k = 0; k < n; ++k)
+			out.insert(out.end(), items.begin(), items.end());
+		return out;
+	}
+
+	template <typename T>
+	std::vector<T> flattened(const std::vector<std::vector<T>>& lists)
+	{
+		std::vector<T> out;
+		for (const auto& xs : lists)
+			out.insert(out.end(), xs.begin(), xs.end());
+		return out;
+	}
+
 	inline void say(std::initializer_list<std::string> parts)
 	{
 		if (show_hook)

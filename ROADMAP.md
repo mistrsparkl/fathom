@@ -63,12 +63,12 @@ Every word added here must read plainly to someone who has never programmed: one
 a one-line example in LANGUAGE.md, and a mistake message that says how to fix it.
 
 ## 8. Files and folders
-- [ ] Facts about a file: `the size of the file "notes.txt"` (in bytes), `when the file "notes.txt" changed` (a moment)
-- [ ] Parts of a path: `the name of the path`, `the extension of the path`, `the folder of the path`
+- [x] Facts about a file: `bytes in the file "notes.txt"` (it was there already), `last change of the file "notes.txt"` (a moment)
+- [x] Parts of a path: `file name of path`, `extension of path`, `folder holding path`
 
 ## 9. Text and lists
-- [ ] `"ab" repeated 3 times`
-- [ ] `flattened xs`: a list of lists as one list
+- [x] `"ab" repeated 3 times`
+- [x] `flattened xs`: a list of lists as one list
 
 ## 10. The web
 - [ ] Any web request: `ask the web with (address, "POST", message)` gives a `web answer` with its `status`, `text` and `headers`

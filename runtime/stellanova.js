@@ -402,6 +402,11 @@
       return thing;
     },
     reversed: (items) => dup(items).reverse(),
+    repeated(x, n, line) {
+      if (n < 0 || Math.floor(n) !== n) fail(line, `'repeated' needs a whole number of times, 0 or more, not ${text(n)}.`);
+      return typeof x === "string" ? x.repeat(n) : Array.from({ length: n }, () => dup(x)).flat();
+    },
+    flattened: (lists) => dup(lists).flat(),
     items_from(items, first, last, line) {
       if (Math.floor(first) !== first || Math.floor(last) !== last || first < 1 || last > items.length || first > last + 1)
         fail(line, `there are no items ${numberText(first)} to ${numberText(last)} in a list of ${items.length} items.`);

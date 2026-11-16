@@ -4,6 +4,8 @@ note: Names of files and folders are text, like "saves/slot 1.json". A name with
 include: <filesystem>
 include: <algorithm>
 include: <fstream>
+include: <chrono>
+include: <cmath>
 
 code:
   namespace stellanova_folders
@@ -247,3 +249,73 @@ javascript:
       try { this.fs(line).writeFileSync(name, Buffer.from(numbers)); } catch { stellanova.fail(line, `I couldn't write the file "${name}".`); }
     },
   };
+
+note: Parts of a path, as text: "saves/slot 1.json" is in the folder "saves", its file name is "slot 1.json" and its extension "json".
+code:
+  namespace stellanova_folders
+  {
+  	inline std::string path_part(const std::string& p, int which)  // 0: file name, 1: extension, 2: folder holding it
+  	{
+  		size_t cut = p.find_last_of("/\\");
+  		std::string file = cut == std::string::npos ? p : p.substr(cut + 1);
+  		if (which == 2)
+  			return cut == std::string::npos ? "" : p.substr(0, cut);
+  		if (which == 0)
+  			return file;
+  		size_t dot = file.rfind('.');
+  		return dot == std::string::npos || dot == 0 ? "" : file.substr(dot + 1);
+  	}
+  	inline double last_change(const std::string& name, int line)
+  	{
+  		std::error_code problem;
+  		auto when = fs::last_write_time(path(name), problem);
+  		if (problem || !fs::is_regular_file(path(name), problem))
+  			stellanova::fail(line, "there is no file called \"" + name + "\".");
+  		auto now = std::chrono::system_clock::now() + (when - fs::file_time_type::clock::now());
+  		return std::floor(std::chrono::duration<double>(now.time_since_epoch()).count());
+  	}
+  }
+
+python:
+  def path_part(p, which):
+      cut = max(p.rfind("/"), p.rfind("\\"))
+      file = p[cut + 1:]
+      if which == 2:
+          return p[:cut] if cut >= 0 else ""
+      if which == 0:
+          return file
+      dot = file.rfind(".")
+      return file[dot + 1:] if dot > 0 else ""
+  def last_change(name):
+      if not os.path.isfile(name):
+          raise RunError(0, 'there is no file called "' + name + '".')
+      return float(int(os.path.getmtime(name)))
+
+to file name of, given path (text), returning text = stellanova_folders::path_part({path}, 0)
+  runs: path_part({path}, 0)
+  web: stellanova_folders.pathPart({path}, 0)
+to extension of, given path (text), returning text = stellanova_folders::path_part({path}, 1)
+  runs: path_part({path}, 1)
+  web: stellanova_folders.pathPart({path}, 1)
+to folder holding, given path (text), returning text = stellanova_folders::path_part({path}, 2)
+  runs: path_part({path}, 2)
+  web: stellanova_folders.pathPart({path}, 2)
+to last change of the file, given name (text), returning a number = stellanova_folders::last_change({name}, {line})
+  runs: last_change({name})
+  web: stellanova_folders.lastChange({name}, {line})
+
+javascript:
+  Object.assign(stellanova_folders, {
+    pathPart(p, which) {
+      const cut = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")), file = p.slice(cut + 1);
+      if (which === 2) return cut >= 0 ? p.slice(0, cut) : "";
+      if (which === 0) return file;
+      const dot = file.lastIndexOf(".");
+      return dot > 0 ? file.slice(dot + 1) : "";
+    },
+    lastChange(name, line) {
+      const fs = this.fs(line);
+      if (!this.isFile(fs, name)) stellanova.fail(line, `there is no file called "${name}".`);
+      return Math.floor(fs.statSync(name).mtimeMs / 1000);
+    },
+  });

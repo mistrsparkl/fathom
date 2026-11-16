@@ -1945,6 +1945,21 @@ class Expr:
             self.need(v, NUMBER, "with commas")
             a = v.run
             return builtin("stellanova::with_commas({s0})", TEXT, lambda env: with_commas(a(env)), [v])
+        if self.at("repeated"):  # '"ab" repeated 3 times' is "ababab"; a list works the same way
+            self.i += 1
+            if v.kind != TEXT and not is_list(v.kind):
+                raise ScriptError(self.line, f"'repeated' needs text or a list, like '\"ab\" repeated 3 times', but this is {kind_name(v.kind)}.")
+            count = self.need(self.primary(), NUMBER, "repeated")
+            self.take("times")
+            a, b, line = v.run, count.run, self.line
+
+            def run(env):
+                n = b(env)
+                if n < 0 or n != int(n):
+                    raise RunError(line, f"'repeated' needs a whole number of times, 0 or more, not {text(n)}.")
+                x = a(env)
+                return x * int(n) if isinstance(x, str) else [dup(y) for _ in range(int(n)) for y in x]
+            return builtin("stellanova::repeated({s0}, {s1}, {line})", v.kind, run, [v, count], line)
         if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"
             self.i += 2
             self.need(v, NUMBER, "padded to")
@@ -2402,6 +2417,13 @@ class Expr:
                                        lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k}, i32 {line})"))
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
+        if self.at("flattened"):  # 'flattened rows': a list of lists as one list
+            self.i += 1
+            v = self.operand()
+            if not (is_list(v.kind) and is_list(element(v.kind))):
+                raise ScriptError(line, f"'flattened' needs a list of lists, like 'flattened rows', but this is {kind_name(v.kind)}.")
+            a = v.run
+            return builtin("stellanova::flattened({a0})", element(v.kind), lambda env: [dup(x) for xs in a(env) for x in xs], [v])
         for word in ("sorted", "reversed"):
             if self.at(word):
                 self.i += 1

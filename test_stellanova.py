@@ -1213,6 +1213,19 @@ def program_checks():
                '  for each n from 1 to 3 by 0: set out to out plus "never"\n  scrawl out\nand the universe said i love you\n')
     assert out.stdout == "0 5 10 15 20 3 2 1 0 0.25 0.5 0.75 1 \n", repr(out.stdout)
 
+    # 'repeated N times' for text and lists, 'flattened' for a list of lists
+    out = both('genesis:\n  scrawl "[", "ab" repeated 3 times, "] [", "x" repeated 0 times, "]"\n  set row to a list of (0, 1) repeated 2 times\n  scrawl row\n  set rows to a list of lists of numbers\n  add a list of (1, 2) to rows\n  add a list of (3) to rows\n  scrawl flattened rows, " ", the size of flattened rows\n  set names to flattened a list of (a list of ("a", "b"), a list of ("c"))\n  scrawl names\n  try:\n    scrawl "a" repeated (0 minus 1) times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
+    assert out.stdout == "[ababab] []\n0, 1, 0, 1\n1, 2, 3 3\na, b, c\n'repeated' needs a whole number of times, 0 or more, not -1.\n", repr(out.stdout)
+
+    # parts of a path, and when a file last changed
+    out = both('use: folders\nuse: time\n\ngenesis:\n  for each p in a list of ("saves/slot 1.json", "notes", "a\\b\\.hidden", "x.tar.gz"):\n'
+               '    scrawl "[", file name of p, "] [", extension of p, "] [", folder holding p, "]"\n'
+               '  set gap to (seconds since 1970) minus last change of the file "f.txt"\n'
+               '  scrawl gap is at least 0 and gap falls below 100, " ", bytes in the file "f.txt"\n'
+               '  try:\n    scrawl last change of the file "nope.txt"\n  if that went wrong:\n    scrawl the wound\n' + END, others={"f.txt": b"hello"})
+    assert out.stdout == ('[slot 1.json] [json] [saves]\n[notes] [] []\n[.hidden] [] [a\\b]\n[x.tar.gz] [gz] []\nyes 5\n'
+                          'there is no file called "nope.txt".\n'), repr(out.stdout)
+
     # dates are text, with words in the time library
     out = both('use: time\n\ngenesis:\n  scrawl days between ("2026-11-13", "2026-12-25"), " ", days between ("2024-03-01", "2024-02-01")\n'
                '  scrawl date plus days ("2026-11-13", 30), " ", date plus days ("2024-03-01", -1), " ", date plus days ("1969-12-31", 1)\n'
