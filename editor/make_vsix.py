@@ -36,4 +36,5 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for f in sorted(SRC.rglob("*")):
         if f.is_file():
             z.write(f, "extension/" + f.relative_to(SRC).as_posix())
+    z.writestr("extension/home.txt", str(HERE.parent.resolve()))  # where stellanova.py is, when PATH and the setting don't say
 print(f"Made {out}")

@@ -48,11 +48,11 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] Parts only a kind's own commands can use: `balance (a number, hidden)`
 
 ## 6. Writing programs
-- [ ] VS Code: problems shown while typing (`stellanova check` on every save), word completion and help on hover
-- [ ] `stellanova tidy`: puts a script's spacing and indenting right
+- [x] VS Code: mistakes shown while typing, word completion and help on hover (`editor/vscode/extension.js`)
+- [x] `stellanova tidy`: puts a script's spacing and indenting right
 - [ ] Messages for every mistake say the line and the fix (a test for each message in LANGUAGE.md)
 
 ## 7. Libraries
-- [ ] Dates as values: `a date`, its parts, adding days, comparing, showing it any way
+- [x] Dates and moments: `date in words`, `date plus months`, `seconds at`, `date at`, `time at` (dates stay text, so they sort and save)
 - [ ] XML and HTML reading (`use: markup`)
 - [ ] Command-line tools: options and flags from `the words given` (`use: options`)

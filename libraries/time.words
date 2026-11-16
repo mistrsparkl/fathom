@@ -191,3 +191,118 @@ javascript:
     },
     weekday_of: (date, line) => ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"][((stellanova_time.day_number(date, line) % 7) + 7) % 7],
   });
+
+note: A moment is seconds since 1970 (as 'seconds since 1970' gives it); 'date at' and 'time at' show one as it is here.
+code:
+  namespace stellanova_time
+  {
+  	inline const char* month_names[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+  	inline std::string date_in_words(const std::string& date, int line)
+  	{
+  		int y = 0, m = 0, d = 0;
+  		std::string day = weekday_of(date, line);
+  		std::sscanf(date.c_str(), "%d-%d-%d", &y, &m, &d);
+  		return day + " " + std::to_string(d) + " " + month_names[m - 1] + " " + std::to_string(y);
+  	}
+  	inline std::string date_plus_months(const std::string& date, double months, int line)
+  	{
+  		if (std::floor(months) != months)
+  			stellanova::fail(line, "'date plus months' needs a whole number of months, not " + stellanova::text(months) + ".");
+  		day_number(date, line);
+  		int y = 0, m = 0, d = 0;
+  		std::sscanf(date.c_str(), "%d-%d-%d", &y, &m, &d);
+  		long long k = y * 12LL + (m - 1) + (long long)months, ny = (k >= 0 ? k : k - 11) / 12, nm = k - ny * 12 + 1;
+  		long long last = nm == 2 ? 28 + ((ny % 4 == 0 && ny % 100 != 0) || ny % 400 == 0) : 30 + ((nm + (nm > 7)) % 2);
+  		char out[32];
+  		std::snprintf(out, sizeof out, "%04lld-%02lld-%02lld", ny, nm, d < last ? (long long)d : last);  // the 31st of a short month is its last day
+  		return out;
+  	}
+  	inline std::string moment(double seconds, bool day)
+  	{
+  		std::tm parts{};
+  		local(parts, (std::time_t)std::floor(seconds));
+  		char out[16];
+  		std::strftime(out, sizeof out, day ? "%Y-%m-%d" : "%H:%M:%S", &parts);
+  		return out;
+  	}
+  	inline double seconds_at(const std::string& date, const std::string& clock, int line)
+  	{
+  		day_number(date, line);
+  		int y = 0, m = 0, d = 0, h = 0, mi = 0, s = 0;
+  		char extra = 0;
+  		std::sscanf(date.c_str(), "%d-%d-%d", &y, &m, &d);
+  		if (clock.size() != 8 || std::sscanf(clock.c_str(), "%2d:%2d:%2d%c", &h, &mi, &s, &extra) != 3 || h > 23 || mi > 59 || s > 59)
+  			stellanova::fail(line, "'" + clock + "' isn't a time: times are written like 14:05:00.");
+  		std::tm parts{};
+  		parts.tm_year = y - 1900, parts.tm_mon = m - 1, parts.tm_mday = d, parts.tm_hour = h, parts.tm_min = mi, parts.tm_sec = s, parts.tm_isdst = -1;
+  		return (double)std::mktime(&parts);
+  	}
+  }
+
+python:
+  import calendar, math, re
+  MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+  def date_in_words(date):
+      d = day_of(date)
+      return ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[d.weekday()] + " " + str(d.day) + " " + MONTH_NAMES[d.month - 1] + " " + str(d.year)
+  def date_plus_months(date, months):
+      if months != int(months):
+          raise RunError(0, "'date plus months' needs a whole number of months, not " + text(months) + ".")
+      d = day_of(date)
+      y, m = divmod(d.year * 12 + d.month - 1 + int(months), 12)
+      return datetime.date(y, m + 1, min(d.day, calendar.monthrange(y, m + 1)[1])).isoformat()
+  def moment(seconds, day):
+      return time.strftime("%Y-%m-%d" if day else "%H:%M:%S", time.localtime(math.floor(seconds)))
+  def seconds_at(date, clock):
+      d = day_of(date)
+      m = re.fullmatch(r"(\d\d):(\d\d):(\d\d)", clock)
+      if not m or int(m[1]) > 23 or int(m[2]) > 59 or int(m[3]) > 59:
+          raise RunError(0, "'" + clock + "' isn't a time: times are written like 14:05:00.")
+      return float(time.mktime((d.year, d.month, d.day, int(m[1]), int(m[2]), int(m[3]), 0, 0, -1)))
+
+to date in words, given date (text), returning text = stellanova_time::date_in_words({date}, {line})
+  runs: date_in_words({date})
+  web: stellanova_time::date_in_words({date}, {line})
+to date plus months, given date (text) and months (a number), returning text = stellanova_time::date_plus_months({date}, {months}, {line})
+  runs: date_plus_months({date}, {months})
+  web: stellanova_time::date_plus_months({date}, {months}, {line})
+to date at, given seconds (a number), returning text = stellanova_time::moment({seconds}, true)
+  runs: moment({seconds}, True)
+  web: stellanova_time::moment({seconds}, true)
+to time at, given seconds (a number), returning text = stellanova_time::moment({seconds}, false)
+  runs: moment({seconds}, False)
+  web: stellanova_time::moment({seconds}, false)
+to seconds at, given date (text) and clock (text), returning a number = stellanova_time::seconds_at({date}, {clock}, {line})
+  runs: seconds_at({date}, {clock})
+  web: stellanova_time::seconds_at({date}, {clock}, {line})
+
+javascript:
+  Object.assign(stellanova_time, {
+    month_names: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    date_in_words(date, line) {
+      const day = stellanova_time.weekday_of(date, line), [y, m, d] = date.split("-").map(Number);
+      return `${day} ${d} ${stellanova_time.month_names[m - 1]} ${y}`;
+    },
+    date_plus_months(date, months, line) {
+      if (Math.floor(months) !== months) stellanova.fail(line, `'date plus months' needs a whole number of months, not ${months}.`);
+      stellanova_time.day_number(date, line);
+      const [y, m, d] = date.split("-").map(Number), k = y * 12 + m - 1 + months, ny = Math.floor(k / 12), nm = k - ny * 12;
+      const at = (day) => { const t = new Date(0); t.setUTCFullYear(ny, nm, day); return t; };  // setUTCFullYear: years below 100 stay as they are
+      const last = 32 - at(32).getUTCDate();  // day 32 runs over into the next month by as many days as it is short
+      const t = at(Math.min(d, last)), two = (n) => String(n).padStart(2, "0");
+      return `${String(t.getUTCFullYear()).padStart(4, "0")}-${two(t.getUTCMonth() + 1)}-${two(t.getUTCDate())}`;
+    },
+    moment(seconds, day) {
+      const t = new Date(Math.floor(seconds) * 1000), two = (n) => String(n).padStart(2, "0");
+      return day ? `${t.getFullYear()}-${two(t.getMonth() + 1)}-${two(t.getDate())}` : `${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}`;
+    },
+    seconds_at(date, clock, line) {
+      stellanova_time.day_number(date, line);
+      const c = /^(\d\d):(\d\d):(\d\d)$/.exec(clock);
+      if (!c || +c[1] > 23 || +c[2] > 59 || +c[3] > 59) stellanova.fail(line, `'${clock}' isn't a time: times are written like 14:05:00.`);
+      const [y, m, d] = date.split("-").map(Number), t = new Date(0);
+      t.setFullYear(y, m - 1, d);
+      t.setHours(+c[1], +c[2], +c[3], 0);
+      return t.getTime() / 1000;
+    },
+  });

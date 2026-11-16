@@ -1,8 +1,8 @@
 {
   "name": "stellanova",
   "displayName": "Stellanova",
-  "description": "Colours, indenting and shortcuts for the Stellanova language (.stella files).",
-  "version": "0.3.0",
+  "description": "Colours, indenting, shortcuts, mistakes shown while typing, word completion and help on hover for the Stellanova language (.stella files).",
+  "version": "0.4.0",
   "publisher": "speda",
   "engines": {
     "vscode": "^1.60.0"
@@ -43,6 +43,20 @@
         "editor.insertSpaces": true,
         "editor.detectIndentation": false
       }
+    },
+    "configuration": {
+      "title": "Stellanova",
+      "properties": {
+        "stellanova.home": {
+          "type": "string",
+          "default": "",
+          "description": "The folder holding stellanova.py. Empty: the folder on PATH that has it."
+        }
+      }
     }
-  }
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:stellanova"
+  ]
 }

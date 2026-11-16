@@ -1104,6 +1104,24 @@ def program_checks():
         said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "c.stella"], capture_output=True, text=True,
                               encoding="utf-8", cwd=d).stdout
         assert "nope" in said and "no mistakes" not in said, said
+        # tidy: two spaces a step (a tab is 4 spaces), no spaces at line ends, one empty line between parts; the file's own line ends kept
+        (Path(d) / "t.stella").write_bytes(b'to greet, given who (text):   \r\n    if who is "x":\r\n\t\tscrawl "hi   there"\r\n'
+                                           b'    scrawl who\r\nand the universe said i love you\r\ngenesis:\r\n\r\n\r\n   greet with "x"\r\n' + END.encode() + b'\r\n\r\n')
+        said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "tidy", "t.stella"], capture_output=True, text=True, cwd=d).stdout
+        assert said == "t.stella: tidied.\n", said
+        assert (Path(d) / "t.stella").read_bytes() == (b'to greet, given who (text):\r\n  if who is "x":\r\n    scrawl "hi   there"\r\n  scrawl who\r\n'
+                                                       b'and the universe said i love you\r\n\r\ngenesis:\r\n\r\n  greet with "x"\r\n'
+                                                       b'and the universe said i love you\r\n'), (Path(d) / "t.stella").read_bytes()
+        said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "tidy", "t.stella"], capture_output=True, text=True, cwd=d).stdout
+        assert said == "t.stella: already tidy.\n", said
+        if node:  # the VS Code extension shows the same mistake on its line, completes words and explains them on hover
+            (Path(d) / "e.stella").write_text('to greet, given who (text):\n  scrawl who\n' + END + 'genesis:\n'
+                                              '  scrawl days between with ("2026-01-01", "2026-01-03")\n  scrawl nope\n' + END, encoding="utf-8")
+            said = subprocess.run([node, str(HERE / "editor" / "check_extension.js"), str(Path(d) / "e.stella")], capture_output=True,
+                                  text=True, encoding="utf-8").stdout.splitlines()
+            assert said[0].startswith("line 6: I don't know 'nope'.") and said[1].endswith("own: greet") and \
+                said[2] == "days between, given first (text) and last (text), returning a number", said
+            assert not list(Path(d).glob(".*.checking.stella")), "the copy being checked is left behind"
 
     # an if line counts every time it is tried, not only when its test is yes
     with tempfile.TemporaryDirectory() as d:
@@ -1165,6 +1183,13 @@ def program_checks():
                'and the universe said i love you\n')
     assert out.stdout == ("42 -29\n2026-12-13 2024-02-29 1970-01-01\nFriday Saturday Wednesday\nyes\n"
                           "'2026-02-30' isn't a date: dates are written like 2026-11-13.\n"), repr(out.stdout)
+    out = both('use: time\n\ngenesis:\n  scrawl date in words "2026-11-16"\n'
+               '  scrawl date plus months ("2026-01-31", 1), " ", date plus months ("2024-01-31", 1), " ", date plus months ("2026-03-15", -15)\n'
+               '  set moment to seconds at ("2026-11-16", "14:05:09")\n'
+               '  scrawl date at moment, " ", time at moment, " ", (seconds at ("2026-11-17", "14:05:09")) minus moment\n'
+               '  try:\n    scrawl seconds at ("2026-11-16", "25:00:00")\n  if that went wrong:\n    scrawl the wound\n' + END)
+    assert out.stdout == ("Monday 16 November 2026\n2026-02-28 2024-02-29 2024-12-15\n2026-11-16 14:05:09 86400\n"
+                          "'25:00:00' isn't a time: times are written like 14:05:00.\n"), repr(out.stdout)
 
     # the spreadsheet library: CSV text <-> rows
     out = both('use: spreadsheet\n\ngenesis:\n  set rows to rows of the spreadsheet ("name,note" plus new line plus "Ann," plus a quotation mark '

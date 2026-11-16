@@ -5618,6 +5618,30 @@ USAGE = """Use:
 (stellanova is short for: py -3 stellanova.py)"""
 
 
+def tidy(text):
+    """A script with its spacing put right: two spaces for each step in, no spaces at line ends, a tab as 4 spaces,
+    one empty line between the top-level parts, and one new line at the end. Words and quotes are left as they are."""
+    out, steps = [], [0]  # steps: the indents seen so far, the deepest last
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            if out and out[-1] != "":
+                out.append("")
+            continue
+        body = line.lstrip(" \t")
+        width = len(line[:len(line) - len(body)].replace("\t", "    "))
+        while width < steps[-1]:
+            steps.pop()
+        if width > steps[-1]:
+            steps.append(width)
+        if len(steps) == 1 and out and out[-1] == CLOSING:
+            out.append("")  # a new part starts after the one before it ends
+        out.append("  " * (len(steps) - 1) + body)
+    while out and out[-1] == "":
+        out.pop()
+    return "\n".join(out) + "\n"
+
+
 def main(argv):
     global LOGIC, OUT
     args = argv[1:]
@@ -5655,6 +5679,17 @@ def main(argv):
         global WATCHING
         WATCHING = True
         args = ["run", args[1]]
+    if len(args) == 2 and args[0] == "tidy":
+        script = Path(args[1])
+        if not script.is_file():
+            print(f"There is no script called {args[1]}.")
+            return 2
+        old = script.read_bytes().decode("utf-8")  # as it is: read_text would hide the \r\n line ends
+        new = tidy(old).replace("\n", "\r\n" if "\r\n" in old else "\n")
+        if new != old:
+            script.write_bytes(new.encode("utf-8"))
+        print(f"{script.name}: " + ("tidied." if new != old else "already tidy."))
+        return 0
     if len(args) == 2 and args[0] == "check":
         LOGIC = Path(args[1]).parent
         try:
