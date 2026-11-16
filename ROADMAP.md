@@ -86,3 +86,18 @@ From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. S
 - [x] `sorted totals by amount, biggest first` (and `sorted scores, biggest first`)
 - [x] Text padded to a width: `"food" padded to 12 letters`
 - [x] The web server: `the web way` says how it was asked ("GET", "POST"...), `answer with the status 404` says a page isn't there, and saved text goes as data, not as a page
+
+# Roadmap 5: the rest (speed last)
+
+- [ ] Sorting by a worked-out value: `sorted names by each n becomes the size of n`
+- [ ] Headers: `the web header "X-Pet"` in a server's answer, `the last web header "Content-Type"` after `ask the web`
+- [ ] The web server answers several people at once
+- [ ] Markup: `<li>`, `<p>`, `<td>` and the like end when the next one starts, as browsers do
+- [ ] Every library word works on the web, apart from C libraries and Python packages
+- [ ] `meanwhile` in WebAssembly
+- [ ] Text in any language and emoji: every text word counts letters, not bytes
+- [ ] Big programs: commands kept to their own script (`to ..., privately:`), clear messages when two scripts use the same name
+- [ ] Messages from databases, mail servers and the system start with plain words saying what failed
+- [ ] The VS Code extension tried in VS Code itself
+- [ ] The tutorial teaches what roadmaps 2 to 4 added; BLOG.md brought up to date
+- [ ] Speed: lists of text and things, and direct runs, measured and made faster
