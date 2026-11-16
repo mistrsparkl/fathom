@@ -401,6 +401,19 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Markup, written in Stellanova (libraries/markup.stella): HTML's loose ways (no </li>, <br>, bare values, script kept as it is) and XML
+    out = both('use: markup.stella\n\ngenesis:\n'
+               '  set page to "<!DOCTYPE html><html><body><!-- note --><p class=\'intro\'>Fish &amp; chips<br>today</p><ul><li><a href=" plus '
+               'a quotation mark plus "/one" plus a quotation mark plus ">One</a><li><a href=two>Two</a></ul><script>if (a < b) x();</script></body></html>"\n'
+               '  set whole to read markup page\n  for each link in parts named with (whole, "a"):\n'
+               '    scrawl attribute with (link, "href"), " ", the content of link\n'
+               '  set p to item 1 of parts named with (whole, "p")\n'
+               '  scrawl attribute with (p, "class"), " [", all words in p, "] ", the size of the parts of p\n'
+               '  scrawl the size of parts named with (whole, "li"), " ", the content of item 1 of parts named with (whole, "script")\n'
+               '  set feed to read markup "<?xml version=\'1.0\'?><feed><item id=\'1\'><title>A</title></item><item id=\'2\'><title>B &lt;b&gt;</title></item></feed>"\n'
+               '  for each item in parts named with (feed, "item"):\n    scrawl attribute with (item, "id"), ": ", all words in item\n' + END)
+    assert out.stdout == "/one One\ntwo Two\nintro [Fish & chipstoday] 1\n2 if (a < b) x();\n1: A\n2: B <b>\n", repr(out.stdout)
+
     # Options, written in Stellanova (libraries/options.stella): '--name' and '--name=value' after the script, plain words, '--' ending options
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "o.stella").write_text('use: options.stella\n\ngenesis:\n  scrawl has option "loud", " ", has option "quiet", " [", option value "size", '

@@ -1,0 +1,152 @@
+whisper: Reading XML and HTML into parts. Written in Stellanova itself. Use it in a program with:  use: markup.stella
+whisper: 'read markup text' gives the whole of it: a part with no name, holding the outermost parts.
+whisper: HTML's loose ways are taken too: <br> and <img> need no closing, and a closing that doesn't fit ends the parts open inside it.
+
+a markup part has:
+  name (text)
+  attributes (a table of text values)
+  content (text)
+  parts (a list of markup parts)
+and the universe said i love you
+
+a markup reader has:
+  source (text)
+  spot (a number)
+and the universe said i love you
+
+to plain markup, given words (text), returning text:
+  set out to words
+  set out to replace "&lt;" with "<" in out
+  set out to replace "&gt;" with ">" in out
+  set out to replace "&quot;" with a quotation mark in out
+  set out to replace "&#39;" with "'" in out
+  set out to replace "&apos;" with "'" in out
+  set out to replace "&nbsp;" with " " in out
+  set out to replace "&amp;" with "&" in out
+  return out
+and the universe said i love you
+
+to upcoming, for a markup reader, given count (a number), returning text:
+  set last to the size of source
+  if spot exceeds last: return ""
+  return letters spot to (smaller of (spot plus count minus 1) and last) of source
+and the universe said i love you
+
+to skip past, for a markup reader, given ending (text):
+  set rest to upcoming with (the markup reader, the size of source)
+  set n to position of ending in rest
+  if n is 0:
+    set spot to (the size of source) plus 1
+  otherwise:
+    set spot to spot plus n minus 1 plus the size of ending
+and the universe said i love you
+
+to name here, for a markup reader, returning text:
+  set found to ""
+  as long as spot is at most the size of source and not (letter spot of source is one of (" ", "/", ">", "=", new line)):
+    set found to found plus letter spot of source
+    set spot to spot plus 1
+  return found
+and the universe said i love you
+
+to read element, for a markup reader, returning a markup part:
+  conjure a markup part as part
+  set the name of part to name here the markup reader
+  set closed to no
+  as long as spot is at most the size of source:
+    set c to letter spot of source
+    if c is ">":
+      set spot to spot plus 1
+      break free
+    if c is one of (" ", "/", new line):
+      if c is "/": set closed to yes
+      set spot to spot plus 1
+      move on
+    set key to name here the markup reader
+    set value to ""
+    if upcoming with (the markup reader, 1) is "=":
+      set spot to spot plus 1
+      set mark to upcoming with (the markup reader, 1)
+      if mark is one of (a quotation mark, "'"):
+        set spot to spot plus 1
+        as long as spot is at most the size of source and letter spot of source is not mark:
+          set value to value plus letter spot of source
+          set spot to spot plus 1
+        set spot to spot plus 1
+      otherwise:
+        as long as spot is at most the size of source and not (letter spot of source is one of (" ", ">", new line)):
+          set value to value plus letter spot of source
+          set spot to spot plus 1
+    if key is not "": set the entry key of the attributes of part to plain markup value
+  set lower to lower case of the name of part
+  if closed or lower is one of ("br", "img", "hr", "input", "meta", "link", "area", "base", "col", "embed", "source", "track", "wbr"):
+    return part
+  if lower is one of ("script", "style"):
+    whisper: what's inside is kept as it is, up to its closing
+    set rest to upcoming with (the markup reader, the size of source)
+    set n to position of "</" plus the name of part in rest
+    if n is 0: set n to (the size of rest) plus 1
+    if n exceeds 1: set the content of part to letters 1 to (n minus 1) of rest
+    set spot to spot plus n minus 1
+    skip past with (the markup reader, ">")
+    return part
+  return read inside with (the markup reader, part)
+and the universe said i love you
+
+to read inside, for a markup reader, given part (a markup part), returning a markup part:
+  set whole to part
+  as long as spot is at most the size of source:
+    if letter spot of source is not "<":
+      set start to spot
+      as long as spot is at most the size of source and letter spot of source is not "<":
+        set spot to spot plus 1
+      set the content of whole to the content of whole plus plain markup (letters start to (spot minus 1) of source)
+    otherwise if upcoming with (the markup reader, 4) is "<!--":
+      skip past with (the markup reader, "-->")
+    otherwise if upcoming with (the markup reader, 2) is one of ("<!", "<?"):
+      skip past with (the markup reader, ">")
+    otherwise if upcoming with (the markup reader, 2) is "</":
+      set back to spot
+      set spot to spot plus 2
+      set ending to name here the markup reader
+      skip past with (the markup reader, ">")
+      if lower case of ending is lower case of the name of whole: return whole
+      if the name of whole is not "":
+        whisper: it closes a part further out: this one ends here, and the one it closes reads it again
+        set spot to back
+        return whole
+    otherwise:
+      set spot to spot plus 1
+      add read element the markup reader to the parts of whole
+  return whole
+and the universe said i love you
+
+to read markup, given words (text), returning a markup part:
+  conjure a markup reader as reader
+  set the source of reader to words
+  set the spot of reader to 1
+  conjure a markup part as whole
+  return read inside with (reader, whole)
+and the universe said i love you
+
+to parts named, given whole (a markup part) and wanted (text), returning a list of markup parts:
+  set found to a list of markup parts
+  for each p in the parts of whole:
+    if lower case of the name of p is lower case of wanted: add p to found
+    for each q in parts named with (p, wanted):
+      add q to found
+  return found
+and the universe said i love you
+
+to attribute, given part (a markup part) and key (text), returning text:
+  if the attributes of part contains key: return the entry key of the attributes of part
+  return ""
+and the universe said i love you
+
+to all words in, given whole (a markup part), returning text:
+  whisper: the content of it and of every part inside, joined
+  set out to the content of whole
+  for each p in the parts of whole:
+    set out to out plus all words in p
+  return out
+and the universe said i love you
