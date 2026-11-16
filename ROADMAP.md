@@ -92,10 +92,10 @@ From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. S
 - [x] Sorting by a worked-out value: `sorted names by each n becomes the size of n`
 - [x] Headers: `the web header "X-Pet"` in a server's answer, `the last web header "Content-Type"` after `ask the web`
 - [x] The web server answers several people at once (reading and sending side by side; `answer` one at a time, so no locks are needed)
-- [ ] Markup: `<li>`, `<p>`, `<td>` and the like end when the next one starts, as browsers do
-- [ ] Every library word works on the web, apart from C libraries and Python packages
-- [ ] `meanwhile` in WebAssembly
-- [ ] Text in any language and emoji: every text word counts letters, not bytes
+- [x] Markup: `<li>`, `<p>`, `<td>` and the like end when the next one starts, as browsers do
+- [x] Every library word works on the web, apart from C libraries and Python packages (they all did; the 3 skipped test programs use C libraries or a test library made without web lines)
+- [x] `meanwhile` in WebAssembly (built for wasm32-wasip1-threads; the runner starts a Node worker for each thread)
+- [x] Text in any language and emoji: every text word counts letters, not bytes (they did; `upper case of` now changes every alphabet, not only a to z)
 - [ ] Big programs: commands kept to their own script (`to ..., privately:`), clear messages when two scripts use the same name
 - [ ] Messages from databases, mail servers and the system start with plain words saying what failed
 - [ ] The VS Code extension tried in VS Code itself

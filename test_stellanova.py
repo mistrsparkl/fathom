@@ -1151,8 +1151,9 @@ def program_checks():
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "m.stella").write_text('to count:\n  scrawl 1\nand the universe said i love you\n\ngenesis:\n  meanwhile count\n'
                                               'and the universe said i love you\n', encoding="utf-8")
-            assert translate.wasm(Path(d) / "m.stella") == ("m.stella can't be built into WebAssembly yet: 'meanwhile' (a WebAssembly "
-                                                            "program has only one thread) isn't in machine code. It still runs directly (stellanova m.stella).")
+            assert translate.wasm(Path(d) / "m.stella") is None  # 'meanwhile': each thread is a Node worker sharing the memory
+            ran = subprocess.run([node, "m.mjs"], capture_output=True, text=True, cwd=d)
+            assert (ran.stdout, ran.returncode) == ("1\n", 0), ran
 
     # stellanova check: a program for a web page is checked as one (and a real mistake in it is still found)
     with tempfile.TemporaryDirectory() as d:
@@ -1253,6 +1254,12 @@ def program_checks():
     # sorted by what each works out to
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set names to a list of ("Rex", "Al", "Tomas", "Bo", "Max")\n  scrawl sorted names by each n becomes the size of n\n  scrawl sorted names by each n becomes the size of n, biggest first\n  scrawl sorted a list of (3, -5, 1) by each x becomes x times x\n  set pets to a list of pets\n  for each n in names:\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  scrawl sorted pets by each p becomes letter 2 of the name of p\nand the universe said i love you\n')
     assert out.stdout == 'Al, Bo, Rex, Max, Tomas\nTomas, Rex, Max, Al, Bo\n1, 3, -5\na pet (name: Max, age: 3), a pet (name: Rex, age: 3), a pet (name: Al, age: 2), a pet (name: Tomas, age: 5), a pet (name: Bo, age: 2)\n', repr(out.stdout)
+    # text in any alphabet, and emoji: counted, cut and changed letter by letter
+    out = both('use: letters\n\ngenesis:\n  set word to "Ünïcødé 😀 Ωμέγα"\n  scrawl the size of word\n  scrawl letter 9 of word, " ", letter 1 of word, " ", letters 11 to 15 of word\n  scrawl upper case of word\n  scrawl lower case of word\n  scrawl position of "😀" in word, " ", position of "Ω" in word\n  scrawl word contains "😀", " ", word begins with "Ün", " ", word ends with "γα"\n  scrawl replace "😀" with "🙂" in word\n  scrawl word split by " "\n  scrawl "[", "ñ" padded to 3 letters, "] ", "é" repeated 3 times\n  scrawl "[", trimmed "  ñ  ", "]"\n  scrawl the words of "à la carte"\n  scrawl code of the letter "😀", " ", the letter with code 937\n  scrawl sorted a list of ("é", "e", "z", "Ω")\n  scrawl "😀😀" is "😀😀", " ", the size of ""\n  for each n from 1 to 3:\n    scrawl letter n of "a😀b"\nand the universe said i love you\n')
+    assert out.stdout == '15\n😀 Ü Ωμέγα\nÜNÏCØDÉ 😀 ΩΜΈΓΑ\nünïcødé 😀 ωμέγα\n9 11\nyes yes yes\nÜnïcødé 🙂 Ωμέγα\nÜnïcødé, 😀, Ωμέγα\n[ñ  ] ééé\n[ñ]\nà, la, carte\n128512 Ω\ne, z, é, Ω\nyes 0\na\n😀\nb\n', repr(out.stdout)
+    # markup: a new <li>, <td> or <p> ends the one before it, as in browsers
+    out = both('use: markup.stella\n\ngenesis:\n  set whole to read markup "<ul><li>One<li>Two<b>!</b><li>Three</ul><table><tr><td>a<td>b<tr><td>c</table><p>x<p>y"\n  for each ul in parts named with (whole, "ul"):\n    scrawl the size of the parts of ul, " items: ", join (the parts of ul changed by each li becomes all words in li) with ", "\n  for each tr in parts named with (whole, "tr"):\n    scrawl the size of the parts of tr, " cells: ", all words in tr\n  scrawl the size of parts named with (whole, "p")\nand the universe said i love you\n')
+    assert out.stdout == '3 items: One, Two!, Three\n2 cells: ab\n1 cells: c\n2\n', repr(out.stdout)
     # text padded to a width
     out = both('genesis:\n  scrawl "[", "food" padded to 8 letters, "] [", "café" padded to 6 letters, "] [", "toolong" padded to 3 letters, "] [", 7 padded to 3 digits, "]"\n  try:\n    scrawl "a" padded to 1.5 letters\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "[food    ] [café  ] [toolong] [007]\nI can't pad to 1.5 letters: it must be a whole number, 0 or more.\n", repr(out.stdout)
@@ -1620,7 +1627,7 @@ def program_checks():
                '  for each n from 1 to 10:\n    if n is 2: move on\n    if n is 5: break free\n    scrawl n\n'
                '  repeat 3 times:\n    as long as yes: break free\n    scrawl "r"\n'
                '  scrawl letter 9 of "abc"\n' + END)
-    assert out.stdout == ("HéLLO WöRLD, HELLO | abc é | é | wörld\n3 0 | HéLP wörld, heLP\n"
+    assert out.stdout == ("HÉLLO WÖRLD, HELLO | abc é | é | wörld\n3 0 | HéLP wörld, heLP\n"
                           "2 hello | Héllo wörld+hello\n1, 2, 3 | b, a | hello | .\n1\n3\n4\nr\nr\nr\n"), repr(out.stdout)
     assert out.stderr == "Line 15: there is no letter 9 in text of 3 letters.\n", repr(out.stderr)
     assert perr('genesis:\n  break free\n' + END)[1] == "'break free' only works inside 'repeat', 'as long as' or 'for each'."

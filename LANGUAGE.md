@@ -17,7 +17,7 @@ Stellanova is a programming language written in plain English words. Scripts end
   ```
 
   A program does exactly the same thing either way. The self-check runs its test programs both ways and compares what they print.
-- **WebAssembly**: `stellanova wasm examples/pets.stella` builds the same machine code as WebAssembly (WASI): `pets.wasm`, and `pets.mjs` to run it with `node pets.mjs` (or any WASI runner: `wasmtime --dir . pets.wasm`). It reads, writes and lists files in its folder, asks and shows text, and does everything the language itself does, with hashing, encryption and zip too. Not yet: `meanwhile` (it has only one thread), C libraries, Python packages, and the libraries that use Windows itself (window, sound, forms, web, network, database, computer, email, pictures). Needs the WASI sysroot: unpack `wasi-sysroot-34.0.tar.gz` and `libclang_rt-34.0.tar.gz` from github.com/WebAssembly/wasi-sdk (release wasi-sdk-34) into `~/.stellanova/wasi`.
+- **WebAssembly**: `stellanova wasm examples/pets.stella` builds the same machine code as WebAssembly (WASI): `pets.wasm`, and `pets.mjs` to run it with `node pets.mjs` (or any WASI runner: `wasmtime --dir . pets.wasm`). It reads, writes and lists files in its folder, asks and shows text, and does everything the language itself does, with hashing, encryption and zip too. `meanwhile` works (each thread is a Node worker sharing the program's memory). Not yet: C libraries, Python packages, and the libraries that use Windows itself (window, sound, forms, web, network, database, computer, email, pictures). Needs the WASI sysroot: unpack `wasi-sysroot-34.0.tar.gz` and `libclang_rt-34.0.tar.gz` from github.com/WebAssembly/wasi-sdk (release wasi-sdk-34) into `~/.stellanova/wasi`.
 - **A program for a web page** is made into JavaScript instead: `stellanova web examples/pets.stella site` writes `site/pets.js` and Stellanova's runtime `site/stellanova.js`. Load both in a page (`<script src="stellanova.js"></script><script src="pets.js"></script>`), or run the program with `node pets.js`. It does the same as the other two ways (the self-check runs its programs with node too). See *Programs for web pages* below.
 - **A part of something else** starts with `this is part of: <thing>`, e.g. Unreal code for a creature. Turn a the folder of these into C++ (`<name>.stella.cpp`, which you never edit) with:
 
@@ -314,7 +314,7 @@ Mixing kinds is an error: `set turn rate to fallen` says "'turn rate' holds a nu
 | `score as text` | a number or yes or no written out as text |
 | `(price times 1.2) rounded to 2 decimal places` | a number rounded to that many decimal places (halves go up, away from zero) |
 | `letter 2 of name`, `letters 2 to 4 of name` | one letter, or some letters, of text (counted from 1) |
-| `upper case of name`, `lower case of name` | text in CAPITALS / small letters (A to Z only) |
+| `upper case of name`, `lower case of name` (any alphabet: `upper case of "straße ω"` is "STRAßE Ω"; letters with no single capital, like ß, stay) | text in CAPITALS / small letters |
 | `trimmed line` | text without the spaces, tabs and line breaks at its start and end |
 | `name begins with "Dr"`, `name ends with ".txt"` | yes or no |
 | `position of "lo" in name` | where it first appears, counted from 1 (0 if it isn't there); in a list, which item it is (`position of "Bo" in names`) |

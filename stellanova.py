@@ -758,6 +758,10 @@ def letters(s):
 
 ASCII_UP = str.maketrans("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 ASCII_DOWN = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+# small and capital letters in every alphabet, in pairs (the same list is in stellanova.h and stellanova.js)
+CASE_PAIRS = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZàÀáÁâÂãÃäÄåÅæÆçÇèÈéÉêÊëËìÌíÍîÎïÏðÐñÑòÒóÓôÔõÕöÖøØùÙúÚûÛüÜýÝþÞÿŸāĀăĂąĄćĆĉĈċĊčČďĎđĐēĒĕĔėĖęĘěĚĝĜğĞġĠģĢĥĤħĦĩĨīĪĭĬįĮĳĲĵĴķĶĺĹļĻľĽŀĿłŁńŃņŅňŇŋŊōŌŏŎőŐœŒŕŔŗŖřŘśŚŝŜşŞšŠţŢťŤŧŦũŨūŪŭŬůŮűŰųŲŵŴŷŶźŹżŻžŽƀɃƃƂƅƄƈƇƌƋƒƑƕǶƙƘƚȽƞȠơƠƣƢƥƤƨƧƭƬưƯƴƳƶƵƹƸƽƼƿǷǆǄǉǇǌǊǎǍǐǏǒǑǔǓǖǕǘǗǚǙǜǛǝƎǟǞǡǠǣǢǥǤǧǦǩǨǫǪǭǬǯǮǳǱǵǴǹǸǻǺǽǼǿǾȁȀȃȂȅȄȇȆȉȈȋȊȍȌȏȎȑȐȓȒȕȔȗȖșȘțȚȝȜȟȞȣȢȥȤȧȦȩȨȫȪȭȬȯȮȱȰȳȲȼȻȿⱾɀⱿɂɁɇɆɉɈɋɊɍɌɏɎɐⱯɑⱭɒⱰɓƁɔƆɖƉɗƊəƏɛƐɜꞫɠƓɡꞬɣƔɥꞍɦꞪɨƗɩƖɪꞮɫⱢɬꞭɯƜɱⱮɲƝɵƟɽⱤʀƦʂꟅʃƩʇꞱʈƮʉɄʊƱʋƲʌɅʒƷʝꞲʞꞰͱͰͳͲͷͶͻϽͼϾͽϿάΆέΈήΉίΊαΑβΒγΓδΔεΕζΖηΗθΘιΙκΚλΛμΜνΝξΞοΟπΠρΡσΣτΤυΥφΦχΧψΨωΩϊΪϋΫόΌύΎώΏϗϏϙϘϛϚϝϜϟϞϡϠϣϢϥϤϧϦϩϨϫϪϭϬϯϮϲϹϳͿϸϷϻϺаАбБвВгГдДеЕжЖзЗиИйЙкКлЛмМнНоОпПрРсСтТуУфФхХцЦчЧшШщЩъЪыЫьЬэЭюЮяЯѐЀёЁђЂѓЃєЄѕЅіІїЇјЈљЉњЊћЋќЌѝЍўЎџЏѡѠѣѢѥѤѧѦѩѨѫѪѭѬѯѮѱѰѳѲѵѴѷѶѹѸѻѺѽѼѿѾҁҀҋҊҍҌҏҎґҐғҒҕҔҗҖҙҘқҚҝҜҟҞҡҠңҢҥҤҧҦҩҨҫҪҭҬүҮұҰҳҲҵҴҷҶҹҸһҺҽҼҿҾӂӁӄӃӆӅӈӇӊӉӌӋӎӍӏӀӑӐӓӒӕӔӗӖәӘӛӚӝӜӟӞӡӠӣӢӥӤӧӦөӨӫӪӭӬӯӮӱӰӳӲӵӴӷӶӹӸӻӺӽӼӿӾԁԀԃԂԅԄԇԆԉԈԋԊԍԌԏԎԑԐԓԒԕԔԗԖԙԘԛԚԝԜԟԞԡԠԣԢԥԤԧԦԩԨԫԪԭԬԯԮաԱբԲգԳդԴեԵզԶէԷըԸթԹժԺիԻլԼխԽծԾկԿհՀձՁղՂճՃմՄյՅնՆշՇոՈչՉպՊջՋռՌսՍվՎտՏրՐցՑւՒփՓքՔօՕֆՖაᲐბᲑგᲒდᲓეᲔვᲕზᲖთᲗიᲘკᲙლᲚმᲛნᲜოᲝპᲞჟᲟრᲠსᲡტᲢუᲣფᲤქᲥღᲦყᲧშᲨჩᲩცᲪძᲫწᲬჭᲭხᲮჯᲯჰᲰჱᲱჲᲲჳᲳჴᲴჵᲵჶᲶჷᲷჸᲸჹᲹჺᲺჽᲽჾᲾჿᲿᏸᏰᏹᏱᏺᏲᏻᏳᏼᏴᏽᏵᵹꝽᵽⱣᶎꟆḁḀḃḂḅḄḇḆḉḈḋḊḍḌḏḎḑḐḓḒḕḔḗḖḙḘḛḚḝḜḟḞḡḠḣḢḥḤḧḦḩḨḫḪḭḬḯḮḱḰḳḲḵḴḷḶḹḸḻḺḽḼḿḾṁṀṃṂṅṄṇṆṉṈṋṊṍṌṏṎṑṐṓṒṕṔṗṖṙṘṛṚṝṜṟṞṡṠṣṢṥṤṧṦṩṨṫṪṭṬṯṮṱṰṳṲṵṴṷṶṹṸṻṺṽṼṿṾẁẀẃẂẅẄẇẆẉẈẋẊẍẌẏẎẑẐẓẒẕẔạẠảẢấẤầẦẩẨẫẪậẬắẮằẰẳẲẵẴặẶẹẸẻẺẽẼếẾềỀểỂễỄệỆỉỈịỊọỌỏỎốỐồỒổỔỗỖộỘớỚờỜởỞỡỠợỢụỤủỦứỨừỪửỬữỮựỰỳỲỵỴỷỶỹỸỻỺỽỼỿỾἀἈἁἉἂἊἃἋἄἌἅἍἆἎἇἏἐἘἑἙἒἚἓἛἔἜἕἝἠἨἡἩἢἪἣἫἤἬἥἭἦἮἧἯἰἸἱἹἲἺἳἻἴἼἵἽἶἾἷἿὀὈὁὉὂὊὃὋὄὌὅὍὑὙὓὛὕὝὗὟὠὨὡὩὢὪὣὫὤὬὥὭὦὮὧὯὰᾺάΆὲῈέΈὴῊήΉὶῚίΊὸῸόΌὺῪύΎὼῺώΏᾰᾸᾱᾹῐῘῑῙῠῨῡῩῥῬⅎℲⅰⅠⅱⅡⅲⅢⅳⅣⅴⅤⅵⅥⅶⅦⅷⅧⅸⅨⅹⅩⅺⅪⅻⅫⅼⅬⅽⅭⅾⅮⅿⅯↄↃⓐⒶⓑⒷⓒⒸⓓⒹⓔⒺⓕⒻⓖⒼⓗⒽⓘⒾⓙⒿⓚⓀⓛⓁⓜⓂⓝⓃⓞⓄⓟⓅⓠⓆⓡⓇⓢⓈⓣⓉⓤⓊⓥⓋⓦⓌⓧⓍⓨⓎⓩⓏⰰⰀⰱⰁⰲⰂⰳⰃⰴⰄⰵⰅⰶⰆⰷⰇⰸⰈⰹⰉⰺⰊⰻⰋⰼⰌⰽⰍⰾⰎⰿⰏⱀⰐⱁⰑⱂⰒⱃⰓⱄⰔⱅⰕⱆⰖⱇⰗⱈⰘⱉⰙⱊⰚⱋⰛⱌⰜⱍⰝⱎⰞⱏⰟⱐⰠⱑⰡⱒⰢⱓⰣⱔⰤⱕⰥⱖⰦⱗⰧⱘⰨⱙⰩⱚⰪⱛⰫⱜⰬⱝⰭⱞⰮⱟⰯⱡⱠⱥȺⱦȾⱨⱧⱪⱩⱬⱫⱳⱲⱶⱵⲁⲀⲃⲂⲅⲄⲇⲆⲉⲈⲋⲊⲍⲌⲏⲎⲑⲐⲓⲒⲕⲔⲗⲖⲙⲘⲛⲚⲝⲜⲟⲞⲡⲠⲣⲢⲥⲤⲧⲦⲩⲨⲫⲪⲭⲬⲯⲮⲱⲰⲳⲲⲵⲴⲷⲶⲹⲸⲻⲺⲽⲼⲿⲾⳁⳀⳃⳂⳅⳄⳇⳆⳉⳈⳋⳊⳍⳌⳏⳎⳑⳐⳓⳒⳕⳔⳗⳖⳙⳘⳛⳚⳝⳜⳟⳞⳡⳠⳣⳢⳬⳫⳮⳭⳳⳲⴀႠⴁႡⴂႢⴃႣⴄႤⴅႥⴆႦⴇႧⴈႨⴉႩⴊႪⴋႫⴌႬⴍႭⴎႮⴏႯⴐႰⴑႱⴒႲⴓႳⴔႴⴕႵⴖႶⴗႷⴘႸⴙႹⴚႺⴛႻⴜႼⴝႽⴞႾⴟႿⴠჀⴡჁⴢჂⴣჃⴤჄⴥჅⴧჇⴭჍꙁꙀꙃꙂꙅꙄꙇꙆꙉꙈꙋꙊꙍꙌꙏꙎꙑꙐꙓꙒꙕꙔꙗꙖꙙꙘꙛꙚꙝꙜꙟꙞꙡꙠꙣꙢꙥꙤꙧꙦꙩꙨꙫꙪꙭꙬꚁꚀꚃꚂꚅꚄꚇꚆꚉꚈꚋꚊꚍꚌꚏꚎꚑꚐꚓꚒꚕꚔꚗꚖꚙꚘꚛꚚꜣꜢꜥꜤꜧꜦꜩꜨꜫꜪꜭꜬꜯꜮꜳꜲꜵꜴꜷꜶꜹꜸꜻꜺꜽꜼꜿꜾꝁꝀꝃꝂꝅꝄꝇꝆꝉꝈꝋꝊꝍꝌꝏꝎꝑꝐꝓꝒꝕꝔꝗꝖꝙꝘꝛꝚꝝꝜꝟꝞꝡꝠꝣꝢꝥꝤꝧꝦꝩꝨꝫꝪꝭꝬꝯꝮꝺꝹꝼꝻꝿꝾꞁꞀꞃꞂꞅꞄꞇꞆꞌꞋꞑꞐꞓꞒꞔꟄꞗꞖꞙꞘꞛꞚꞝꞜꞟꞞꞡꞠꞣꞢꞥꞤꞧꞦꞩꞨꞵꞴꞷꞶꞹꞸꞻꞺꞽꞼꞿꞾꟁꟀꟃꟂꟈꟇꟊꟉꟑꟐꟗꟖꟙꟘꟶꟵꭓꞳꭰᎠꭱᎡꭲᎢꭳᎣꭴᎤꭵᎥꭶᎦꭷᎧꭸᎨꭹᎩꭺᎪꭻᎫꭼᎬꭽᎭꭾᎮꭿᎯꮀᎰꮁᎱꮂᎲꮃᎳꮄᎴꮅᎵꮆᎶꮇᎷꮈᎸꮉᎹꮊᎺꮋᎻꮌᎼꮍᎽꮎᎾꮏᎿꮐᏀꮑᏁꮒᏂꮓᏃꮔᏄꮕᏅꮖᏆꮗᏇꮘᏈꮙᏉꮚᏊꮛᏋꮜᏌꮝᏍꮞᏎꮟᏏꮠᏐꮡᏑꮢᏒꮣᏓꮤᏔꮥᏕꮦᏖꮧᏗꮨᏘꮩᏙꮪᏚꮫᏛꮬᏜꮭᏝꮮᏞꮯᏟꮰᏠꮱᏡꮲᏢꮳᏣꮴᏤꮵᏥꮶᏦꮷᏧꮸᏨꮹᏩꮺᏪꮻᏫꮼᏬꮽᏭꮾᏮꮿᏯａＡｂＢｃＣｄＤｅＥｆＦｇＧｈＨｉＩｊＪｋＫｌＬｍＭｎＮｏＯｐＰｑＱｒＲｓＳｔＴｕＵｖＶｗＷｘＸｙＹｚＺ𐐨𐐀𐐩𐐁𐐪𐐂𐐫𐐃𐐬𐐄𐐭𐐅𐐮𐐆𐐯𐐇𐐰𐐈𐐱𐐉𐐲𐐊𐐳𐐋𐐴𐐌𐐵𐐍𐐶𐐎𐐷𐐏𐐸𐐐𐐹𐐑𐐺𐐒𐐻𐐓𐐼𐐔𐐽𐐕𐐾𐐖𐐿𐐗𐑀𐐘𐑁𐐙𐑂𐐚𐑃𐐛𐑄𐐜𐑅𐐝𐑆𐐞𐑇𐐟𐑈𐐠𐑉𐐡𐑊𐐢𐑋𐐣𐑌𐐤𐑍𐐥𐑎𐐦𐑏𐐧𐓘𐒰𐓙𐒱𐓚𐒲𐓛𐒳𐓜𐒴𐓝𐒵𐓞𐒶𐓟𐒷𐓠𐒸𐓡𐒹𐓢𐒺𐓣𐒻𐓤𐒼𐓥𐒽𐓦𐒾𐓧𐒿𐓨𐓀𐓩𐓁𐓪𐓂𐓫𐓃𐓬𐓄𐓭𐓅𐓮𐓆𐓯𐓇𐓰𐓈𐓱𐓉𐓲𐓊𐓳𐓋𐓴𐓌𐓵𐓍𐓶𐓎𐓷𐓏𐓸𐓐𐓹𐓑𐓺𐓒𐓻𐓓𐖗𐕰𐖘𐕱𐖙𐕲𐖚𐕳𐖛𐕴𐖜𐕵𐖝𐕶𐖞𐕷𐖟𐕸𐖠𐕹𐖡𐕺𐖣𐕼𐖤𐕽𐖥𐕾𐖦𐕿𐖧𐖀𐖨𐖁𐖩𐖂𐖪𐖃𐖫𐖄𐖬𐖅𐖭𐖆𐖮𐖇𐖯𐖈𐖰𐖉𐖱𐖊𐖳𐖌𐖴𐖍𐖵𐖎𐖶𐖏𐖷𐖐𐖸𐖑𐖹𐖒𐖻𐖔𐖼𐖕𐳀𐲀𐳁𐲁𐳂𐲂𐳃𐲃𐳄𐲄𐳅𐲅𐳆𐲆𐳇𐲇𐳈𐲈𐳉𐲉𐳊𐲊𐳋𐲋𐳌𐲌𐳍𐲍𐳎𐲎𐳏𐲏𐳐𐲐𐳑𐲑𐳒𐲒𐳓𐲓𐳔𐲔𐳕𐲕𐳖𐲖𐳗𐲗𐳘𐲘𐳙𐲙𐳚𐲚𐳛𐲛𐳜𐲜𐳝𐲝𐳞𐲞𐳟𐲟𐳠𐲠𐳡𐲡𐳢𐲢𐳣𐲣𐳤𐲤𐳥𐲥𐳦𐲦𐳧𐲧𐳨𐲨𐳩𐲩𐳪𐲪𐳫𐲫𐳬𐲬𐳭𐲭𐳮𐲮𐳯𐲯𐳰𐲰𐳱𐲱𐳲𐲲𑣀𑢠𑣁𑢡𑣂𑢢𑣃𑢣𑣄𑢤𑣅𑢥𑣆𑢦𑣇𑢧𑣈𑢨𑣉𑢩𑣊𑢪𑣋𑢫𑣌𑢬𑣍𑢭𑣎𑢮𑣏𑢯𑣐𑢰𑣑𑢱𑣒𑢲𑣓𑢳𑣔𑢴𑣕𑢵𑣖𑢶𑣗𑢷𑣘𑢸𑣙𑢹𑣚𑢺𑣛𑢻𑣜𑢼𑣝𑢽𑣞𑢾𑣟𑢿𖹠𖹀𖹡𖹁𖹢𖹂𖹣𖹃𖹤𖹄𖹥𖹅𖹦𖹆𖹧𖹇𖹨𖹈𖹩𖹉𖹪𖹊𖹫𖹋𖹬𖹌𖹭𖹍𖹮𖹎𖹯𖹏𖹰𖹐𖹱𖹑𖹲𖹒𖹳𖹓𖹴𖹔𖹵𖹕𖹶𖹖𖹷𖹗𖹸𖹘𖹹𖹙𖹺𖹚𖹻𖹛𖹼𖹜𖹽𖹝𖹾𖹞𖹿𖹟𞤢𞤀𞤣𞤁𞤤𞤂𞤥𞤃𞤦𞤄𞤧𞤅𞤨𞤆𞤩𞤇𞤪𞤈𞤫𞤉𞤬𞤊𞤭𞤋𞤮𞤌𞤯𞤍𞤰𞤎𞤱𞤏𞤲𞤐𞤳𞤑𞤴𞤒𞤵𞤓𞤶𞤔𞤷𞤕𞤸𞤖𞤹𞤗𞤺𞤘𞤻𞤙𞤼𞤚𞤽𞤛𞤾𞤜𞤿𞤝𞥀𞤞𞥁𞤟𞥂𞤠𞥃𞤡"
+CASE_UP = str.maketrans(CASE_PAIRS[0::2], CASE_PAIRS[1::2])
+CASE_DOWN = str.maketrans(CASE_PAIRS[1::2], CASE_PAIRS[0::2])
 
 
 def letter(s, number, line):
@@ -2386,7 +2390,7 @@ class Expr:
             v = self.need(self.operand(), TEXT, "trimmed")
             a = v.run
             return builtin("stellanova::trimmed({a0})", TEXT, lambda env: a(env).strip(" \t\r\n"), [v])
-        for words, fn, table in ((("upper", "case", "of"), "upper", ASCII_UP), (("lower", "case", "of"), "lower", ASCII_DOWN)):
+        for words, fn, table in ((("upper", "case", "of"), "upper_case", CASE_UP), (("lower", "case", "of"), "lower_case", CASE_DOWN)):
             if self.at(*words):
                 self.i += 3
                 v = self.need(self.operand(), TEXT, " ".join(words))
@@ -2436,24 +2440,22 @@ class Expr:
                 ins, gives = SIGNATURES.get(f.kind, (None, None))
                 if gives not in (NUMBER, TEXT):
                     raise ScriptError(line, f"'sorted ... by each' needs to work out a number or text for each item, not {kind_name(gives)}.")
-                a, g = v.run, f.run
-                if JS:
-                    keys = Value(f"(await stellanova::changed_by({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line}))", "list of " + gives,
-                                 lambda env: (lambda fn: [invoke_value(fn, [x], line) for x in a(env)])(g(env)))
-                else:
-                    keys = with_ir(Value(f"stellanova::changed_by<{cpp_type(gives)}>({strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})",
-                                         "list of " + gives, lambda env: (lambda fn: [invoke_value(fn, [x], line) for x in a(env)])(g(env))),
-                                   lambda fn, v=v, f=f: machine.by_command(fn, machine.emit(fn, v), machine.emit(fn, f), item, gives, False, line))
                 down = self.biggest_first()
                 if down:  # as for parts: back to front, sorted, back to front, so equal ones keep their order
-                    v, keys = reversed_list(v), reversed_list(keys)
-                a, k = v.run, keys.run
+                    v = reversed_list(v)
+                a, g = v.run, f.run
 
                 def run(env):
-                    xs, ks = a(env), k(env)
+                    xs, fn = a(env), g(env)
+                    ks = [invoke_value(fn, [x], line) for x in xs]
                     return [dup(xs[j]) for j in sorted(range(len(xs)), key=lambda j: ks[j])]
-                out = with_ir(Value(f"stellanova::sorted_by_keys({strip_parens(v.cpp)}, {strip_parens(keys.cpp)})", v.kind, run),
-                              lambda fn, v=v, keys=keys: fn.op(f"call ptr @cn_sorted_by_keys(ptr {machine.emit(fn, v)}, ptr {machine.emit(fn, keys)})"))
+
+                def ir(fn, v=v, f=f):
+                    xs = fn.hold(machine.emit(fn, v))  # held: the loop working out keys frees what isn't
+                    ks = machine.by_command(fn, xs, machine.emit(fn, f), item, gives, False, line)
+                    return fn.op(f"call ptr @cn_sorted_by_keys(ptr {xs}, ptr {ks})")
+                how = f"(await stellanova::sorted_by_command(" if JS else f"stellanova::sorted_by_command<{cpp_type(gives)}>("
+                out = with_ir(Value(how + f"{strip_parens(v.cpp)}, {strip_parens(f.cpp)}, {line})" + (")" if JS else ""), v.kind, run), ir)
                 return reversed_list(out) if down else out
             if self.at("by") and is_list(v.kind) and is_thing(element(v.kind)):
                 self.i += 1

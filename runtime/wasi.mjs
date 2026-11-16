@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { readdirSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Worker, isMainThread, workerData } from "node:worker_threads";
 
 const warn = process.emitWarning;  // (Node calls WASI experimental: say nothing about that)
 process.emitWarning = (w, ...more) => (String(w).includes("WASI") ? undefined : warn.call(process, w, ...more));
@@ -12,7 +13,18 @@ const { WASI } = await import("node:wasi");
 const wasi = new WASI({ version: "preview1", args: ["PROGRAM", ...process.argv.slice(2)], env: process.env, preopens: { ".": "." }, returnOnExit: true });
 const imports = wasi.getImportObject();
 const calls = imports.wasi_snapshot_preview1;
-let memory;
+// One memory, shared by every thread ('meanwhile'): each thread is a Node worker running the same program in it.
+const memory = isMainThread ? new WebAssembly.Memory({ initial: 1024, maximum: 65536, shared: true }) : workerData.memory;
+let threads = isMainThread ? new Int32Array(new SharedArrayBuffer(4)) : workerData.threads;
+imports.env = { memory };
+imports.wasi = {
+  "thread-spawn": (start) => {
+    const id = Atomics.add(threads, 0, 1) + 1;
+    new Worker(new URL(import.meta.url), { workerData: { memory, threads, id, start } });
+    return id;
+  },
+};
+if (!isMainThread) calls.proc_exit = (code) => process.kill(process.pid);  // shortcut: ends the program, but not with code
 
 // Node's WASI can't list a folder on Windows (fd_readdir: "not implemented"), so it is done here: path_open says which
 // folder each number is, and fd_readdir lists it, the way WASI lays a folder's entries out.
@@ -22,7 +34,7 @@ const open = calls.path_open, close = calls.fd_close, readdir = calls.fd_readdir
 calls.path_open = (fd, dirflags, path, length, ...rest) => {
   const answer = open(fd, dirflags, path, length, ...rest);
   if (answer === 0 && folders.has(fd)) {
-    const name = new TextDecoder().decode(new Uint8Array(memory.buffer, path, length));
+    const name = new TextDecoder().decode(new Uint8Array(memory.buffer, path, length).slice());
     const opened = new DataView(memory.buffer).getUint32(rest[rest.length - 1], true);
     folders.set(opened, join(folders.get(fd), name));
   }
@@ -63,5 +75,10 @@ calls.fd_readdir = (fd, buffer, size, cookie, used) => {
 
 const code = await WebAssembly.compile(await readFile(fileURLToPath(new URL("PROGRAM.wasm", import.meta.url))));
 const instance = await WebAssembly.instantiate(code, imports);
-memory = instance.exports.memory;
-process.exitCode = wasi.start(instance);
+if (isMainThread) {
+  const ended = wasi.start(instance);
+  process.exit(ended);  // the program is done: its other threads end with it
+} else {
+  wasi.finalizeBindings(instance, { memory });
+  instance.exports.wasi_thread_start(workerData.id, workerData.start);
+}

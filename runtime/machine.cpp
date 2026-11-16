@@ -6,7 +6,7 @@
 #include "stellanova.h"
 #include "machine.h"
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__wasm__)
 #include <pthread.h>
 #include <setjmp.h>
 #elif !defined(__wasm__)
@@ -86,7 +86,18 @@ namespace gc
 		{
 			Thread* t = new Thread;
 #ifdef __wasm__
-			t->top = &__stack_high;
+			static std::atomic<bool> first{true};  // the main thread's stack is the linker's; the others' come from pthread
+			pthread_attr_t attr;
+			void* low;
+			size_t size;
+			if (first.exchange(false) || pthread_getattr_np(pthread_self(), &attr) != 0)
+				t->top = &__stack_high;
+			else
+			{
+				pthread_attr_getstack(&attr, &low, &size);
+				pthread_attr_destroy(&attr);
+				t->top = static_cast<char*>(low) + size;
+			}
 #elif defined(__linux__)
 			pthread_attr_t attr;
 			void* low;
@@ -716,13 +727,9 @@ extern "C"
 		std::cerr << std::flush;
 		std::_Exit(1);  // commands still going alongside stop too
 	}
+	void* cn_memory(long long size) { return std::malloc(static_cast<size_t>(size)); }  // (size_t is 32 bits in WebAssembly)
 	void cn_meanwhile(void (*command)(void*), void* names, long long size)  // 'meanwhile ...': names holds its own copy of every name it uses
 	{
-#ifdef __wasm__
-		std::cout << std::flush;
-		std::cerr << "'meanwhile' can't be used in a WebAssembly program yet (it has only one thread).\n" << std::flush;
-		std::_Exit(1);
-#endif
 		cn_root(static_cast<const char*>(names), size);  // kept until the command is done with them
 		stellanova::meanwhile([command, names] {
 			gc::me();

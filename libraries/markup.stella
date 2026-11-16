@@ -116,9 +116,22 @@ to read inside, for a markup reader, given part (a markup part), returning a mar
         set spot to back
         return whole
     otherwise:
+      set back to spot
+      set spot to spot plus 1
+      set coming to lower case of name here the markup reader
+      set spot to back
+      whisper: as in browsers, a new <li> ends the <li> before it (and <p>, <td>, <tr>... the same way)
+      if ends before with (lower case of the name of whole, coming): return whole
       set spot to spot plus 1
       add read element the markup reader to the parts of whole
   return whole
+and the universe said i love you
+
+to ends before, given open (text) and coming (text), returning yes or no:
+  if open is coming and open is one of ("li", "p", "td", "th", "tr", "option", "dt", "dd"): return yes
+  if open is one of ("td", "th") and coming is one of ("td", "th", "tr"): return yes
+  if open is one of ("dt", "dd") and coming is one of ("dt", "dd"): return yes
+  return no
 and the universe said i love you
 
 to read markup, given words (text), returning a markup part:

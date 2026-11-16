@@ -175,7 +175,7 @@ declare void @cn_statement()
 @cn_failed_flag = external thread_local global i8
 declare void @cn_root(ptr, i64)
 declare void @cn_wait_for_others()
-declare ptr @malloc(i64)
+declare ptr @cn_memory(i64)
 declare void @cn_enter()
 declare void @cn_leave(ptr)
 declare void @cn_slot(ptr)
@@ -682,6 +682,8 @@ def by_command(f, seq, command, item, gives, keep, line):
     items = f.hold(f.op(f"call ptr @cn_dup(ptr {seq})"))
     f.hold(command)  # (made on this line, perhaps: each round below starts a new one)
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
+    if TARGET == "wasm":  # what the line made before this stays young through the rounds below (see cn_enter)
+        f.put("call void @cn_enter()")
     k = counter(f, "m")
     top, inside, out_label = f.label("each"), f.label("doing"), f.label("done")
     f.place(top)
@@ -715,6 +717,8 @@ def by_command(f, seq, command, item, gives, keep, line):
     f.put(f"store i64 {f.op(f'add i64 {now}, 1')}, ptr {k}")
     f.jump(top)
     f.place(out_label)
+    if TARGET == "wasm":
+        f.put(f"call void @cn_leave(ptr {holder})")
     return holder
 
 
@@ -750,15 +754,13 @@ def closure(f, name, inputs, gives, body):
 
 def meanwhile(f, piece):
     """'meanwhile count up with 5': piece goes in a function of its own, run alongside, with copies of the names it uses."""
-    if TARGET == "wasm":
-        raise Unsupported("'meanwhile' (a WebAssembly program has only one thread)")
     module = f.module
     module.alongside = getattr(module, "alongside", 0) + 1
     g = Fn(module, f"meanwhile_{module.alongside}", [("names", TEXT)], None)
     g.owner = None
     emit(g, piece)
     used = list(g.slots.items())  # (C++ name, (its place, kind)): only names the piece itself needed
-    block = f.op(f"call ptr @malloc(i64 {8 * max(1, len(used))})")
+    block = f.op(f"call ptr @cn_memory(i64 {8 * max(1, len(used))})")
     for k, (cpp, (where, kind)) in enumerate(used):
         at = f.op(f"getelementptr i8, ptr {block}, i64 {8 * k}")
         f.put(f"store {ll_type(kind)} {f.copied(f.load(cpp, kind), kind)}, ptr {at}")
@@ -905,7 +907,7 @@ def target_flags():
     if TARGET != "wasm":
         return ["-fms-extensions"]
     root = sysroot()
-    return ["--target=wasm32-wasip1", f"--sysroot={root}", "-isystem", str(root / "include" / "wasm32-wasip1" / "eh"),
+    return ["--target=wasm32-wasip1-threads", "-pthread", f"--sysroot={root}", "-isystem", str(root / "include" / "wasm32-wasip1-threads" / "eh"),
             "-fwasm-exceptions", "-mllvm", "-wasm-use-legacy-eh=false"]
 
 
@@ -949,8 +951,9 @@ def make_exe(ll_text_, exe, work, units=None):
     link = []
     if TARGET == "wasm":
         root = sysroot()
-        link = [f for f in target_flags() if "include" not in f and f != "-isystem"] + ["-nodefaultlibs", f"-L{root / 'lib' / 'wasm32-wasip1' / 'eh'}", "-lc++", "-lc++abi", "-lunwind", "-lc",
-                str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608"]
+        link = [f for f in target_flags() if "include" not in f and f != "-isystem"] + ["-nodefaultlibs", f"-L{root / 'lib' / 'wasm32-wasip1-threads' / 'eh'}", "-lc++", "-lc++abi", "-lunwind", "-lc",
+                str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1-threads" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608",
+                "-Wl,--import-memory,--export-memory,--shared-memory,--max-memory=4294967296"]  # memory shared by threads ('meanwhile')
     elif TARGET == "linux":
         link = ["-pthread"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
