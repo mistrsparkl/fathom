@@ -1733,7 +1733,25 @@ def program_checks():
             print("\n".join(sorted(set(web_skipped))))
 
 
+def plain_word_checks():
+    """Mistake messages use plain words: no programmer words (a DLL's 'function', and a system's own words passed on, aside)."""
+    import re
+    jargon = re.compile(r"\b(std|nullptr|NoneType|None|null|undefined|NaN|int|float|double|bool|string|str|vector|dict|tuple|array|"
+                        r"exception|errno|Traceback|pointer|segfault|boolean|integer|variable|argument|parameter|index|syntax|"
+                        r"token|parse|runtime|struct|class|object|method|type)\b")
+    files = [HERE / "stellanova.py", HERE / "machine.py", *(HERE / "libraries").glob("*.words"), *(HERE / "runtime").glob("*.[hcj]*")]
+    found = []
+    for path in files:
+        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            for m in re.finditer(r"(?:ScriptError|RunError|fail)\((?:[^,()]+,\s*)?(f?[\"'`].*)", line):
+                said = "".join(re.findall(r"[\"'`]([^\"'`]*)[\"'`]", re.sub(r"\$?\{[^}]*\}", "", m.group(1))))
+                if jargon.search(said) and "+ str(" not in m.group(1) and "std::to_string" not in m.group(1):
+                    found.append(f"{path.name}:{n}: {said}")
+    assert not found, "programmer words in mistake messages:\n" + "\n".join(found)
+
+
 def main():
+    plain_word_checks()
     for path in sorted(translate.LOGIC.glob("*.stella")):
         translate.translate(path)
 

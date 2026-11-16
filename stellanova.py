@@ -987,7 +987,7 @@ def py_fix(err, lines):
         return err
     if isinstance(err, RecursionError):
         return RunError(n, "commands called each other too many times in a row (they may never stop).")
-    return RunError(n, f"something went wrong inside Stellanova: {err}")
+    return RunError(n, f"Stellanova itself went wrong here; this is not a mistake in your program. Please tell whoever looks after Stellanova: {err}")
 
 
 PY_ZERO = {NUMBER: "0.0", YESNO: "False", TEXT: "''"}
@@ -2619,7 +2619,7 @@ def load_words(name, line):
             parts = parts[:-1]
         cpp, kind = ", ".join(parts[:-1]), parts[-1]
         if kind not in CPP_TYPE:
-            raise ScriptError(n, f"{path.name}: unknown type '{kind}'.")
+            raise ScriptError(n, f"{path.name}: '{kind}' isn't a kind. Kinds here are: {', '.join(CPP_TYPE)}.")
         names.add(english.strip().lower().split(), cpp, kind, read_only, not_here(line, f"'{english.strip()}'"))
     return names, info
 
@@ -4398,7 +4398,7 @@ def guard(run, n):
         except RecursionError:
             raise RunError(n, "commands called each other too many times in a row (they may never stop).")
         except Exception as err:
-            raise RunError(n, f"something went wrong inside Stellanova: {err}")
+            raise RunError(n, f"Stellanova itself went wrong here; this is not a mistake in your program. Please tell whoever looks after Stellanova: {err}")
     guarded.inner = run  # so a missing piece is named by what it really is
     guarded.line_n = n
     return with_ir(guarded, getattr(run, "ir", None))
