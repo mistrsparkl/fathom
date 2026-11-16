@@ -443,6 +443,11 @@
       return sign + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (rest.length ? "." + rest.join(".") : "");
     },
     padded(n, digits, line) {
+      if (typeof n === "string") {  // '"food" padded to 12 letters': spaces after it
+        if (Math.floor(digits) !== digits || digits < 0)
+          fail(line, `I can't pad to ${numberText(digits)} letters: it must be a whole number, 0 or more.`);
+        return n + " ".repeat(Math.max(0, digits - [...n].length));
+      }
       if (Math.floor(digits) !== digits || digits < 0)
         fail(line, `I can't pad to ${numberText(digits)} digits: it must be a whole number, 0 or more.`);
       let s = numberText(n), sign = "";
@@ -558,6 +563,13 @@
     file_exists(path) {
       try {
         return !!fs && fs.statSync(path).isFile();
+      } catch {
+        return false;
+      }
+    },
+    folder_exists(path) {
+      try {
+        return !!fs && fs.statSync(path).isDirectory();
       } catch {
         return false;
       }

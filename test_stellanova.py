@@ -1243,6 +1243,16 @@ def program_checks():
     out = both('a pet has:\n  name (text)\nand the universe said i love you\n\ngenesis:\n  conjure a pet as rex\n  set the name of rex to "Rex"\n  conjure a pet as tom\n  set the name of tom to "Tom"\n  set pets to a list of pets\n  add rex to pets\n  add tom to pets\n  scrawl reversed pets\n  scrawl pets repeated 2 times\n  set groups to a list of lists of pets\n  add pets to groups\n  add reversed pets to groups\n  scrawl flattened groups\n  scrawl reversed a list of (1, 2, 3), " ", "ab" repeated 2 times, " ", flattened a list of (a list of (1), a list of (2, 3))\n  try:\n    scrawl pets repeated 0.5 times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "a pet (name: Tom), a pet (name: Rex)\na pet (name: Rex), a pet (name: Tom), a pet (name: Rex), a pet (name: Tom)\na pet (name: Rex), a pet (name: Tom), a pet (name: Tom), a pet (name: Rex)\n3, 2, 1 abab 1, 2, 3\n'repeated' needs a whole number of times, 0 or more, not 0.5.\n", repr(out.stdout)
 
+    # 'for each' can borrow a name: each item in the loop, what it was after
+    out = both('genesis:\n  set kind to "start"\n  for each kind in a list of ("a", "b"):\n    scrawl kind\n  scrawl kind\n  set n to 5\n  for each n from 1 to 2:\n    scrawl n\n  scrawl n\n  for each n in a list of ("x"):\n    scrawl n\n  scrawl n plus 1\nand the universe said i love you\n')
+    assert out.stdout == 'a\nb\nstart\n1\n2\n5\nx\n6\n', repr(out.stdout)
+    # sorted ..., biggest first (equal ones keep their order)
+    out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set pets to a list of pets\n  for each n in a list of ("Rex", "Tom", "Bo", "Max"):\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  scrawl sorted pets by age, biggest first\n  scrawl sorted pets by age\n  scrawl sorted a list of (3, 1, 2), biggest first, " ", sorted a list of ("b", "a")\n  scrawl reversed a list of (1, 2)\nand the universe said i love you\n')
+    assert out.stdout == 'a pet (name: Rex, age: 3), a pet (name: Tom, age: 3), a pet (name: Max, age: 3), a pet (name: Bo, age: 2)\na pet (name: Bo, age: 2), a pet (name: Rex, age: 3), a pet (name: Tom, age: 3), a pet (name: Max, age: 3)\n3, 2, 1 a, b\n2, 1\n', repr(out.stdout)
+    # text padded to a width
+    out = both('genesis:\n  scrawl "[", "food" padded to 8 letters, "] [", "café" padded to 6 letters, "] [", "toolong" padded to 3 letters, "] [", 7 padded to 3 digits, "]"\n  try:\n    scrawl "a" padded to 1.5 letters\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
+    assert out.stdout == "[food    ] [café  ] [toolong] [007]\nI can't pad to 1.5 letters: it must be a whole number, 0 or more.\n", repr(out.stdout)
+
     # parts of a path, and when a file last changed
     out = both('use: folders\nuse: time\n\ngenesis:\n  for each p in a list of ("saves/slot 1.json", "notes", "a\\b\\.hidden", "x.tar.gz"):\n'
                '    scrawl "[", file name of p, "] [", extension of p, "] [", folder holding p, "]"\n'
@@ -1395,6 +1405,10 @@ def program_checks():
                           'PUT /pets/1 [dog] [application/json] [{}] 200\nDELETE /missing [] [] [] 404\n'
                           'I couldn\'t reach the web page "http://127.0.0.1:1/".\n'), repr(out.stdout)
 
+    # the web server: how it was asked, a status for the answer
+    out = both('use: server\nuse: web\n\nto answer, given address (text), returning text:\n  if address is "/gone":\n    answer with the status 404\n    return "no"\n  return the web way plus " " plus the web message\n' + END + 'genesis:\n  meanwhile serve the web with (8767, the command answer)\n  wait 0.5\n  scrawl ask the web with ("http://127.0.0.1:8767/", "PUT", "hi"), " ", the last web status\n  scrawl ask the web with ("http://127.0.0.1:8767/gone", "GET"), " ", the last web status\n  end the program with 0\n' + END)
+    assert out.stdout == 'PUT hi 200\nno 404\n', repr(out.stdout)
+
     # Saved text: any value as JSON text, and back (for the web, or other programs).
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set the name of p to "Rex " plus a quotation mark plus "the dog" plus a quotation mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus a quotation mark plus "name" plus a quotation mark plus ": " plus a quotation mark plus "Jo" plus a quotation mark plus ", " plus a quotation mark plus "age" plus a quotation mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == '{"Rex": 3, "Tom": 12.5}\nRex: 3, Tom: 12.5\n{"name": "Rex \\"the dog\\"", "age": 0}\na pet (name: Jo, age: 4)\n1, 2.5, -3\nthe text doesn\'t hold a list of numbers.\n', repr(out.stdout)
@@ -1497,9 +1511,9 @@ def program_checks():
     out = both('genesis:\n  make the folder "box/inner"\n  inscribe "hello" into file "box/a.txt"\n'
                '  copy the file with "box/a.txt", "box/b.txt"\n  move the file with "box/b.txt", "box/c.txt"\n'
                '  scrawl files in the folder "box", " / ", folders in the folder "box"\n'
-               '  scrawl bytes in the file "box/c.txt", " ", there is a folder "box/inner", " ", there is a folder "nope"\n'
+               '  scrawl bytes in the file "box/c.txt", " ", folder "box/inner" exists, " ", folder "nope" exists\n'
                '  erase the file "box/a.txt"\n  scrawl files in the folder "box"\n  try:\n    erase the file "box/a.txt"\n'
-               '  if that went wrong:\n    scrawl the wound\n  erase the folder "box"\n  scrawl there is a folder "box"\n'
+               '  if that went wrong:\n    scrawl the wound\n  erase the folder "box"\n  scrawl folder "box" exists\n'
                '  scrawl files in the folder "nope"\n' + END)
     assert (out.stdout, out.stderr) == ('a.txt, c.txt / inner\n5 yes no\nc.txt\nI couldn\'t erase the file "box/a.txt".\nno\n',
                                         'Line 16: there is no folder called "nope".\n'), repr((out.stdout, out.stderr))

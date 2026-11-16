@@ -46,14 +46,14 @@ genesis:
       scrawl "Row ", n, " skipped: ", the wound
       set skipped to skipped plus 1
   set sums to a list of totals
-  for each name in keys of totals:
+  for each kind in keys of totals:
     conjure a total as t
-    set the kind of t to name
-    set the amount of t to the entry name of totals
+    set the kind of t to kind
+    set the amount of t to the entry kind of totals
     add t to sums
   set all to 0
-  for each sum in reversed (sorted sums by amount):
-    scrawl the kind of sum, ": ", the amount of sum rounded to 2 decimal places
-    set all to all plus the amount of sum
-  scrawl "Altogether: ", all rounded to 2 decimal places
+  for each t in sorted sums by amount, biggest first:
+    scrawl the kind of t padded to 12 letters, the amount of t rounded to 2 decimal places
+    set all to all plus the amount of t
+  scrawl "Altogether" padded to 12 letters, all rounded to 2 decimal places
 and the universe said i love you

@@ -423,6 +423,11 @@ namespace stellanova
 	}
 
 	inline bool file_exists(const std::string& path) { return std::filesystem::is_regular_file(std::filesystem::u8path(path)); }
+	inline bool folder_exists(const std::string& path)
+	{
+		std::error_code problem;
+		return std::filesystem::is_directory(std::filesystem::u8path(path), problem);
+	}
 
 	inline std::string read_file(const std::string& path, int line)
 	{
@@ -1025,6 +1030,13 @@ namespace stellanova
 		return sign + out + rest;
 	}
 
+	inline std::string padded(const std::string& s, double width, int line)  // '"food" padded to 12 letters': spaces after it
+	{
+		if (std::floor(width) != width || width < 0)
+			fail(line, "I can't pad to " + text(width) + " letters: it must be a whole number, 0 or more.");
+		double have = letters(s);
+		return have >= width ? s : s + std::string(static_cast<size_t>(width - have), ' ');
+	}
 	inline std::string padded(double n, double digits, int line)
 	{
 		if (std::floor(digits) != digits || digits < 0)

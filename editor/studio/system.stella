@@ -186,7 +186,7 @@ to answer, given address (text), returning text:
   if route is "/api/write":
     inscribe the web message into file path
     return "saved"
-  if route is "/api/exists": return (file path exists or there is a folder path) as saved text
+  if route is "/api/exists": return (file path exists or folder path exists) as saved text
   if route is "/api/make folder":
     make the folder path
     return "made"
@@ -204,7 +204,7 @@ to answer, given address (text), returning text:
     set place to joined with (environment value of "APPDATA", "Stellanova Studio")
     set settings file to joined with (place, "settings.json")
     if the web message is not "":
-      if not (there is a folder place): make the folder place
+      if not (folder place exists): make the folder place
       inscribe the web message into file settings file
     if file settings file exists: return contents of file settings file
     return "{}"

@@ -75,3 +75,14 @@ a one-line example in LANGUAGE.md, and a mistake message that says how to fix it
 
 ## 11. Reading easily
 - [x] Mistake messages checked for plain words: no C++, Python or JavaScript words reach the person writing (`plain_word_checks` in the tests)
+
+# Roadmap 4: what real programs needed
+
+From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. Simple and readable first.
+
+- [x] One way to ask whether something is there: `folder "saves" exists`, like `file "notes.txt" exists` (`there is a folder` goes)
+- [x] Output shows straight away, even when it goes to a file or another program
+- [x] `for each` can use a name the command already has: each item inside the loop, what it was after it
+- [x] `sorted totals by amount, biggest first` (and `sorted scores, biggest first`)
+- [x] Text padded to a width: `"food" padded to 12 letters`
+- [x] The web server: `the web way` says how it was asked ("GET", "POST"...), `answer with the status 404` says a page isn't there, and saved text goes as data, not as a page

@@ -1,6 +1,6 @@
 whisper: A guest book web service, kept in guests.json.
 whisper:   stellanova guestbook.stella        then open http://127.0.0.1:8080/
-whisper:   /sign sends a message (the text sent along is "name: words"); /book gives every entry as saved text.
+whisper:   POST /sign signs it (the text sent along is "name: words"); /book gives every entry as data.
 
 use: server
 use: time
@@ -31,7 +31,7 @@ and the universe said i love you
 to answer, given address (text), returning text:
   if address is "/": return page
   if address is "/book": return book as saved text
-  if address is "/sign":
+  if address is "/sign" and the web way is "POST":
     set sent to the web message
     if not (sent contains ": "): return "Send it as 'name: words'."
     set cut to position of ": " in sent
@@ -43,6 +43,7 @@ to answer, given address (text), returning text:
     add e to book
     save book to file "guests.json"
     return "Thank you, " plus the name of e plus "."
+  answer with the status 404
   return "There is no page " plus address plus "."
 and the universe said i love you
 

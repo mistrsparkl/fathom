@@ -2,6 +2,7 @@ note: Words for being a web server: other programs (and web browsers) on this co
 note: Use them in a program with:  use: server
 note: The command it is given gets the address asked for (like "/hello" or "/scores?top=3") and gives back the page, as text.
 note: What a page is (a web page, a style sheet, a script, a picture) is told to the browser from the address's ending (.css, .js, .png ...).
+note: An answer that is saved text (starting with { or [) goes as data. 'answer with the status 404' says the page isn't there.
 
 code:
   #define NOMINMAX
@@ -15,6 +16,24 @@ code:
   {
   	inline std::string message;  // what was sent with the request being answered ('the web message')
   	inline std::string file_asked;  // 'answer with the file': sent instead of the answer's text
+  	inline std::string way;  // 'the web way': GET, POST...
+  	inline double status = 200;  // 'answer with the status 404'
+
+  	inline std::string status_words(double code)
+  	{
+  		static const std::pair<int, const char*> words[] = {{200, "OK"}, {201, "Created"}, {204, "No Content"}, {301, "Moved Permanently"},
+  			{302, "Found"}, {400, "Bad Request"}, {401, "Unauthorized"}, {403, "Forbidden"}, {404, "Not Found"}, {405, "Method Not Allowed"},
+  			{500, "Internal Server Error"}};
+  		for (const auto& [n, w] : words)
+  			if (n == (int)code)
+  				return w;
+  		return "Answer";
+  	}
+  	inline bool looks_like_data(const std::string& page)  // saved text ('book as saved text') goes as data, not as a web page
+  	{
+  		size_t k = page.find_first_not_of(" \t\r\n");
+  		return k != std::string::npos && (page[k] == '{' || page[k] == '[');
+  	}
 
   	inline std::string kind_of_page(const std::string& path)
   	{
@@ -131,11 +150,15 @@ code:
   			}
   			size_t a = asked.find(' '), b = a == std::string::npos ? a : asked.find(' ', a + 1);
   			std::string path = b == std::string::npos ? "/" : asked.substr(a + 1, b - a - 1);
+  			way = a == std::string::npos ? "GET" : asked.substr(0, a);
+  			status = 200;
   			std::string page, kind = kind_of_page(path == "/" && !folder.empty() ? "/index.html" : path);
   			if (!file_for(folder, path, page))
   			{
   				file_asked.clear();
   				page = stellanova::invoke(answer, line, path);
+  				if (kind.rfind("text/html", 0) == 0 && looks_like_data(page))
+  					kind = "application/json; charset=utf-8";
   				if (!file_asked.empty())
   				{
   					std::ifstream in(std::filesystem::u8path(file_asked), std::ios::binary);
@@ -143,7 +166,7 @@ code:
   					kind = kind_of_page(file_asked);
   				}
   			}
-  			std::string reply = "HTTP/1.1 200 OK\r\nContent-Type: " + kind +
+  			std::string reply = "HTTP/1.1 " + std::to_string((int)status) + " " + status_words(status) + "\r\nContent-Type: " + kind +
   				"\r\nCache-Control: no-store\r\nContent-Length: " + std::to_string(page.size()) + "\r\nConnection: close\r\n\r\n" + page;
   			for (size_t sent = 0; sent < reply.size();)
   			{
@@ -163,6 +186,12 @@ code:
   			stellanova::fail(line, "there is no file called " + name + ".");
   		file_asked = name;
   	}
+  	inline void answer_with_status(double code, int line)
+  	{
+  		if (std::floor(code) != code || code < 100 || code > 599)
+  			stellanova::fail(line, "a web status is a whole number from 100 to 599, like 404, not " + stellanova::text(code) + ".");
+  		status = code;
+  	}
   	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line) { serve_from(port, "", answer, line); }
   }
 
@@ -170,6 +199,14 @@ python:
   import http.server, os.path, urllib.parse
   MESSAGE = [""]
   FILE_ASKED = [""]
+  WAY = ["GET"]
+  STATUS = [200]
+  def answer_with_status(code):
+      if code != int(code) or not 100 <= code <= 599:
+          raise RunError(0, "a web status is a whole number from 100 to 599, like 404, not " + text(code) + ".")
+      STATUS[0] = int(code)
+  def looks_like_data(page):
+      return page.lstrip()[:1] in ("{", "[")
   def answer_with(name):
       if not os.path.isfile(name):
           raise RunError(0, "there is no file called " + name + ".")
@@ -200,21 +237,25 @@ python:
               MESSAGE[0] = self.rfile.read(length).decode("utf-8", "replace") if length else ""
               page = file_for(folder, self.path)
               kind = kind_of_page("/index.html" if self.path == "/" and folder else self.path)
+              WAY[0], STATUS[0] = self.command, 200
               if page is None:
                   FILE_ASKED[0] = ""
-                  page = answer(self.path).encode("utf-8", "surrogateescape")
+                  said = answer(self.path)
+                  if kind.startswith("text/html") and looks_like_data(said):
+                      kind = "application/json; charset=utf-8"
+                  page = said.encode("utf-8", "surrogateescape")
                   if FILE_ASKED[0]:
                       with open(FILE_ASKED[0], "rb") as f:
                           page = f.read()
                       kind = kind_of_page(FILE_ASKED[0])
-              self.send_response(200)
+              self.send_response(STATUS[0])
               self.send_header("Content-Type", kind)
               self.send_header("Cache-Control", "no-store")
               self.send_header("Content-Length", str(len(page)))
               self.send_header("Connection", "close")
               self.end_headers()
               self.wfile.write(page)
-          do_POST = do_GET
+          do_POST = do_PUT = do_DELETE = do_PATCH = do_GET
           def log_message(self, *args):
               pass
       try:
@@ -232,6 +273,12 @@ to serve the web from the folder, given port (a number) and folder (text) and an
 the web message = stellanova_server::message, text, read only
   runs: MESSAGE[0]
   web: stellanova_server_web.message
+the web way = stellanova_server::way, text, read only
+  runs: WAY[0]
+  web: stellanova_server_web.way
+to answer with the status, given code (a number) = stellanova_server::answer_with_status({code}, {line})
+  runs: answer_with_status({code})
+  web: stellanova_server_web.answerWithStatus({code}, {line})
 to web decoded, given piece (text), returning text = stellanova_server::decoded({piece})
   runs: urllib.parse.unquote_plus({piece})
   web: stellanova_server_web::decoded({piece})
@@ -246,6 +293,13 @@ javascript:
   const stellanova_server_web = {
     message: "",
     asked: "",
+    way: "GET",
+    status: 200,
+    answerWithStatus(code, line) {
+      if (Math.floor(code) !== code || code < 100 || code > 599)
+        stellanova.fail(line, `a web status is a whole number from 100 to 599, like 404, not ${stellanova.text(code)}.`);
+      this.status = code;
+    },
     decoded(piece) {
       try {
         return decodeURIComponent(piece.replace(/\+/g, " "));
@@ -285,18 +339,22 @@ javascript:
         request.on("end", () => {
           turn = turn.then(async () => {
             this.message = Buffer.concat(parts).toString("utf8");
+            this.way = request.method;
+            this.status = 200;
             let page = this.fileFor(folder, request.url), kind = this.kindOf(request.url === "/" && folder ? "/index.html" : request.url);
             if (page === null) {
               this.asked = "";
               try {
-                page = Buffer.from(String(await answer(request.url)), "utf8");
+                const said = String(await answer(request.url));
+                if (kind.startsWith("text/html") && /^\s*[\[{]/.test(said)) kind = "application/json; charset=utf-8";
+                page = Buffer.from(said, "utf8");
               } catch (e) {
                 stellanova.report(e);
                 page = Buffer.from("", "utf8");
               }
               if (this.asked) page = fs.readFileSync(this.asked), kind = this.kindOf(this.asked);
             }
-            response.writeHead(200, { "Content-Type": kind, "Cache-Control": "no-store", "Content-Length": page.length, Connection: "close" });
+            response.writeHead(this.status, { "Content-Type": kind, "Cache-Control": "no-store", "Content-Length": page.length, Connection: "close" });
             response.end(page);
           });
         });

@@ -811,6 +811,10 @@ def with_commas(n):
 
 
 def padded(n, digits, line):
+    if isinstance(n, str):  # '"food" padded to 12 letters': spaces after it
+        if math.floor(digits) != digits or digits < 0:
+            raise RunError(line, f"I can't pad to {text(digits)} letters: it must be a whole number, 0 or more.")
+        return n.ljust(int(digits))
     if math.floor(digits) != digits or digits < 0:
         raise RunError(line, f"I can't pad to {text(digits)} digits: it must be a whole number, 0 or more.")
     s = text(n)
@@ -1138,7 +1142,7 @@ OLD_WORDS = [  # (old words, how to say it now) - checked anywhere in a line, ou
     (r"\bopen a window\b", "open a world"), (r"\bthe window is open\b", "the world lives"),
     (r"\bclose the window\b", "end the world"), (r"\bshow the frame\b", "reveal the frame"),
     (r"\bquote mark\b", "a quotation mark"), (r"\brounded to [^ ]+ places\b", "rounded to ... decimal places"),
-    (r"\bgiving back\b", "returning"),
+    (r"\bgiving back\b", "returning"), (r"\bthere is an? folder\b", "folder ... exists"),
 ]
 OLD_STARTS = [  # (old first words, how to say it now) - checked at the start of a line
     (r"while\b", "as long as"), (r"echo\b", "repeat"), (r"stop the loop$", "break free"),
@@ -1286,6 +1290,13 @@ class Value:
     @pyf.setter
     def pyf(self, make):
         self.run.pyf = make
+
+
+def reversed_list(v):
+    """A copy of the list v, back to front (any kind of item)."""
+    a = v.run
+    out = builtin("stellanova::reversed({a0})", v.kind, lambda env: [dup(x) for x in reversed(a(env))], [v])
+    return with_ir(out, lambda f: f.op(f"call ptr @cn_reversed(ptr {machine.emit(f, v)})"))
 
 
 def with_ir(x, write):
@@ -1603,6 +1614,13 @@ class Expr:
 
     COMPARE = [(("is", "more", "than"), ">"), (("is", "less", "than"), "<"), (("is", "at", "least"), ">="),
                (("is", "at", "most"), "<="), (("is", "not"), "!="), (("is",), "==")]
+
+    def biggest_first(self):
+        """', biggest first' after 'sorted ...': read it, and say whether it was there."""
+        if self.at(",", "biggest", "first"):
+            self.i += 3
+            return True
+        return False
 
     def circle(self, v):
         """Where something is and how big it is, for 'touches': a thing's existence and radius, or a place and the radius in reach."""
@@ -1963,11 +1981,14 @@ class Expr:
             return with_ir(out, lambda f, v=v, count=count, line=line:  # any kind of item, things too
                            f.call("ptr", "cn_repeated", ("ptr", machine.emit(f, v)), ("double", machine.emit(f, count)), ("i32", str(line)),
                                   checked=True))
-        if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"
+        if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"; '"food" padded to 12 letters' has spaces after it
             self.i += 2
-            self.need(v, NUMBER, "padded to")
+            if v.kind not in (NUMBER, TEXT):
+                raise ScriptError(self.line, f"'padded to' needs a number ('7 padded to 3 digits') or text ('\"food\" padded to 12 letters'), "
+                                             f"not {kind_name(v.kind)}.")
             digits = self.need(self.primary(), NUMBER, "padded to")
-            if self.peek() in ("digits", "digit"):
+            unit = ("letters", "letter") if v.kind == TEXT else ("digits", "digit")
+            if self.peek() in unit:
                 self.i += 1
             a, b, line = v.run, digits.run, self.line
             return builtin("stellanova::padded({s0}, {s1}, {line})", TEXT, lambda env: padded(a(env), b(env), line), [v, digits], line)
@@ -2333,6 +2354,12 @@ class Expr:
             self.take("exists")
             w = where.run
             return builtin("stellanova::file_exists({a0})", YESNO, lambda env: os.path.isfile(w(env)), [where])
+        if self.at("folder") and self.peek(1) not in (None, "exists") and "exists" in self.t[self.i:]:  # 'folder "saves" exists'
+            self.i += 1
+            where = self.need(self.operand(), TEXT, "folder")
+            self.take("exists")
+            w = where.run
+            return builtin("stellanova::folder_exists({a0})", YESNO, lambda env: os.path.isdir(w(env)), [where])
         for words, fn, f in ((("lines", "of"), "lines_of", lines_of), (("words", "of"), "words_of", str.split)):
             if self.at(*words):
                 self.i += 2
@@ -2412,12 +2439,16 @@ class Expr:
                         member, kind = FIELDS[key][thing]
                         if kind not in (NUMBER, TEXT):
                             raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
+                        down = self.biggest_first()
+                        if down:  # back to front, smallest first, back to front again: biggest first, and equal ones keep their order
+                            v = reversed_list(v)
                         a = v.run
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
                         k = field_index(thing, member)
-                        return with_ir(Value(f"stellanova::sorted_by({v.cpp}, {by}, {line})", v.kind,
-                                             lambda env: [dup(x) for x in sorted(no_nothing(a(env), line), key=lambda t: t.fields[member])]),
-                                       lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k}, i32 {line})"))
+                        out = with_ir(Value(f"stellanova::sorted_by({v.cpp}, {by}, {line})", v.kind,
+                                            lambda env: [dup(x) for x in sorted(no_nothing(a(env), line), key=lambda t: t.fields[member])]),
+                                      lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k}, i32 {line})"))
+                        return reversed_list(out) if down else out
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
         if self.at("flattened"):  # 'flattened rows': a list of lists as one list
@@ -2428,19 +2459,20 @@ class Expr:
             a = v.run
             out = builtin("stellanova::flattened({a0})", element(v.kind), lambda env: [dup(x) for xs in a(env) for x in xs], [v])
             return with_ir(out, lambda f, v=v: f.op(f"call ptr @cn_flattened(ptr {machine.emit(f, v)})"))  # any kind of item
-        for word in ("sorted", "reversed"):
-            if self.at(word):
-                self.i += 1
-                v = self.operand()
-                if not is_list(v.kind) or (word == "sorted" and element(v.kind) not in (NUMBER, TEXT)):
-                    need = " of numbers or text" if word == "sorted" else ""
-                    raise ScriptError(line, f"'{word}' needs a list{need}, but this is {kind_name(v.kind)}.")
-                a = v.run
-                run = (lambda env: sorted(a(env))) if word == "sorted" else (lambda env: [dup(x) for x in reversed(a(env))])
-                out = builtin(f"stellanova::{word}({{a0}})", v.kind, run, [v])
-                if word == "reversed":  # any kind of item, things too
-                    out = with_ir(out, lambda f, v=v: f.op(f"call ptr @cn_reversed(ptr {machine.emit(f, v)})"))
-                return out
+        if self.at("reversed"):
+            self.i += 1
+            v = self.operand()
+            if not is_list(v.kind):
+                raise ScriptError(line, f"'reversed' needs a list, but this is {kind_name(v.kind)}.")
+            return reversed_list(v)
+        if self.at("sorted"):
+            self.i += 1
+            v = self.operand()
+            if not is_list(v.kind) or element(v.kind) not in (NUMBER, TEXT):
+                raise ScriptError(line, f"'sorted' needs a list of numbers or text, but this is {kind_name(v.kind)}.")
+            a = v.run
+            out = builtin("stellanova::sorted({a0})", v.kind, lambda env: sorted(a(env)), [v])
+            return reversed_list(out) if self.biggest_first() else out
         if tok == "items" and self.peek(1) not in ITEM_NOT_INDEX and not self.names.match(self.t, self.i)[0]:
             self.i += 1  # 'items 2 to 5 of names'
             first = self.need(self.sum(), NUMBER, "items")
@@ -4914,8 +4946,9 @@ def for_each(n, head, body, names, declared, depth):
     words = tokens[2:cut] if cut else []
     if not words or bad_name(words) or any(not w[0].isalpha() for w in words):
         raise ScriptError(n, "'for each' looks like 'for each score in scores:' or 'for each n from 1 to 10:'.")
-    if tuple(words) in names.known:
-        raise ScriptError(n, f"'{' '.join(words)}' already means something here, so pick another name for each item.")
+    before = names.known.get(tuple(words))  # a name already set here: each item for the loop, then what it was again
+    if before is not None and before[2]:
+        raise ScriptError(n, f"'{' '.join(words)}' already means something here that can't change, so pick another name for each item.")
     cpp = snake(words) + f"_{n}"
     if tokens[cut] == "in":
         seq = expr_to_end(tokens, cut + 1, names, n)
@@ -4959,6 +4992,8 @@ def for_each(n, head, body, names, declared, depth):
     names.add(words, cpp, kind, read_only=True)
     lines, then = body(loop=True)
     del names.known[tuple(words)]
+    if before is not None:
+        names.known[tuple(words)] = before
 
     def run(env):
         for x in items(env):
@@ -5675,6 +5710,9 @@ def tidy(text):
 def main(argv):
     global LOGIC, OUT
     args = argv[1:]
+    for stream in (sys.stdout, sys.stderr):  # each line shows straight away, even into a file or another program (as built ones do)
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(line_buffering=True)
     if not args:
         return try_it()
     if args[0].lower().endswith(".stella"):
