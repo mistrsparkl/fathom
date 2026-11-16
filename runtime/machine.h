@@ -17,16 +17,74 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 	char tag = 'n';  // n number, y yes or no, t text, l list, m table, p place, f flat place, k thing, c command
 	bool marked = false;  // the collector reached it
 	bool owned = false;  // text only one name holds (cn_append): it may grow in place
+	bool numbers = false;  // a list holding only plain numbers (in Full's nums)
 	double d = 0;  // a number, or 1 / 0 for yes / no
+};
+
+#include <cstdlib>
+#include <cstring>
+struct Nums  // a list's plain numbers: laid out so machine code can add and read them itself (see machine.py's NUMS)
+{
+	double* data = nullptr;
+	size_t count = 0, room = 0;
+	Nums() = default;
+	Nums(const Nums& o) { *this = o; }
+	Nums(Nums&& o) noexcept : data(o.data), count(o.count), room(o.room) { o.data = nullptr, o.count = o.room = 0; }
+	Nums& operator=(const Nums& o)
+	{
+		if (this != &o)
+		{
+			clear();
+			reserve(o.count);
+			if (o.count)
+				std::memcpy(data, o.data, o.count * sizeof(double));
+			count = o.count;
+		}
+		return *this;
+	}
+	~Nums() { std::free(data); }
+	void reserve(size_t n)
+	{
+		if (n <= room)
+			return;
+		room = n < 8 ? 8 : n;
+		data = static_cast<double*>(std::realloc(data, room * sizeof(double)));
+	}
+	void push_back(double x)
+	{
+		if (count == room)
+			reserve(room ? room * 2 : 8);
+		data[count++] = x;
+	}
+	void insert(double* at, double x)
+	{
+		size_t k = static_cast<size_t>(at - data);
+		push_back(0);
+		std::memmove(data + k + 1, data + k, (count - 1 - k) * sizeof(double));
+		data[k] = x;
+	}
+	void erase(double* at)
+	{
+		std::memmove(at, at + 1, static_cast<size_t>(data + count - at - 1) * sizeof(double));
+		--count;
+	}
+	void clear() { count = 0; }
+	void release() { std::free(data), data = nullptr, count = room = 0; }
+	size_t size() const { return count; }
+	bool empty() const { return count == 0; }
+	double& operator[](size_t k) { return data[k]; }
+	double operator[](size_t k) const { return data[k]; }
+	double back() const { return data[count - 1]; }
+	double* begin() const { return data; }
+	double* end() const { return data + count; }
 };
 
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
+	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): first, at a fixed place
 	double x = 0, y = 0, z = 0;  // a place
 	std::string s;  // text
 	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items
-	std::vector<double> nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set)
-	bool numbers = false;
 	std::map<std::string, V*> table;
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
@@ -88,8 +146,8 @@ T cn_to_cpp(V* v)
 	{
 		T out;
 		if constexpr (std::is_same_v<T, std::vector<double>>)
-			if (full(v)->numbers)
-				return full(v)->nums;
+			if (v->numbers)
+				return T(full(v)->nums.begin(), full(v)->nums.end());
 		for (V* x : cn_items(v))
 			out.push_back(cn_to_cpp<typename cn_is_vector<T>::item>(x));
 		return out;

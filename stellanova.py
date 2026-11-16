@@ -4569,8 +4569,8 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
         added = with_ir(lambda env: seq(env).append(dup(get(env))),
-                        lambda f: f.put(f"call void @cn_list_add_number(ptr {machine.emit(f, target)}, double {machine.emit(f, v)})" if v.kind == NUMBER else
-                                        f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
+                        lambda f: f.add_number(machine.emit(f, target), machine.emit(f, v)) if v.kind == NUMBER else
+                        f.put(f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         added.pyl = lambda tab: [(None, f"{tab}{py_expr(target)}.append({py_expr(v) if v.kind in (NUMBER, YESNO, TEXT) else '_dup(' + py_expr(v) + ')'})")]
         if JS:
             return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None

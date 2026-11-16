@@ -316,6 +316,44 @@ class Fn:
         self.ended = False
         self.here = label
 
+    def nums_place(self, lst):
+        """Where a list's plain numbers are (machine.h's Nums, just after V): (numbers flag, data, count, room, size type)."""
+        word, size = (4, "i32") if TARGET == "wasm" else (8, "i64")
+        at = lambda k: self.op(f"getelementptr inbounds i8, ptr {lst}, i64 {k}")
+        return at(3), at(16), at(16 + word), at(16 + 2 * word), size
+
+    def add_number(self, lst, d):
+        """Adds a number to a list: in place while it holds plain numbers and has room (the runtime otherwise)."""
+        flag, data, count, room, size = self.nums_place(lst)
+        check, fast, slow, done = self.label("addcheck"), self.label("addfast"), self.label("addslow"), self.label("added")
+        self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), check, slow)
+        self.place(check)
+        n = self.op(f"load {size}, ptr {count}")
+        self.branch(self.op(f"icmp ult {size} {n}, {self.op(f'load {size}, ptr {room}')}"), fast, slow)
+        self.place(fast)
+        self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, {size} {n}')}")
+        self.put(f"store {size} {self.op(f'add {size} {n}, 1')}, ptr {count}")
+        self.jump(done)
+        self.place(slow)
+        self.put(f"call void @cn_list_add_number(ptr {lst}, double {d})")
+        self.jump(done)
+        self.place(done)
+
+    def list_number(self, lst, k):
+        """Item k (from 0, always there) of a list of numbers, read in place while it holds plain numbers."""
+        flag, data, _, _, size = self.nums_place(lst)
+        fast, slow, done = self.label("numfast"), self.label("numslow"), self.label("numread")
+        self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
+        self.place(fast)
+        index = k if size == "i64" else self.op(f"trunc i64 {k} to i32")
+        a = self.op(f"load double, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, {size} {index}')}")
+        self.jump(done)
+        self.place(slow)
+        b = self.op(f"call double @cn_list_number(ptr {lst}, i64 {k})")
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow} ]")
+
     def jump(self, label):
         self.put(f"br label %{label}")
         self.ended = True
@@ -602,12 +640,14 @@ def each_in(f, cpp, kind, seq, body):
         more, out = f.label("item"), f.label("noitem")
         f.branch(go, more, out)
         f.place(more)
-        got = f.op(f"call double @cn_list_number(ptr {items}, i64 {now})") if kind == NUMBER else \
+        got = f.list_number(items, now) if kind == NUMBER else \
             f.unbox(f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})"), kind)
         f.put(f"store {ll_type(kind)} {got}, ptr {f.slot(cpp, kind)}")
+        stored = f.label("itemkept")  # (reading the item may have made blocks of its own)
+        f.place(stored)
         f.jump(out)
         f.place(out)
-        return f.op(f"phi i1 [ true, %{more} ], [ false, %{test.before} ]")
+        return f.op(f"phi i1 [ true, %{stored} ], [ false, %{test.before} ]")
 
     def wrapped():
         test.before = f.here
@@ -645,7 +685,7 @@ def by_command(f, seq, command, item, gives, keep, line):
     f.branch(f.op(f"icmp slt i64 {now}, {size}"), inside, out_label)
     f.place(inside)
     if item == NUMBER:
-        x = boxed = f.op(f"call double @cn_list_number(ptr {items}, i64 {now})")
+        x = boxed = f.list_number(items, now)
     else:
         boxed = f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})")
         x = f.unbox(boxed, item)
@@ -656,13 +696,17 @@ def by_command(f, seq, command, item, gives, keep, line):
         yes, after = f.label("keep"), f.label("kept")
         f.branch(answer, yes, after)
         f.place(yes)
-        f.put(f"call void @cn_list_add_number(ptr {holder}, double {x})" if item == NUMBER else
-              f"call void @cn_list_add(ptr {holder}, ptr {f.copied(boxed, item)})")
+        if item == NUMBER:
+            f.add_number(holder, x)
+        else:
+            f.put(f"call void @cn_list_add(ptr {holder}, ptr {f.copied(boxed, item)})")
         f.jump(after)
         f.place(after)
     else:
-        f.put(f"call void @cn_list_add_number(ptr {holder}, double {answer})" if gives == NUMBER else
-              f"call void @cn_list_add(ptr {holder}, ptr {f.box(answer, gives)})")
+        if gives == NUMBER:
+            f.add_number(holder, answer)
+        else:
+            f.put(f"call void @cn_list_add(ptr {holder}, ptr {f.box(answer, gives)})")
     f.put(f"store i64 {f.op(f'add i64 {now}, 1')}, ptr {k}")
     f.jump(top)
     f.place(out_label)

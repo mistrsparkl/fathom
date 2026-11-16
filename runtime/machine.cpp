@@ -212,6 +212,8 @@ namespace gc
 				if (f->boxed.capacity() > 1024)
 					std::vector<V*>().swap(f->boxed);
 				f->boxed.clear();
+				if (f->nums.room > 4096)
+					f->nums.release();
 				f->nums.clear();
 				f->numbers = false;
 				f->table.clear();
@@ -666,14 +668,17 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 	}
 }
 
+// machine.py's add_number and list_number find a list's plain numbers at these places.
+static_assert(offsetof(V, numbers) == 3 && offsetof(Full, nums) == 16, "machine.py's nums_place needs changing");
+static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == 2 * sizeof(void*), "machine.py's nums_place needs changing");
+
 // A list's or thing's items, boxed: a list of plain numbers is boxed first (and stays boxed).
 std::vector<V*>& cn_items(const V* v)
 {
 	Full* f = const_cast<Full*>(full(v));
 	if (f->numbers)
 	{
-		std::vector<double> nums = std::move(f->nums);
-		f->nums.clear();
+		Nums nums = std::move(f->nums);
 		f->numbers = false;
 		f->boxed.reserve(nums.size());
 		for (double d : nums)
