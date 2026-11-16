@@ -50,7 +50,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 ## 6. Writing programs
 - [x] VS Code: mistakes shown while typing, word completion and help on hover (`editor/vscode/extension.js`)
 - [x] `stellanova tidy`: puts a script's spacing and indenting right
-- [ ] Messages for every mistake say the line and the fix (a test for each message in LANGUAGE.md)
+- [x] Every whole program in LANGUAGE.md (one with `genesis:`) is checked for mistakes by the tests, as TUTORIAL.md's are
 
 ## 7. Libraries
 - [x] Dates and moments: `date in words`, `date plus months`, `seconds at`, `date at`, `time at` (dates stay text, so they sort and save)

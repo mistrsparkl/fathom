@@ -154,6 +154,20 @@ def tutorial_checks():
                 assert out.stdout == blocks[k + 1][1] and not out.stderr, f"TUTORIAL.md:\n{body}\nprinted:\n{out.stdout}{out.stderr}"
                 ran += 1
     assert ran >= 8, ran
+    # every whole program in LANGUAGE.md (one with genesis:) has no mistakes either
+    whole = [b for b in re.findall(r"^```\n(.*?)^```", (HERE / "LANGUAGE.md").read_text(encoding="utf-8"), re.S | re.M)
+             if re.search(r"^genesis:", b, re.M)]
+    for body in whole:
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "language.stella"
+            script.write_text(body, encoding="utf-8")
+            translate.LOGIC = Path(d)
+            try:
+                translate.read_script(script)
+            except translate.ScriptError as err:  # a program for a web page: checked the way it will be made
+                assert "only works in a program made for the web" in err.message, err.message
+                assert translate.web(script, d) is None, body
+    assert len(whole) >= 6, len(whole)
     translate.LOGIC = HERE / "examples"
 
 

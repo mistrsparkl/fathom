@@ -87,6 +87,14 @@ to apply to all, given f (a command given a number returning a number) and items
   return out
 and the universe said i love you
 
+to double, given x (a number), returning a number:
+  return x times 2
+and the universe said i love you
+
+to greet, given name (text):
+  scrawl "Hi ", name
+and the universe said i love you
+
 genesis:
   scrawl apply to all with (the command double, a list of (1, 2, 3))
   set steps to a list of (the command double, the command round)
