@@ -945,6 +945,79 @@ extern "C"
 	}
 	void cn_wait_for_others() { Parked waiting; stellanova::wait_for_others(); }
 
+	// A program made into a plugin for a game engine ('stellanova plugin game.stella'): the engine calls its commands.
+	// (stellanova_start, made with the program, stellanova_call and stellanova_has are what the plugin shows the engine.)
+	using EngineOutput = void (*)(const char* text, int is_problem);  // what the program shows, and what went wrong
+	// An engine word ('put 3 at ...'): its name, its numbers and text; numbers back go in answers (3 for a place), text in answer_text.
+	using EngineWord = double (*)(const char* word, const double* numbers, int count, const char* text, double* answers, char* answer_text, int room);
+	EngineWord cn_engine = nullptr;
+	double cn_me = 0;  // the engine's object the program is answering now ('me')
+	struct PluginCommand { void* code; int count; bool gives; };
+	static std::map<std::string, PluginCommand> plugin_commands;
+	void cn_plugin_command(const char* name, void* code, int count, int gives) { plugin_commands[name] = {code, count, gives != 0}; }
+	void cn_plugin_begin(EngineOutput out, EngineWord engine)
+	{
+		cn_engine = engine;
+		if (out)
+			stellanova::show_hook = [out](const std::string& s, bool problem) { out(s.c_str(), problem ? 1 : 0); };
+		gc::me();
+	}
+	int cn_plugin_settle()  // after the engine's call: 0, or 2 when something went wrong (said through the output)
+	{
+		if (!failed)
+			return 0;
+		stellanova::report(pending);
+		failed = false;
+		return 2;
+	}
+	// 0 when it ran, 1 when the program has no such command (with that many numbers), 2 when something went wrong in it.
+	int stellanova_call(const char* name, double me, const double* numbers, int count, double* answer)
+	{
+		auto found = plugin_commands.find(name);
+		if (found == plugin_commands.end() || found->second.count != count || count > 4)
+			return 1;
+		gc::me();
+		cn_me = me;
+		double a[4] = {};
+		for (int k = 0; k < count; ++k)
+			a[k] = numbers[k];
+		void* c = found->second.code;
+		double out = 0;
+		try
+		{
+			if (found->second.gives)
+				switch (count)
+				{
+				case 0: out = reinterpret_cast<double (*)()>(c)(); break;
+				case 1: out = reinterpret_cast<double (*)(double)>(c)(a[0]); break;
+				case 2: out = reinterpret_cast<double (*)(double, double)>(c)(a[0], a[1]); break;
+				case 3: out = reinterpret_cast<double (*)(double, double, double)>(c)(a[0], a[1], a[2]); break;
+				default: out = reinterpret_cast<double (*)(double, double, double, double)>(c)(a[0], a[1], a[2], a[3]); break;
+				}
+			else
+				switch (count)
+				{
+				case 0: reinterpret_cast<void (*)()>(c)(); break;
+				case 1: reinterpret_cast<void (*)(double)>(c)(a[0]); break;
+				case 2: reinterpret_cast<void (*)(double, double)>(c)(a[0], a[1]); break;
+				case 3: reinterpret_cast<void (*)(double, double, double)>(c)(a[0], a[1], a[2]); break;
+				default: reinterpret_cast<void (*)(double, double, double, double)>(c)(a[0], a[1], a[2], a[3]); break;
+				}
+		}
+		catch (const stellanova::Problem& problem)
+		{
+			cn_set_problem(problem);
+		}
+		if (answer)
+			*answer = out;
+		return cn_plugin_settle();
+	}
+	int stellanova_has(const char* name, int count)  // 1 when the program has that command, with that many numbers
+	{
+		auto found = plugin_commands.find(name);
+		return found != plugin_commands.end() && found->second.count == count ? 1 : 0;
+	}
+
 	bool cn_failed() { return failed; }
 	void cn_raise(int line, V* message) { cn_set_problem({line, full(message)->s}); }
 	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, full(message)->s, full(kind)->s}); }

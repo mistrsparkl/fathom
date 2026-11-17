@@ -1,0 +1,79 @@
+note: Words for a program inside a game engine (Unity, Unreal or Godot). Use them in a program with:  use: engine
+note: Make the program into a plugin with:  stellanova plugin game.stella
+note: The engine calls the program's own commands: 'to begin:' when an object with the script starts,
+note: 'to every frame, given seconds (a number):' each frame, and 'to touched, given other (a number):' when it touches another.
+note: Objects are numbers. 'me' is the object the program is answering now. Places are across (horizontal), up (vertical) and away (depth).
+
+code:
+  extern "C"
+  {
+  	extern double (*cn_engine)(const char* word, const double* numbers, int count, const char* text, double* answers, char* answer_text, int room);
+  	extern double cn_me;
+  }
+  namespace stellanova_engine
+  {
+  	inline double (*need(int line))(const char*, const double*, int, const char*, double*, char*, int)
+  	{
+  		if (!cn_engine)
+  			stellanova::fail(line, "the engine words only work inside a game engine: make the program with 'stellanova plugin', then add it to Unity, Unreal or Godot.");
+  		return cn_engine;
+  	}
+  	inline double ask(const char* word, std::initializer_list<double> numbers, const std::string& text, int line)
+  	{
+  		double answers[3] = {};
+  		char none[1] = {};
+  		return need(line)(word, numbers.begin(), static_cast<int>(numbers.size()), text.c_str(), answers, none, 0);
+  	}
+  	inline FVector ask_place(const char* word, std::initializer_list<double> numbers, int line)
+  	{
+  		double answers[3] = {};
+  		char none[1] = {};
+  		need(line)(word, numbers.begin(), static_cast<int>(numbers.size()), "", answers, none, 0);
+  		return FVector(answers[0], answers[1], answers[2]);
+  	}
+  	inline std::string ask_text(const char* word, std::initializer_list<double> numbers, int line)
+  	{
+  		double answers[3] = {};
+  		char words[4096] = {};
+  		need(line)(word, numbers.begin(), static_cast<int>(numbers.size()), "", answers, words, sizeof words);
+  		return std::string(words);
+  	}
+  	inline double ask_at(const char* word, double object, FVector at, int line)  // an object and a place
+  	{
+  		return ask(word, {object, at.X, at.Y, at.Z}, "", line);
+  	}
+  	inline double object(double n, int line)  // an object that must be there
+  	{
+  		if (n == 0)
+  			stellanova::fail(line, "this is 0, which means there is nothing there.");
+  		return n;
+  	}
+  }
+
+me = cn_me, number, read only
+
+to place of, given object (a number), returning a place = stellanova_engine::ask_place("place", {stellanova_engine::object({object}, {line})}, {line})
+
+to put the object, given object (a number) and where (a place) = stellanova_engine::ask_at("put", stellanova_engine::object({object}, {line}), {where}, {line})
+
+to move the object, given object (a number) and by (a place) = stellanova_engine::ask_at("move", stellanova_engine::object({object}, {line}), {by}, {line})
+
+to turn of, given object (a number), returning a number = stellanova_engine::ask("turn", {stellanova_engine::object({object}, {line})}, "", {line})
+
+to turn the object, given object (a number) and degrees (a number) = stellanova_engine::ask("turn by", {stellanova_engine::object({object}, {line}), {degrees}}, "", {line})
+
+to the object named, given name (text), returning a number = stellanova_engine::ask("named", {}, {name}, {line})
+
+to object name of, given object (a number), returning text = stellanova_engine::ask_text("name", {stellanova_engine::object({object}, {line})}, {line})
+
+to copy the object, given object (a number) and where (a place), returning a number = stellanova_engine::ask_at("copy", stellanova_engine::object({object}, {line}), {where}, {line})
+
+to remove the object, given object (a number) = stellanova_engine::ask("remove", {stellanova_engine::object({object}, {line})}, "", {line})
+
+to colour the object, given object (a number) and colour (text) = stellanova_engine::ask("colour", {stellanova_engine::object({object}, {line})}, {colour}, {line})
+
+to key held, given key (text), returning yes or no = (stellanova_engine::ask("key held", {}, {key}, {line}) != 0)
+
+to key pressed, given key (text), returning yes or no = (stellanova_engine::ask("key pressed", {}, {key}, {line}) != 0)
+
+frame time = stellanova_engine::ask("frame time", {}, "", 0), number, read only

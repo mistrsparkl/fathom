@@ -88,6 +88,9 @@ def ll_text(data):
 
 
 RUNTIME = """declare void @cn_begin(i32, ptr)
+declare void @cn_plugin_begin(ptr, ptr)
+declare i32 @cn_plugin_settle()
+declare void @cn_plugin_command(ptr, ptr, i32, i32)
 declare void @cn_add_file(ptr)
 declare i32 @cn_end()
 declare i1 @cn_failed()
@@ -235,7 +238,9 @@ class Module:
         if line not in self.declared and line not in RUNTIME:
             self.declared.append(line)
 
-    def finish(self, files):
+    def finish(self, files, plugin=None):
+        """The module's LLVM code. plugin: [(words, function name, how many numbers, gives a number)] for the commands
+        a game engine may call: then the program is started by stellanova_start, not main."""
         start = Fn(self, "main", [], None)
         for cpp, kind in self.shared.items():
             self.constants.append(f"@g.{cpp} = internal global {ll_type(kind)} {zero_const(kind)}")
@@ -244,13 +249,23 @@ class Module:
         for able, kinds in ABLE.items():  # each kind a saved speaker may be loaded as
             for kind in kinds:
                 start.put(f"call void @cn_able_kind(ptr {start.spec(able)}, ptr {start.shape(kind)})")
-        entry_name = "__main_argc_argv" if TARGET == "wasm" else "main"  # (what WASI's start calls)
-        main = [f"define i32 @{entry_name}(i32 %count, ptr %given) {{", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
+        for words, name, count, gives in plugin or []:
+            start.put(f"call void @cn_plugin_command(ptr {self.text(words)[0]}, ptr @cn_user_{name}, i32 {count}, i32 {int(gives)})")
+        genesis = any("@cn_user_Start(" in f for f in self.functions)
+        if plugin is not None:  # stellanova_start(output, engine): 0, or 2 when genesis went wrong
+            main = ["define dllexport i32 @stellanova_start(ptr %out, ptr %engine) {", "entry:",
+                    "  call void @cn_plugin_begin(ptr %out, ptr %engine)", "  call void @cn_begin(i32 0, ptr null)"]
+        else:
+            entry_name = "__main_argc_argv" if TARGET == "wasm" else "main"  # (what WASI's start calls)
+            main = [f"define i32 @{entry_name}(i32 %count, ptr %given) {{", "entry:", "  call void @cn_begin(i32 %count, ptr %given)"]
         for name in files:
             const, _ = self.text(name)
             main.append(f"  call void @cn_add_file(ptr {const})")
         main += start.entry + [l if l.endswith(":") else l for l in start.lines]
-        main += ["  call void @cn_user_Start()", "  %code = call i32 @cn_end()", "  ret i32 %code", "}"]
+        if plugin is not None:
+            main += (["  call void @cn_user_Start()"] if genesis else []) + ["  %code = call i32 @cn_plugin_settle()", "  ret i32 %code", "}"]
+        else:
+            main += ["  call void @cn_user_Start()", "  %code = call i32 @cn_end()", "  ret i32 %code", "}"]
         return "\n".join(self.constants + [c_bools(RUNTIME)] + [c_bools(d) for d in self.declared] + self.functions + main) + "\n"
 
 
@@ -1199,8 +1214,9 @@ def runtime_object():
                         [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h"])
 
 
-def make_exe(ll_text_, exe, work, units=None):
-    """Turns the LLVM code into exe. units: the module's built-in and library words. Returns an error message, or None."""
+def make_exe(ll_text_, exe, work, units=None, plugin=False):
+    """Turns the LLVM code into exe (a .dll, or .so, for a game engine when plugin). units: the module's built-in and library words.
+    Returns an error message, or None."""
     ll = Path(work) / "program.ll"
     ll.write_text(ll_text_, encoding="utf-8")
     try:
@@ -1233,6 +1249,8 @@ def make_exe(ll_text_, exe, work, units=None):
                 "-Wl,--import-memory,--export-memory,--shared-memory,--max-memory=4294967296"]  # memory shared by threads ('meanwhile')
     elif TARGET == "linux":
         link = ["-pthread"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
+    if plugin:
+        link += ["-shared"] + (["-Wl,/EXPORT:stellanova_call", "-Wl,/EXPORT:stellanova_has"] if TARGET == "windows" else [])
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True)
     if done.returncode:

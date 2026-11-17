@@ -67,6 +67,7 @@ JS_RESERVED = set("""function let var yield await async in of typeof instanceof 
 export default null undefined true false arguments eval with enum implements interface package private protected public
 static stellanova""".split())
 MAKING_CPP = False  # yes while a program is being made into C++ (build, unreal, translate)
+PLUGIN = False  # yes while a program is being made into a plugin for a game engine
 UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of running can't use it; the message follows
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
 THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
@@ -3655,9 +3656,9 @@ def read_one(path, auto):
         for (words, cpp, inputs, gives), command in zip(heads, made):
             command.js = f"{cpp}_{snake(inputs[0][1][6:].split())}" if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else cpp
     if program:
-        if ("start",) not in names.commands:
+        if ("start",) not in names.commands and not PLUGIN and "engine" not in used:  # (the engine calls a plugin's commands)
             raise ScriptError(main_lines or 1, "A program needs a 'genesis:' command: that is where it begins.")
-        if names.commands[("start",)].kinds or names.commands[("start",)].gives:
+        if ("start",) in names.commands and (names.commands[("start",)].kinds or names.commands[("start",)].gives):
             raise ScriptError(next(n for (w, *_), (_, n, _) in zip(heads, commands) if w == ["start"]),
                               "'genesis:' has no inputs and gives nothing back.")
     functions = [function(head, n, body, names, info, command) for head, (_, n, body), command in zip(heads, commands, made)]
@@ -5595,6 +5596,9 @@ def run_program(script, tests=False):
     if program is None:
         print(f"{script.name} is part of something else ('this is part of:'), so it can't run on its own.")
         return 1
+    if ("start",) not in program.commands:
+        print(f"{script.name} is for a game engine (it has no 'genesis:'): make it into a plugin with 'stellanova plugin {script.name}'.")
+        return 1
     result = {"code": 0}
     # Text is UTF-8 everywhere, as in built programs (Windows would otherwise use its old code page when piped).
     for stream in (sys.stdin, sys.stdout, sys.stderr):
@@ -5628,7 +5632,7 @@ def run_program(script, tests=False):
 MACHINE_UNITS = {}  # the built-in and library words the program being built uses (see machine.wrap)
 
 
-def machine_code(program):
+def machine_code(program, plugin=False):
     """The whole program as LLVM code (raises machine.Unsupported for what can't be made into machine code yet)."""
     module = machine.Module()
     module.shared = dict(WORLD_KINDS)
@@ -5642,11 +5646,19 @@ def machine_code(program):
             machine.function(module, name, inputs, gives, run)
     MACHINE_UNITS.clear()
     MACHINE_UNITS.update(module.units)
-    return module.finish(FILES)
+    if not plugin:
+        return module.finish(FILES)
+    calls = []  # the commands an engine can call: numbers in, nothing or a number back
+    for key, base in program.commands.items():
+        if base.inputs is None and not base.versions and getattr(base, "machine", None):
+            name, inputs, gives, _ = base.machine
+            if name != "Start" and len(inputs) <= 4 and all(k == NUMBER for _, k in inputs) and gives in (None, NUMBER):
+                calls.append((" ".join(key), name, len(inputs), gives == NUMBER))
+    return module.finish(FILES, calls)
 
 
-def build(script, exe):
-    """Reads a program script and compiles it into exe. Returns an error message, or None."""
+def build(script, exe, plugin=False):
+    """Reads a program script and compiles it into exe (a plugin for a game engine, when plugin). Returns an error message, or None."""
     global LOGIC, MAKING_CPP
     LOGIC = script.parent
     MAKING_CPP = True
@@ -5659,11 +5671,11 @@ def build(script, exe):
     if program is None:
         return f"{script.name} is part of something else ('this is part of:'), so it can't run on its own."
     try:
-        ll = machine_code(program)
+        ll = machine_code(program, plugin)
     except machine.Unsupported as missing:
         made = {"wasm": "WebAssembly", "linux": "a program"}.get(machine.TARGET, "an .exe")
         return f"{script.name} can't be built into {made} yet: {missing} isn't in machine code. It still runs directly (stellanova {script.name})."
-    return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS)
+    return machine.make_exe(ll, exe, tempfile.mkdtemp(prefix="stellanova_"), MACHINE_UNITS, plugin)
 
 
 def wasm(script):
@@ -6027,6 +6039,23 @@ def main(argv):
             print(problem)
             return 1
         print(f"Built {WORLD}" + ("" if os.environ.get("STELLANOVA_NO_LAUNCH") else " and started it."))
+        return 0
+    if len(args) == 2 and args[0] == "plugin":  # a plugin for a game engine: Unity, Unreal or Godot calls its commands
+        script = Path(args[1])
+        if not script.exists():
+            print(f"There is no script called {script}.")
+            return 2
+        made = script.with_suffix(".so" if machine.TARGET == "linux" else ".dll")
+        global PLUGIN
+        PLUGIN = True
+        problem = build(script, made, plugin=True)
+        for extra in (".lib", ".exp"):  # (what the linker makes for C++ programs using the .dll: an engine doesn't need them)
+            if made.suffix == ".dll":
+                made.with_suffix(extra).unlink(missing_ok=True)
+        if problem:
+            print(problem)
+            return 1
+        print(f"Built {made.name}")
         return 0
     if len(args) == 2 and args[0] == "wasm":
         script = Path(args[1])

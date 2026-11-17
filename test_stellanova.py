@@ -233,7 +233,7 @@ def program_checks():
     assert perr("genesis:\n  set n to 5 as a number\n" + END)[1] == "'as a number' turns text into a number, but this is a number."
 
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
-    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, folders, forms, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
+    assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, engine, folders, forms, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
 
     # Run real programs both ways: directly.
     # Both must print exactly the same, so the two halves of every piece of the language agree.
@@ -1882,7 +1882,42 @@ def main():
     tutorial_checks()
     program_checks()
     built_run_checks()
+    plugin_checks()
     print("stellanova.py self-check passed")
+
+
+def plugin_checks():
+    """'stellanova plugin' makes a program a game engine can call (engines/host/host.cpp is a tiny engine)."""
+    import subprocess
+    clang = shutil.which("clang++") or r"C:\Program Files\LLVM\bin\clang++.exe"
+    if not Path(clang).exists():
+        return
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "game.stella"
+        script.write_text("use: engine\n\nto begin:\n  scrawl \"coin \", me, \" \", object name of me, \" at \", place of me\n" + END +
+                          "\nto every frame, given seconds (a number):\n  turn the object with me, 90 times seconds\n"
+                          "  move the object with me, 0 horizontal (frame time) vertical 0 depth\n" + END +
+                          "\nto touched, given other (a number):\n  if object name of other is \"Player\":\n"
+                          "    copy the object with me, place of me plus 0 horizontal 2 vertical 0 depth\n    remove the object me\n"
+                          "  scrawl item 3 of a list of (1)\n" + END +
+                          "\nto doubled, given x (a number), returning a number:\n  return x times 2\n" + END, encoding="utf-8")
+        made = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "plugin", str(script)], capture_output=True, text=True, cwd=d)
+        assert made.returncode == 0, made.stdout + made.stderr
+        lib = "game.so" if sys.platform.startswith("linux") else "game.dll"
+        assert sorted(p.name for p in Path(d).iterdir()) == sorted(["game.stella", lib]), list(Path(d).iterdir())
+        host = Path(d) / "host.exe"
+        built = subprocess.run([clang, "-O1", str(HERE / "engines" / "host" / "host.cpp"), "-o", str(host)] +
+                               (["-ldl"] if sys.platform.startswith("linux") else []), capture_output=True, text=True)
+        assert built.returncode == 0, built.stderr
+        ran = subprocess.run([str(host), str(Path(d) / lib)], capture_output=True, text=True, cwd=d)
+        assert ran.stdout.splitlines() == [
+            "start 0", "  [name 5]", "  [place 5]", "coin 5 Coin at 1 horizontal 2 vertical 3 depth", "begin 0",
+            "  [turn by 5 45]", "  [frame time]", "  [move 5 0 0.5 0]", "every frame 0",
+            "  [name 7]", "  [place 5]", "  [copy 5 1 4 3]", "  [remove 5]",
+            "problem: Line 16: there is no item 3 in a list of 1 item. Items are counted from 1.", "touched 2",
+            "doubled 0 1", "missing 1"], ran.stdout
+        alone = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script)], capture_output=True, text=True, cwd=d)
+        assert alone.returncode == 1 and "stellanova plugin game.stella" in alone.stdout, alone.stdout
 
 
 def built_run_checks():
