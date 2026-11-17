@@ -7,8 +7,11 @@
 #include "machine.h"
 #include <cstddef>
 static_assert(offsetof(Full, s) == offsetof(TextValue, s), "a text is the start of a Full");
-static_assert(offsetof(Full, nums) == 16 + sizeof(std::string) && offsetof(Full, boxed) == offsetof(Full, nums) + 3 * sizeof(size_t),
-              "machine.py reads these places itself");
+#ifdef __wasm__
+static_assert(offsetof(Full, nums) == 32 && offsetof(Full, boxed) == 80, "machine.py's nums_at and boxed_at need changing");
+#else
+static_assert(offsetof(Full, nums) == 48 && offsetof(Full, boxed) == 104, "machine.py's nums_at and boxed_at need changing");
+#endif
 
 #if defined(__linux__) || defined(__wasm__)
 #include <pthread.h>

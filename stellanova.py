@@ -3856,6 +3856,9 @@ def is_kind_of(kind, other):
     return kind == other
 
 
+machine.HAS_KINDS_OF = lambda kind: any(is_kind_of("thing " + k, kind) for k in PARENTS if "thing " + k != kind)
+
+
 def can(kind, able):
     """Can this kind of thing do everything the ability needs?"""
     commands = NAMES_NOW[0].commands if NAMES_NOW[0] else {}

@@ -29,11 +29,19 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 #include <cstring>
 struct Nums  // a list's plain numbers: laid out so machine code can add and read them itself (see machine.py's NUMS)
 {
-	double* data = nullptr;
-	size_t count = 0, room = 0;
+	double* data = few;  // (a few numbers are kept right here: most things' number parts, with no allocation)
+	size_t count = 0, room = 4;
+	double few[4];
 	Nums() = default;
 	Nums(const Nums& o) { *this = o; }
-	Nums(Nums&& o) noexcept : data(o.data), count(o.count), room(o.room) { o.data = nullptr, o.count = o.room = 0; }
+	Nums(Nums&& o) noexcept
+	{
+		if (o.data == o.few)
+			std::memcpy(few, o.few, sizeof few), count = o.count;
+		else
+			data = o.data, count = o.count, room = o.room;
+		o.data = o.few, o.count = 0, o.room = 4;
+	}
 	Nums& operator=(const Nums& o)
 	{
 		if (this != &o)
@@ -46,13 +54,20 @@ struct Nums  // a list's plain numbers: laid out so machine code can add and rea
 		}
 		return *this;
 	}
-	~Nums() { std::free(data); }
+	~Nums() { if (data != few) std::free(data); }
 	void reserve(size_t n)
 	{
 		if (n <= room)
 			return;
 		room = n < 8 ? 8 : n;
-		data = static_cast<double*>(std::realloc(data, room * sizeof(double)));
+		if (data == few)
+		{
+			double* bigger = static_cast<double*>(std::malloc(room * sizeof(double)));
+			std::memcpy(bigger, few, count * sizeof(double));
+			data = bigger;
+		}
+		else
+			data = static_cast<double*>(std::realloc(data, room * sizeof(double)));
 	}
 	void push_back(double x)
 	{
@@ -73,7 +88,7 @@ struct Nums  // a list's plain numbers: laid out so machine code can add and rea
 		--count;
 	}
 	void clear() { count = 0; }
-	void release() { std::free(data), data = nullptr, count = room = 0; }
+	void release() { if (data != few) std::free(data); data = few, count = 0, room = 4; }
 	size_t size() const { return count; }
 	bool empty() const { return count == 0; }
 	double& operator[](size_t k) { return data[k]; }

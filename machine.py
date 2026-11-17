@@ -19,6 +19,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 NUMBER, YESNO, TEXT, PLACE, FLAT = "number", "yes or no", "text", "place", "flat"
 THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set by stellanova.py before writing
+HAS_KINDS_OF = lambda kind: True  # are there kinds of this kind of thing (with parts of their own)? Set by stellanova.py
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
@@ -268,11 +269,14 @@ def zero_const(kind):
     return {"double": number(0.0), "i1": "false"}.get(ll_type(kind), "null")
 
 
-NUMS_AT_BY_TARGET = {"wasm": 28}  # where machine.h's Full keeps nums: after V (16 bytes) and the text (a std::string: 12 bytes in WASI's C++, 32 in the others)
-
-
 def nums_at():
-    return NUMS_AT_BY_TARGET.get(TARGET, 48)
+    """Where machine.h's Full keeps nums (after V and the text): machine.cpp checks these."""
+    return 32 if TARGET == "wasm" else 48
+
+
+def boxed_at():
+    """Where it keeps boxed (just after nums)."""
+    return 80 if TARGET == "wasm" else 104
 
 
 class Fn:
@@ -402,7 +406,7 @@ class Fn:
         Branches to the slow label when it isn't there (a list of plain numbers, not a whole number, out of range)."""
         flag, _, _, _, size = self.nums_place(lst)
         word = 4 if size == "i32" else 8
-        start = nums_at() + 3 * word  # (machine.h's Full: boxed is just after nums; a vector begins with its first and last places)
+        start = boxed_at()  # (a vector begins with its first place)
         whole, ranged, fast, slow = self.label("bwhole"), self.label("brange"), self.label("bfast"), self.label("bslow")
         self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), whole, slow)
         self.place(whole)
@@ -439,7 +443,7 @@ class Fn:
         at, fast, slow = self.item_place(lst, index)
         done = self.label("bput")
         if kind and kind.startswith("thing "):
-            self.put(f"call void @cn_assign(ptr {at}, ptr {x})")
+            self.assign_thing(at, x, kind)
         else:
             old = self.op(f"load ptr, ptr {at}")
             self.share(x)
@@ -680,6 +684,34 @@ class Fn:
         for t in texts:
             self.put(f"call void @cn_append(ptr {self.where(cpp, TEXT)}, ptr {t})")
 
+    def assign_thing(self, slot, value, kind):
+        """A thing put where one is held (cn_assign): for a kind that is only numbers, copied in by the machine code itself."""
+        parts = THINGS.get(kind, [])
+        if not parts or any(k != NUMBER for _, _, k in parts) or HAS_KINDS_OF(kind):
+            self.put(f"call void @cn_assign(ptr {slot}, ptr {value})")
+            return
+        to = self.op(f"load ptr, ptr {slot}")
+        checks = [f"icmp eq ptr {to}, null", f"icmp eq ptr {value}, null", f"icmp eq ptr {to}, {value}"]
+        bad = [self.op(c) for c in checks]
+        look, fast, slow, done = self.label("asklook"), self.label("asfast"), self.label("asslow"), self.label("asdone")
+        self.branch(self.op(f"or i1 {self.op(f'or i1 {bad[0]}, {bad[1]}')}, {bad[2]}"), slow, look)
+        self.place(look)
+        flag = lambda v: self.op(f"load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {v}, i64 3')}")
+        shared = self.op(f"load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {to}, i64 4')}")
+        ok = self.op(f"and i1 {self.op(f'icmp ne i8 {flag(to)}, 0')}, {self.op(f'icmp ne i8 {flag(value)}, 0')}")
+        self.branch(self.op(f"and i1 {ok}, {self.op(f'icmp eq i8 {shared}, 0')}"), fast, slow)
+        self.place(fast)
+        data = lambda v: self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {v}, i64 {nums_at()}')}")
+        a, b = data(value), data(to)
+        for k in range(len(parts)):
+            d = self.op(f"load double, ptr {self.op(f'getelementptr inbounds double, ptr {a}, i32 {k}')}")
+            self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds double, ptr {b}, i32 {k}')}")
+        self.jump(done)
+        self.place(slow)
+        self.put(f"call void @cn_assign(ptr {slot}, ptr {value})")
+        self.jump(done)
+        self.place(done)
+
     def own(self, cpp, kind):
         """A name's list, table, place or thing, about to be changed: copied first if it is held elsewhere too."""
         if ll_type(kind) != "ptr" or kind == TEXT or kind.startswith("command("):
@@ -701,7 +733,7 @@ class Fn:
 
     def store(self, cpp, kind, value):
         if kind.startswith("thing ") and not self.fresh(value):  # (into the thing already there, when only this name holds it)
-            self.put(f"call void @cn_assign(ptr {self.where(cpp, kind)}, ptr {value})")
+            self.assign_thing(self.where(cpp, kind), value, kind)
             return
         mutable = ll_type(kind) == "ptr" and kind != TEXT and not kind.startswith("command(")
         old = self.op(f"load ptr, ptr {self.where(cpp, kind)}") if mutable else None
