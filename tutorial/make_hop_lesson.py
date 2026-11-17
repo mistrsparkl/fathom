@@ -1,4 +1,4 @@
-"""Writes lessons/16-platformer.lesson from lessons/files/hop.stella and records.stella: the game is put together piece
+"""Writes lessons/17-platformer.lesson from lessons/files/hop.stella and records.stella: the game is put together piece
 by piece, in the file's own order, so every zoom names the file's real line numbers. The game uses every part of the
 language the lessons before it teach."""
 from pathlib import Path
@@ -73,7 +73,7 @@ def span(a_text, b_text, start=1, lines=None):
 
 put("title: Making a platform game")
 put("files: records.stella")
-put("card: Chapter 16 | Making a game | Hop! A platform game that uses everything")
+put("card: Chapter 17 | Making a game | Hop! A platform game that uses everything")
 say("Now let's put it all together, and make a real game: a platform game called Hop.",
     "A little blue block runs and jumps across floating platforms, picks up every coin, dodges spikes and bees, and reaches the flag at the end.",
     "It uses every part of the language we've seen. We'll write it piece by piece, and look closely at how each piece works.")
@@ -301,5 +301,5 @@ put("card: Thank you | That's Stellanova | Every word is in the list on the left
 say("That's every part of Stellanova. Every word is listed in the studio, and in the language guide. Now it's your turn: go and make something of your own.")
 put("pause: 2")
 
-(HERE / "lessons" / "16-platformer.lesson").write_text("\n".join(out) + "\n", encoding="utf-8")
-print("made 16-platformer.lesson")
+(HERE / "lessons" / "17-platformer.lesson").write_text("\n".join(out) + "\n", encoding="utf-8")
+print("made 17-platformer.lesson")

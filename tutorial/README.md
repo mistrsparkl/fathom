@@ -16,7 +16,7 @@ cd ../../tutorial
 py -3 join.py                                     # out/Stellanova Tutorial.mp4, a chapter per lesson
 ```
 
-`py -3 make_hop_lesson.py` writes `lessons/16-platformer.lesson` from the game itself (and the `records.stella` script it uses), so its line numbers stay right
+`py -3 make_hop_lesson.py` writes `lessons/17-platformer.lesson` from the game itself (and the `records.stella` script it uses), so its line numbers stay right
 when the game changes. Games are filmed by the game itself: the window library's demo mode (`STELLANOVA_DEMO_FRAMES`,
 `STELLANOVA_DEMO_KEYS`) writes every frame and presses keys from a list like `lessons/files/hop.keys`.
 

@@ -1,0 +1,183 @@
+title: Sorting, lining up, and tidy programs
+card: Chapter 16 | Sorting | Biggest first, and by what each works out to
+say:
+  Real programs sort things, line them up in columns, and grow into several scripts. Here are the words for that.
+uncard
+
+new: spending.stella
+type fast:
+  a cost has:
+    kind (text)
+    amount (a number)
+  and the universe said i love you
+
+  to cost of, given kind (text) and amount (a number), returning a cost:
+    conjure a cost as c
+    set the kind of c to kind
+    set the amount of c to amount
+    return c
+  and the universe said i love you
+
+  genesis:
+    set costs to a list containing (cost of with ("food", 20.75), cost of with ("rent", 700), cost of with ("fun", 20))
+    for each c in sorted costs by amount, biggest first:
+      scrawl the kind of c padded to 8 letters, the amount of c
+  and the universe said i love you
+run
+zoom: lines 15-17
+say:
+  Sorted costs by amount puts the smallest first. Adding biggest first turns it round. Padded to eight letters puts spaces after each kind, so the amounts line up in a column.
+zoom: #output
+wait
+zoom: out
+
+select: 16-16
+type:
+      scrawl the kind of c padded to 8 letters, the amount of c
+    scrawl sorted a list containing ("Tomas", "Al", "Rex") by each n becomes the size of n
+keys: enter
+run
+zoom: #output
+say:
+  Sorting can also go by anything worked out from each item. Here, by each n becomes the size of n: the shortest name first. Things that come out the same keep the order they had.
+wait
+zoom: out
+
+card: Chapter 16 | Text | Every alphabet
+say:
+  Text words count letters, not bytes, so accents, other alphabets and emoji all work the way they look.
+uncard
+new: letters.stella
+type fast:
+  genesis:
+    set word to "straße Ωμέγα 😀"
+    scrawl upper case of word
+    scrawl the size of word, " letters; the last is ", letter (the size of word) of word
+    scrawl "ab" repeated 3 times
+  and the universe said i love you
+run
+zoom: #output
+say:
+  Upper case changes every alphabet. A letter with no single capital, like this German one, stays as it is. The emoji counts as one letter, and repeated gives text that many times over.
+wait
+zoom: out
+
+card: Chapter 16 | Several scripts | Keeping a command to its own script
+say:
+  As a program grows into several scripts, two of them may want a helper with the same name. A command written privately is kept to its own script.
+uncard
+new: money.stella
+type fast:
+  to tidy, privately, given amount (a number), returning text:
+    return "$" plus (amount rounded to 2 decimal places)
+  and the universe said i love you
+
+  to price tag, given amount (a number), returning text:
+    return "costs " plus tidy with amount
+  and the universe said i love you
+save
+new: shop.stella
+type fast:
+  use: money.stella
+
+  to tidy, given name (text), returning text:
+    return trimmed name
+  and the universe said i love you
+
+  genesis:
+    scrawl tidy with "  tea  ", " ", price tag with 3.25
+  and the universe said i love you
+run
+zoom: #output
+say:
+  Money's tidy is written privately, so only money dot stella can use it, and the shop can have a tidy of its own. Without privately, Stellanova would say there are two commands called tidy, and where each one is.
+wait
+zoom: out
+
+card: Chapter 16 | Files | Is it there?
+say:
+  Asking whether a file or a folder is there reads the same way for both.
+uncard
+new: saves.stella
+type fast:
+  genesis:
+    if folder "saves" exists:
+      scrawl "found the saves"
+    otherwise:
+      make the folder "saves"
+      scrawl "made the saves folder"
+    scrawl file "saves/game.txt" exists
+    scrawl extension of "saves/game.txt", " ", file name of "saves/game.txt"
+  and the universe said i love you
+run
+zoom: #output
+say:
+  Folder saves exists is yes or no, like file exists. Extension of, and file name of, take a path apart.
+wait
+zoom: out
+
+card: Chapter 16 | Kinds | Parts only a kind's own commands can touch
+say:
+  A part written hidden can only be used by the commands for that kind of thing. Everywhere else, it is a mistake to reach in and change it.
+uncard
+new: bank.stella
+type fast:
+  an account has:
+    balance (a number, hidden)
+  and the universe said i love you
+
+  a savings account is a kind of account that has:
+    rate (a number)
+  and the universe said i love you
+
+  to pay in, for an account, given amount (a number):
+    if amount falls below 0: raise an error with "pay in more than nothing"
+    set the balance of account to the balance of account plus amount
+  and the universe said i love you
+
+  to balance now, for an account, returning a number:
+    return the balance of account
+  and the universe said i love you
+
+  genesis:
+    conjure a savings account as mine
+    pay in with (mine, 50)
+    scrawl balance now mine
+    scrawl mine is an account, " ", mine is a savings account
+  and the universe said i love you
+run
+zoom: #output
+say:
+  Only pay in can change the balance, so it can't go wrong from outside. And is a asks what kind of thing something really is: a savings account is an account too.
+wait
+zoom: out
+
+card: Chapter 16 | The web | A server that says how it was asked
+say:
+  A web server's answer command can see how it was asked, with the web way, and say a page isn't there with a status.
+uncard
+new: tiny server.stella
+type fast:
+  use: server
+  use: web
+
+  to answer, given address (text), returning text:
+    if address is not "/":
+      answer with the status 404
+      return "no such page"
+    return "you asked with " plus the web way
+  and the universe said i love you
+
+  genesis:
+    meanwhile serve the web with (8790, the command answer)
+    wait 0.5
+    scrawl ask the web with ("http://127.0.0.1:8790/", "POST", "hi"), ", status ", the last web status
+    scrawl ask the web with ("http://127.0.0.1:8790/nope", "GET"), ", status ", the last web status
+    end the program with 0
+  and the universe said i love you
+run
+zoom: #output
+say:
+  The program serves the web alongside, then asks itself twice. The first answer knows it was a POST. The second page isn't there, so it comes back with status four oh four.
+wait
+zoom: out

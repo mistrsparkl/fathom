@@ -1,6 +1,6 @@
 title: Making a platform game
 files: records.stella
-card: Chapter 16 | Making a game | Hop! A platform game that uses everything
+card: Chapter 17 | Making a game | Hop! A platform game that uses everything
 say:
   Now let's put it all together, and make a real game: a platform game called Hop.
   A little blue block runs and jumps across floating platforms, picks up every coin, dodges spikes and bees, and reaches the flag at the end.
