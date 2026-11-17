@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
-FALLIBLE = {"cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
+FALLIBLE = {"cn_own_item", "cn_own_entry", "cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
@@ -38,7 +38,7 @@ WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt
 
 # libraries whose words only work things out, never waiting: their calls needn't keep registers for the collector
 NEVER_WAIT = {"builtins", "maths", "letters", "patterns", "big numbers"}
-NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\(|cn_list_put_number\()"  # (adding a number to a list keeps it in the list)
+NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\(|cn_list_put_number\(|cn_part_number\(|cn_part_number_put\()|call ptr @cn_(?:text_kept|own|own_field|own_item|own_entry)\("  # (adding a number to a list keeps it in the list)
                        r"|call (?:double|i1) @cn_w_\w+\((?:(?:double|i1|i32) [^,()]*(?:, )?)*\)$")  # a library word given and giving only numbers or yes/no
 
 
@@ -46,6 +46,12 @@ def makes_nothing(lines):
     """True when these lines make no values of their own: they call nothing, or only commands of the program's own
     that give back a number, yes or no, or nothing (those free what they make themselves, and look for a collector)."""
     return all("call " not in l or (TARGET != "wasm" and NO_VALUES.search(l)) for l in lines)
+
+
+def owned(f, v):
+    """v, about to be changed in place: a copy first wherever it is held elsewhere too (and kept where v is)."""
+    own = getattr(v, "ir_own", None)
+    return own(f) if own else emit(f, v)
 
 
 def emit(f, x, what="a part of the language"):
@@ -157,6 +163,15 @@ declare ptr @cn_place_op(i32, ptr, ptr)
 declare ptr @cn_place_scale(i32, ptr, double)
 declare double @cn_place_size(ptr)
 declare ptr @cn_thing(ptr)
+declare ptr @cn_text_kept(ptr, i64, ptr)
+declare ptr @cn_deep(ptr)
+declare ptr @cn_join_number(ptr, double)
+declare double @cn_part_number(ptr, i32)
+declare void @cn_part_number_put(ptr, i32, double)
+declare ptr @cn_own(ptr)
+declare ptr @cn_own_field(ptr, i32)
+declare ptr @cn_own_item(ptr, double, i32)
+declare ptr @cn_own_entry(ptr, ptr, i32)
 declare ptr @cn_zero_part(i1)
 declare ptr @cn_as_kind(ptr, ptr)
 declare ptr @cn_field(ptr, i32)
@@ -195,6 +210,7 @@ class Module:
         self.shared = {}  # 'the world remembers:' names: C++ name -> kind
         self.units = {}  # built-in and library words the program uses: unit -> [head, {C function name: its C++}]
         self.texts = {}
+        self.text_slots = set()  # texts written in the program, each made once (see text_const)
 
     def bytes_const(self, data):
         if data not in self.texts:
@@ -392,6 +408,33 @@ class Fn:
         self.jump(done)
         self.place(done)
 
+    def thing_number(self, thing, k):
+        """Number part k of a thing: read in place while its number parts are kept plain."""
+        flag, data, _, _, _ = self.nums_place(thing)
+        fast, slow, done = self.label("partfast"), self.label("partslow"), self.label("partread")
+        self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
+        self.place(fast)
+        a = self.op(f"load double, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, i32 {k}')}")
+        self.jump(done)
+        self.place(slow)
+        b = self.op(f"call double @cn_part_number(ptr {thing}, i32 {k})")
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow} ]")
+
+    def put_thing_number(self, thing, k, d):
+        """Sets number part k of a thing in place (the runtime first, if its number parts aren't kept plain)."""
+        flag, data, _, _, _ = self.nums_place(thing)
+        fast, slow, done = self.label("partput"), self.label("partplain"), self.label("partset")
+        self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
+        self.place(fast)
+        self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, i32 {k}')}")
+        self.jump(done)
+        self.place(slow)
+        self.put(f"call void @cn_part_number_put(ptr {thing}, i32 {k}, double {d})")
+        self.jump(done)
+        self.place(done)
+
     def list_number(self, lst, k):
         """Item k (from 0, always there) of a list of numbers, read in place while it holds plain numbers."""
         flag, data, _, _, size = self.nums_place(lst)
@@ -539,12 +582,36 @@ class Fn:
         for t in texts:
             self.put(f"call void @cn_append(ptr {self.where(cpp, TEXT)}, ptr {t})")
 
+    def own(self, cpp, kind):
+        """A name's list, table, place or thing, about to be changed: copied first if it is held elsewhere too."""
+        if ll_type(kind) != "ptr" or kind == TEXT or kind.startswith("command("):
+            return self.load(cpp, kind)
+        where = self.where(cpp, kind)
+        have = self.op(f"load ptr, ptr {where}")
+        look, copy, done = self.label("ownlook"), self.label("owncopy"), self.label("owned")
+        before = self.here
+        self.branch(self.op(f"icmp eq ptr {have}, null"), done, look)  # (nothing: no thing to copy)
+        self.place(look)
+        shared = self.op(f"icmp ne i8 {self.op(f'load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {have}, i64 4')}')}, 0")
+        self.branch(shared, copy, done)  # (V's shared flag, 4 bytes in)
+        self.place(copy)
+        made = self.op(f"call ptr @cn_own(ptr {have})")
+        self.put(f"store ptr {made}, ptr {where}")
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi ptr [ {have}, %{before} ], [ {have}, %{look} ], [ {made}, %{copy} ]")
+
     def store(self, cpp, kind, value):
         self.put(f"store {ll_type(kind)} {self.copied(value, kind)}, ptr {self.where(cpp, kind)}")
 
     def text_const(self, s):
+        """Text written in the program: made the first time it is used, then the same value each time."""
         const, size = self.module.text(s)
-        return self.op(f"call ptr @cn_text(ptr {const}, i64 {size})")
+        slot = const.replace("@s", "@ts")
+        if slot not in self.module.text_slots:
+            self.module.text_slots.add(slot)
+            self.module.constants.append(f"{slot} = internal global ptr null")
+        return self.op(f"call ptr @cn_text_kept(ptr {const}, i64 {size}, ptr {slot})")
 
     def as_text(self, value, kind):
         if kind == TEXT:
@@ -825,7 +892,8 @@ def meanwhile(f, piece):
     block = f.op(f"call ptr @cn_memory(i64 {8 * max(1, len(used))})")
     for k, (cpp, (where, kind)) in enumerate(used):
         at = f.op(f"getelementptr i8, ptr {block}, i64 {8 * k}")
-        f.put(f"store {ll_type(kind)} {f.copied(f.load(cpp, kind), kind)}, ptr {at}")
+        x = f.load(cpp, kind)
+        f.put(f"store {ll_type(kind)} {f.op(f'call ptr @cn_deep(ptr {x})') if ll_type(kind) == 'ptr' and kind != TEXT and not kind.startswith('command(') else x}, ptr {at}")  # (nothing shared across threads)
         at = g.tmp()
         g.entry += [f"  {at} = getelementptr i8, ptr %p.names, i64 {8 * k}"]
         value = g.tmp()

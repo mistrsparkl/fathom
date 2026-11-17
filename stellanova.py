@@ -1426,16 +1426,25 @@ def field_index(kind, member):
     return next(k for k, (cpp, _, _) in enumerate(machine.THINGS[kind]) if cpp == member)
 
 
-def thing_part_ir(owner_ir, kind, member, part_kind):
-    """A part of a thing: (get, put) machine-code writers. owner_ir(f) gives the thing itself (not a copy)."""
+def thing_part_ir(owner_ir, kind, member, part_kind, owner_own=None):
+    """A part of a thing: (get, put, own) machine-code writers. owner_ir(f) gives the thing itself (not a copy),
+    owner_own(f) the same, ready to be changed."""
     k = field_index(kind, member)
+    owner_own = owner_own or owner_ir
 
     def get(f):
+        if part_kind == NUMBER:
+            return f.thing_number(owner_ir(f), k)
         return f.unbox(f.op(f"call ptr @cn_field(ptr {owner_ir(f)}, i32 {k})"), part_kind)
 
     def put(f, x):
-        f.put(f"call void @cn_field_put(ptr {owner_ir(f)}, i32 {k}, ptr {f.box(x, part_kind)})")
-    return get, put
+        if part_kind == NUMBER:
+            return f.put_thing_number(owner_own(f), k, x)
+        f.put(f"call void @cn_field_put(ptr {owner_own(f)}, i32 {k}, ptr {f.box(x, part_kind)})")
+
+    def own(f):
+        return f.op(f"call ptr @cn_own_field(ptr {owner_own(f)}, i32 {k})") if machine.ll_type(part_kind) == "ptr" else get(f)
+    return get, put, own
 
 
 WORLD_KINDS = {}  # 'the world remembers:' names: C++ name -> kind (for machine code's shared names)
@@ -1448,7 +1457,15 @@ def join_ir(f, parts):
     """The parts' text, one after the other."""
     out = None
     for v in parts:
+        if out is not None and v.kind == NUMBER:  # (one new text, not two)
+            out = f.op(f"call ptr @cn_join_number(ptr {out}, double {machine.emit(f, v)})")
+            continue
         t = f.as_text(machine.emit(f, v), v.kind)
+        made = f"  {t} = call ptr @cn_text_number(double "
+        if out is not None and f.lines and f.lines[-1].startswith(made):  # '"w" plus (n as text)': one new text, not two
+            number = f.lines.pop()[len(made):-1]
+            out = f.op(f"call ptr @cn_join_number(ptr {out}, double {number})")
+            continue
         out = t if out is None else f.op(f"call ptr @cn_join(ptr {out}, ptr {t})")
     return out
 
@@ -1513,9 +1530,10 @@ class Names:
             v = Value(cpp, kind, run[0], None if read_only else run[1])
             if cpp in WORLD_KINDS:
                 v.ir, v.ir_store = (lambda f: f.load(cpp, kind)), (lambda f, x: f.store(cpp, kind, x))
+                v.ir_own = lambda f: f.own(cpp, kind)
             elif "." in cpp:  # 'speed' inside 'to bounce, for a ball:' is the ball's speed
                 own, member = cpp.split(".", 1)
-                v.ir, v.ir_store = thing_part_ir(lambda f: f.load(own, f.slots[own][1]), OWNER_KINDS[own], member, kind)
+                v.ir, v.ir_store, v.ir_own = thing_part_ir(lambda f: f.load(own, f.slots[own][1]), OWNER_KINDS[own], member, kind)
             else:  # the whole thing: setting it changes the caller's thing
                 v.ir = lambda f: f.load(cpp, kind)
                 v.ir_store = lambda f, x: f.put(f"call void @cn_replace(ptr {f.load(cpp, kind)}, ptr {x})")
@@ -1536,6 +1554,7 @@ class Names:
         put.py_store = lambda x: f"env[{cpp!r}] = {py_copy(x, kind)}"
         v = with_ir(Value(cpp, kind, get, None if read_only else put), lambda f: f.load(cpp, kind))
         v.ir_store = lambda f, x: f.store(cpp, kind, x)
+        v.ir_own = lambda f: f.own(cpp, kind)
         v.local_name = cpp
         return v
 
@@ -2208,9 +2227,11 @@ class Expr:
                 f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
                                ("i32", line), checked=True), v.kind)
             if seq.writable and v.kind == NUMBER:  # in place, in the machine code itself
-                v.ir_store = lambda f, x: f.write_number_item(machine.emit(f, seq), machine.emit(f, index), x, line)
+                v.ir_store = lambda f, x: f.write_number_item(machine.owned(f, seq), machine.emit(f, index), x, line)
             elif seq.writable:
-                v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
+                v.ir_own = lambda f: f.call("ptr", "cn_own_item", ("ptr", machine.owned(f, seq)), ("double", machine.emit(f, index)),
+                                            ("i32", line), checked=True)
+                v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.owned(f, seq)), ("double", machine.emit(f, index)),
                                                  ("ptr", f.box(x, v.kind)), ("i32", line), checked=True)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
                 v.cpp_assign, v.cpp_close = f"stellanova::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
@@ -2234,7 +2255,10 @@ class Expr:
             v.ir = lambda f: f.unbox(f.call("ptr", "cn_entry", ("ptr", machine.emit(f, table)), ("ptr", machine.emit(f, name)),
                                             ("i32", line), checked=True), v.kind)
             if table.writable:
-                v.ir_store = lambda f, x: f.put(f"call void @cn_entry_put(ptr {machine.emit(f, table)}, ptr {machine.emit(f, name)}, ptr {f.box(x, v.kind)})")
+                v.ir_store = lambda f, x: f.put(f"call void @cn_entry_put(ptr {machine.owned(f, table)}, ptr {machine.emit(f, name)}, ptr {f.box(x, v.kind)})")
+                if machine.ll_type(v.kind) == "ptr":
+                    v.ir_own = lambda f: f.call("ptr", "cn_own_entry", ("ptr", machine.owned(f, table)), ("ptr", machine.emit(f, name)),
+                                                ("i32", line), checked=True)
             v.cpp_assign = f"({table.cpp})[{strip_parens(name.cpp)}] = "  # setting an entry may make a new one
             if JS:
                 v.cpp_assign, v.cpp_close = f"stellanova::put_entry({table.cpp}, {strip_parens(name.cpp)}, ", ")"
@@ -2751,20 +2775,22 @@ def part_of(owner, key, line=0):
     if owner.kind in (PLACE, FLAT):
         k = "XYZ".index(member)
         v.ir = lambda f: f.op(f"call double @cn_part(ptr {machine.emit(f, owner)}, i32 {k})")
-        v.ir_store = lambda f, x: f.put(f"call void @cn_part_put(ptr {machine.emit(f, owner)}, i32 {k}, double {x})")
+        v.ir_store = lambda f, x: f.put(f"call void @cn_part_put(ptr {machine.owned(f, owner)}, i32 {k}, double {x})")
     else:
         k = field_index(owner.kind, member)
-        v.ir, v.ir_store = thing_part_ir(lambda f: f.op(f"call ptr @cn_something(ptr {machine.emit(f, owner)}, ptr {f.spec(owner.kind)}, "
-                                                        f"i32 {k}, i32 {line})"), owner.kind, member, kind)
+        v.ir, v.ir_store, v.ir_own = thing_part_ir(
+            lambda f: f.op(f"call ptr @cn_something(ptr {machine.emit(f, owner)}, ptr {f.spec(owner.kind)}, i32 {k}, i32 {line})"),
+            owner.kind, member, kind,
+            lambda f: f.op(f"call ptr @cn_something(ptr {machine.owned(f, owner)}, ptr {f.spec(owner.kind)}, i32 {k}, i32 {line})"))
     if not owner.writable:
-        v.ir_store = None
+        v.ir_store = v.ir_own = None
     if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:
         def born(env, x):
             fields = get(env).fields
             fields["birth"], fields["existence"] = dup(x), dup(x)
         v.store = born
-        _, put_birth = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, "birth", kind)
-        _, put_existence = thing_part_ir(lambda f: machine.emit(f, owner), owner.kind, "existence", kind)
+        _, put_birth, _ = thing_part_ir(lambda f: machine.owned(f, owner), owner.kind, "birth", kind)
+        _, put_existence, _ = thing_part_ir(lambda f: machine.owned(f, owner), owner.kind, "existence", kind)
         v.ir_store = lambda f, x: (put_birth(f, x), put_existence(f, x))
         v.cpp_assign, v.cpp_close = f"stellanova::born(({owner.cpp}).birth, ({owner.cpp}).existence, ", ")"
         if JS:
@@ -4722,8 +4748,8 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"This list holds {plural(element(target.kind))}, so I can't add {kind_name(v.kind)} to it.")
         seq, get = target.run, v.run
         added = with_ir(lambda env: seq(env).append(dup(get(env))),
-                        lambda f: f.add_number(machine.emit(f, target), machine.emit(f, v)) if v.kind == NUMBER else
-                        f.put(f"call void @cn_list_add(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
+                        lambda f: f.add_number(machine.owned(f, target), machine.emit(f, v)) if v.kind == NUMBER else
+                        f.put(f"call void @cn_list_add(ptr {machine.owned(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         added.pyl = lambda tab: [(None, f"{tab}{py_expr(target)}.append({py_expr(v) if v.kind in (NUMBER, YESNO, TEXT) else '_dup(' + py_expr(v) + ')'})")]
         if JS:
             return [f"{tab}({target.cpp}).push({js_copy(v.cpp, v.kind)});"], added, None
@@ -4743,7 +4769,7 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"'insert ... at' needs a number for the place, but this is {kind_name(index.kind)}.")
         seq, get, at = target.run, v.run, index.run
         inserted = with_ir(lambda env: insert_at(seq(env), at(env), dup(get(env)), n),
-                           lambda f: f.call("void", "cn_list_insert", ("ptr", machine.emit(f, target)), ("double", machine.emit(f, index)),
+                           lambda f: f.call("void", "cn_list_insert", ("ptr", machine.owned(f, target)), ("double", machine.emit(f, index)),
                                             ("ptr", f.box(machine.emit(f, v), v.kind)), ("i32", n), checked=True))
         if JS:
             return [f"{tab}stellanova.insert_item({target.cpp}, {strip_parens(index.cpp)}, {js_copy(v.cpp, v.kind)}, {n});"], inserted, None
@@ -4757,7 +4783,7 @@ def statement(n, text_, inner, names, declared, depth):
         get, at = table.run, key.run
         return ([f"{tab}stellanova::remove_entry({table.cpp}, {strip_parens(key.cpp)}, {n});"],
                 with_ir(lambda env: remove_entry(get(env), at(env), n),
-                        lambda f: f.call("void", "cn_entry_remove", ("ptr", machine.emit(f, table)), ("ptr", machine.emit(f, key)),
+                        lambda f: f.call("void", "cn_entry_remove", ("ptr", machine.owned(f, table)), ("ptr", machine.emit(f, key)),
                                          ("i32", n), checked=True)), None)
     if tokens[0] == "remove" and "from" in tokens:
         cut = len(tokens) - 1 - tokens[::-1].index("from")
@@ -4772,7 +4798,7 @@ def statement(n, text_, inner, names, declared, depth):
             def run(env):
                 items = seq(env)
                 items.pop(index_of(items, at(env), n))
-            with_ir(run, lambda f: f.call("void", "cn_list_remove_item", ("ptr", machine.emit(f, target)),
+            with_ir(run, lambda f: f.call("void", "cn_list_remove_item", ("ptr", machine.owned(f, target)),
                                           ("double", machine.emit(f, index)), ("i32", n), checked=True))
             return [f"{tab}stellanova::remove_item({target.cpp}, {strip_parens(index.cpp)}, {n});"], run, None
         v = expr_to_end(tokens[:cut], 1, names, n)
@@ -4784,7 +4810,7 @@ def statement(n, text_, inner, names, declared, depth):
             items, x = seq(env), get(env)
             if x in items:
                 items.remove(x)
-        with_ir(run, lambda f: f.put(f"call void @cn_list_remove_value(ptr {machine.emit(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
+        with_ir(run, lambda f: f.put(f"call void @cn_list_remove_value(ptr {machine.owned(f, target)}, ptr {f.box(machine.emit(f, v), v.kind)})"))
         return [f"{tab}stellanova::remove_value({target.cpp}, {strip_parens(v.cpp)});"], run, None
     if tokens[0] == "draw":
         raise ScriptError(n, "'draw' is now 'etch', like: etch a circle with 100, 100, 20, \"orange\".")
@@ -5095,7 +5121,7 @@ def able_call(key, command, args, names, n):
         return nearest_version(versions, "thing " + given[0].name).runner(*given)
 
     def write(f):
-        done = [machine.emit(f, a) for a in args]
+        done = [machine.owned(f, args[0])] + [machine.emit(f, a) for a in args[1:]]
         done = done[:1] + [f.copied(x, a.kind) for x, a in zip(done[1:], args[1:])]
         f.op(f"call ptr @cn_able(ptr {done[0]}, ptr {f.module.bytes_const(able.encode())}, ptr {f.module.bytes_const(what.encode())}, i32 {n})")
         slot = None
@@ -5159,7 +5185,7 @@ def call(key, args, names, n):
     cpp = command.cpp
     if command.inputs is None:  # one of the script's own commands: after it, look whether a problem happened in it
         def write(f, command=command, args=args):
-            done = [machine.emit(f, a) for a in args]
+            done = [machine.owned(f, a) if k == 0 and command.cpp in OWNERS else machine.emit(f, a) for k, a in enumerate(args)]
             if command.cpp not in OWNERS or not done:  # inputs are copies, except the thing a command for a kind changes
                 done = [f.copied(x, a.kind) for x, a in zip(done, args)]
             else:
@@ -5219,7 +5245,7 @@ def owner_command_value(c, line):
 
     def body_ir(f):
         args = [f.load(x, k) for x, k in zip(ins, c.kinds)]
-        args = [args[0] if c.gives else f.copied(args[0], thing)] + [f.copied(x, k) for x, k in zip(args[1:], c.kinds[1:])]
+        args = [args[0] if c.gives else f.op(f"call ptr @cn_own(ptr {f.copied(args[0], thing)})")] + [f.copied(x, k) for x, k in zip(args[1:], c.kinds[1:])]
         given = ", ".join(f"{machine.ll_type(k)} {x}" for x, k in zip(args, c.kinds))
         name = machine_name(c.cpp, [((), k) for k in c.kinds])
         if c.gives:

@@ -1,8 +1,11 @@
 // The one kind of value machine code passes around for everything that isn't a number or yes/no (see machine.cpp).
 // Library words made into machine code (machine.py's library wrappers) turn these into C++ values and back.
 #pragma once
+#include <algorithm>
 #include <functional>
 #include <map>
+#include <memory>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -17,7 +20,8 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 	char tag = 'n';  // n number, y yes or no, t text, l list, m table, p place, f flat place, k thing, c command
 	bool marked = false;  // the collector reached it
 	bool owned = false;  // text only one name holds (cn_append): it may grow in place
-	bool numbers = false;  // a list holding only plain numbers (in Full's nums)
+	bool numbers = false;  // a list holding only plain numbers (in Full's nums); a thing whose number parts are there
+	bool shared = false;  // may be held in more than one place: copied before it is changed
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 
@@ -79,17 +83,60 @@ struct Nums  // a list's plain numbers: laid out so machine code can add and rea
 	double* end() const { return data + count; }
 };
 
+struct Table  // a table's entries: made only when the first is put in (most values aren't tables)
+{
+	using Map = std::unordered_map<std::string, V*>;
+	std::unique_ptr<Map> m;
+	Table() = default;
+	Table(const Table& o) { *this = o; }
+	Table& operator=(const Table& o)
+	{
+		if (this == &o)
+			return *this;
+		if (o.empty())
+			clear();
+		else if (m)
+			*m = *o.m;
+		else
+			m = std::make_unique<Map>(*o.m);
+		return *this;
+	}
+	static Map& none() { static Map nothing; return nothing; }  // (never changed)
+	Map& have() const { return m ? *m : none(); }
+	bool empty() const { return !m || m->empty(); }
+	size_t size() const { return m ? m->size() : 0; }
+	void clear() { if (m) m->clear(); }
+	Map::iterator begin() const { return have().begin(); }
+	Map::iterator end() const { return have().end(); }
+	Map::iterator find(const std::string& k) const { return have().find(k); }
+	size_t count(const std::string& k) const { return m ? m->count(k) : 0; }
+	size_t erase(const std::string& k) { return m ? m->erase(k) : 0; }
+	V*& operator[](const std::string& k) { return made()[k]; }
+	std::pair<Map::iterator, bool> try_emplace(const std::string& k) { return made().try_emplace(k); }
+	Map& made() { if (!m) m = std::make_unique<Map>(); return *m; }
+};
+
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
 	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): first, at a fixed place
 	double x = 0, y = 0, z = 0;  // a place
 	std::string s;  // text
 	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items
-	std::map<std::string, V*> table;
+	Table table;  // (in no order: sorted_keys gives them in order)
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
+	std::pair<const std::string, V*>* last = nullptr;  // a table's entry found last (most lines use one entry twice or more)
 };
 
+inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Full* f)  // a table's entries, in order of name
+{
+	std::vector<const std::pair<const std::string, V*>*> out;
+	out.reserve(f->table.size());
+	for (const auto& e : f->table)
+		out.push_back(&e);
+	std::sort(out.begin(), out.end(), [](auto* a, auto* b) { return a->first < b->first; });
+	return out;
+}
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
 inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }

@@ -769,6 +769,21 @@ def program_checks():
     assert out.stdout == "inside the lock\nthe other one has it\n60000\n", repr(out.stdout + out.stderr)
     assert "can't leave it partway" in perr('to f:\n  holding the lock "a":\n    return\n' + END + 'genesis:\n  f\n' + END)[1]
 
+    # Values shared until one is changed: a change never shows up in a copy (lists, tables, things, and what they hold).
+    out = both('a dot has:\n  x (a number)\n  tags (a list of text)\n  inner (a list of numbers)\nand the universe said i love you\n\nto nudge, for a dot:\n  set x to x plus 1\n  add "n" to tags\nand the universe said i love you\n\nto grow, given xs (a list of numbers):\n  set mine to xs\n  add 99 to mine\n  scrawl "inside ", mine\nand the universe said i love you\n\ngenesis:\n  conjure a dot as d\n  add "a" to the tags of d\n  add 1 to the inner of d\n  set e to d\n  set the x of e to 5\n  add "b" to the tags of e\n  add 2 to the inner of e\n  scrawl the x of d, " ", the tags of d, " ", the inner of d\n  scrawl the x of e, " ", the tags of e, " ", the inner of e\n  set ds to a list of dots\n  add d to ds\n  add d to ds\n  set the x of item 1 of ds to 7\n  add "c" to the tags of item 2 of ds\n  scrawl the x of item 1 of ds, " ", the x of item 2 of ds, " ", the tags of item 1 of ds, " ", the tags of item 2 of ds, " ", the tags of d\n  for each p in ds:\n    set q to p\n    set the x of q to 100\n    add "z" to the tags of q\n    scrawl the tags of q, " ", the tags of p\n  scrawl the x of item 1 of ds, " ", the tags of item 1 of ds\n  nudge item 1 of ds\n  nudge d\n  scrawl the x of item 1 of ds, " ", the tags of item 1 of ds, " ", the x of item 2 of ds, " ", the tags of d\n  set xs to a list of (1, 2)\n  set ys to xs\n  grow xs\n  scrawl xs, " ", ys\n  set t to a table of lists of numbers\n  set entry "a" of t to xs\n  add 5 to entry "a" of t\n  set item 1 of entry "a" of t to 42\n  scrawl xs, " ", entry "a" of t\n  set u to t\n  add 6 to entry "a" of u\n  scrawl entry "a" of t, " ", entry "a" of u\n  set nest to a list of lists of numbers\n  add xs to nest\n  add xs to nest\n  add 8 to item 1 of nest\n  set item 1 of item 2 of nest to 0\n  scrawl nest, " ", xs\n  set copy to nest\n  for each row in copy:\n    set r to row\n    add 3 to r\n    scrawl r, " ", row\n  scrawl nest, " ", copy\nand the universe said i love you\n')
+    assert out.stdout == '0 a 1\n5 a, b 1, 2\n7 0 a a, c a\na, z a\na, c, z a, c\n7 a\n8 a, n 0 a, n\ninside 1, 2, 99\n1, 2 1, 2\n1, 2 42, 2, 5\n42, 2, 5 42, 2, 5, 6\n(1, 2, 8), (0, 2) 1, 2\n1, 2, 8, 3 1, 2, 8\n0, 2, 3 0, 2\n(1, 2, 8), (0, 2) (1, 2, 8), (0, 2)' + chr(10), out.stdout
+    if compiler:  # threads making values (and text written in the program) while the collector runs as often as it can
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "busy.stella").write_text(
+                'a pet has:\n  name (text)\n' + END + '\nto churn, given name (text):\n  set pets to a list of pets\n'
+                '  for each n from 1 to 3000:\n    conjure a pet as p\n    set the name of p to name plus "-" plus (n as text)\n    add p to pets\n'
+                '  holding the lock "screen":\n    scrawl name, " ", the name of last item of pets\n' + END
+                + '\ngenesis:\n  meanwhile churn with "a"\n  meanwhile churn with "b"\n  churn with "c"\n  wait for the others\n' + END, encoding="utf-8")
+            assert translate.build(Path(d) / "busy.stella", Path(d) / "busy.exe") is None
+            ran = subprocess.run([str(Path(d) / "busy.exe")], capture_output=True, text=True, timeout=120,
+                                 env=dict(os.environ, STELLANOVA_COLLECT_OFTEN="1"))
+            assert sorted(ran.stdout.split()) == sorted("a a-3000 b b-3000 c c-3000".split()), ran
+
     # Lists of numbers (kept as plain numbers in built programs): every list word still works on them.
     out = both('genesis:\n  set xs to a list of numbers\n  for each n from 1 to 5:\n    add n times 2 to xs\n  insert 7 at 2 in xs\n'
                '  remove item 1 from xs\n  set item 1 of xs to 0.5\n'
