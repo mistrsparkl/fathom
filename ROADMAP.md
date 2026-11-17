@@ -98,6 +98,6 @@ From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. S
 - [x] Text in any language and emoji: every text word counts letters, not bytes (they did; `upper case of` now changes every alphabet, not only a to z)
 - [x] Big programs: commands kept to their own script (`to ..., privately:`), clear messages when two scripts use the same name
 - [x] Messages from databases, mail servers and the system start with plain words saying what failed (the database was the one that didn't: common SQLite messages now say what they mean first)
-- [ ] The VS Code extension tried in VS Code itself
+- [x] The VS Code extension tried in VS Code itself (`node editor/in_vscode.js`: mistakes, words offered and hover help all work; not in the test suite, since it opens a window)
 - [ ] The tutorial teaches what roadmaps 2 to 4 added; BLOG.md brought up to date
 - [ ] Speed: lists of text and things, and direct runs, measured and made faster
