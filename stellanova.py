@@ -2204,11 +2204,12 @@ class Expr:
             put.py_store = lambda x: f"_put_item({py_expr(get)}, {py_expr(at)}, {line}, {py_copy(x, element(seq.kind))})"
             v = Value(f"stellanova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
-            v.ir = lambda f: f.call("double", "cn_list_at_number", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
-                                    ("i32", line), checked=True) if v.kind == NUMBER else \
+            v.ir = lambda f: f.read_number_item(machine.emit(f, seq), machine.emit(f, index), line) if v.kind == NUMBER else \
                 f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
                                ("i32", line), checked=True), v.kind)
-            if seq.writable:
+            if seq.writable and v.kind == NUMBER:  # in place, in the machine code itself
+                v.ir_store = lambda f, x: f.write_number_item(machine.emit(f, seq), machine.emit(f, index), x, line)
+            elif seq.writable:
                 v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
                                                  ("ptr", f.box(x, v.kind)), ("i32", line), checked=True)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime

@@ -32,7 +32,4 @@ Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do
 
 Checking Stellanova itself: `py -3 test_stellanova.py` runs every test program both ways (directly and built) and checks they print exactly the same.
 
-`stellanova build game.stella` makes machine code: Stellanova writes LLVM code for the program and LLVM's clang
-turns it into an .exe (install LLVM: `winget install LLVM.LLVM`). What every program needs is in `runtime/machine.cpp`,
-compiled once, and it frees values a program no longer uses. A library word's own C++ is compiled into a small
-function the machine code calls; the program's own code never becomes C++.
+`stellanova build game.stella` makes an .exe with LLVM (install it: `winget install LLVM.LLVM`). The runtime is `runtime/machine.cpp`.

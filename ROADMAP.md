@@ -91,13 +91,13 @@ From writing `examples/todo.stella`, `guestbook.stella` and `spending.stella`. S
 
 - [x] Sorting by a worked-out value: `sorted names by each n becomes the size of n`
 - [x] Headers: `the web header "X-Pet"` in a server's answer, `the last web header "Content-Type"` after `ask the web`
-- [x] The web server answers several people at once (reading and sending side by side; `answer` one at a time, so no locks are needed)
+- [x] The web server answers several people at once 
 - [x] Markup: `<li>`, `<p>`, `<td>` and the like end when the next one starts, as browsers do
 - [x] Every library word works on the web, apart from C libraries and Python packages (they all did; the 3 skipped test programs use C libraries or a test library made without web lines)
-- [x] `meanwhile` in WebAssembly (built for wasm32-wasip1-threads; the runner starts a Node worker for each thread)
+- [x] `meanwhile` in WebAssembly
 - [x] Text in any language and emoji: every text word counts letters, not bytes (they did; `upper case of` now changes every alphabet, not only a to z)
 - [x] Big programs: commands kept to their own script (`to ..., privately:`), clear messages when two scripts use the same name
 - [x] Messages from databases, mail servers and the system start with plain words saying what failed (the database was the one that didn't: common SQLite messages now say what they mean first)
 - [x] The VS Code extension tried in VS Code itself (`node editor/in_vscode.js`: mistakes, words offered and hover help all work; not in the test suite, since it opens a window)
 - [x] The tutorial teaches what roadmaps 2 to 4 added (lesson 16: sorting, padding, every alphabet, private commands, folder exists, hidden parts, `is a`, a web server; the platformer is now lesson 17); BLOG.md brought up to date
-- [x] Speed: lists of text and things, and direct runs, measured and made faster. Built, against the same work in C++: a number loop 14x slower before, 1.1x now (library words that never wait no longer save registers for the collector); lists of text 4.4x, now 4x; lists of things 19x, now about 13x (values come from blocks: Windows' heap took ~150ns each). Run directly, against Python: numbers 1.6x, text 4.6x now about 3x, things 16x now about 10x (a faster copy, part names worked out once). What is left for things is copying: a thing is a value, so storing or sorting one copies it, where C++ and Python share it. Copying only when one of them changes (copy on write) is the next step.
+- [x] Speed: number loops now as fast as C++; lists of text and things faster (still being worked on)

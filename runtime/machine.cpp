@@ -943,6 +943,15 @@ extern "C"
 		const Full* f = full(list);
 		return f->numbers ? cn_box_number(f->nums[static_cast<size_t>(k)]) : f->boxed[static_cast<size_t>(k)];
 	}
+	void cn_list_put_number(V* list, double number, double x, int line)  // (makes no value unless the list holds boxed items)
+	{
+		GUARDED(,
+			size_t k = index_of(list, number, line);
+			if (full(list)->numbers)
+				full(list)->nums[k] = x;
+			else
+				cn_items(list)[k] = cn_box_number(x);)
+	}
 	void cn_list_put(V* list, double number, V* item, int line)
 	{
 		GUARDED(,

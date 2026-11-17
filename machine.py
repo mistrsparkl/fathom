@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
-FALLIBLE = {"cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
+FALLIBLE = {"cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
@@ -38,7 +38,7 @@ WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt
 
 # libraries whose words only work things out, never waiting: their calls needn't keep registers for the collector
 NEVER_WAIT = {"builtins", "maths", "letters", "patterns", "big numbers"}
-NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\()"  # (adding a number to a list keeps it in the list)
+NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\(|cn_list_put_number\()"  # (adding a number to a list keeps it in the list)
                        r"|call (?:double|i1) @cn_w_\w+\((?:(?:double|i1|i32) [^,()]*(?:, )?)*\)$")  # a library word given and giving only numbers or yes/no
 
 
@@ -128,6 +128,7 @@ declare double @cn_list_at_number(ptr, double, i32)
 declare ptr @cn_list_at(ptr, double, i32)
 declare ptr @cn_list_item(ptr, i64)
 declare void @cn_list_put(ptr, double, ptr, i32)
+declare void @cn_list_put_number(ptr, double, double, i32)
 declare void @cn_list_remove_item(ptr, double, i32)
 declare void @cn_list_insert(ptr, double, ptr, i32)
 declare void @cn_list_remove_value(ptr, ptr)
@@ -345,6 +346,49 @@ class Fn:
         self.jump(done)
         self.place(slow)
         self.put(f"call void @cn_list_add_number(ptr {lst}, double {d})")
+        self.jump(done)
+        self.place(done)
+
+    def number_item(self, lst, index):
+        """Where item index (a number, from 1) of a list of plain numbers is: (pointer, fast label) when it's there.
+        Branches to the label it returns when it isn't (not plain numbers, not a whole number, out of range)."""
+        flag, data, count, _, size = self.nums_place(lst)
+        whole, ranged, fast, slow = self.label("idxwhole"), self.label("idxrange"), self.label("itemfast"), self.label("itemslow")
+        self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), whole, slow)
+        self.place(whole)
+        k = self.op(f"fptosi double {index} to i64")
+        back = self.op(f"sitofp i64 {k} to double")
+        self.branch(self.op(f"fcmp oeq double {back}, {index}"), ranged, slow)
+        self.place(ranged)
+        n = self.op(f"load {size}, ptr {count}")
+        n64 = n if size == "i64" else self.op(f"zext i32 {n} to i64")
+        k0 = self.op(f"sub i64 {k}, 1")
+        self.branch(self.op(f"icmp ult i64 {k0}, {n64}"), fast, slow)  # (k - 1 below the count, unsigned: also k >= 1)
+        self.place(fast)
+        at = k0 if size == "i64" else self.op(f"trunc i64 {k0} to i32")
+        return self.op(f"getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, {size} {at}"), fast, slow
+
+    def read_number_item(self, lst, index, line):
+        """'item i of scores' for a list of numbers: read in place when it's there, the runtime (and its message) otherwise."""
+        at, fast, slow = self.number_item(lst, index)
+        done = self.label("itemread")
+        a = self.op(f"load double, ptr {at}")
+        self.jump(done)
+        self.place(slow)
+        b = self.call("double", "cn_list_at_number", ("ptr", lst), ("double", index), ("i32", line), checked=True)
+        slow_end = self.here
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow_end} ]")
+
+    def write_number_item(self, lst, index, x, line):
+        """'set item i of scores to x' for a list of numbers: in place when it's there, the runtime otherwise."""
+        at, fast, slow = self.number_item(lst, index)
+        done = self.label("itemput")
+        self.put(f"store double {x}, ptr {at}")
+        self.jump(done)
+        self.place(slow)
+        self.call("void", "cn_list_put_number", ("ptr", lst), ("double", index), ("double", x), ("i32", line), checked=True)
         self.jump(done)
         self.place(done)
 
