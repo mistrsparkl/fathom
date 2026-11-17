@@ -57,6 +57,7 @@ namespace gc
 		std::vector<V*> young;  // made since its current line began
 		std::vector<V*> made;  // made while running, not yet in all (the collector moves them there): no lock needed
 		std::vector<V*> ready[3];  // freed values this thread took from spare to use again (by size: see size_of)
+		size_t since = 0;  // made since it last added to made_since (counted here first: an atomic add each time is slow)
 	};
 	static std::mutex lock;  // every value, the roots, and each thread's young values
 	static std::mutex stop_lock;  // the threads and their states
@@ -69,6 +70,7 @@ namespace gc
 	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
 	static std::atomic<size_t> made_since{0};
+	static const size_t batch = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 1 : 64;
 	static size_t limit = least;
 	static std::mutex collecting;
 	static std::atomic<bool>& stopping = cn_stopping;
@@ -379,7 +381,7 @@ namespace gc
 			t->made.push_back(v);
 			if (!stored_now)
 				t->young.push_back(v);
-			if (++made_since > limit)
+			if (++t->since >= batch && (made_since += std::exchange(t->since, 0)) > limit)
 				collect(t);
 			return v;
 		}
