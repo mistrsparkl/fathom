@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellanova: a programming language you can read out loud | Stellanova Kitchen</title>
+<style>
+:root {
+  --brand: #c8452c; --brand-dark: #9e3420; --cream: #fff8f0; --paper: #ffffff; --ink: #1d1d1d; --soft: #5a5a5a;
+  --line: #e9e2d8; --herb: #3f7a4a; --gold: #f2a51a; --code-bg: #fdf3e6; --code-ink: #3a2a1a;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.75 "Source Serif Pro", Georgia, serif; }
+a { color: var(--brand); }
+.topbar { background: var(--brand); color: #fff; font: 600 13px/1 system-ui, sans-serif; text-align: center; padding: 9px; letter-spacing: .04em; }
+.masthead { border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 5; }
+.masthead .in { max-width: 1140px; margin: 0 auto; display: flex; align-items: center; gap: 28px; padding: 14px 24px; }
+.logo { font: 800 26px/1 system-ui, sans-serif; color: var(--brand); letter-spacing: -.02em; text-decoration: none; }
+.logo span { color: var(--ink); font-weight: 400; }
+.masthead nav { display: flex; gap: 22px; font: 600 14px system-ui, sans-serif; }
+.masthead nav a { color: var(--ink); text-decoration: none; text-transform: uppercase; letter-spacing: .05em; }
+.masthead nav a:hover { color: var(--brand); }
+.search { margin-left: auto; border: 1px solid var(--line); border-radius: 22px; padding: 8px 16px; font: 14px system-ui, sans-serif; color: var(--soft); min-width: 220px; }
+.wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 48px; }
+main { min-width: 0; }
+.crumbs { font: 600 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--soft); margin: 26px 0 10px; }
+.crumbs a { color: var(--soft); text-decoration: none; }
+h1 { font: 800 clamp(32px, 4.6vw, 46px)/1.12 system-ui, sans-serif; margin: 0 0 14px; letter-spacing: -.02em; }
+.rating { display: flex; align-items: center; gap: 12px; font: 14px system-ui, sans-serif; color: var(--soft); flex-wrap: wrap; }
+.stars { color: var(--brand); font-size: 19px; letter-spacing: 2px; }
+.rating b { color: var(--ink); }
+.dek { font-size: 19px; color: #333; margin: 18px 0; }
+.byline { display: flex; align-items: center; gap: 12px; font: 14px system-ui, sans-serif; color: var(--soft); padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; }
+.byline b { color: var(--ink); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 24px; }
+.btn { font: 700 13px/1 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; padding: 12px 18px; border-radius: 4px;
+  border: 1.5px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; gap: 8px; align-items: center; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn:hover { filter: brightness(.95); }
+.photo { border-radius: 6px; overflow: hidden; background: linear-gradient(135deg, #f7d9b5, #f0b48a 55%, #d9744f); padding: 46px 40px; position: relative; margin-bottom: 8px; }
+.photo .board { background: #fffaf3; border-radius: 14px; box-shadow: 0 22px 44px rgba(90, 40, 10, .35); max-width: 470px; margin: 0 auto; padding: 22px 24px; transform: rotate(-2deg);
+  font: 15px/1.7 "Cascadia Code", Consolas, monospace; color: var(--code-ink); }
+.photo .dots { display: flex; gap: 6px; margin-bottom: 12px; } .photo .dots i { width: 11px; height: 11px; border-radius: 50%; background: #e7c9a8; display: block; }
+.photo .steam { position: absolute; right: 64px; top: 22px; font-size: 54px; opacity: .55; }
+.caption { font: 13px system-ui, sans-serif; color: var(--soft); margin-bottom: 26px; }
+.story p { margin: 0 0 18px; }
+.jumpbox { background: var(--cream); border: 1px solid var(--line); border-radius: 6px; padding: 18px 22px; margin: 26px 0; }
+.jumpbox h3 { font: 800 15px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
+.jumpbox ol { columns: 2; margin: 0; padding-left: 20px; font: 15px/1.9 system-ui, sans-serif; }
+.jumpbox a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--soft); }
+.card { border: 2px solid var(--ink); border-radius: 6px; padding: 28px; margin: 36px 0; background: #fff; }
+.card .kicker { font: 800 12px system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); }
+.card h2 { font: 800 30px/1.2 system-ui, sans-serif; margin: 6px 0 18px; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--cream); border-radius: 6px; padding: 16px 20px; gap: 12px 20px; font: 14px system-ui, sans-serif; }
+.facts div b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--soft); }
+.card h3 { font: 800 22px system-ui, sans-serif; margin: 28px 0 12px; }
+.ingredients { list-style: none; padding: 0; margin: 0; }
+.ingredients li { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.ingredients label { display: flex; gap: 14px; align-items: flex-start; cursor: pointer; font: 16px/1.5 system-ui, sans-serif; }
+.ingredients input { width: 20px; height: 20px; accent-color: var(--herb); margin-top: 2px; flex: none; }
+.ingredients small { display: block; color: var(--soft); font-size: 13px; }
+.ingredients input:checked + span { color: #9a9a9a; text-decoration: line-through; }
+.directions { list-style: none; padding: 0; margin: 0; }
+.directions li { margin-bottom: 18px; }
+.directions h4 { font: 800 15px system-ui, sans-serif; margin: 0 0 4px; }
+.directions p { margin: 0; }
+.note { background: #eef6ef; border-left: 4px solid var(--herb); padding: 14px 18px; border-radius: 0 6px 6px 0; font: 15px/1.6 system-ui, sans-serif; margin-top: 18px; }
+.note b { color: var(--herb); text-transform: uppercase; letter-spacing: .06em; font-size: 12px; display: block; margin-bottom: 2px; }
+.nutrition { border: 2px solid var(--ink); padding: 14px 16px; margin-top: 26px; font: 14px system-ui, sans-serif; }
+.nutrition h3 { margin: 0 0 6px !important; font-size: 24px !important; border-bottom: 8px solid var(--ink); padding-bottom: 4px; }
+.nutrition table { width: 100%; border-collapse: collapse; }
+.nutrition th, .nutrition td { padding: 6px 0; border-bottom: 1px solid #999; text-align: left; }
+.nutrition td { text-align: right; font-weight: 700; }
+article h2 { font: 800 28px/1.25 system-ui, sans-serif; margin: 52px 0 14px; letter-spacing: -.01em; padding-top: 70px; margin-top: -18px; }
+article h3 { font: 800 20px/1.35 system-ui, sans-serif; margin: 30px 0 10px; color: var(--brand-dark); }
+article p, article li { margin: 0 0 16px; }
+article ul { padding-left: 22px; }
+article ul li::marker { color: var(--brand); }
+code { font: .84em/1.5 "Cascadia Code", Consolas, monospace; background: var(--code-bg); color: var(--brand-dark); padding: 2px 6px; border-radius: 4px; }
+pre { background: var(--code-bg); border: 1px dashed #e2c6a4; border-radius: 8px; padding: 18px 20px; overflow-x: auto; margin: 0 0 24px; }
+pre code { background: none; color: var(--code-ink); padding: 0; font-size: 14.5px; }
+pre.shell code::before { content: "$ "; color: #b08a62; }
+.kw { color: var(--brand); font-weight: 600; } .str { color: var(--herb); } .num { color: #b26a00; } .end { color: #9b4dca; font-style: italic; }
+.table { overflow-x: auto; margin: 0 0 26px; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font: 15px/1.55 system-ui, sans-serif; }
+article th, article td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+article th { background: var(--cream); font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em; }
+article tbody tr:nth-child(even) td { background: #fffcf8; }
+td code { white-space: nowrap; }
+aside { padding-top: 92px; }
+.sticky { position: sticky; top: 84px; }
+.panel { border: 1px solid var(--line); border-radius: 6px; padding: 18px; margin-bottom: 20px; font: 14px/1.6 system-ui, sans-serif; background: #fff; }
+.panel h4 { font: 800 13px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .1em; margin: 0 0 10px; color: var(--brand); }
+.panel ol { padding-left: 18px; margin: 0; }
+.panel a { color: var(--ink); text-decoration: none; }
+.panel a:hover { color: var(--brand); }
+.tip { background: var(--cream); }
+.reviews { border-top: 3px solid var(--ink); margin-top: 56px; padding-top: 10px; }
+.review { border-bottom: 1px solid var(--line); padding: 16px 0; font: 15px/1.6 system-ui, sans-serif; }
+.review .who { font-weight: 700; } .review .stars { font-size: 15px; }
+footer { background: #1d1d1d; color: #ccc; margin-top: 64px; padding: 36px 24px; text-align: center; font: 14px system-ui, sans-serif; }
+footer b { color: #fff; }
+@media (max-width: 980px) { .wrap { grid-template-columns: minmax(0, 1fr); } aside { display: none; } .masthead nav, .search { display: none; } .facts { grid-template-columns: repeat(2, 1fr); } .jumpbox ol { columns: 1; } }
+@media print { .topbar, .masthead, aside, .actions, .photo, .reviews, footer { display: none; } }
+</style>
+</head>
+<body>
+<div class="topbar">NEW: Stellanova now builds for Linux. Same recipe, different kitchen.</div>
+<header class="masthead"><div class="in">
+  <a class="logo" href="#">Stellanova<span>Kitchen</span></a>
+  <nav><a href="#getting-started">Basics</a><a href="#commands">Commands</a><a href="#libraries">Libraries</a><a href="#the-window-library">Games</a></nav>
+  <div class="search">Find a word...</div>
+</div></header>
+
+<div class="wrap">
+<main>
+  <div class="crumbs"><a href="#">Recipes</a> &rsaquo; <a href="#">Programming</a> &rsaquo; <a href="#">Languages</a> &rsaquo; Plain English</div>
+  <h1>Stellanova: a programming language you can read out loud</h1>
+  <div class="rating"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span><b>4.9</b> (1,207) <span>&middot;</span> 312 reviews <span>&middot;</span> 48 photos</div>
+  <div class="dek">The whole language, every term explained, with small examples you can copy straight into your own kitchen.</div>
+  <div class="byline"><div class="avatar">S</div><div>By <b>The Stellanova Team</b><br>Updated on November 15, 2026</div></div>
+  <div class="actions">
+    <a class="btn primary" href="#recipe">&#8595; Jump to Recipe</a>
+    <button class="btn" onclick="this.textContent='&#9829; Saved'">&#9825; Save</button>
+    <button class="btn" onclick="this.textContent='&#9733; Thanks!'">&#9734; Rate</button>
+    <button class="btn" onclick="window.print()">&#9113; Print</button>
+    <button class="btn" onclick="navigator.clipboard && navigator.clipboard.writeText(location.href); this.textContent='&#10003; Copied'">&#10150; Share</button>
+  </div>
+
+  <div class="photo"><span class="steam">&#9832;</span><div class="board"><div class="dots"><i></i><i></i><i></i></div>
+<span class="kw">genesis</span>:<br>&nbsp;&nbsp;<span class="kw">ask</span> <span class="str">"What's your name? "</span> <span class="kw">into</span> name<br>&nbsp;&nbsp;<span class="kw">scrawl</span> <span class="str">"Hello, [name]!"</span><br><span class="end">and the universe said i love you</span></div></div>
+  <div class="caption">Fresh out of the editor: a three-line greeting, ready in seconds.</div>
+
+  <div class="story"><p>I've always thought code should read like what it does. Stellanova is my attempt at that. You write programs in plain English words, and the same script can run straight away, become a fast <code>.exe</code>, turn into WebAssembly, or become JavaScript for a web page. This post walks through the whole language, term by term, with small examples you can copy.</p><p>Grab a coffee. It's a long one.</p></div>
+
+  <section class="card" id="recipe">
+    <div class="kicker">The recipe</div>
+    <h2>Your First Stellanova Program</h2>
+    <div class="facts">
+      <div><b>Prep Time</b>2 mins</div><div><b>Cook Time</b>0 mins</div><div><b>Total Time</b>2 mins</div>
+      <div><b>Servings</b>1 program</div><div><b>Yield</b>1 greeting</div><div><b>Difficulty</b>Easy</div>
+    </div>
+    <h3>Ingredients</h3>
+    <ul class="ingredients">
+<li><label><input type="checkbox"><span><b>1</b> text editor<small>any kind; Notepad works fine</small></span></label></li>
+<li><label><input type="checkbox"><span><b>1</b> copy of Stellanova<small><code>stellanova.py</code> and its <code>libraries</code> folder</small></span></label></li>
+<li><label><input type="checkbox"><span><b>1</b> Python 3<small>for running programs straight away</small></span></label></li>
+<li><label><input type="checkbox"><span><b>1 pinch</b> LLVM<small>optional, only if you want a fast <code>.exe</code></small></span></label></li>
+<li><label><input type="checkbox"><span><b>3 lines</b> plain English<small>freshly typed</small></span></label></li>
+<li><label><input type="checkbox"><span><b>1 heaping</b> <code>and the universe said i love you</code><small>to close every block</small></span></label></li>
+    </ul>
+    <h3>Directions</h3>
+    <ol class="directions">
+<li><h4>Step 1</h4><p>Make a new file called <code>hello.stella</code>.</p></li>
+<li><h4>Step 2</h4><p>Type <code>genesis:</code> on the first line. This is where every program begins.</p></li>
+<li><h4>Step 3</h4><p>On the next line, indent two spaces and type <code>scrawl "Hello, world!"</code>.</p></li>
+<li><h4>Step 4</h4><p>Close it with <code>and the universe said i love you</code>, not indented.</p></li>
+<li><h4>Step 5</h4><p>Run it with <code>stellanova hello.stella</code>. It's ready the moment you press Enter.</p></li>
+<li><h4>Step 6</h4><p>For a faster batch, run <code>stellanova build hello.stella</code> and serve the <code>.exe</code> warm.</p></li>
+    </ol>
+    <div class="note"><b>Cook's Note</b>Forgot the closing line? Stellanova will tell you exactly which command is missing it, in plain words, with the line number.</div>
+    <div class="nutrition"><h3>Nutrition Facts</h3><table>
+<tr><th>Speed, built</th><td>same as C++</td></tr>
+<tr><th>Speed, run directly</th><td>about Python's</td></tr>
+<tr><th>Compilers needed</th><td>0</td></tr>
+<tr><th>Semicolons</th><td>0g</td></tr>
+<tr><th>Platforms</th><td>Windows, Linux, web, WebAssembly</td></tr>
+<tr><th>Libraries included</th><td>25</td></tr>
+    </table></div>
+  </section>
+
+  <div class="jumpbox"><h3>In this guide</h3><ol>
+<li><a href="#getting-started">Getting started</a></li>
+<li><a href="#the-kinds-of-values">The kinds of values</a></li>
+<li><a href="#names">Names</a></li>
+<li><a href="#showing-things-and-asking-questions">Showing things and asking questions</a></li>
+<li><a href="#working-things-out">Working things out</a></li>
+<li><a href="#making-choices">Making choices</a></li>
+<li><a href="#loops">Loops</a></li>
+<li><a href="#commands">Commands</a></li>
+<li><a href="#your-own-kinds-of-things">Your own kinds of things</a></li>
+<li><a href="#files-and-saving">Files and saving</a></li>
+<li><a href="#when-things-go-wrong">When things go wrong</a></li>
+<li><a href="#doing-things-at-the-same-time">Doing things at the same time</a></li>
+<li><a href="#notes-and-grammar">Notes and grammar</a></li>
+<li><a href="#programs-made-of-several-scripts">Programs made of several scripts</a></li>
+<li><a href="#libraries">Libraries</a></li>
+<li><a href="#programs-for-web-pages">Programs for web pages</a></li>
+<li><a href="#wrapping-up">Wrapping up</a></li>
+  </ol></div>
+
+  <article>
+<h2 id="getting-started">Getting started</h2>
+<p>A Stellanova script is a text file ending in <code>.stella</code>. Here's the smallest useful program:</p>
+<pre class="stella"><code><span class="kw">genesis</span>:
+  <span class="kw">scrawl</span> <span class="str">&quot;Hello, world!&quot;</span>
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Save it as <code>hello.stella</code> and run it:</p>
+<pre class="shell"><code>stellanova hello.stella</code></pre>
+<p>That's it. No compiler, no project file. Stellanova reads the script and does what it says, line by line.</p>
+<p>Two words in there deserve an explanation right away:</p>
+<ul><li><strong><code>genesis:</code></strong> is where a program begins. Every program has exactly one.</li><li><strong><code>and the universe said i love you</code></strong> ends a block. Every command, every description of a kind of thing, and every <code>the world remembers:</code> block finishes with this line, unindented. Leaving it out is an error. Yes, it's a little sentimental. I like it.</li></ul>
+<h3 id="the-ways-to-run-a-program">The ways to run a program</h3>
+<div class="table"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>stellanova game.stella</code></td><td>Runs it right now.</td></tr><tr><td><code>stellanova build game.stella</code></td><td>Turns it into machine code: a real <code>.exe</code> (or a Linux program, if you build on Linux). Needs LLVM.</td></tr><tr><td><code>stellanova wasm game.stella</code></td><td>Builds WebAssembly, plus a small <code>.mjs</code> file so <code>node</code> can run it.</td></tr><tr><td><code>stellanova web game.stella site</code></td><td>Turns it into JavaScript for a web page.</td></tr><tr><td><code>stellanova check game.stella</code></td><td>Looks for mistakes without running anything.</td></tr><tr><td><code>stellanova test maths.stella</code></td><td>Runs every command whose name starts with <code>test</code>, and tells you which passed.</td></tr><tr><td><code>stellanova debug game.stella 12 30</code></td><td>Runs it and stops before lines 12 and 30 so you can look around.</td></tr><tr><td><code>stellanova profile game.stella</code></td><td>Runs it, then shows which lines took the most time.</td></tr><tr><td><code>stellanova watch game.stella</code></td><td>Shows each line as it runs, with the names it changed.</td></tr><tr><td><code>stellanova</code> on its own</td><td>A prompt where every line you type runs straight away. Type <code>bye</code> to leave.</td></tr></tbody></table></div>
+<p>A program does exactly the same thing whichever way you run it. The test suite checks this by running every test program both directly and built, and comparing what they print.</p>
+<p>How fast is it? Built programs run at the same speed as C++ for number crunching, commands calling each other, and lists of numbers. Running directly is closer to Python's speed. So try things out directly, and build when you want speed.</p>
+<h3 id="when-you-make-a-mistake">When you make a mistake</h3>
+<p>Stellanova tells you in plain words, with the line number:</p>
+<pre class="stella"><code>follow.stella line <span class="num">31</span>: I don&#x27;t know &#x27;walk sped&#x27;. Did you mean &#x27;walk speed&#x27;?</code></pre>
+<p>Mistakes found while running look the same:</p>
+<pre class="stella"><code>Line <span class="num">22</span>: there <span class="kw">is</span> <span class="kw">no</span> <span class="kw">item</span> <span class="num">9</span> <span class="kw">in</span> a list of <span class="num">4</span> items. Items are counted <span class="kw">from</span> <span class="num">1</span>.</code></pre>
+<h2 id="the-kinds-of-values">The kinds of values</h2>
+<p>Every value has a kind, and a name keeps holding the same kind once you've set it.</p>
+<div class="table"><table><thead><tr><th>Kind</th><th>What it looks like</th></tr></thead><tbody><tr><td><strong>a number</strong></td><td><code>60</code>, <code>2.5</code>, <code>30 degrees</code> (words after a number like <code>degrees</code> are just for you)</td></tr><tr><td><strong>yes or no</strong></td><td><code>yes</code>, <code>no</code>, <code>speed exceeds 10</code></td></tr><tr><td><strong>text</strong></td><td><code>&quot;hello&quot;</code>, <code>&quot;Hi &quot; plus name</code></td></tr><tr><td><strong>a place</strong></td><td><code>1 horizontal 2 vertical 3 depth</code>: a point in space, across, down and deep</td></tr><tr><td><strong>a flat place</strong></td><td><code>300 horizontal 200 vertical</code>: across and down only, like a spot on the screen</td></tr><tr><td><strong>a list of ...</strong></td><td><code>a list of numbers</code> (empty), <code>a list of (3, 5, 7)</code>. One kind of thing, in order.</td></tr><tr><td><strong>a table of ...</strong></td><td><code>a table of numbers</code>. Looks values up by a name, like a phone book.</td></tr><tr><td><strong>your own kind</strong></td><td><code>conjure a pet</code>, once you've described what a pet has</td></tr></tbody></table></div>
+<p>Mixing kinds is caught for you. If <code>turn rate</code> holds a number, then <code>set turn rate to fallen</code> says: <code>&#x27;turn rate&#x27; holds a number, not yes or no.</code></p>
+<p>Lists and tables can hold other lists and tables. <code>a list of lists of numbers</code> is a grid, and <code>item 2 of item 3 of grid</code> reaches inside it.</p>
+<h2 id="names">Names</h2>
+<p>You keep values under names, and names can be several words long:</p>
+<pre class="stella"><code><span class="kw">set</span> braking speed <span class="kw">to</span> <span class="num">12</span>
+<span class="kw">set</span> player name <span class="kw">to</span> <span class="str">&quot;Sam&quot;</span></code></pre>
+<p>The first <code>set</code> makes the name. After that, <code>set</code> changes it.</p>
+<p>A few words belong to the language, so they can't be names: <code>and</code>, <code>or</code>, <code>not</code>, <code>if</code>, <code>set</code>, <code>to</code>, <code>of</code>, <code>is</code>, <code>plus</code>, <code>minus</code>, <code>times</code> and friends. Stellanova tells you if you trip over one.</p>
+<p>A name you set inside a command belongs to that command alone. To share names across the whole program, list them in a <strong><code>the world remembers:</code></strong> block at the top level:</p>
+<pre class="stella"><code><span class="kw">the world remembers</span>:
+  score (a number)
+  players (a list of text)
+<span class="end">and the universe said i love you</span></code></pre>
+<p>They start empty (0, no, "", an empty list), and every command can read and change them.</p>
+<h2 id="showing-things-and-asking-questions">Showing things and asking questions</h2>
+<p><strong><code>scrawl</code></strong> prints things, one after another, then starts a new line:</p>
+<pre class="stella"><code><span class="kw">scrawl</span> <span class="str">&quot;Score: &quot;</span>, score</code></pre>
+<p>Text can fill itself in. Words in square brackets inside text are replaced by what they hold:</p>
+<pre class="stella"><code><span class="kw">scrawl</span> <span class="str">&quot;Hello, [name]! [count plus 1] left.&quot;</span></code></pre>
+<p>If you need real square brackets, double them: <code>[[like this]]</code> shows <code>[like this]</code>.</p>
+<p><strong><code>ask</code></strong> shows a question and keeps what the person types:</p>
+<pre class="stella"><code><span class="kw">ask</span> <span class="str">&quot;What&#x27;s your name? &quot;</span> <span class="kw">into</span> name
+<span class="kw">ask</span> <span class="str">&quot;How old are you? &quot;</span> <span class="kw">into</span> age (a number)
+<span class="kw">ask</span> <span class="str">&quot;Play again? &quot;</span> <span class="kw">into</span> again (<span class="kw">yes</span> <span class="kw">or</span> <span class="kw">no</span>)</code></pre>
+<p>When you ask for a number, it keeps asking until it gets one. For yes or no, it accepts <code>yes</code>, <code>y</code>, <code>no</code> or <code>n</code>.</p>
+<h2 id="working-things-out">Working things out</h2>
+<h3 id="arithmetic">Arithmetic</h3>
+<p><code>a plus b</code>, <code>a minus b</code>, <code>a times b</code> and <code>a divided by b</code> do what they say. The symbols <code>+ - * /</code> work too. A minus in front gives the negative: <code>-look limit</code>.</p>
+<p><code>2 to the power 10</code> raises a number to a power, and it comes before <code>times</code> and <code>plus</code> the way it does in maths. So <code>3 times 2 to the power 3</code> is 24.</p>
+<p>More number words:</p>
+<ul><li><code>square root of x</code></li><li><code>smaller of a and b</code>, <code>larger of a and b</code></li><li><code>clamp x between low and high</code> keeps x inside a range</li><li><code>random number from 1 to 100</code> gives a whole number, both ends included</li><li><code>random fraction</code> gives a number from 0 up to, but never quite, 1</li><li><code>(price times 1.2) rounded to 2 decimal places</code> (halves go up, away from zero)</li><li><code>1234567 with commas</code> gives "1,234,567"</li><li><code>7 padded to 3 digits</code> gives "007"</li><li><code>12 bitwise and 10</code>, <code>bitwise or</code>, <code>bitwise exclusive or</code>, <code>1 shifted left by 4</code>, <code>shifted right by</code> work on the bits of whole numbers</li></ul>
+<h3 id="comparing">Comparing</h3>
+<p>These all give yes or no:</p>
+<ul><li><code>a exceeds b</code> (greater than)</li><li><code>a falls below b</code> (less than)</li><li><code>a is at least b</code>, <code>a is at most b</code></li><li><code>a is b</code>, <code>a is not b</code></li><li><code>answer is one of (&quot;yes&quot;, &quot;y&quot;, &quot;sure&quot;)</code>, and <code>is not one of</code></li><li><code>existence is within 30 of coin</code> asks whether two places or numbers are 30 or less apart</li><li><code>ball touches coin</code> asks whether two things' circles overlap</li></ul>
+<p>Combine them with <code>and</code>, <code>or</code> and <code>not</code>.</p>
+<h3 id="text">Text</h3>
+<ul><li><code>&quot;Hi &quot; plus name</code> joins text. Numbers and yes or no are written out for you, so <code>&quot;Score: &quot; plus 5</code> works.</li><li><code>the size of name</code> is how many letters it has.</li><li><code>letter 2 of name</code>, <code>letters 2 to 4 of name</code> (counted from 1)</li><li><code>upper case of name</code>, <code>lower case of name</code></li><li><code>trimmed line</code> drops spaces and line breaks from both ends</li><li><code>name begins with &quot;Dr&quot;</code>, <code>name ends with &quot;.txt&quot;</code>, <code>name contains &quot;ell&quot;</code></li><li><code>position of &quot;lo&quot; in name</code> is where it first appears, or 0 if it isn't there</li><li><code>replace &quot;a&quot; with &quot;b&quot; in name</code></li><li><code>line split by &quot;, &quot;</code> cuts text into a list</li><li><code>lines of text</code>, <code>the words of text</code></li><li><code>answer as a number</code> turns <code>&quot;42&quot;</code> into 42, and <code>score as text</code> goes the other way</li><li><code>a quotation mark</code> and <code>new line</code> are how you put those two characters inside text</li></ul>
+<h3 id="lists">Lists</h3>
+<p>Make them:</p>
+<pre class="stella"><code><span class="kw">set</span> scores <span class="kw">to</span> a list of numbers
+<span class="kw">set</span> primes <span class="kw">to</span> a list of (<span class="num">2</span>, <span class="num">3</span>, <span class="num">5</span>, <span class="num">7</span>)
+<span class="kw">set</span> kept <span class="kw">to</span> a list containing new notification</code></pre>
+<p>Change them:</p>
+<div class="table"><table><thead><tr><th>Line</th><th>What it does</th></tr></thead><tbody><tr><td><code>add 5 to scores</code></td><td>Puts 5 at the end.</td></tr><tr><td><code>insert 5 at 2 in scores</code></td><td>Puts 5 in second place and moves the rest along.</td></tr><tr><td><code>remove item 2 from scores</code></td><td>Takes out the second item.</td></tr><tr><td><code>remove 5 from scores</code></td><td>Takes out the first 5.</td></tr><tr><td><code>set item 2 of scores to 9</code></td><td>Changes one item.</td></tr></tbody></table></div>
+<p>Read them:</p>
+<ul><li><code>item 2 of scores</code> (items are counted from 1, the way people count)</li><li><code>last item of scores</code>, <code>a random item of scores</code></li><li><code>items 2 to 5 of scores</code>, <code>first 3 of scores</code>, <code>last 3 of scores</code></li><li><code>the size of scores</code></li><li><code>scores contains 5</code></li><li><code>sum of scores</code>, <code>average of scores</code>, <code>biggest of scores</code>, <code>smallest of scores</code></li><li><code>sorted scores</code>, <code>reversed scores</code>, <code>unique names</code>, <code>shuffled names</code> (each gives a new list)</li><li><code>join names with &quot;, &quot;</code> makes one piece of text</li><li><code>position of &quot;Bo&quot; in names</code></li><li><code>sorted pets by age</code> sorts your own things by one of their parts</li></ul>
+<h3 id="tables">Tables</h3>
+<pre class="stella"><code><span class="kw">set</span> ages <span class="kw">to</span> a table of numbers
+<span class="kw">set</span> entry <span class="str">&quot;Rex&quot;</span> of ages <span class="kw">to</span> <span class="num">3</span>
+<span class="kw">scrawl</span> entry <span class="str">&quot;Rex&quot;</span> of ages
+<span class="kw">remove</span> entry <span class="str">&quot;Rex&quot;</span> <span class="kw">from</span> ages</code></pre>
+<p><code>keys of ages</code> gives the names in alphabetical order, <code>ages contains &quot;Rex&quot;</code> checks for one, and <code>the size of ages</code> counts them. A number works as a name too, so <code>the entry 3 of ages</code> is the entry "3".</p>
+<h3 id="places">Places</h3>
+<p>Places are for games and anything that moves. <code>p of horizontal</code>, <code>p of vertical</code> and <code>p of depth</code> read one part, and <code>set p of horizontal to 5</code> changes it. You can add places, take them away, and multiply or divide them by a number. <code>flat (place)</code> drops the height, <code>direction of flat place</code> gives a compass angle in degrees, and <code>angle from a to b</code> gives the turn between two angles, from -180 to 180.</p>
+<p><strong><code>birth</code> and <code>existence</code></strong> are two special names for where something starts and where it is now. <code>set birth to 300 horizontal 200 vertical</code> sets both at once. Move <code>existence</code> around, and <code>set existence to birth</code> sends it home.</p>
+<h3 id="how-of-groups-things">How <code>of</code> groups things</h3>
+<p><code>of</code> takes everything after it, up to a word like <code>is</code>, <code>and</code>, <code>between</code> or <code>by</code>. Parts and items are the exception: <code>the age of rex plus 1</code> means <code>(the age of rex) plus 1</code>. Words that change a whole value, like <code>as text</code> or <code>rounded to</code>, apply to everything before them. When in doubt, use brackets.</p>
+<h2 id="making-choices">Making choices</h2>
+<pre class="stella"><code><span class="kw">if</span> fallen: <span class="kw">cease</span></code></pre>
+<p>The part after the colon runs only when the test is yes. For longer choices, put the lines underneath:</p>
+<pre class="stella"><code><span class="kw">if</span> score <span class="kw">exceeds</span> <span class="num">100</span>:
+  <span class="kw">scrawl</span> <span class="str">&quot;Amazing!&quot;</span>
+<span class="kw">otherwise</span> <span class="kw">if</span> score <span class="kw">exceeds</span> <span class="num">50</span>:
+  <span class="kw">scrawl</span> <span class="str">&quot;Nice.&quot;</span>
+<span class="kw">otherwise</span>:
+  <span class="kw">scrawl</span> <span class="str">&quot;Keep going.&quot;</span></code></pre>
+<p>When you're choosing based on one value, <strong><code>depending on</code></strong> is tidier:</p>
+<pre class="stella"><code><span class="kw">depending on</span> weather:
+  <span class="str">&quot;rain&quot;</span>: <span class="kw">scrawl</span> <span class="str">&quot;Umbrella!&quot;</span>
+  <span class="str">&quot;sun&quot;</span>, <span class="str">&quot;heat&quot;</span>: <span class="kw">scrawl</span> <span class="str">&quot;Sunscreen!&quot;</span>
+  <span class="kw">anything else</span>: <span class="kw">scrawl</span> <span class="str">&quot;Just a jacket.&quot;</span></code></pre>
+<h2 id="loops">Loops</h2>
+<div class="table"><table><thead><tr><th>Loop</th><th>Runs</th></tr></thead><tbody><tr><td><code>repeat 10 times:</code></td><td>10 times.</td></tr><tr><td><code>as long as guess is not secret:</code></td><td>While the test is yes.</td></tr><tr><td><code>for each score in scores:</code></td><td>Once for every item, with <code>score</code> holding it.</td></tr><tr><td><code>for each n from 1 to 10:</code></td><td>For each whole number from 1 to 10.</td></tr><tr><td><code>for each n from 0 to 100 by 5:</code></td><td>Counting in steps. A negative step counts down.</td></tr></tbody></table></div>
+<p>Inside any loop, <strong><code>break free</code></strong> leaves the loop and <strong><code>move on</code></strong> skips to the next round.</p>
+<p>There are also loops that run on their own once a command's other lines are done:</p>
+<ul><li><strong><code>whenever ticks exceeds 2:</code></strong> runs its lines each time the test turns yes.</li><li><strong><code>every 2 seconds:</code></strong> runs its lines every two seconds.</li><li><strong><code>every frame:</code></strong> runs once per frame in a game window.</li></ul>
+<h2 id="commands">Commands</h2>
+<p>A command is a named set of lines. You make one with <code>to</code>:</p>
+<pre class="stella"><code><span class="kw">to</span> greet, <span class="kw">given</span> who (text):
+  <span class="kw">scrawl</span> <span class="str">&quot;Hello, &quot;</span> <span class="kw">plus</span> who <span class="kw">plus</span> <span class="str">&quot;!&quot;</span>
+<span class="end">and the universe said i love you</span></code></pre>
+<p>And use it by name:</p>
+<pre class="stella"><code>greet with <span class="str">&quot;Sam&quot;</span></code></pre>
+<p><strong><code>given</code></strong> lists the inputs, each with its kind in brackets. Join several with <code>and</code>. A command with no inputs is just its name: <code>greet</code>. With one input, <code>with</code> is optional. With two or more, put them in brackets: <code>pet called with (&quot;Rex&quot;, 3)</code>.</p>
+<p>If you have a lot of inputs, you can list them under the first line instead:</p>
+<pre class="stella"><code><span class="kw">to</span> tell, <span class="kw">use</span>:
+  app name (text)
+  title (text)
+  quiet delivery (<span class="kw">yes</span> <span class="kw">or</span> <span class="kw">no</span>)
+
+  <span class="kw">scrawl</span> title
+<span class="end">and the universe said i love you</span></code></pre>
+<h3 id="commands-that-give-an-answer">Commands that give an answer</h3>
+<p>Add <strong><code>returning</code></strong> and the kind, then leave with <strong><code>return</code></strong>:</p>
+<pre class="stella"><code><span class="kw">to</span> double, <span class="kw">given</span> x (a number), <span class="kw">returning</span> a number:
+  <span class="kw">return</span> x <span class="kw">times</span> <span class="num">2</span>
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Now <code>double with 4</code> is a value you can use anywhere. <code>return whether x is 3</code> reads nicely too; <code>whether</code> changes nothing.</p>
+<p><strong><code>cease</code></strong> leaves a command early, for commands that don't return anything.</p>
+<h3 id="commands-as-values">Commands as values</h3>
+<p><code>the command double</code> is the command itself, not its answer. You can keep it in a name or a list, hand it to another command, and run it later with <strong><code>invoke</code></strong>:</p>
+<pre class="stella"><code><span class="kw">set</span> steps <span class="kw">to</span> a list of (<span class="kw">the command</span> double, <span class="kw">the command</span> round)
+<span class="kw">scrawl</span> <span class="kw">invoke</span> <span class="kw">the command</span> double with <span class="num">5</span></code></pre>
+<p>The kind of a command value says what it takes and gives: <code>a command</code>, <code>a command given text</code>, or <code>a command given a number and text returning yes or no</code>.</p>
+<p>You can also write a small command right where you need it with <strong><code>each ... becomes</code></strong>:</p>
+<pre class="stella"><code><span class="kw">scrawl</span> scores changed <span class="kw">by</span> <span class="kw">each</span> s <span class="kw">becomes</span> s <span class="kw">times</span> <span class="num">2</span>
+<span class="kw">scrawl</span> scores kept <span class="kw">by</span> <span class="kw">each</span> s <span class="kw">becomes</span> s <span class="kw">exceeds</span> <span class="num">10</span>
+<span class="kw">set</span> <span class="kw">add</span> tax <span class="kw">to</span> <span class="kw">each</span> price (a number) <span class="kw">becomes</span> price <span class="kw">times</span> <span class="num">1.2</span></code></pre>
+<p><strong><code>changed by</code></strong> makes a new list with the command applied to every item. <strong><code>kept by</code></strong> keeps only the items the command says yes to. A command written this way keeps a copy of any name it uses, as it was when the command was made.</p>
+<h2 id="your-own-kinds-of-things">Your own kinds of things</h2>
+<p>Describe what a kind of thing has, one part per line:</p>
+<pre class="stella"><code>a pet <span class="kw">has</span>:
+  name (text)
+  age (a number)
+  tricks (a list of text)
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Then:</p>
+<ul><li><strong><code>conjure a pet</code></strong> makes a new one, with every part empty. <code>conjure a pet as rex</code> says the same thing the other way round.</li><li><strong><code>the name of rex</code></strong> reads a part, and <code>set the name of rex to &quot;Rex&quot;</code> changes it.</li><li><strong><code>scrawl rex</code></strong> shows <code>a pet (name: Rex, age: 3, tricks: sit)</code>.</li></ul>
+<h3 id="commands-for-a-kind-of-thing">Commands for a kind of thing</h3>
+<pre class="stella"><code><span class="kw">to</span> bounce, <span class="kw">for a</span> ball:
+  <span class="kw">set</span> speed <span class="kw">to</span> speed <span class="kw">times</span> -<span class="num">1</span>
+  <span class="kw">set</span> bounces <span class="kw">to</span> bounces <span class="kw">plus</span> <span class="num">1</span>
+<span class="end">and the universe said i love you</span></code></pre>
+<p><strong><code>for a ball</code></strong> means the command belongs to balls. Inside it, the ball's parts are plain names, and changing them changes the real ball you gave it. Call it with <code>bounce b</code>. Inside, the whole ball is called <code>ball</code>.</p>
+<h3 id="kinds-of-kinds">Kinds of kinds</h3>
+<pre class="stella"><code>a dog <span class="kw">is</span> <span class="kw">a kind of</span> pet that <span class="kw">has</span>:
+  tricks (a list of text)
+<span class="end">and the universe said i love you</span></code></pre>
+<p>A dog has everything a pet has, plus its own parts. Commands for pets work on dogs, and a dog can have its own version of a command that it uses instead. A dog can go anywhere a pet is wanted. It goes there as a pet, with just a pet's parts.</p>
+<h3 id="kinds-for-any-kind">Kinds for any kind</h3>
+<p><strong><code>anything</code></strong> lets you describe a kind once for every kind it might hold:</p>
+<pre class="stella"><code>a stack of anything <span class="kw">has</span>:
+  items (a list of anything)
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Now <code>a stack of numbers</code> and <code>a stack of text</code> both exist.</p>
+<h3 id="shared-abilities">Shared abilities</h3>
+<pre class="stella"><code>a speaker <span class="kw">is</span> anything that can speak.</code></pre>
+<p>Any kind of thing with its own <code>to speak, for a ...:</code> command is now a speaker. A list of speakers can hold dogs and robots together, and <code>speak s</code> does it the way each one's own kind does.</p>
+<h3 id="nothing">Nothing</h3>
+<p>A name for a kind of thing can hold nothing: <code>set best to no enemy</code>. Ask with <code>if best is nothing</code> or <code>if best is something</code>. Reading a part of nothing stops with a clear message, like <code>this enemy is nothing, so it has no health.</code></p>
+<h2 id="files-and-saving">Files and saving</h2>
+<ul><li><strong><code>inscribe &quot;hello&quot; into file &quot;notes.txt&quot;</code></strong> makes or replaces a file.</li><li><strong><code>add &quot;a line&quot; to file &quot;log.txt&quot;</code></strong> adds a line to the end.</li><li><strong><code>contents of file &quot;notes.txt&quot;</code></strong> reads the whole file as text.</li><li><strong><code>lines of file &quot;notes.txt&quot;</code></strong> reads it as a list of lines.</li><li><strong><code>file &quot;notes.txt&quot; exists</code></strong> is yes or no.</li></ul>
+<p><strong><code>save</code></strong> and <strong><code>load</code></strong> keep any value in a JSON file:</p>
+<pre class="stella"><code>save high scores <span class="kw">to</span> file <span class="str">&quot;scores.json&quot;</span>
+<span class="kw">set</span> high scores <span class="kw">to</span> a table of numbers
+load high scores <span class="kw">from</span> file <span class="str">&quot;scores.json&quot;</span></code></pre>
+<p><code>load</code> needs a name that already holds the right kind. If you add a part to a kind of thing later, old saves still load; the new part just starts empty.</p>
+<p><strong><code>scores as saved text</code></strong> gives the same JSON without a file, and <strong><code>load scores from the text reply</code></strong> reads it back. That's how you talk to web services: describe the parts you want as a kind of thing and load the answer into it. Stellanova even matches <code>windSpeed</code>, <code>wind_speed</code> and <code>Wind-Speed</code> to your part called <code>wind speed</code>.</p>
+<h2 id="when-things-go-wrong">When things go wrong</h2>
+<p>Put risky lines under <strong><code>try:</code></strong>, and what to do instead under <strong><code>if that went wrong:</code></strong>. Inside, <strong><code>the wound</code></strong> is the reason, as text:</p>
+<pre class="stella"><code><span class="kw">try</span>:
+  <span class="kw">set</span> notes <span class="kw">to</span> contents of file <span class="str">&quot;notes.txt&quot;</span>
+<span class="kw">if</span> that went wrong:
+  <span class="kw">scrawl</span> <span class="str">&quot;I couldn&#x27;t read the notes: &quot;</span>, the wound
+  <span class="kw">set</span> notes <span class="kw">to</span> <span class="str">&quot;&quot;</span></code></pre>
+<p>You can raise problems of your own:</p>
+<ul><li><strong><code>raise an error with &quot;the tank is empty&quot;</code></strong> stops with your message.</li><li><strong><code>raise a fuel problem with &quot;the tank is empty&quot;</code></strong> gives the problem a kind. Then <code>if that went wrong with a fuel problem:</code> catches only those.</li></ul>
+<p><strong><code>check</code></strong> is the quick version for tests: <code>check double with 2 is 4</code> stops with <code>this check failed: double with 2 is 4</code> if it isn't true.</p>
+<h2 id="doing-things-at-the-same-time">Doing things at the same time</h2>
+<p><strong><code>meanwhile</code></strong> starts a command running on its own, and the next line carries on straight away:</p>
+<pre class="stella"><code><span class="kw">meanwhile</span> download with (<span class="str">&quot;https://example.com/a.png&quot;</span>, <span class="str">&quot;a.png&quot;</span>)
+<span class="kw">scrawl</span> <span class="str">&quot;Downloading in the background...&quot;</span>
+<span class="kw">wait for the others</span></code></pre>
+<p><strong><code>wait for the others</code></strong> waits for everything started with <code>meanwhile</code>. Each one gets its own copy of every name, so they can't spoil each other's values. When they do need to share names from <code>the world remembers:</code>, they take turns with a lock:</p>
+<pre class="stella"><code><span class="kw">holding the lock</span> <span class="str">&quot;total&quot;</span>:
+  <span class="kw">set</span> total <span class="kw">to</span> total <span class="kw">plus</span> <span class="num">1</span></code></pre>
+<h2 id="notes-and-grammar">Notes and grammar</h2>
+<p><strong><code>whisper:</code></strong> writes a note for people. The computer ignores it.</p>
+<p>Grammar is mostly for you. Stellanova skips <code>the</code>, <code>a</code> and <code>an</code> before reading a line, so <code>set the notices to kept</code> and <code>set notices to kept</code> are the same. A few places need them, though:</p>
+<ul><li><code>the</code> before a part: <code>the size of xs</code>, <code>the name of rex</code></li><li><code>a</code> or <code>an</code> after <code>conjure</code>: <code>conjure a pet</code></li><li><code>a</code> before <code>list containing</code></li><li><code>a</code> before consonants and <code>an</code> before vowels, as in English</li></ul>
+<p>And <code>add</code> reads both ways: <code>add 1 to count</code> makes a number bigger, while <code>add item to collection</code> puts an item at the end of a list.</p>
+<h2 id="programs-made-of-several-scripts">Programs made of several scripts</h2>
+<pre class="stella"><code><span class="kw">use</span>: shapes.stella</code></pre>
+<p>That brings in another script's commands and kinds of things. The other script can have its own <code>genesis:</code> so you can run it alone; that part is skipped when it's used.</p>
+<h2 id="libraries">Libraries</h2>
+<p>A library gives you more words. It loads by itself as soon as you use one of its words, and <code>use: time</code> at the top says so out loud. Here's what comes with Stellanova.</p>
+<div class="table"><table><thead><tr><th>Library</th><th>What it gives you</th></tr></thead><tbody><tr><td><code>maths</code></td><td><code>pi</code>, <code>e</code>, <code>sine of</code>, <code>cosine of</code>, <code>tangent of</code> (in degrees), their <code>arc</code> versions, <code>round</code>, <code>round down</code>, <code>round up</code>, <code>whole part of</code>, <code>power of</code>, <code>remainder of</code>, <code>logarithm of</code>, <code>natural logarithm of</code></td></tr><tr><td><code>time</code></td><td><code>wait 2 seconds</code>, <code>seconds since the start</code>, <code>today</code>, <code>the time now</code>, <code>the day of the week</code>, <code>days between</code>, <code>days until</code>, <code>date plus days</code>, <code>weekday of</code>, and the current hour, minute, second, day, month and year</td></tr><tr><td><code>window</code></td><td>A window for games and pictures, in 2D and 3D (more on this below)</td></tr><tr><td><code>sound</code></td><td><code>play the sound with &quot;boom.wav&quot;</code>, <code>play the sound and wait</code>, <code>play the sound again and again</code>, <code>stop the sound</code>. Plays .wav and .mp3, many at once.</td></tr><tr><td><code>sound making</code></td><td>Builds sounds from scratch: <code>a tone with (&quot;sine&quot;, 440, 0.5, 0.8)</code>, <code>the pitch of the note &quot;C#5&quot;</code>, <code>mixed with</code>, <code>followed by with</code>, <code>louder with</code>, <code>faded with</code>, <code>echoed with</code>, <code>save the sound with</code>, and <code>record the sound 3</code> from the microphone</td></tr><tr><td><code>pictures</code></td><td>Edit pictures dot by dot: <code>a blank picture with</code>, <code>the picture in the file</code>, <code>the dot at with</code>, <code>colour the dot with</code>, <code>the dots of the picture</code>, <code>save the picture with</code></td></tr><tr><td><code>forms</code></td><td>Desktop forms with buttons, fields, labels, lists and tick boxes. <code>open a form with</code>, <code>add a button with</code>, <code>wait for a click</code>, <code>the words in &quot;name&quot;</code>, <code>is ticked &quot;loud&quot;</code></td></tr><tr><td><code>web</code></td><td><code>web page &quot;https://...&quot;</code> reads a page, <code>download with</code> saves a file, <code>send to the web page with</code> posts text</td></tr><tr><td><code>server</code></td><td>Turns your program into a web server: <code>serve the web with (8080, the command answer)</code></td></tr><tr><td><code>network</code></td><td>TCP (<code>connect to with</code>, <code>listen on port</code>, <code>send on with</code>, <code>receive from</code>), UDP and WebSockets</td></tr><tr><td><code>email</code></td><td><code>send an email with (...)</code> over TLS</td></tr><tr><td><code>database</code></td><td>SQLite: <code>change the database with</code>, <code>rows from the database with</code>, with <code>?</code> placeholders so typed text can't break your queries</td></tr><tr><td><code>spreadsheet</code></td><td>Reads and writes CSV</td></tr><tr><td><code>json</code></td><td>Reaches into JSON with paths like <code>&quot;weather.days[2].high&quot;</code></td></tr><tr><td><code>computer</code></td><td>Runs other programs and reads what they print, reads environment values, opens files, beeps, and ends the program with an exit number</td></tr><tr><td><code>folders</code></td><td>Lists, makes, moves, copies and erases files and folders, and reads files as bytes</td></tr><tr><td><code>zip</code></td><td>Packs and unpacks .zip files</td></tr><tr><td><code>encryption</code></td><td><code>encrypted with (message, password)</code> and <code>decrypted with</code>, plus <code>a random code of 16</code></td></tr><tr><td><code>hashing</code></td><td>sha256, sha512, sha1 and md5 fingerprints, and HMAC signatures</td></tr><tr><td><code>patterns</code></td><td>Regular expressions in plain words: <code>the pattern fits with</code>, <code>matches of the pattern with</code>, <code>pieces of the pattern with</code>, <code>replace the pattern with</code></td></tr><tr><td><code>letters</code></td><td>Text to UTF-8 bytes and back, and the number behind a letter</td></tr><tr><td><code>animation</code></td><td>Smooth movement: <code>eased with</code>, <code>tweened with</code>, <code>ping pong</code>, <code>wave of with</code>, <code>sheet frame with</code></td></tr><tr><td><code>big numbers</code></td><td>Whole numbers of any size, kept as text</td></tr><tr><td><code>physics.stella</code></td><td>Boxes that fall, slide, land and bounce, written in Stellanova itself</td></tr><tr><td><code>page</code></td><td>For web programs: find and change page elements, listen for clicks, animate, draw on a canvas, play media</td></tr><tr><td><code>screen</code></td><td>A full-screen surface with see-through colours, rounded shapes, real fonts and frosted glass, for building whole desktops</td></tr></tbody></table></div>
+<h3 id="the-window-library">The window library</h3>
+<p>This one deserves its own section, because it's where Stellanova is the most fun.</p>
+<pre class="stella"><code><span class="kw">use</span>: window
+
+<span class="kw">genesis</span>:
+  open a world with <span class="str">&quot;My game&quot;</span>, <span class="num">800</span>, <span class="num">600</span>
+  <span class="kw">set</span> x <span class="kw">to</span> <span class="num">400</span>
+  <span class="kw">as long as</span> the world lives:
+    <span class="kw">if</span> key held <span class="str">&quot;right&quot;</span>: <span class="kw">set</span> x <span class="kw">to</span> x <span class="kw">plus</span> <span class="num">5</span>
+    consume the window with <span class="str">&quot;black&quot;</span>
+    etch a circle with x, <span class="num">300</span>, <span class="num">20</span>, <span class="str">&quot;orange&quot;</span>
+    reveal the frame
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Places are counted in dots from the top left corner. <code>x</code> goes right and <code>y</code> goes down.</p>
+<p><strong>Opening, drawing and showing:</strong></p>
+<ul><li><code>open a world with &quot;Title&quot;, 800, 600</code> opens a window.</li><li><code>consume the window with &quot;black&quot;</code> fills it with one colour.</li><li><code>etch a box with x, y, width, height, &quot;red&quot;</code>, <code>etch a circle with x, y, radius, &quot;blue&quot;</code>, <code>etch a square with x, y, half width, &quot;purple&quot;</code> and <code>etch a line with x, y, to x, to y, &quot;white&quot;</code> draw shapes.</li><li><code>etch words with &quot;Score: &quot; plus score, x, y, &quot;yellow&quot;</code> draws text, and <code>set the text size to 32</code> makes it bigger.</li><li><code>etch the picture with &quot;ship.png&quot;, x, y</code> draws a .png or .gif. <code>etch the picture turned with</code> adds size and angle, and <code>etch the sheet frame with</code> draws one frame of a sprite sheet.</li><li><code>reveal the frame</code> shows what you drew, then waits so the game runs at 60 frames a second.</li><li><code>the world lives</code> turns to no when the person closes the window, and <code>end the world</code> closes it yourself.</li><li><code>frame time</code> is how long the last frame took, so movement can stay smooth on slow computers.</li></ul>
+<p><strong>Keys and the mouse:</strong></p>
+<ul><li><code>key held &quot;left&quot;</code> is yes while a key is down. <code>key pressed &quot;space&quot;</code> is yes for one frame only, so one press does one thing.</li><li><code>mouse x</code>, <code>mouse y</code>, <code>mouse held</code>, <code>mouse clicked</code>, <code>mouse right held</code>, <code>mouse right clicked</code> and <code>mouse wheel turned</code> cover the mouse.</li><li><code>hold the pointer</code> hides the pointer and keeps it in the window for 3D games. Then <code>mouse moved across</code> and <code>mouse moved down</code> tell you how far it moved.</li></ul>
+<p><strong>Colours</strong> are names (<code>black</code>, <code>white</code>, <code>red</code>, <code>green</code>, <code>blue</code>, <code>yellow</code>, <code>orange</code>, <code>purple</code>, <code>pink</code>, <code>brown</code>, <code>grey</code>) or codes like <code>&quot;#ff8800&quot;</code>. <code>colour from (255, 136, 0)</code> builds one from numbers.</p>
+<p><strong>3D.</strong> The same window shows a 3D world, seen from <strong>the eye</strong>:</p>
+<ul><li><code>place the eye at 0 horizontal 1.6 vertical -10 depth</code> and <code>aim the eye with (turn, tilt)</code> set the camera.</li><li><code>etch the ground with (&quot;green&quot;, &quot;#2a7a2a&quot;)</code> draws a checkered floor.</li><li><code>etch a cube with</code>, <code>etch a block with</code>, <code>etch a ball with</code> and <code>etch a triangle in space with</code> draw shapes.</li><li><code>etch the model with (&quot;ship.obj&quot;, middle, 2, 45, &quot;&quot;)</code> loads a 3D model.</li><li><code>etch the picture in space with</code> lays a picture on the world like a texture.</li><li><code>shine the light from</code>, <code>set the daylight to 0.3</code> and <code>set the eye view to 90</code> set the mood.</li><li><code>start keeping the shapes as &quot;house&quot;</code> and <code>etch the kept shapes &quot;house&quot;</code> let you draw thousands of blocks every frame without slowing down.</li><li><code>shade the shapes with the command tint</code> gives each shape a colour from your own command.</li></ul>
+<p>The graphics card draws the 3D shapes, so things hide behind each other properly and balls are smoothly lit.</p>
+<h3 id="making-your-own-library">Making your own library</h3>
+<p>A library is a <code>.words</code> file. Each word says what it means in C++ (for built programs) and, on a <code>runs:</code> line, in Python (for running directly):</p>
+<pre class="stella"><code><span class="kw">to</span> wait, <span class="kw">given</span> seconds (a number) = std::this_thread::sleep_for(std::chrono::duration&lt;double&gt;({seconds}))
+  runs: time.sleep(max(<span class="num">0.0</span>, {seconds}))</code></pre>
+<p><code>{seconds}</code> stands for the input. A <code>web:</code> line adds the JavaScript version. Libraries can also bring headers (<code>include:</code>), system libraries (<code>link:</code>), and helper code (<code>code:</code>, <code>python:</code>, <code>javascript:</code>).</p>
+<p>You can also borrow words without writing a library:</p>
+<ul><li><strong><code>use python &quot;statistics&quot;:</code></strong> gives words for Python functions (when running directly).</li><li><strong><code>use the library &quot;user32.dll&quot;:</code></strong> gives words for C functions in any <code>.dll</code> or <code>.so</code>.</li><li><strong><code>stellanova get user/project</code></strong> fetches someone else's library from GitHub. Only get libraries from people you trust, since a library can run any code.</li></ul>
+<h2 id="programs-for-web-pages">Programs for web pages</h2>
+<p><code>stellanova web</code> turns a program into JavaScript. With the <code>page</code> library, it can run a real web page:</p>
+<pre class="stella"><code><span class="kw">use</span>: page
+
+<span class="kw">the world remembers</span>:
+  clicks (a number)
+<span class="end">and the universe said i love you</span>
+
+<span class="kw">to</span> pressed, <span class="kw">given</span> event (a number):
+  <span class="kw">set</span> clicks <span class="kw">to</span> clicks <span class="kw">plus</span> <span class="num">1</span>
+  <span class="kw">set</span> the text with (the element <span class="str">&quot;#count&quot;</span>, <span class="str">&quot;Clicks: &quot;</span> <span class="kw">plus</span> clicks)
+<span class="end">and the universe said i love you</span>
+
+<span class="kw">genesis</span>:
+  listen for an event with (the element <span class="str">&quot;button&quot;</span>, <span class="str">&quot;click&quot;</span>, <span class="kw">the command</span> pressed)
+<span class="end">and the universe said i love you</span></code></pre>
+<p>Window games work in a browser as they are: the window becomes a canvas in the page.</p>
+<h2 id="wrapping-up">Wrapping up</h2>
+<p>That's the whole language. To recap the shape of things:</p>
+<ul><li>A program starts at <code>genesis:</code>, and every block ends with <code>and the universe said i love you</code>.</li><li><code>set</code> keeps values, <code>scrawl</code> shows them, and <code>ask</code> takes them from people.</li><li><code>to</code> makes commands, <code>returning</code> gives them answers, and <code>for a pet</code> gives them to a kind of thing.</li><li><code>a pet has:</code> describes your own kinds, and <code>conjure</code> makes them.</li><li><code>try:</code> and <code>if that went wrong:</code> handle problems.</li><li>Libraries add everything else, from windows and sound to databases and web servers.</li></ul>
+<p>The examples folder is the best place to go next. <code>guess.stella</code> is a guessing game, <code>pets.stella</code> shows lists and kinds of things, <code>dodge.stella</code> and <code>pong.stella</code> are games in a window, and <code>driftstone.stella</code> is an island of blocks you can dig, build on and craft with, all in plain English.</p>
+<p>Happy writing.</p>
+  </article>
+
+  <section class="reviews">
+    <h2 style="font: 800 26px system-ui, sans-serif">Reviews</h2>
+    <div class="review"><div class="who">Marisol K.</div><div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>Made the guessing game with my kids on a Sunday. They kept reading the code out loud like a story. We'll be making the pong recipe next.</div>
+    <div class="review"><div class="who">Dev from Duluth</div><div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>Built it and it ran as fast as my C++ version. I added a pinch of the sound library for some extra flavour.</div>
+    <div class="review"><div class="who">PatInTheKitchen</div><div class="stars">&#9733;&#9733;&#9733;&#9733;&#9734;</div>Took off one star because I kept forgetting "and the universe said i love you." Then it grew on me. Now I say it to my cat.</div>
+  </section>
+</main>
+
+<aside><div class="sticky">
+  <div class="panel"><h4>Jump to</h4><ol>
+<li><a href="#getting-started">Getting started</a></li>
+<li><a href="#the-kinds-of-values">The kinds of values</a></li>
+<li><a href="#names">Names</a></li>
+<li><a href="#showing-things-and-asking-questions">Showing things and asking questions</a></li>
+<li><a href="#working-things-out">Working things out</a></li>
+<li><a href="#making-choices">Making choices</a></li>
+<li><a href="#loops">Loops</a></li>
+<li><a href="#commands">Commands</a></li>
+<li><a href="#your-own-kinds-of-things">Your own kinds of things</a></li>
+<li><a href="#files-and-saving">Files and saving</a></li>
+<li><a href="#when-things-go-wrong">When things go wrong</a></li>
+<li><a href="#doing-things-at-the-same-time">Doing things at the same time</a></li>
+<li><a href="#notes-and-grammar">Notes and grammar</a></li>
+<li><a href="#programs-made-of-several-scripts">Programs made of several scripts</a></li>
+<li><a href="#libraries">Libraries</a></li>
+<li><a href="#programs-for-web-pages">Programs for web pages</a></li>
+<li><a href="#wrapping-up">Wrapping up</a></li>
+  </ol></div>
+  <div class="panel tip"><h4>Chef's tip</h4>Run a program directly while you taste and adjust, then <code>stellanova build</code> it when it's ready to serve. Same flavour, C++ speed.</div>
+</div></aside>
+</div>
+
+<footer><b>Stellanova Kitchen</b><br>Programs in plain English. Every block ends with: and the universe said i love you.</footer>
+</body>
+</html>
