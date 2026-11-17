@@ -1074,8 +1074,9 @@ def kept_span(tokens, i, names):
         if len(key) > best and tuple(tokens[i:i + len(key)]) == key and any(w in ARTICLES for w in key):
             best = len(key)
     for key in names.commands:  # a command's own name is kept whole: 'total age of shelter' is the command 'total age of'
-        if len(key) > best and tuple(tokens[i:i + len(key)]) == key:
-            best = len(key)
+        said = tuple(spoken(key).split())
+        if len(said) > best and tuple(tokens[i:i + len(said)]) == said:
+            best = len(said)
     return best
 
 
@@ -1468,7 +1469,10 @@ class Names:
 
     def unknown(self, tokens, i):
         """The best guess at what an unknown name at tokens[i] was meant to be, as an error message."""
-        known = [" ".join(k) for k in self.known] + [" ".join(k) for k in self.commands]
+        for k in self.commands:
+            if hidden_from_here(k) and tuple(tokens[i:i + len(k) - 1]) == k[:-1]:
+                return private_message(k)
+        known = [" ".join(k) for k in self.known] + [spoken(k) for k in self.commands if not hidden_from_here(k)]
         best = (0.0, tokens[i], None)
         for n in range(1, min(5, len(tokens) - i) + 1):
             if not all(t[0].isalpha() for t in tokens[i:i + n]):
@@ -2767,7 +2771,7 @@ def library_hint(tokens):
 
 def similar_words(tokens, names):
     """' Words that start with 'etch': ...' when a line starts like known words but goes on differently."""
-    found = sorted({" ".join(k) for k in names.commands if k[0] == tokens[0]})
+    found = sorted({spoken(k) for k in names.commands if k[0] == tokens[0] and not hidden_from_here(k)})
     if not found:
         return ""
     return f" Words that start with '{tokens[0]}': " + ", ".join(found) + "."
@@ -3514,12 +3518,19 @@ def read_one(path, auto):
     made = []  # the Command for each head
     for (words, cpp, inputs, gives), (_, n, _) in zip(heads, commands):
         command = Command(cpp, [kind for _, kind in inputs], gives)
+        command.line = n
         command.usual = USUAL.get(cpp, {})
         have = names.commands.get(tuple(words))
         if have is not None:
             owner = inputs[0][1] if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else None
             if have.versions is None or owner is None or owner in have.versions:
-                raise ScriptError(n, f"There are two commands called '{' '.join(words)}'.")
+                if getattr(have, "line", None) is None:
+                    raise ScriptError(n, f"There is already a word called '{spoken(words)}' (from a library): rename this command.")
+                first = where(have.line)
+                if n // PER_FILE != have.line // PER_FILE:
+                    raise ScriptError(n, f"There are two commands called '{spoken(words)}': this one, and one in {first}. "
+                                         f"Rename one, or write 'to {spoken(words)}, privately' in the script that only uses it there.")
+                raise ScriptError(n, f"There are two commands called '{spoken(words)}' (the other is at {first}): rename one.")
             copies = owner[6:] in GENERIC_COPIES and all(k[6:] in GENERIC_COPIES for k in have.versions)
             if not copies and (len(have.kinds) != len(command.kinds) or have.kinds[1:] != command.kinds[1:] or have.gives != gives):
                 raise ScriptError(n, f"Every version of '{' '.join(words)}' must take the same inputs and return the same kind.")
@@ -3751,11 +3762,14 @@ def command_head(header, line):
     """'to greet, given name (text):' -> (['greet'], 'Greet', [(['name'], TEXT)], None)."""
     if "giving back" in header.lower():
         raise ScriptError(line, "'giving back' is now 'returning'.")
+    private = re.match(r"to [a-z ]+?, privately(?=[,:])", header.lower())
+    if private:  # 'to helper, privately:' only its own script can use it
+        header = header[:private.end() - len(", privately")] + header[private.end():]
     m = re.fullmatch(r"to ([a-z ]+?)(?:, for an? ([a-z ]+?))?(?:, given (.+?))?(?:, returning (.+))?:", header.lower())
     if not m:
         raise ScriptError(line, "A command starts like 'to steer toward, given goal (a place) and running (yes or no):'.")
     inputs = []
-    words = m.group(1).split()
+    words = m.group(1).split() + ([f"privately{line // PER_FILE}"] if private else [])
     if m.group(2):  # a command for a kind of thing: it gets that thing and can change it
         owner = " ".join(m.group(2).split())
         if owner not in THINGS:
@@ -4474,6 +4488,7 @@ def guard(run, n):
 def statement(n, text_, inner, names, declared, depth):
     """One line (with its indented lines). Returns (C++ lines, run, branch); branch is set for if/otherwise lines."""
     tab = "\t" * depth
+    READING_FILE[0] = n // PER_FILE
     if text_.startswith("note:"):
         return [f"{tab}// {text_[5:].strip()}"], None, None
     head, colon, rest = split_colon(text_)
@@ -4953,12 +4968,15 @@ def statement(n, text_, inner, names, declared, depth):
     hint = library_hint(tokens)
     if hint:
         raise ScriptError(n, f"I don't know how to start a line with '{tokens[0]}'." + hint)
+    for k in names.commands:
+        if hidden_from_here(k) and tuple(tokens[:len(k) - 1]) == k[:-1]:
+            raise ScriptError(n, private_message(k))
     near = similar_words(tokens, names)
     if near:
         raise ScriptError(n, f"I don't know '{' '.join(tokenize(text_, n)[:4])}'." + near)  # as written, with its grammar
     starts = ["set", "move", "scrawl", "ask", "add", "insert", "remove", "inscribe", "if", "otherwise", "repeat", "as long as", "for each",
               "try", "return", "raise an error with", "cease", "whisper", "depending on", "whenever", "every", "meanwhile",
-              "invoke", "save", "load", "conjure", "break free", "move on"] + [" ".join(k) for k in names.commands]
+              "invoke", "save", "load", "conjure", "break free", "move on"] + [spoken(k) for k in names.commands if not hidden_from_here(k)]
     for size in (3, 2, 1):  # a misspelt first word (or words): the nearest way a line can start
         guess = difflib.get_close_matches(" ".join(tokens[:size]), [s for s in starts if len(s.split()) == size], n=1, cutoff=0.75)
         if guess:
@@ -5274,11 +5292,32 @@ def writable_list(tokens, names, n, what):
     return v
 
 
+READING_FILE = [0]  # which script the line being read is in (FILES), for its private commands
+
+
 def match_command(names, tokens):
     for size in range(len(tokens), 0, -1):
+        mine = tuple(tokens[:size]) + (f"privately{READING_FILE[0]}",)
+        if mine in names.commands:
+            return mine, size
         if tuple(tokens[:size]) in names.commands:
             return tuple(tokens[:size]), size
     return None, 0
+
+
+def hidden_from_here(key):
+    """A private command of another script."""
+    return bool(key) and key[-1].startswith("privately") and key[-1] != f"privately{READING_FILE[0]}"
+
+
+def private_message(key):
+    elsewhere = FILES[int(key[-1][len("privately"):])]
+    return f"'{spoken(key)}' is kept to {elsewhere} (it is written 'privately' there), so only {elsewhere} can use it."
+
+
+def spoken(key):
+    """A command's name as written: without the mark a private one has."""
+    return " ".join(key[:-1] if key and key[-1].startswith("privately") else key)
 
 
 def ask(tokens, names, declared, n, tab):

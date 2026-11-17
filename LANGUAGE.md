@@ -384,6 +384,8 @@ use: shapes.stella
 
 The other script is looked for next to this one. It can have its own `genesis:` (so it can be run and tried by itself); that part is left out when it is used. A script used more than once, even by scripts it uses itself, is read once. A mistake in a used script names it, like `shapes.stella line 13: ...`.
 
+A command only the script itself needs can be kept to it: `to tidy up, privately:` (or `to tidy up, privately, given ...:`). Other scripts can't use it, and they can have a `tidy up` of their own. Two scripts with a command of the same name that isn't private is a mistake, and the message says where both are.
+
 ## Libraries
 
 A library gives a program more words. A library loads by itself as soon as the program uses one of its words; `use: <library>` near the top says so out loud:

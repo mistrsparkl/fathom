@@ -37,8 +37,31 @@ link: winsqlite3
 linux link: :libsqlite3.so.0
 
 code:
+  #include <array>
   namespace stellanova_database
   {
+  	inline std::string plainly(const std::string& why)  // what failed, in plain words, then the database's own
+  	{
+  		static const std::vector<std::array<std::string, 3>> rules = {
+  			{"no such table: ", "", "there is no table called \"{x}\", so make it first with CREATE TABLE"},
+  			{"no such column: ", "", "there is no column called \"{x}\""},
+  			{"table ", " already exists", "there is already a table called \"{x}\"; CREATE TABLE IF NOT EXISTS makes it only once"},
+  			{"UNIQUE constraint failed: ", "", "another row already has the same {x}"},
+  			{"NOT NULL constraint failed: ", "", "{x} must be given a value"},
+  			{"near ", ": syntax error", "the command isn't written the way the database reads it, near {x}"},
+  			{"database is locked", "", "another program is using the database just now"},
+  		};
+  		for (const auto& r : rules)
+  			if (why.rfind(r[0], 0) == 0 && why.size() >= r[0].size() + r[1].size() && why.compare(why.size() - r[1].size(), r[1].size(), r[1]) == 0)
+  			{
+  				std::string x = why.substr(r[0].size(), why.size() - r[0].size() - r[1].size()), out = r[2];
+  				size_t at = out.find("{x}");
+  				if (at != std::string::npos)
+  					out.replace(at, 3, x);
+  				return "the database couldn't do it: " + out + " (it said: " + why + ").";
+  			}
+  		return "the database couldn't do it (it said: " + why + ").";
+  	}
   	inline std::vector<std::vector<std::string>> run(const std::string& file, const std::string& command,
   		const std::vector<std::string>& values, int line)
   	{
@@ -60,7 +83,7 @@ code:
   			{
   				std::string why = sqlite3_errmsg(db);
   				sqlite3_close(db);
-  				stellanova::fail(line, "the database said: " + why + ".");
+  				stellanova::fail(line, plainly(why));
   			}
   			rest = next;
   			if (!step)
@@ -89,7 +112,7 @@ code:
   			{
   				std::string why = sqlite3_errmsg(db);
   				sqlite3_close(db);
-  				stellanova::fail(line, "the database said: " + why + ".");
+  				stellanova::fail(line, plainly(why));
   			}
   		}
   		sqlite3_close(db);
@@ -101,6 +124,12 @@ code:
 
 python:
   import sqlite3
+  PLAIN = [('no such table: ', '', 'there is no table called "{x}", so make it first with CREATE TABLE'), ('no such column: ', '', 'there is no column called "{x}"'), ('table ', ' already exists', 'there is already a table called "{x}"; CREATE TABLE IF NOT EXISTS makes it only once'), ('UNIQUE constraint failed: ', '', 'another row already has the same {x}'), ('NOT NULL constraint failed: ', '', '{x} must be given a value'), ('near ', ': syntax error', "the command isn't written the way the database reads it, near {x}"), ('database is locked', '', 'another program is using the database just now')]
+  def plainly(why):
+      for start, end, plain in PLAIN:
+          if why.startswith(start) and why.endswith(end) and len(why) >= len(start) + len(end):
+              return "the database couldn't do it: " + plain.replace("{x}", why[len(start):len(why) - len(end)]) + " (it said: " + why + ")."
+      return "the database couldn't do it (it said: " + why + ")."
   def database(file, command, values):
       try:
           db = sqlite3.connect(file, isolation_level=None)
@@ -115,7 +144,7 @@ python:
               rows += [["" if c is None else text(float(c)) if isinstance(c, (int, float)) and not isinstance(c, bool) else str(c) for c in row]
                        for row in cur.fetchall()]
       except sqlite3.Error as why:
-          raise RunError(0, "the database said: " + str(why) + ".")
+          raise RunError(0, plainly(str(why)))
       except (IndexError, sqlite3.ProgrammingError):
           raise RunError(0, "the command has " + str(command.count("?")) + " ?, but there are " + str(len(values)) + " values.")
       finally:
@@ -169,6 +198,13 @@ javascript:
       if (now.trim() && !/^(\s|--[^\n]*(\n|$)|\/\*[\s\S]*?\*\/)*$/.test(now)) parts.push(now);
       return parts;
     },
+    plain: [["no such table: ", "", "there is no table called \"{x}\", so make it first with CREATE TABLE"], ["no such column: ", "", "there is no column called \"{x}\""], ["table ", " already exists", "there is already a table called \"{x}\"; CREATE TABLE IF NOT EXISTS makes it only once"], ["UNIQUE constraint failed: ", "", "another row already has the same {x}"], ["NOT NULL constraint failed: ", "", "{x} must be given a value"], ["near ", ": syntax error", "the command isn't written the way the database reads it, near {x}"], ["database is locked", "", "another program is using the database just now"]],
+    plainly(why) {
+      for (const [start, end, plain] of this.plain)
+        if (why.startsWith(start) && why.endsWith(end) && why.length >= start.length + end.length)
+          return `the database couldn't do it: ${plain.replace("{x}", why.slice(start.length, why.length - end.length))} (it said: ${why}).`;
+      return `the database couldn't do it (it said: ${why}).`;
+    },
     run(file, command, values, line) {
       if (typeof require !== "function") stellanova.fail(line, "a web page has no databases (this works with node).");
       let db;
@@ -183,7 +219,7 @@ javascript:
       try {
         for (const part of this.split(command)) {
           let step;
-          try { step = db.prepare(part); } catch (e) { stellanova.fail(line, `the database said: ${e.message}.`); }
+          try { step = db.prepare(part); } catch (e) { stellanova.fail(line, stellanova_database.plainly(e.message)); }
           const holes = (part.match(/\?/g) || []).length;
           if (used + holes > values.length) stellanova.fail(line, `the command has ${(command.match(/\?/g) || []).length} ?, but there are ${values.length} values.`);
           const given = values.slice(used, used + holes);
@@ -192,7 +228,7 @@ javascript:
           try {
             if (step.columns().length) { step.setReturnArrays(true); got = step.all(...given); }
             else { step.run(...given); got = []; }
-          } catch (e) { stellanova.fail(line, `the database said: ${e.message}.`); }
+          } catch (e) { stellanova.fail(line, stellanova_database.plainly(e.message)); }
           for (const row of got)
             rows.push(row.map((c) => (c === null ? "" : typeof c === "number" || typeof c === "bigint" ? stellanova.text(Number(c)) : c instanceof Uint8Array ? Buffer.from(c).toString("latin1") : String(c))));
         }

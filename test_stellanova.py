@@ -1260,6 +1260,22 @@ def program_checks():
     # markup: a new <li>, <td> or <p> ends the one before it, as in browsers
     out = both('use: markup.stella\n\ngenesis:\n  set whole to read markup "<ul><li>One<li>Two<b>!</b><li>Three</ul><table><tr><td>a<td>b<tr><td>c</table><p>x<p>y"\n  for each ul in parts named with (whole, "ul"):\n    scrawl the size of the parts of ul, " items: ", join (the parts of ul changed by each li becomes all words in li) with ", "\n  for each tr in parts named with (whole, "tr"):\n    scrawl the size of the parts of tr, " cells: ", all words in tr\n  scrawl the size of parts named with (whole, "p")\nand the universe said i love you\n')
     assert out.stdout == '3 items: One, Two!, Three\n2 cells: ab\n1 cells: c\n2\n', repr(out.stdout)
+    # big programs: a command written 'privately' is kept to its own script
+    scripts = {'a.stella': 'to greet, privately:\n  scrawl "hi from a"\nand the universe said i love you\n\nto helper, privately, returning number:\n  return 1\nand the universe said i love you\n\nto from a:\n  greet\nand the universe said i love you\n', 'b.stella': 'to greet:\n  scrawl "hi from b"\nand the universe said i love you\n\nto helper, returning number:\n  return 2\nand the universe said i love you\n'}
+    out = both('use: a.stella\nuse: b.stella\n\ngenesis:\n  greet\n  from a\nand the universe said i love you\n', others=scripts)
+    assert out.stdout == 'hi from b\nhi from a\n', repr(out.stdout)
+    def mistake(source, others):  # what running it directly says is wrong
+        with tempfile.TemporaryDirectory() as d:
+            for name, text_ in dict(others, **{'probe.stella': source}).items():
+                (Path(d) / name).write_text(text_, encoding='utf-8')
+            return subprocess.run([sys.executable, str(HERE / 'stellanova.py'), 'run', 'probe.stella'], cwd=d,
+                                  capture_output=True, text=True, encoding='utf-8')
+    out = mistake('use: a.stella\n\ngenesis:\n  scrawl helper\n' + END, scripts)
+    assert "'helper' is kept to a.stella (it is written 'privately' there), so only a.stella can use it." in out.stdout + out.stderr, out
+    out = mistake('use: a.stella\nuse: b.stella\n\ngenesis:\n  greet\n  from a\nand the universe said i love you\n', {'a.stella': 'to greet:\n  scrawl "hi from a"\nand the universe said i love you\n\nto helper, returning number:\n  return 1\nand the universe said i love you\n\nto from a:\n  greet\nand the universe said i love you\n', 'b.stella': 'to greet:\n  scrawl "hi from b"\nand the universe said i love you\n\nto helper, returning number:\n  return 2\nand the universe said i love you\n'})
+    assert ("b.stella line 1: There are two commands called 'greet': this one, and one in a.stella line 1. "
+            "Rename one, or write 'to greet, privately' in the script that only uses it there.") in out.stdout + out.stderr, out
+
     # text padded to a width
     out = both('genesis:\n  scrawl "[", "food" padded to 8 letters, "] [", "café" padded to 6 letters, "] [", "toolong" padded to 3 letters, "] [", 7 padded to 3 digits, "]"\n  try:\n    scrawl "a" padded to 1.5 letters\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "[food    ] [café  ] [toolong] [007]\nI can't pad to 1.5 letters: it must be a whole number, 0 or more.\n", repr(out.stdout)
@@ -1304,7 +1320,7 @@ def program_checks():
                '  scrawl item 1 of item 1 of rows from the database with values ("shop.db", "select count(*) from items where price > ?", a list containing "5")\n'
                '  try:\n    change the database ("shop.db", "select * from nowhere")\n  if that went wrong:\n    scrawl the wound\n'
                'and the universe said i love you\n')
-    assert out.stdout == "tea costs 3.5\nBob's cake costs 12\n1\nthe database said: no such table: nowhere.\n", repr(out.stdout)
+    assert out.stdout == "tea costs 3.5\nBob's cake costs 12\n1\nthe database couldn't do it: there is no table called \"nowhere\", so make it first with CREATE TABLE (it said: no such table: nowhere).\n", repr(out.stdout)
 
     # JSON from web services: other spellings of a part's name, null, and parts not asked for
     q = "plus a quotation mark plus"
