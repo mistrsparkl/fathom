@@ -48,6 +48,8 @@ namespace gc
 		char* sp = nullptr;
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
+		std::vector<V*> made;  // made while running, not yet in all (the collector moves them there): no lock needed
+		std::vector<V*> ready, ready_small;  // freed values this thread took from spare to use again
 	};
 	static std::mutex lock;  // every value, the roots, and each thread's young values
 	static std::mutex stop_lock;  // the threads and their states
@@ -59,7 +61,8 @@ namespace gc
 	static std::vector<std::pair<const char*, size_t>> roots;
 	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 18;  // set it to test the collector hard
-	static size_t made_since = 0, limit = least;
+	static std::atomic<size_t> made_since{0};
+	static size_t limit = least;
 	static std::mutex collecting;
 	static std::atomic<bool>& stopping = cn_stopping;
 
@@ -72,6 +75,10 @@ namespace gc
 				return;
 			{
 				std::lock_guard<std::mutex> hold(stop_lock);
+				std::lock_guard<std::mutex> heap(lock);
+				all.insert(all.end(), t->made.begin(), t->made.end());  // what it made may still be held elsewhere
+				spare.insert(spare.end(), t->ready.begin(), t->ready.end());
+				spare_small.insert(spare_small.end(), t->ready_small.begin(), t->ready_small.end());
 				threads.erase(std::find(threads.begin(), threads.end(), t));
 				delete t;
 			}
@@ -156,6 +163,11 @@ namespace gc
 	static size_t sorted = 0;  // all[0, sorted) are in order (what the last sweep kept): only newer ones need sorting
 	static void mark_and_sweep()
 	{
+		for (Thread* x : threads)  // (every thread is stopped or parked; parked ones put what they make straight into all)
+		{
+			all.insert(all.end(), x->made.begin(), x->made.end());
+			x->made.clear();
+		}
 		std::sort(all.begin() + std::min(sorted, all.size()), all.end());
 		std::inplace_merge(all.begin(), all.begin() + std::min(sorted, all.size()), all.end());
 		std::vector<V*> work;
@@ -296,28 +308,46 @@ namespace gc
 		Thread* t = me();
 		if (t->state == 0 && stopping)
 			stop_here(t);
-		bool full;
 		V* v;
+		if (t->state == 0)  // running: the collector waits for this thread before it looks, so no lock is needed
 		{
-			std::lock_guard<std::mutex> hold(lock);
-			std::vector<V*>& ready = is_small(tag) ? spare_small : spare;
-			if (!ready.empty())
+			std::vector<V*>& ready = is_small(tag) ? t->ready_small : t->ready;
+			if (ready.empty())  // take a batch of freed values (or new ones) at once
 			{
-				v = ready.back();
-				ready.pop_back();
+				std::lock_guard<std::mutex> hold(lock);
+				std::vector<V*>& from = is_small(tag) ? spare_small : spare;
+				size_t take = std::min<size_t>(from.size(), 256);
+				ready.assign(from.end() - take, from.end());
+				from.resize(from.size() - take);
+				while (ready.size() < 256)
+					ready.push_back(is_small(tag) ? small_value() : full_value());
 			}
-			else if (is_small(tag))
-				v = small_value();
+			v = ready.back();
+			ready.pop_back();
+			v->tag = tag;
+			v->owned = false;
+			t->made.push_back(v);
+			t->young.push_back(v);
+			if (++made_since > limit)
+				collect(t);
+			return v;
+		}
+		{  // parked (inside a library word): a collector may be looking now, so as before, under the lock
+			std::lock_guard<std::mutex> hold(lock);
+			std::vector<V*>& from = is_small(tag) ? spare_small : spare;
+			if (!from.empty())
+			{
+				v = from.back();
+				from.pop_back();
+			}
 			else
-				v = full_value();
+				v = is_small(tag) ? small_value() : full_value();
 			v->tag = tag;
 			v->owned = false;
 			all.push_back(v);
 			t->young.push_back(v);
-			full = ++made_since > limit;
+			++made_since;
 		}
-		if (full && t->state == 0)
-			collect(t);
 		return v;
 	}
 }
@@ -379,6 +409,17 @@ extern "C"
 	{
 		std::lock_guard<std::mutex> hold(gc::lock);
 		gc::kept.push_back(v);
+	}
+	V* cn_zero_part(bool text)  // a new thing's 0 or "" part: one shared value (numbers and text never change in place)
+	{
+		static V* zero[2] = {};
+		static std::once_flag made[2];
+		std::call_once(made[text], [text] {
+			V* v = text ? cn_make_text("") : cn_box_number(0);
+			cn_keep(v);
+			zero[text] = v;
+		});
+		return zero[text];
 	}
 	void cn_root(const char* from, long long size)  // the world's shared names: always kept
 	{
@@ -1060,17 +1101,25 @@ extern "C"
 	{
 		static std::map<const char*, ThingKind*> kinds;
 		static std::mutex kinds_lock;
-		std::lock_guard<std::mutex> hold(kinds_lock);
-		ThingKind*& kind = kinds[spec];
-		if (!kind)
+		static thread_local const char* last_spec = nullptr;  // (most things made in a row are the same kind: no lock then)
+		static thread_local ThingKind* last_kind = nullptr;
+		if (spec != last_spec)
 		{
-			kind = new ThingKind;
-			std::stringstream in(spec);
-			std::string word;
-			std::getline(in, kind->name, '\x01');
-			while (std::getline(in, word, '\x01'))
-				kind->fields.push_back(word);
+			std::lock_guard<std::mutex> hold(kinds_lock);
+			ThingKind*& kind = kinds[spec];
+			if (!kind)
+			{
+				kind = new ThingKind;
+				std::stringstream in(spec);
+				std::string word;
+				std::getline(in, kind->name, '\x01');
+				while (std::getline(in, word, '\x01'))
+					kind->fields.push_back(word);
+			}
+			last_spec = spec;
+			last_kind = kind;
 		}
+		ThingKind* kind = last_kind;
 		V* v = fresh('k');
 		full(v)->kind = kind;
 		cn_items(v).resize(kind->fields.size());

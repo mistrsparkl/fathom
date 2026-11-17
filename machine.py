@@ -156,6 +156,7 @@ declare ptr @cn_place_op(i32, ptr, ptr)
 declare ptr @cn_place_scale(i32, ptr, double)
 declare double @cn_place_size(ptr)
 declare ptr @cn_thing(ptr)
+declare ptr @cn_zero_part(i1)
 declare ptr @cn_as_kind(ptr, ptr)
 declare ptr @cn_field(ptr, i32)
 declare ptr @cn_something(ptr, ptr, i32, i32)
@@ -399,7 +400,11 @@ class Fn:
                 return "null"
             thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
             for k, (_, _, part_kind) in enumerate(THINGS[kind]):
-                self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {self.box(self.zero(part_kind), part_kind)})")
+                if part_kind in (NUMBER, TEXT):  # a shared 0 or "", not a new value for each thing
+                    part = self.op(f"call ptr @cn_zero_part(i1 {'true' if part_kind == TEXT else 'false'})")
+                else:
+                    part = self.box(self.zero(part_kind), part_kind)
+                self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {part})")
             return thing
         finally:
             if into is not None:

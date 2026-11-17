@@ -118,6 +118,18 @@ namespace stellanova
 		{
 			if (d == 0)
 				return "0";  // not "-0"
+			if (std::fabs(d) < 9007199254740992.0)  // exactly a whole number: no printf (slow on Windows)
+			{
+				char digits[24], *end = digits + sizeof digits, *p = end;
+				long long n = static_cast<long long>(d);
+				unsigned long long u = n < 0 ? 0ull - static_cast<unsigned long long>(n) : static_cast<unsigned long long>(n);
+				do
+					*--p = static_cast<char>('0' + u % 10);
+				while (u /= 10);
+				if (n < 0)
+					*--p = '-';
+				return std::string(p, end);
+			}
 			char digits[32];
 			std::snprintf(digits, sizeof digits, "%.0f", d);
 			return digits;
