@@ -316,9 +316,15 @@ class Thing:
 
     def __init__(self, name, things):
         self.name, self.spec = name, things[name]
+        if PLAIN_KINDS.get(name) is self.spec:  # (every part plain: the same new parts each time)
+            self.fields = PLAIN_ZEROS[name].copy()
+            return
         known = PART_NAMES.get(name)
         if known is None or known[0] is not self.spec:  # each part's inner name, worked out once for each kind
             known = PART_NAMES[name] = (self.spec, [(snake(w), k) for w, k in self.spec])
+            if all(k in (NUMBER, YESNO, TEXT) for _, k in self.spec):
+                PLAIN_KINDS[name] = self.spec
+                PLAIN_ZEROS[name] = {part: py_zero(k, things) for part, k in known[1]}
         self.fields = {part: py_zero(k, things) for part, k in known[1]}
 
     def __eq__(self, other):
@@ -457,8 +463,16 @@ PLAIN = (float, str, bool, type(None))  # never changed in place, so never copie
 def dup_thing(v):
     new = Thing.__new__(Thing)
     new.name, new.spec = v.name, v.spec
-    new.fields = {k: x if type(x) in PLAIN else dup(x) for k, x in v.fields.items()}
+    if PLAIN_KINDS.get(v.name) is v.spec:  # only numbers, yes/no and text: a plain copy is enough
+        new.fields = v.fields.copy()
+    else:
+        new.fields = {k: x if type(x) in PLAIN else dup(x) for k, x in v.fields.items()}
     return new
+
+
+_new_thing = Thing.__new__
+PLAIN_KINDS = {}  # a kind's name -> its parts as described, when every part is a number, yes/no or text
+PLAIN_ZEROS = {}  # such a kind's name -> a new one's parts
 
 
 def dup(v):
@@ -466,6 +480,11 @@ def dup(v):
 
     Made by hand rather than with copy.deepcopy: it is called on every 'set', so it must be quick."""
     t = type(v)
+    if t is Thing:  # (most often: py_copy leaves out numbers, yes/no and text it knows about)
+        new = _new_thing(Thing)
+        new.name, new.spec = v.name, v.spec
+        new.fields = v.fields.copy() if PLAIN_KINDS.get(v.name) is v.spec else             {k: x if type(x) in PLAIN else dup(x) for k, x in v.fields.items()}
+        return new
     if t is float or t is str or t is bool:
         return v
     if t is Place:
@@ -967,16 +986,30 @@ def py_loop(head, then, tab):
         (None, tab + "    except _Leave:"), (None, tab + "        break"), (None, tab + "    except _Next:"), (None, tab + "        pass")]
 
 
-def py_copy(x, kind):  # Python text keeping x: lists, places and things are copied
-    return x if kind in (NUMBER, YESNO, TEXT) else f"_dup({x})"
+def py_copy(x, kind):  # Python text keeping x: lists, places and things are copied (not ones just made)
+    return x if kind in (NUMBER, YESNO, TEXT) or x == "[]" or x.startswith(PY_FRESH) else f"_dup({x})"
+
+
+PY_FRESH = ("_Thing(", "_sorted_by(")  # Python text that always makes a new value
+
+
+def py_sorted_by(items, member, line):  # 'sorted pets by age' (a new list of copies)
+    return [dup(x) for x in sorted(no_nothing(items, line), key=lambda t: t.fields[member])]
 
 
 def py_item(items, number, line):
+    k = int(number) if number >= 1 else 0
+    if k == number and k <= len(items):
+        return items[k - 1]
     return items[index_of(items, number, line)]
 
 
 def py_put_item(items, number, line, x):
-    items[index_of(items, number, line)] = x
+    k = int(number) if number >= 1 else 0
+    if k == number and k <= len(items):
+        items[k - 1] = x
+    else:
+        items[index_of(items, number, line)] = x
 
 
 def py_empty_list(env):
@@ -987,6 +1020,12 @@ py_empty_list.pyf = lambda: "[]"
 
 
 def py_count(x, last, by=1.0):  # 'for each n from 1 to 10 by 2'
+    if by == 1 and float(x).is_integer() and math.isfinite(last):  # (counting whole numbers: range is quicker)
+        return map(float, range(int(x), math.floor(last) + 1))
+    return py_counting(x, last, by)
+
+
+def py_counting(x, last, by):
     while (by > 0 and x <= last) or (by < 0 and x >= last):
         yield x
         x += by
@@ -1037,7 +1076,7 @@ def py_command(name, params, zeros, gives_zero, run):
              "_count": py_count, "_each": py_each, "_item": py_item, "_put_item": py_put_item, "_something": something,
              "_Place": Place, "_Thing": Thing, "_THINGS": THINGS, "_Stop": Stop, "_Give": GiveBack, "_Flow": Flow,
              "_Leave": LeaveLoop, "_Next": NextRound, "_fix": py_fix, "_L": lines, "_dup": dup, "_divide": divide,
-             "_reps": py_reps, "_text": text}
+             "_reps": py_reps, "_sorted_by": py_sorted_by, "_text": text}
     try:
         exec(compile("\n".join(t for _, t in src), f"<{name}>", "exec"), space)
     except SyntaxError:  # (a mistake here: the old way still works)
@@ -2522,8 +2561,9 @@ class Expr:
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
                         k = field_index(thing, member)
                         out = with_ir(Value(f"stellanova::sorted_by({v.cpp}, {by}, {line})", v.kind,
-                                            lambda env: [dup(x) for x in sorted(no_nothing(a(env), line), key=lambda t: t.fields[member])]),
+                                            lambda env: py_sorted_by(a(env), member, line)),
                                       lambda f, v=v, k=k: f.op(f"call ptr @cn_sorted_by(ptr {machine.emit(f, v)}, i32 {k}, i32 {line})"))
+                        out.run.pyf = lambda v=v, member=member: f"_sorted_by({py_expr(v)}, {member!r}, {line})"
                         return reversed_list(out) if down else out
                 raise ScriptError(line, f"{kind_name(thing).capitalize()} has no part called '{' '.join(self.t[self.i:self.i + 2])}'.")
             self.i = start
@@ -2769,7 +2809,8 @@ def part_of(owner, key, line=0):
     if is_thing(owner.kind):  # it may be nothing
         whose, part, plain = owner.kind, " ".join(key), owner.run
         get = lambda env: something(plain(env), whose, part, line)
-        get.pyf = lambda: f"_something({py_expr(plain)}, {whose!r}, {part!r}, {line})"
+        get.pyf = lambda: (lambda e: f"({e} or _something({e}, {whose!r}, {part!r}, {line}))" if PY_NAME.fullmatch(e)
+                           else f"_something({e}, {whose!r}, {part!r}, {line})")(py_expr(plain))  # (a thing is never false)
         if JS:
             cpp = f"stellanova::something({strip_parens(owner.cpp)}, {json.dumps(whose[6:])}, {json.dumps(part)}, {line}).{member}"
 
