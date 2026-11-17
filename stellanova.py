@@ -2255,7 +2255,8 @@ class Expr:
             v.ir = lambda f: f.unbox(f.call("ptr", "cn_entry", ("ptr", machine.emit(f, table)), ("ptr", machine.emit(f, name)),
                                             ("i32", line), checked=True), v.kind)
             if table.writable:
-                v.ir_store = lambda f, x: f.put(f"call void @cn_entry_put(ptr {machine.owned(f, table)}, ptr {machine.emit(f, name)}, ptr {f.box(x, v.kind)})")
+                v.ir_store = lambda f, x: f.put(f"call void @cn_entry_put_number(ptr {machine.owned(f, table)}, ptr {machine.emit(f, name)}, double {x})") \
+                    if v.kind == NUMBER else f.put(f"call void @cn_entry_put(ptr {machine.owned(f, table)}, ptr {machine.emit(f, name)}, ptr {f.box(x, v.kind)})")
                 if machine.ll_type(v.kind) == "ptr":
                     v.ir_own = lambda f: f.call("ptr", "cn_own_entry", ("ptr", machine.owned(f, table)), ("ptr", machine.emit(f, name)),
                                                 ("i32", line), checked=True)

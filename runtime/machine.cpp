@@ -671,7 +671,11 @@ static V* copy_of(const V* v)  // a copy that can be changed: what it holds is s
 	for (auto& x : to->boxed)
 		share(x);
 	for (auto& [key, x] : to->table)
+	{
 		share(x);
+		if (x && x->tag == 'n')
+			x->owned = false;  // (two tables hold this number now: neither changes it in place)
+	}
 	return out;
 }
 static V* deep_copy(const V* v)  // for a command going alongside: nothing shared with this thread
@@ -1253,6 +1257,22 @@ extern "C"
 			e = full(table)->last = &*full(table)->table.try_emplace(full(key)->s).first;
 		V* old = e->second;
 		e->second = share(x);
+		release(old);
+	}
+	void cn_entry_put_number(V* table, V* key, double d)  // a number entry: changed in place when only this table holds its box
+	{
+		auto* e = entry_of(table, key);
+		if (!e)
+			e = full(table)->last = &*full(table)->table.try_emplace(full(key)->s).first;
+		if (e->second && e->second->tag == 'n' && e->second->owned)
+		{
+			e->second->d = d;
+			return;
+		}
+		V* old = e->second;
+		V* box = cn_box_number(d);
+		box->owned = true;
+		e->second = box;
 		release(old);
 	}
 	V* cn_own_entry(V* table, V* key, int line)  // entry 'key' is about to be changed (the table keeps the copy)
