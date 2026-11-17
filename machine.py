@@ -36,7 +36,10 @@ TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm"
 WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
 
 
-NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\()")  # (adding a number to a list keeps it in the list)
+# libraries whose words only work things out, never waiting: their calls needn't keep registers for the collector
+NEVER_WAIT = {"builtins", "maths", "letters", "patterns", "big numbers"}
+NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\()"  # (adding a number to a list keeps it in the list)
+                       r"|call (?:double|i1) @cn_w_\w+\((?:(?:double|i1|i32) [^,()]*(?:, )?)*\)$")  # a library word given and giving only numbers or yes/no
 
 
 def makes_nothing(lines):
@@ -448,8 +451,18 @@ class Fn:
     def copied(self, value, kind):
         """Lists, tables, places and things are copied when they are stored (numbers, yes/no and text never change)."""
         if ll_type(kind) == "ptr" and kind != TEXT and not kind.startswith("command("):
+            if self.fresh(value):
+                return value  # only just made, so nothing else holds it
             return self.op(f"call ptr @cn_dup(ptr {value})")
         return value
+
+    def fresh(self, value):
+        """value was made by the line just before, by something that makes a new value of its own (deep, not shared)."""
+        made = f"  {value} = call ptr @"
+        for line in reversed(self.lines[-8:]):
+            if line.startswith(made):
+                return line[len(made):].startswith(("cn_thing(", "cn_list_new(", "cn_dup("))
+        return False
 
     def slot(self, cpp, kind):
         """The place a name is kept, made (and given its starting value) the first time it is used."""
@@ -820,7 +833,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
     types = [cpp_type(a.kind) for a in args]
     ret = {"double": "double", "i1": "bool"}.get(ll_type(gives), "V*") if gives else "void"
     import hashlib
-    name = "cn_w_" + hashlib.sha1("|".join([unit, template, ret] + types).encode("utf-8")).hexdigest()[:16]
+    name = "cn_w_" + hashlib.sha1("|".join([unit, template, ret, str(unit in NEVER_WAIT)] + types).encode("utf-8")).hexdigest()[:16]
     params = []
     body = template.replace("{line}", "line")
     for k, (a, t) in enumerate(zip(args, types)):
@@ -836,7 +849,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
         result = f"return static_cast<{ret}>({body});"
     fallback = {"double": "0.0", "bool": "false", "V*": "cn_box_number(0)"}.get(ret, "")
     code = (f'extern "C" {ret} {name}({", ".join(params + ["int line"])})\n'
-            f"{{\n\tCnParked parked;\n\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n"
+            "{\n" + ("" if unit in NEVER_WAIT else "\tCnParked parked;\n") + f"\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n"
             f"#ifdef __wasm__\n\tcatch (const std::system_error&) {{ cn_set_problem({{line, ONE_THREAD}}); return {fallback}; }}\n#endif\n}}\n")
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"

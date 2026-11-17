@@ -213,9 +213,9 @@ namespace gc
 			{
 				spare_small.push_back(v);  // (from a block: never deleted)
 			}
-			else if (spare.size() < (1 << 20))
+			else
 			{
-				Full* f = full(v);
+				Full* f = full(v);  // (from a block too: kept to be used again, never deleted)
 				f->d = f->x = f->y = f->z = 0;
 				if (f->s.capacity() > 4096)
 					std::string().swap(f->s);
@@ -232,8 +232,6 @@ namespace gc
 				f->command = nullptr;
 				spare.push_back(v);
 			}
-			else
-				delete full(v);
 		all.resize(kept);
 		sorted = kept;
 		made_since = 0;
@@ -281,6 +279,18 @@ namespace gc
 		return &block[--left];
 	}
 
+	static V* full_value()  // the same for every other value: one allocation each is slow (Windows' heap takes ~150ns)
+	{
+		static Full* block = nullptr;
+		static size_t left = 0;
+		if (!left)
+		{
+			left = 1024;
+			block = new Full[left];
+		}
+		return &block[--left];
+	}
+
 	static V* track(char tag)  // a new value (a freed one used again when there is one)
 	{
 		Thread* t = me();
@@ -299,7 +309,7 @@ namespace gc
 			else if (is_small(tag))
 				v = small_value();
 			else
-				v = new Full;
+				v = full_value();
 			v->tag = tag;
 			v->owned = false;
 			all.push_back(v);

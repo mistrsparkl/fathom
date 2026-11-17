@@ -307,13 +307,19 @@ def plural(kind):
 
 # ---------------------------------------------------------------- what running a program uses
 
+PART_NAMES = {}  # a kind's name -> (its parts as described, [(each part's inner name, kind)])
+
+
 class Thing:
     """One of a script's own kinds of things, while a program runs."""
     __slots__ = ("name", "spec", "fields")
 
     def __init__(self, name, things):
         self.name, self.spec = name, things[name]
-        self.fields = {snake(w): py_zero(k, things) for w, k in self.spec}
+        known = PART_NAMES.get(name)
+        if known is None or known[0] is not self.spec:  # each part's inner name, worked out once for each kind
+            known = PART_NAMES[name] = (self.spec, [(snake(w), k) for w, k in self.spec])
+        self.fields = {part: py_zero(k, things) for part, k in known[1]}
 
     def __eq__(self, other):
         return isinstance(other, Thing) and self.name == other.name and self.fields == other.fields
@@ -445,6 +451,16 @@ def invoke_value(f, args, line):
         raise
 
 
+PLAIN = (float, str, bool, type(None))  # never changed in place, so never copied
+
+
+def dup_thing(v):
+    new = Thing.__new__(Thing)
+    new.name, new.spec = v.name, v.spec
+    new.fields = {k: x if type(x) in PLAIN else dup(x) for k, x in v.fields.items()}
+    return new
+
+
 def dup(v):
     """Lists, tables, places and things are copied when they are stored, as they are in the C++.
 
@@ -457,12 +473,11 @@ def dup(v):
         new.fields = v.fields.copy()
         return new
     if t is Thing:
-        new = Thing.__new__(Thing)
-        new.name, new.spec = v.name, v.spec
-        new.fields = {k: dup(x) for k, x in v.fields.items()}
-        return new
+        return dup_thing(v)
     if t is list:
-        return [dup(x) for x in v] if v and type(v[0]) in DEEP else v.copy()
+        if not v or type(v[0]) not in DEEP:
+            return v.copy()
+        return [dup_thing(x) if type(x) is Thing else dup(x) for x in v]
     if t is dict:
         return {k: dup(x) for k, x in v.items()} if v and type(next(iter(v.values()))) in DEEP else v.copy()
     return v
@@ -978,7 +993,7 @@ def py_count(x, last, by=1.0):  # 'for each n from 1 to 10 by 2'
 
 
 def py_each(items, simple):  # 'for each x in xs': a copy, so changing xs inside doesn't change the rounds
-    return list(items) if simple else copy.deepcopy(items)
+    return list(items) if simple else dup(items)
 
 
 def py_reps(c):
@@ -5008,7 +5023,7 @@ def for_each(n, head, body, names, declared, depth):
         simple = kind in (NUMBER, YESNO, TEXT)
 
         def items(env):
-            return list(get(env)) if simple else copy.deepcopy(get(env))
+            return list(get(env)) if simple else dup(get(env))
     else:
         e = Expr(tokens[cut + 1:], names, n)
         lo = e.need(e.sum(), NUMBER, "for each ... from")
