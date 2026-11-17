@@ -7,6 +7,7 @@
 #include "machine.h"
 #include <cstddef>
 static_assert(offsetof(Full, s) == offsetof(TextValue, s), "a text is the start of a Full");
+static_assert(offsetof(Full, nums) == offsetof(ThingValue, nums) && offsetof(Full, boxed) == offsetof(ThingValue, boxed) && offsetof(Full, kind) == offsetof(ThingValue, kind) && offsetof(Full, table) == offsetof(ThingValue, table), "a thing is the start of a Full");
 #ifdef __wasm__
 static_assert(offsetof(Full, nums) == 32 && offsetof(Full, boxed) == 80, "machine.py's nums_at and boxed_at need changing");
 #else
@@ -56,7 +57,7 @@ namespace gc
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
 		std::vector<V*> made;  // made while running, not yet in all (the collector moves them there): no lock needed
-		std::vector<V*> ready[3];  // freed values this thread took from spare to use again (by size: see size_of)
+		std::vector<V*> ready[4];  // freed values this thread took from spare to use again (by size: see size_of)
 		size_t since = 0;  // made since it last added to made_since (counted here first: an atomic add each time is slow)
 	};
 	static std::mutex lock;  // every value, the roots, and each thread's young values
@@ -64,8 +65,8 @@ namespace gc
 	static std::condition_variable stop_cv;
 	static std::vector<Thread*> threads;
 	static std::vector<V*> all;
-	static std::vector<V*> spare[3];  // freed values, ready to be used again: numbers and yes/no, text, the rest
-	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : 2; }
+	static std::vector<V*> spare[4];  // freed values, ready to be used again: numbers and yes/no, text, the rest, things
+	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : tag == 'k' ? 3 : 2; }
 	static std::vector<std::pair<const char*, size_t>> roots;
 	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
@@ -255,6 +256,22 @@ namespace gc
 				v->d = 0;
 				spare[1].push_back(v);
 			}
+			else if (v->tag == 'k')
+			{
+				ThingValue* f = static_cast<ThingValue*>(v);
+				f->d = 0;
+				f->s.clear();
+				if (f->boxed.capacity() > 1024)
+					f->boxed.release();
+				f->boxed.clear();
+				if (f->nums.room > 4096)
+					f->nums.release();
+				f->nums.clear();
+				f->numbers = false;
+				f->table.clear();
+				f->kind = nullptr;
+				spare[3].push_back(v);
+			}
 			else
 			{
 				Full* f = full(v);  // (from a block too: kept to be used again, never deleted)
@@ -347,7 +364,20 @@ namespace gc
 		return &block[--left];
 	}
 
-	static V* new_value(int size) { return size == 0 ? small_value() : size == 1 ? text_value() : full_value(); }
+	static V* thing_value()  // things are smaller: a million of them is less new memory to fill
+	{
+		static ThingValue* block = nullptr;
+		static size_t left = 0;
+		if (!left)
+		{
+			left = 1024;
+			block = new ThingValue[left];
+			add_block(block, left, sizeof(ThingValue));
+		}
+		return &block[--left];
+	}
+
+	static V* new_value(int size) { return size == 0 ? small_value() : size == 1 ? text_value() : size == 3 ? thing_value() : full_value(); }
 
 #ifdef __wasm__
 	static const bool stored_now = false;
@@ -1395,11 +1425,29 @@ extern "C"
 		for (const V* x : cn_items(out))
 			if (!x)
 				{ GUARDED(out, stellanova::fail(line, "a list sorted by a part can't hold nothing.");) }
-		std::stable_sort(cn_items(out).begin(), cn_items(out).end(), [k](const V* a, const V* b) {
-			const V* x = cn_items(a)[static_cast<size_t>(k)];
-			const V* y = cn_items(b)[static_cast<size_t>(k)];
-			return x->tag == 't' ? full(x)->s < full(y)->s : x->d < y->d;
-		});
+		Items& xs = cn_items(out);
+		const size_t at = static_cast<size_t>(k);
+		if (xs.size() && full(xs[0])->boxed[at] && full(xs[0])->boxed[at]->tag == 't')
+		{
+			std::vector<std::pair<const std::string*, V*>> keyed;
+			keyed.reserve(xs.size());
+			for (V* x : xs)
+				keyed.emplace_back(&full(full(x)->boxed[at])->s, x);
+			std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return *a.first < *b.first; });
+			for (size_t i = 0; i < xs.size(); ++i)
+				xs[i] = keyed[i].second;
+			return out;
+		}
+		std::vector<std::pair<double, V*>> keyed;  // each key read once, without boxing the things' number parts
+		keyed.reserve(xs.size());
+		for (V* x : xs)
+		{
+			const Full* f = full(x);
+			keyed.emplace_back(f->numbers ? f->nums[at] : f->boxed[at] ? f->boxed[at]->d : 0, x);
+		}
+		std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+		for (size_t i = 0; i < xs.size(); ++i)
+			xs[i] = keyed[i].second;
 		return out;
 	}
 	V* cn_sorted_by_keys(V* list, V* keys)  // 'sorted names by each n becomes ...': in order of keys (numbers or text), ties kept in order
@@ -1588,7 +1636,14 @@ extern "C"
 	{
 		V* fresh_copy = copy_of(with);
 		bool marked = thing->marked, shared = thing->shared;
-		*full(thing) = *full(fresh_copy);
+		if (thing->tag == 'k' || fresh_copy->tag == 'k')  // (a thing is a smaller value: only its own parts are copied)
+		{
+			if (thing->tag != fresh_copy->tag)
+				stellanova::fail(0, "a thing can only be set to another thing.");
+			*static_cast<ThingValue*>(thing) = *static_cast<ThingValue*>(fresh_copy);
+		}
+		else
+			*full(thing) = *full(fresh_copy);
 		thing->marked = marked, thing->shared = shared;
 	}
 }

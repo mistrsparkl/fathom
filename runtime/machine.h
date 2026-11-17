@@ -148,9 +148,9 @@ struct Full : V  // every other value: text, lists, tables, places, things and c
 	std::string s;  // text: first (a text is made smaller, as only this: TextValue)
 	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): at a fixed place
 	Items boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
-	double x = 0, y = 0, z = 0;  // a place
-	Table table;  // (in no order: sorted_keys gives them in order)
 	const ThingKind* kind = nullptr;
+	Table table;  // (in no order: sorted_keys gives them in order)
+	double x = 0, y = 0, z = 0;  // a place
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
 	std::pair<const std::string, V*>* last = nullptr;  // a table's entry found last (most lines use one entry twice or more)
 };
@@ -165,6 +165,7 @@ inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Fu
 	return out;
 }
 struct TextValue : V { std::string s; };  // a text: only Full's first part (its other parts are never touched)
+struct ThingValue : V { std::string s; Nums nums; Items boxed; const ThingKind* kind = nullptr; Table table; };  // a thing: only Full's parts up to table
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
 inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
