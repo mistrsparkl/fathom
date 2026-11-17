@@ -536,6 +536,42 @@ and the universe said i love you
 
 Leave out `the` in `scrawl size of kept notices` and Stellanova says: Write 'the size of', not 'size of'.
 
+## 16. Tidy programs
+
+```stellanova
+a cost has:
+  kind (text)
+  amount (a number)
+and the universe said i love you
+
+to cost of, given kind (text) and amount (a number), returning a cost:
+  conjure a cost as c
+  set the kind of c to kind
+  set the amount of c to amount
+  return c
+and the universe said i love you
+
+genesis:
+  set costs to a list of (cost of with ("food", 20.75), cost of with ("rent", 700), cost of with ("fun", 20))
+  for each c in sorted costs by amount, biggest first:
+    scrawl the kind of c padded to 6 letters, the amount of c
+  scrawl sorted a list of ("Tomas", "Al", "Rex") by each n becomes the size of n
+  scrawl upper case of "café", " ", folder "saves" exists
+and the universe said i love you
+```
+
+```output
+rent  700
+food  20.75
+fun   20
+Al, Rex, Tomas
+CAFÉ no
+```
+
+`sorted costs by amount` puts the smallest first; `, biggest first` turns it round. `by each n becomes ...` sorts by anything worked out from each item, and things that come out the same keep their order. `padded to 6 letters` puts spaces after text so columns line up. Text words count letters, not bytes, so `upper case of` works in every alphabet. `folder "saves" exists`, like `file "notes.txt" exists`, is yes or no.
+
+Two more for bigger programs. A part written `amount (a number, hidden)` can only be used by the commands for that kind (`to pay, for a cost, ...:`), so nothing else can change it by mistake. And in a program made of several scripts, `to tidy, privately:` keeps a command to the script it is in: other scripts can't use it, and can have a `tidy` of their own.
+
 ## Where next
 
 - `LANGUAGE.md` lists everything the language can do.
