@@ -6029,6 +6029,17 @@ def main(argv):
             return 1
         print(f"Made {Path(args[2]) / (script.stem + '.js') if len(args) == 3 else script.stem + '.js'}")  # (no whole paths: they hold the user's name)
         return 0
+    if len(args) == 2 and args[0] == "unreal" and Path(args[1]).is_dir():  # sets an Unreal project up for Stellanova programs
+        project = Path(args[1])
+        if not list(project.glob("*.uproject")):
+            print(f"{args[1]} isn't an Unreal project: it needs a .uproject file (make one with the Epic Games Launcher first).")
+            return 2
+        shutil.copytree(HERE / "engines" / "unreal" / "Stellanova", project / "Plugins" / "Stellanova", dirs_exist_ok=True)
+        (project / "Stellanova").mkdir(exist_ok=True)
+        (project / "Stellanova" / "home.txt").write_text(f"{HERE}\n{sys.executable}\n", encoding="utf-8")  # (and the Python to run it with)
+        print("Stellanova is in Plugins/Stellanova. Put .stella files in the project's Stellanova folder, add a Stellanova Component "
+              "to an actor and type the file's name (without .stella) into it.")
+        return 0
     if len(args) == 2 and args[0] == "unreal":
         script = Path(args[1])
         if not script.exists():

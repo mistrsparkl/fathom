@@ -1,0 +1,16 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "Stellanova",
+  "Description": "Stellanova programs on actors: add a Stellanova Component and name a .stella file in the project's Stellanova folder.",
+  "Category": "Scripting",
+  "CanContainContent": false,
+  "Modules": [
+    {
+      "Name": "Stellanova",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

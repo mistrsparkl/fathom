@@ -1177,7 +1177,7 @@ def compile_once(src, out, newer_than):
     if not out.exists() or out.stat().st_mtime < max(p.stat().st_mtime for p in newer_than):
         out.parent.mkdir(exist_ok=True)
         done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-Wno-everything", *target_flags(),
-                               "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True)
+                               "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True, stdin=subprocess.DEVNULL)
         if done.returncode:
             if src.name.startswith("w_"):  # a kept wrapper that can't compile would break every later build: start that file again
                 src.unlink(missing_ok=True)
@@ -1252,7 +1252,7 @@ def make_exe(ll_text_, exe, work, units=None, plugin=False):
     if plugin:
         link += ["-shared"] + (["-Wl,/EXPORT:stellanova_call", "-Wl,/EXPORT:stellanova_has"] if TARGET == "windows" else [])
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
     if done.returncode:
         return ("Stellanova wrote machine code LLVM didn't accept. That is a bug in Stellanova, not in your script.\n"
                 + done.stderr + f"\n(the LLVM code is in {ll})")
