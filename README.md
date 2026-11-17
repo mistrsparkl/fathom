@@ -18,6 +18,7 @@ and the universe said i love you
 - `stellanova game.stella` runs a program. Nothing else is needed but Python 3. With LLVM, it runs as fast machine code: the first run after a change takes about half a second longer.
 - `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
 - `stellanova wasm game.stella` makes the same machine code as WebAssembly: `node game.mjs` runs it (see LANGUAGE.md).
+- `stellanova unity <project>`, `stellanova unreal <project>` or `stellanova godot <project>` lets that game engine run Stellanova programs (`use: engine`; see `libraries/engine.words`).
 - `stellanova` on its own lets you try lines out one at a time.
 - `stellanova check game.stella` looks for mistakes without running it.
 - `stellanova tidy game.stella` puts its spacing right: two spaces for each step in, one empty line between parts.

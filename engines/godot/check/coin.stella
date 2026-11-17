@@ -1,0 +1,17 @@
+use: engine
+
+to begin:
+  scrawl "coin ", object name of me, " at ", place of me
+and the universe said i love you
+
+to every frame, given seconds (a number):
+  turn the object with me, 90 times seconds
+  move the object with me, 0 horizontal (seconds) vertical 0 depth
+and the universe said i love you
+
+to touched, given other (a number):
+  if object name of other is "Player":
+    copy the object with me, place of me plus 0 horizontal 2 vertical 0 depth
+    remove the object me
+    colour the object with the object named "Player", "red"
+and the universe said i love you

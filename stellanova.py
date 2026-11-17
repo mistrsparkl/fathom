@@ -6051,6 +6051,35 @@ def main(argv):
             return 1
         print(f"Built {WORLD}" + ("" if os.environ.get("STELLANOVA_NO_LAUNCH") else " and started it."))
         return 0
+    if len(args) == 2 and args[0] == "godot":  # sets a Godot project up for Stellanova programs
+        project = Path(args[1])
+        if not (project / "project.godot").exists():
+            print(f"{args[1]} isn't a Godot project: it needs a project.godot file (make one with Godot first).")
+            return 2
+        into = project / "addons" / "stellanova"
+        shutil.copytree(HERE / "engines" / "godot" / "stellanova", into, dirs_exist_ok=True)
+        made = into / ("stellanova_godot.so" if machine.TARGET == "linux" else "stellanova_godot.dll")
+        try:
+            done = subprocess.run([machine.find_clang(), "-std=c++20", "-O2", "-shared", *(["-fPIC"] if machine.TARGET == "linux" else []), str(into / "stellanova_godot.cpp"), "-o", str(made)],
+                                  capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        except RuntimeError as missing:
+            print(missing)
+            return 1
+        if done.returncode:
+            print("Stellanova's part of Godot didn't compile. That is a bug in Stellanova:\n" + done.stderr)
+            return 1
+        for extra in (".lib", ".exp"):
+            made.with_suffix(extra).unlink(missing_ok=True)
+        # Godot loads the extensions listed here as it starts (one it first finds while running can make it crash).
+        listed = project / ".godot" / "extension_list.cfg"
+        listed.parent.mkdir(exist_ok=True)
+        have = listed.read_text(encoding="utf-8").split() if listed.exists() else []
+        if "res://addons/stellanova/stellanova.gdextension" not in have:
+            listed.write_text("".join(line + "\n" for line in have + ["res://addons/stellanova/stellanova.gdextension"]), encoding="utf-8")
+        (into / "home.txt").write_text(f"{HERE}\n{sys.executable}\n", encoding="utf-8")  # (and the Python to run it with)
+        print("Stellanova is in addons/stellanova. Put .stella files in the project, add a StellanovaScript node under an object "
+              "and choose the file as its program.")
+        return 0
     if len(args) == 2 and args[0] == "unity":  # sets a Unity project up for Stellanova programs
         project = Path(args[1])
         if not (project / "Assets").is_dir() or not (project / "ProjectSettings").is_dir():
