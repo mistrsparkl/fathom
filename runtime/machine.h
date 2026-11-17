@@ -21,7 +21,7 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 	bool marked = false;  // the collector reached it
 	bool owned = false;  // text only one name holds (cn_append): it may grow in place
 	bool numbers = false;  // a list holding only plain numbers (in Full's nums); a thing whose number parts are there
-	bool shared = false;  // may be held in more than one place: copied before it is changed
+	unsigned char shared = 0;  // how many more places hold it (255: too many to count): copied before it is changed if any
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 
@@ -119,9 +119,9 @@ struct Table  // a table's entries: made only when the first is put in (most val
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
 	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): first, at a fixed place
+	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
 	double x = 0, y = 0, z = 0;  // a place
 	std::string s;  // text
-	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items
 	Table table;  // (in no order: sorted_keys gives them in order)
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code

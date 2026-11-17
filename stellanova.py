@@ -2224,15 +2224,13 @@ class Expr:
             v = Value(f"stellanova::at({seq.cpp}, {strip_parens(index.cpp)}, {line})", element(seq.kind), item,
                       put if seq.writable else None)
             v.ir = lambda f: f.read_number_item(machine.emit(f, seq), machine.emit(f, index), line) if v.kind == NUMBER else \
-                f.unbox(f.call("ptr", "cn_list_at", ("ptr", machine.emit(f, seq)), ("double", machine.emit(f, index)),
-                               ("i32", line), checked=True), v.kind)
+                f.unbox(f.read_item(machine.emit(f, seq), machine.emit(f, index), line), v.kind)
             if seq.writable and v.kind == NUMBER:  # in place, in the machine code itself
                 v.ir_store = lambda f, x: f.write_number_item(machine.owned(f, seq), machine.emit(f, index), x, line)
             elif seq.writable:
                 v.ir_own = lambda f: f.call("ptr", "cn_own_item", ("ptr", machine.owned(f, seq)), ("double", machine.emit(f, index)),
                                             ("i32", line), checked=True)
-                v.ir_store = lambda f, x: f.call("void", "cn_list_put", ("ptr", machine.owned(f, seq)), ("double", machine.emit(f, index)),
-                                                 ("ptr", f.box(x, v.kind)), ("i32", line), checked=True)
+                v.ir_store = lambda f, x: f.write_item(machine.owned(f, seq), machine.emit(f, index), f.box(x, v.kind), line, v.kind)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
                 v.cpp_assign, v.cpp_close = f"stellanova::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
             return v
@@ -2779,9 +2777,8 @@ def part_of(owner, key, line=0):
     else:
         k = field_index(owner.kind, member)
         v.ir, v.ir_store, v.ir_own = thing_part_ir(
-            lambda f: f.op(f"call ptr @cn_something(ptr {machine.emit(f, owner)}, ptr {f.spec(owner.kind)}, i32 {k}, i32 {line})"),
-            owner.kind, member, kind,
-            lambda f: f.op(f"call ptr @cn_something(ptr {machine.owned(f, owner)}, ptr {f.spec(owner.kind)}, i32 {k}, i32 {line})"))
+            lambda f: f.something(machine.emit(f, owner), f.spec(owner.kind), k, line), owner.kind, member, kind,
+            lambda f: f.something(machine.owned(f, owner), f.spec(owner.kind), k, line))
     if not owner.writable:
         v.ir_store = v.ir_own = None
     if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:

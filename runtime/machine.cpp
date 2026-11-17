@@ -5,6 +5,8 @@
 // made here, copied when stored (as Python and C++ copy), and shown and compared the way Python does.
 #include "stellanova.h"
 #include "machine.h"
+#include <cstddef>
+static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 16 + 3 * sizeof(size_t), "machine.py reads these places itself");
 
 #if defined(__linux__) || defined(__wasm__)
 #include <pthread.h>
@@ -317,6 +319,11 @@ namespace gc
 		return &block[--left];
 	}
 
+#ifdef __wasm__
+	static const bool stored_now = false;
+#else
+	static thread_local bool stored_now = false;  // the value being made goes straight into a name, list or thing (cn_own): not young
+#endif
 	static V* track(char tag)  // a new value (a freed one used again when there is one)
 	{
 		Thread* t = me();
@@ -341,7 +348,8 @@ namespace gc
 			v->tag = tag;
 			v->owned = v->shared = v->marked = false;  // (a freed value may have been marked by a look at the stack)
 			t->made.push_back(v);
-			t->young.push_back(v);
+			if (!stored_now)
+				t->young.push_back(v);
 			if (++made_since > limit)
 				collect(t);
 			return v;
@@ -600,9 +608,14 @@ static bool same(const V* a, const V* b)
 static bool never_changes(char tag) { return tag == 'n' || tag == 'y' || tag == 't' || tag == 'c'; }
 static V* share(V* v)  // v is held in one more place now: whoever changes it later copies it first (cn_own)
 {
-	if (v && !never_changes(v->tag))
-		v->shared = true;
+	if (v && !never_changes(v->tag) && v->shared < 255)
+		v->shared++;
 	return v;
+}
+static void release(V* v)  // one place that held v holds something else now
+{
+	if (v && v->shared && v->shared < 255)
+		v->shared--;
 }
 static V* copy_of(const V* v)  // a copy that can be changed: what it holds is shared, and copied only when that is changed
 {
@@ -833,7 +846,23 @@ static size_t index_of(const V* list, double number, int line)
 
 extern "C"
 {
-	void cn_begin(int count, char** given) { stellanova::begin({}, count, given); }
+	void cn_begin(int count, char** given)
+	{
+		std::vector<V*> two(2);  // machine code reads a list's items itself (machine.py's item_place): is the vector laid out as it thinks?
+		uintptr_t words[2];
+		std::memcpy(words, &two, sizeof words);
+#ifdef __wasm__
+		bool as_thought = words[1] == 2;
+#else
+		bool as_thought = words[1] == reinterpret_cast<uintptr_t>(two.data() + 2);
+#endif
+		if (words[0] != reinterpret_cast<uintptr_t>(two.data()) || !as_thought)
+		{
+			std::fputs("This C++ library keeps its lists in a way Stellanova's machine code doesn't know. That is a bug in Stellanova.\n", stderr);
+			std::exit(1);
+		}
+		stellanova::begin({}, count, given);
+	}
 	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
 	int cn_end()
 	{
@@ -969,12 +998,53 @@ extern "C"
 	}
 	V* cn_dup(V* v) { return share(v); }
 	V* cn_deep(V* v) { return deep_copy(v); }
-	V* cn_own(V* v) { return v && v->shared ? copy_of(v) : v; }  // v is about to be changed: a copy if it is held elsewhere too
+	static V* stored_copy(const V* v)  // a copy that goes straight where v was
+	{
+#ifndef __wasm__
+		gc::stored_now = true;
+#endif
+		V* out = copy_of(v);
+#ifndef __wasm__
+		gc::stored_now = false;
+#endif
+		return out;
+	}
+	void cn_assign(V** slot, V* from)  // a thing put where only one thing of its kind is held: its parts copied in (no new value)
+	{
+		V* to = *slot;
+		if (to == from)
+			return;
+		if (from && to && !to->shared && to->tag == 'k' && from->tag == 'k' && full(to)->kind == full(from)->kind)
+		{
+			Full* t = full(to);
+			const Full* f = full(from);
+			for (V* x : t->boxed)
+				release(x);
+			t->boxed = f->boxed;
+			for (V* x : t->boxed)
+				share(x);
+			t->nums = f->nums;
+			t->numbers = f->numbers;
+			return;
+		}
+		*slot = share(from);
+		release(to);
+	}
+	V* cn_own(V* v)  // (the caller puts the copy where v was)
+	{
+		if (!v || !v->shared)
+			return v;
+		release(v);
+		return stored_copy(v);
+	}  // v is about to be changed: a copy if it is held elsewhere too
 	V* cn_own_field(V* thing, int k)  // the same for part k of a thing (the thing keeps the copy)
 	{
 		V*& x = full(thing)->boxed[static_cast<size_t>(k)];  // (never a number: those don't change)
 		if (x && x->shared)
-			x = copy_of(x);
+		{
+			release(x);
+			x = stored_copy(x);
+		}
 		return x;
 	}
 	bool cn_equal(V* a, V* b) { return same(a, b); }
@@ -1013,6 +1083,10 @@ extern "C"
 			const Full* f = full(list);
 			return f->numbers ? f->nums[k] : f->boxed[k]->d;)
 	}
+	V* cn_list_at(V* list, double number, int line);
+	V* cn_list_at_slow(V* list, double number, int line) { return cn_list_at(list, number, line); }  // (machine code's way out)
+	void cn_list_put(V* list, double number, V* item, int line);
+	void cn_list_put_slow(V* list, double number, V* item, int line) { cn_list_put(list, number, item, line); }
 	V* cn_list_at(V* list, double number, int line)
 	{
 		GUARDED(cn_box_number(0),
@@ -1029,7 +1103,10 @@ extern "C"
 		GUARDED(nullptr,
 			V*& x = cn_items(list)[index_of(list, number, line)];
 			if (x && x->shared)
-				x = copy_of(x);
+			{
+				release(x);
+				x = stored_copy(x);
+			}
 			return x;)
 	}
 	void cn_list_put_number(V* list, double number, double x, int line)  // (makes no value unless the list holds boxed items)
@@ -1048,7 +1125,12 @@ extern "C"
 			if (full(list)->numbers && item && item->tag == 'n')
 				full(list)->nums[k] = item->d;
 			else
-				cn_items(list)[k] = share(item);)
+			{
+				V*& at = cn_items(list)[k];
+				V* old = at;
+				at = share(item);
+				release(old);
+			})
 	}
 	void cn_list_remove_item(V* list, double number, int line)
 	{
@@ -1153,7 +1235,9 @@ extern "C"
 		auto* e = entry_of(table, key);
 		if (!e)
 			e = full(table)->last = &*full(table)->table.try_emplace(full(key)->s).first;
+		V* old = e->second;
 		e->second = share(x);
+		release(old);
 	}
 	V* cn_own_entry(V* table, V* key, int line)  // entry 'key' is about to be changed (the table keeps the copy)
 	{
@@ -1162,7 +1246,10 @@ extern "C"
 			if (!e)
 				stellanova::fail(line, "there is no entry \"" + full(key)->s + "\" in the table.");
 			if (e->second && e->second->shared)
-				e->second = copy_of(e->second);
+			{
+				release(e->second);
+				e->second = stored_copy(e->second);
+			}
 			return e->second;)
 	}
 	void cn_entry_remove(V* table, V* key, int line)
@@ -1412,7 +1499,9 @@ extern "C"
 		Full* f = full(thing);
 		if (f->numbers && x && x->tag == 'n')
 			f->nums[static_cast<size_t>(k)] = x->d;
+		V* old = f->boxed[static_cast<size_t>(k)];
 		f->boxed[static_cast<size_t>(k)] = share(x);
+		release(old);
 	}
 	void cn_replace(V* thing, V* with)  // 'set ball to ...' inside a command for a ball: the caller's ball itself changes
 	{
