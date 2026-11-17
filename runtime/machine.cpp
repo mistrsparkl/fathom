@@ -261,7 +261,7 @@ namespace gc
 					std::string().swap(f->s);
 				f->s.clear();
 				if (f->boxed.capacity() > 1024)
-					std::vector<V*>().swap(f->boxed);
+					f->boxed.release();
 				f->boxed.clear();
 				if (f->nums.room > 4096)
 					f->nums.release();
@@ -832,7 +832,7 @@ static_assert(offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py
 static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == 2 * sizeof(void*), "machine.py's nums_place needs changing");
 
 // A list's or thing's items, boxed: a list of plain numbers is boxed first (and stays boxed).
-std::vector<V*>& cn_items(const V* v)
+Items& cn_items(const V* v)
 {
 	Full* f = const_cast<Full*>(full(v));
 	if (f->numbers && f->tag == 'k')  // a thing's number parts go back in their boxes
@@ -877,19 +877,6 @@ extern "C"
 {
 	void cn_begin(int count, char** given)
 	{
-		std::vector<V*> two(2);  // machine code reads a list's items itself (machine.py's item_place): is the vector laid out as it thinks?
-		uintptr_t words[2];
-		std::memcpy(words, &two, sizeof words);
-#ifdef __wasm__
-		bool as_thought = words[1] == 2;
-#else
-		bool as_thought = words[1] == reinterpret_cast<uintptr_t>(two.data() + 2);
-#endif
-		if (words[0] != reinterpret_cast<uintptr_t>(two.data()) || !as_thought)
-		{
-			std::fputs("This C++ library keeps its lists in a way Stellanova's machine code doesn't know. That is a bug in Stellanova.\n", stderr);
-			std::exit(1);
-		}
 		stellanova::begin({}, count, given);
 	}
 	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
@@ -1419,7 +1406,7 @@ extern "C"
 	}
 	V* cn_join_texts(V* list, V* between)  // 'join names with ", "' for a list of text
 	{
-		const std::vector<V*>& items = cn_items(list);
+		const Items& items = cn_items(list);
 		const std::string& by = full(between)->s;
 		size_t size = items.empty() ? 0 : by.size() * (items.size() - 1);
 		for (const V* x : items)
@@ -1440,7 +1427,7 @@ extern "C"
 		const std::string& b = full(by)->s;
 		GUARDED(cn_list_new(), if (b.empty()) stellanova::fail(line, "I can't split text by empty text.");)
 		V* out = cn_list_new();
-		std::vector<V*>& items = full(out)->boxed;
+		Items& items = full(out)->boxed;
 		size_t start = 0;
 		for (size_t at = s.find(b); at != std::string::npos; at = s.find(b, start))
 		{

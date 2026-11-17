@@ -27,14 +27,15 @@ struct V  // every value begins like this, and a number or a yes/no is only this
 
 #include <cstdlib>
 #include <cstring>
-struct Nums  // a list's plain numbers: laid out so machine code can add and read them itself (see machine.py's NUMS)
+template <typename T>
+struct Few  // a list of numbers or values, laid out so machine code can read and change it itself (machine.py's nums_place)
 {
-	double* data = few;  // (a few numbers are kept right here: most things' number parts, with no allocation)
+	T* data = few;  // (a few are kept right here: most things' parts and short lists, with no allocation)
 	size_t count = 0, room = 4;
-	double few[4];
-	Nums() = default;
-	Nums(const Nums& o) { *this = o; }
-	Nums(Nums&& o) noexcept
+	T few[4];
+	Few() = default;
+	Few(const Few& o) { *this = o; }
+	Few(Few&& o) noexcept
 	{
 		if (o.data == o.few)
 			std::memcpy(few, o.few, sizeof few), count = o.count;
@@ -42,19 +43,19 @@ struct Nums  // a list's plain numbers: laid out so machine code can add and rea
 			data = o.data, count = o.count, room = o.room;
 		o.data = o.few, o.count = 0, o.room = 4;
 	}
-	Nums& operator=(const Nums& o)
+	Few& operator=(const Few& o)
 	{
 		if (this != &o)
 		{
 			clear();
 			reserve(o.count);
 			if (o.count)
-				std::memcpy(data, o.data, o.count * sizeof(double));
+				std::memcpy(data, o.data, o.count * sizeof(T));
 			count = o.count;
 		}
 		return *this;
 	}
-	~Nums() { if (data != few) std::free(data); }
+	~Few() { if (data != few) std::free(data); }
 	void reserve(size_t n)
 	{
 		if (n <= room)
@@ -62,41 +63,52 @@ struct Nums  // a list's plain numbers: laid out so machine code can add and rea
 		room = n < 8 ? 8 : n;
 		if (data == few)
 		{
-			double* bigger = static_cast<double*>(std::malloc(room * sizeof(double)));
-			std::memcpy(bigger, few, count * sizeof(double));
+			T* bigger = static_cast<T*>(std::malloc(room * sizeof(T)));
+			std::memcpy(bigger, few, count * sizeof(T));
 			data = bigger;
 		}
 		else
-			data = static_cast<double*>(std::realloc(data, room * sizeof(double)));
+			data = static_cast<T*>(std::realloc(data, room * sizeof(T)));
 	}
-	void push_back(double x)
+	void push_back(T x)
 	{
 		if (count == room)
-			reserve(room ? room * 2 : 8);
+			reserve(room * 2);
 		data[count++] = x;
 	}
-	void insert(double* at, double x)
+	void insert(T* at, T x)
 	{
 		size_t k = static_cast<size_t>(at - data);
-		push_back(0);
-		std::memmove(data + k + 1, data + k, (count - 1 - k) * sizeof(double));
+		push_back(T());
+		std::memmove(data + k + 1, data + k, (count - 1 - k) * sizeof(T));
 		data[k] = x;
 	}
-	void erase(double* at)
+	void erase(T* at)
 	{
-		std::memmove(at, at + 1, static_cast<size_t>(data + count - at - 1) * sizeof(double));
+		std::memmove(at, at + 1, static_cast<size_t>(data + count - at - 1) * sizeof(T));
 		--count;
+	}
+	void resize(size_t n)
+	{
+		reserve(n);
+		for (size_t k = count; k < n; ++k)
+			data[k] = T();
+		count = n;
 	}
 	void clear() { count = 0; }
 	void release() { if (data != few) std::free(data); data = few, count = 0, room = 4; }
 	size_t size() const { return count; }
+	size_t capacity() const { return room; }
 	bool empty() const { return count == 0; }
-	double& operator[](size_t k) { return data[k]; }
-	double operator[](size_t k) const { return data[k]; }
-	double back() const { return data[count - 1]; }
-	double* begin() const { return data; }
-	double* end() const { return data + count; }
+	T& operator[](size_t k) { return data[k]; }
+	const T& operator[](size_t k) const { return data[k]; }
+	T& back() { return data[count - 1]; }
+	const T& back() const { return data[count - 1]; }
+	T* begin() const { return data; }
+	T* end() const { return data + count; }
 };
+using Nums = Few<double>;  // a list's plain numbers, or a thing's number parts
+using Items = Few<V*>;  // a list's items, or a thing's parts
 
 struct Table  // a table's entries: made only when the first is put in (most values aren't tables)
 {
@@ -135,7 +147,7 @@ struct Full : V  // every other value: text, lists, tables, places, things and c
 {
 	std::string s;  // text: first (a text is made smaller, as only this: TextValue)
 	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): at a fixed place
-	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
+	Items boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
 	double x = 0, y = 0, z = 0;  // a place
 	Table table;  // (in no order: sorted_keys gives them in order)
 	const ThingKind* kind = nullptr;
@@ -158,7 +170,7 @@ inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value t
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
-std::vector<V*>& cn_items(const V* v);  // a list's or thing's items, boxed (a list of plain numbers is boxed first)
+Items& cn_items(const V* v);  // a list's or thing's items, boxed (a list of plain numbers is boxed first)
 namespace stellanova { struct Problem; }
 void cn_set_problem(const stellanova::Problem& p);
 

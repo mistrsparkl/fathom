@@ -414,11 +414,8 @@ class Fn:
         self.branch(self.op(f"fcmp oeq double {self.op(f'sitofp i64 {k} to double')}, {index}"), ranged, slow)
         self.place(ranged)
         first = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {start}')}")
-        if TARGET == "wasm":  # (WASI's vector keeps its count next; the others keep where it ends: see cn_begin's check)
-            n = self.op(f"zext i32 {self.op(f'load i32, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {start + word}')}')} to i64")
-        else:
-            last = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {start + word}')}")
-            n = self.op(f"lshr i64 {self.op(f'sub i64 {self.op(f'ptrtoint ptr {last} to i64')}, {self.op(f'ptrtoint ptr {first} to i64')}')}, 3")
+        n = self.op(f"load {size}, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {start + word}')}")  # (machine.h's Few: data, then count)
+        n = n if size == "i64" else self.op(f"zext i32 {n} to i64")
         k0 = self.op(f"sub i64 {k}, 1")
         self.branch(self.op(f"icmp ult i64 {k0}, {n}"), fast, slow)
         self.place(fast)
@@ -1074,11 +1071,23 @@ def give_up(f):
 # Each becomes a small C function in the prebuilt library (made the first time a program needs it, kept after),
 # so a program calls it like any other library function: the program's own code still never becomes C++.
 
+ONE_STEP = {"remainder_of": "frem", "round": "llvm.round.f64", "floor": "llvm.floor.f64", "ceil": "llvm.ceil.f64",
+            "trunc": "llvm.trunc.f64", "sqrt": "llvm.sqrt.f64", "fabs": "llvm.fabs.f64"}  # library words machine code does itself
+
+
 def wrap(f, unit, head, template, args, gives, cpp_type, line):
     """Calls the C function for one built-in (unit 'builtins') or library word (unit = the library's name).
 
     template: its C++, with {a0} / {s0} for the inputs and {line} for the line number; head: what the unit's file
     needs above its functions (a library's includes and code). Returns where the answer is (None for nothing)."""
+    simple = re.fullmatch(r"(?:std|stellanova)::(\w+)\(\{[as]0\}(?:, \{[as]1\})?\)", template)
+    if simple and simple.group(1) in ONE_STEP and gives == NUMBER and all(a.kind == NUMBER for a in args):
+        op = ONE_STEP[simple.group(1)]  # one machine instruction, not a call (the same answers)
+        given = [emit(f, a) for a in args]
+        if op == "frem":
+            return f.op(f"frem double {given[0]}, {given[1]}")
+        f.module.declare(f"declare double @{op}(double)")
+        return f.op(f"call double @{op}(double {given[0]})")
     for a in args:
         if a.kind in THINGS or ll_type(a.kind) is None:
             raise Unsupported(f"{a.kind} given to {template[:40]}")
