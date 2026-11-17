@@ -2761,7 +2761,7 @@ def load_words(name, line):
     if not path.exists():
         raise ScriptError(line, f"There is no '{name}' to be part of (no {name}.words next to the script).")
     names, info = Names(), {}
-    for n, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for n, raw in enumerate(source_text(path).splitlines(), 1):
         text_ = raw.strip()
         if not text_ or text_.startswith("note:"):
             continue
@@ -3061,7 +3061,7 @@ def load_library(name, line, names, rows=None):
         if not path:
             have = sorted({p.stem for p in (HERE / "libraries").glob("*.words")} | {p.stem for p in got_folder().glob("*.words")})
             raise ScriptError(line, f"There is no library called '{name}'." + (f" Libraries: {', '.join(have)}." if have else ""))
-        rows = path.read_text(encoding="utf-8").splitlines()
+        rows = source_text(path).splitlines()
     else:
         path = Path(name)
     c_library = None  # 'c library: user32.dll': where the words' C functions are
@@ -3257,7 +3257,7 @@ def gather(path, from_line=None, seen=None):
     seen.add(path.resolve())
     k = len(FILES)
     FILES.append(path.name)
-    own = path.read_text(encoding="utf-8").splitlines()
+    own = source_text(path).splitlines()
     if len(own) >= PER_FILE:
         raise ScriptError(k * PER_FILE + 1, f"A script can have at most {PER_FILE - 1} lines.")
     lines, numbers = [], []
@@ -5512,9 +5512,80 @@ def run_tests(program):
     return 1 if failed else 0
 
 
+SOURCES = set()  # every script and .words file read since run_built began (start.py checks them before using a kept copy)
+
+
+def source_text(path):
+    SOURCES.add(str(path.resolve()))
+    return path.read_text(encoding="utf-8")
+
+
+
+
+def run_built(script):
+    """Runs the program as machine code: built the first time, then the kept copy runs. Its exit code,
+    or None when it can't be built (it then runs the old way, which says any mistake itself)."""
+    global LOGIC, MAKING_CPP
+    import hashlib
+    import start
+    RUNS = start.RUNS
+    SOURCES.clear()
+    try:
+        LOGIC = script.parent
+        MAKING_CPP = True
+        try:
+            _, program = read_script(script)
+        finally:
+            MAKING_CPP = False
+        if program is None:
+            return None
+        ll = machine_code(program)
+        runtime = HERE / "runtime"
+        key = hashlib.sha256("\x00".join([machine.TARGET, ll, repr(sorted(MACHINE_UNITS.items()))] +
+                                         [(runtime / f).read_text(encoding="utf-8") for f in ("machine.cpp", "machine.h", "stellanova.h")])
+                             .encode("utf-8")).hexdigest()[:24]
+        exe = RUNS / (key + ("" if machine.TARGET == "linux" else ".exe"))
+        if not exe.exists():
+            RUNS.mkdir(parents=True, exist_ok=True)
+            fresh = RUNS / f"{key}.{os.getpid()}.making{exe.suffix}"
+            work = tempfile.mkdtemp(prefix="stellanova_")
+            try:
+                if machine.make_exe(ll, fresh, work, MACHINE_UNITS):
+                    return None
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
+            try:
+                os.replace(fresh, exe)
+            except OSError:  # (another run made it first, and it is running)
+                fresh.unlink(missing_ok=True)
+            for notes in (False, True):  # only the newest 40 built copies (and notes) are kept
+                made = [p for p in RUNS.iterdir() if (p.suffix == ".json") == notes]
+                for old in sorted(made, key=lambda p: p.stat().st_mtime)[:-40]:
+                    try:
+                        old.unlink()
+                    except OSError:
+                        pass
+        else:
+            os.utime(exe)  # (used again: kept longer)
+        # shortcut: a new file that a 'use:' would find before the one it found isn't noticed until the script changes.
+        note = {"exe": exe.name, "stamp": start.install_stamp(), "sources": [start.stamp(Path(p)) for p in sorted(SOURCES)]}
+        start.note_of(script).write_text(json.dumps(note), encoding="utf-8")
+    except (ScriptError, machine.Unsupported, RuntimeError, OSError, RecursionError):
+        return None
+    sys.stdout.flush()
+    try:
+        return subprocess.run([str(exe), *ARGUMENTS]).returncode
+    except KeyboardInterrupt:
+        return 130
+
+
 def run_program(script, tests=False):
     """Runs a program directly (or its tests). Returns the exit code (0 when it finished, 1 when it stopped with an error)."""
     global LOGIC
+    if not tests and DEBUG is None and PROFILE is None and not WATCHING and not os.environ.get("STELLANOVA_DIRECT"):
+        code = run_built(script)  # as fast as C++: the same program, built
+        if code is not None:
+            return code
     LOGIC = script.parent
     try:
         _, program = read_script(script)

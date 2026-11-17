@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+os.environ["STELLANOVA_DIRECT"] = "1"  # direct runs here run the old way, so each test compares it with the built program
 sys.path.insert(0, str(HERE))
 import stellanova as translate
 translate.LOGIC = Path(__file__).resolve().parent / "examples"
@@ -1880,7 +1881,27 @@ def main():
     translate.THINGS = {}
     tutorial_checks()
     program_checks()
+    built_run_checks()
     print("stellanova.py self-check passed")
+
+
+def built_run_checks():
+    """'stellanova x.stella' runs a built copy (kept for next time), and the old way when it can't be built."""
+    import subprocess
+    if not shutil.which("clang++") and not Path(r"C:\Program Files\LLVM\bin\clang++.exe").exists():
+        return
+    env = {k: v for k, v in os.environ.items() if k != "STELLANOVA_DIRECT"}
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "probe.stella"
+        script.write_text('genesis:\n  scrawl "hi ", the words given\n  set x to item 5 of a list of (1)\n' + END, encoding="utf-8")
+        go = lambda: subprocess.run([sys.executable, str(HERE / "stellanova.py"), "run", str(script), "a", "b"],
+                                    capture_output=True, text=True, encoding="utf-8", cwd=d, env=env)
+        for _ in range(2):  # built, then the kept copy
+            done = go()
+            assert (done.stdout, done.returncode) == ("hi a, b\n", 1) and "item 5" in done.stderr, (done.stdout, done.stderr, done.returncode)
+        script.write_text('genesis:\n  scrawl "hi" plus\n' + END, encoding="utf-8")  # a mistake: said as before
+        done = go()
+        assert done.returncode == 1 and "line 2" in done.stdout, (done.stdout, done.stderr)
 
 
 if __name__ == "__main__":
