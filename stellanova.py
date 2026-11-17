@@ -6040,6 +6040,16 @@ def main(argv):
             return 1
         print(f"Built {WORLD}" + ("" if os.environ.get("STELLANOVA_NO_LAUNCH") else " and started it."))
         return 0
+    if len(args) == 2 and args[0] == "unity":  # sets a Unity project up for Stellanova programs
+        project = Path(args[1])
+        if not (project / "Assets").is_dir() or not (project / "ProjectSettings").is_dir():
+            print(f"{args[1]} isn't a Unity project: it needs an Assets and a ProjectSettings folder (make one with Unity Hub first).")
+            return 2
+        into = project / "Assets" / "Stellanova"
+        shutil.copytree(HERE / "engines" / "unity" / "Stellanova", into, dirs_exist_ok=True)
+        (into / "home.txt").write_text(str(HERE), encoding="utf-8")
+        print("Stellanova is in Assets/Stellanova. Put a .stella file in Assets, then add a Stellanova Script to an object and drag the file onto it.")
+        return 0
     if len(args) == 2 and args[0] == "plugin":  # a plugin for a game engine: Unity, Unreal or Godot calls its commands
         script = Path(args[1])
         if not script.exists():
