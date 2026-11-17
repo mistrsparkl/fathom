@@ -6,7 +6,9 @@
 #include "stellanova.h"
 #include "machine.h"
 #include <cstddef>
-static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 16 + 3 * sizeof(size_t), "machine.py reads these places itself");
+static_assert(offsetof(Full, s) == offsetof(TextValue, s), "a text is the start of a Full");
+static_assert(offsetof(Full, nums) == 16 + sizeof(std::string) && offsetof(Full, boxed) == offsetof(Full, nums) + 3 * sizeof(size_t),
+              "machine.py reads these places itself");
 
 #if defined(__linux__) || defined(__wasm__)
 #include <pthread.h>
@@ -51,15 +53,15 @@ namespace gc
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
 		std::vector<V*> made;  // made while running, not yet in all (the collector moves them there): no lock needed
-		std::vector<V*> ready, ready_small;  // freed values this thread took from spare to use again
+		std::vector<V*> ready[3];  // freed values this thread took from spare to use again (by size: see size_of)
 	};
 	static std::mutex lock;  // every value, the roots, and each thread's young values
 	static std::mutex stop_lock;  // the threads and their states
 	static std::condition_variable stop_cv;
 	static std::vector<Thread*> threads;
 	static std::vector<V*> all;
-	static std::vector<V*> spare;  // freed values, ready to be used again
-	static std::vector<V*> spare_small;  // freed numbers and yes/no values
+	static std::vector<V*> spare[3];  // freed values, ready to be used again: numbers and yes/no, text, the rest
+	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : 2; }
 	static std::vector<std::pair<const char*, size_t>> roots;
 	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
@@ -79,8 +81,8 @@ namespace gc
 				std::lock_guard<std::mutex> hold(stop_lock);
 				std::lock_guard<std::mutex> heap(lock);
 				all.insert(all.end(), t->made.begin(), t->made.end());  // what it made may still be held elsewhere
-				spare.insert(spare.end(), t->ready.begin(), t->ready.end());
-				spare_small.insert(spare_small.end(), t->ready_small.begin(), t->ready_small.end());
+				for (int k = 0; k < 3; ++k)
+					spare[k].insert(spare[k].end(), t->ready[k].begin(), t->ready[k].end());
 				threads.erase(std::find(threads.begin(), threads.end(), t));
 				delete t;
 			}
@@ -221,7 +223,7 @@ namespace gc
 		{
 			V* v = work.back();
 			work.pop_back();
-			if (is_small(v->tag))
+			if (is_small(v->tag) || v->tag == 't')
 				continue;
 			for (V* x : full(v)->boxed)
 				reach(x);
@@ -237,7 +239,16 @@ namespace gc
 			}
 			else if (is_small(v->tag))
 			{
-				spare_small.push_back(v);  // (from a block: never deleted)
+				spare[0].push_back(v);  // (from a block: never deleted)
+			}
+			else if (v->tag == 't')
+			{
+				std::string& s = static_cast<TextValue*>(v)->s;
+				if (s.capacity() > 4096)
+					std::string().swap(s);
+				s.clear();
+				v->d = 0;
+				spare[1].push_back(v);
 			}
 			else
 			{
@@ -257,7 +268,7 @@ namespace gc
 				f->kind = nullptr;
 				f->command = nullptr;
 				f->last = nullptr;
-				spare.push_back(v);
+				spare[2].push_back(v);
 			}
 		all.resize(kept);
 		made_since = 0;
@@ -306,6 +317,18 @@ namespace gc
 		return &block[--left];
 	}
 
+	static V* text_value()
+	{
+		static TextValue* block = nullptr;
+		static size_t left = 0;
+		if (!left)
+		{
+			left = 2048;
+			block = new TextValue[left];
+			add_block(block, left, sizeof(TextValue));
+		}
+		return &block[--left];
+	}
 	static V* full_value()  // the same for every other value: one allocation each is slow (Windows' heap takes ~150ns)
 	{
 		static Full* block = nullptr;
@@ -318,6 +341,8 @@ namespace gc
 		}
 		return &block[--left];
 	}
+
+	static V* new_value(int size) { return size == 0 ? small_value() : size == 1 ? text_value() : full_value(); }
 
 #ifdef __wasm__
 	static const bool stored_now = false;
@@ -332,16 +357,17 @@ namespace gc
 		V* v;
 		if (t->state == 0)  // running: the collector waits for this thread before it looks, so no lock is needed
 		{
-			std::vector<V*>& ready = is_small(tag) ? t->ready_small : t->ready;
+			int size = size_of(tag);
+			std::vector<V*>& ready = t->ready[size];
 			if (ready.empty())  // take a batch of freed values (or new ones) at once
 			{
 				std::lock_guard<std::mutex> hold(lock);
-				std::vector<V*>& from = is_small(tag) ? spare_small : spare;
+				std::vector<V*>& from = spare[size];
 				size_t take = std::min<size_t>(from.size(), 256);
 				ready.assign(from.end() - take, from.end());
 				from.resize(from.size() - take);
 				while (ready.size() < 256)
-					ready.push_back(is_small(tag) ? small_value() : full_value());
+					ready.push_back(new_value(size));
 			}
 			v = ready.back();
 			ready.pop_back();
@@ -356,14 +382,14 @@ namespace gc
 		}
 		{  // parked (inside a library word): a collector may be looking now, so as before, under the lock
 			std::lock_guard<std::mutex> hold(lock);
-			std::vector<V*>& from = is_small(tag) ? spare_small : spare;
+			std::vector<V*>& from = spare[size_of(tag)];
 			if (!from.empty())
 			{
 				v = from.back();
 				from.pop_back();
 			}
 			else
-				v = is_small(tag) ? small_value() : full_value();
+				v = new_value(size_of(tag));
 			v->tag = tag;
 			v->owned = v->shared = v->marked = false;
 			all.push_back(v);
@@ -799,7 +825,7 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 }
 
 // machine.py's add_number and list_number find a list's plain numbers at these places.
-static_assert(offsetof(V, numbers) == 3 && offsetof(Full, nums) == 16, "machine.py's nums_place needs changing");
+static_assert(offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's nums_place and count_holders need changing");
 static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == 2 * sizeof(void*), "machine.py's nums_place needs changing");
 
 // A list's or thing's items, boxed: a list of plain numbers is boxed first (and stays boxed).
@@ -1376,6 +1402,49 @@ extern "C"
 		V* out = cn_list_new();
 		for (size_t k : order)
 			cn_list_add(out, cn_items(list)[k]);
+		return out;
+	}
+	V* cn_sorted_numbers(V* list)  // 'sorted scores' for a list of numbers (stable, as Python's)
+	{
+		V* out = copy_of(list);
+		Full* f = full(out);
+		if (f->numbers)
+			std::stable_sort(f->nums.begin(), f->nums.end());
+		else
+			std::stable_sort(f->boxed.begin(), f->boxed.end(), [](const V* a, const V* b) { return a->d < b->d; });
+		return out;
+	}
+	V* cn_join_texts(V* list, V* between)  // 'join names with ", "' for a list of text
+	{
+		const std::vector<V*>& items = cn_items(list);
+		const std::string& by = full(between)->s;
+		size_t size = items.empty() ? 0 : by.size() * (items.size() - 1);
+		for (const V* x : items)
+			size += full(x)->s.size();
+		std::string out;
+		out.reserve(size);
+		for (size_t k = 0; k < items.size(); ++k)
+		{
+			if (k)
+				out += by;
+			out += full(items[k])->s;
+		}
+		return cn_make_text(std::move(out));
+	}
+	V* cn_split(V* text, V* by, int line)  // 'whole split by ","'
+	{
+		const std::string& s = full(text)->s;
+		const std::string& b = full(by)->s;
+		GUARDED(cn_list_new(), if (b.empty()) stellanova::fail(line, "I can't split text by empty text.");)
+		V* out = cn_list_new();
+		std::vector<V*>& items = full(out)->boxed;
+		size_t start = 0;
+		for (size_t at = s.find(b); at != std::string::npos; at = s.find(b, start))
+		{
+			items.push_back(cn_make_text(s.substr(start, at - start)));
+			start = at + b.size();
+		}
+		items.push_back(cn_make_text(s.substr(start)));
 		return out;
 	}
 	V* cn_reversed(V* list)  // a copy, back to front: any kind of item

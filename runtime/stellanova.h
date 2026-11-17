@@ -1138,6 +1138,17 @@ namespace stellanova
 		return items;
 	}
 
+	inline double remainder_of(double x, double y)  // as std::fmod: whole numbers (most of them) the quick way
+	{
+		const double most = 9007199254740992.0;  // 2^53
+		if (x == std::trunc(x) && y == std::trunc(y) && std::fabs(x) < most && std::fabs(y) < most && y != 0)
+		{
+			double r = static_cast<double>(static_cast<long long>(x) % static_cast<long long>(y));
+			return r == 0 ? std::copysign(0.0, x) : r;
+		}
+		return std::fmod(x, y);
+	}
+
 	// 'a is within 30 of b': the distance between them is 30 or less.
 	inline bool within(double a, double b, double reach) { return std::fabs(a - b) <= reach; }
 	inline bool within(const FVector& a, const FVector& b, double reach) { return (a - b).Size() <= reach; }

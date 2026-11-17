@@ -118,10 +118,10 @@ struct Table  // a table's entries: made only when the first is put in (most val
 
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
-	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): first, at a fixed place
+	std::string s;  // text: first (a text is made smaller, as only this: TextValue)
+	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): at a fixed place
 	std::vector<V*> boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
 	double x = 0, y = 0, z = 0;  // a place
-	std::string s;  // text
 	Table table;  // (in no order: sorted_keys gives them in order)
 	const ThingKind* kind = nullptr;
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
@@ -137,6 +137,7 @@ inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Fu
 	std::sort(out.begin(), out.end(), [](auto* a, auto* b) { return a->first < b->first; });
 	return out;
 }
+struct TextValue : V { std::string s; };  // a text: only Full's first part (its other parts are never touched)
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
 inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }

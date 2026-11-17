@@ -30,7 +30,7 @@ to round up, given x (a number), returning a number = std::ceil({x})
 to power of, given x (a number) and power (a number), returning a number = std::pow({x}, {power})
   runs: power_of({x}, {power})
   web: Math.pow({x}, {power})
-to remainder of, given x (a number) and divided by (a number), returning a number = std::fmod({x}, {divided by})
+to remainder of, given x (a number) and divided by (a number), returning a number = stellanova::remainder_of({x}, {divided by})
   runs: math.fmod({x}, {divided by}) if {divided by} != 0 else math.nan
   web: (({x}) % ({divided by}))
 

@@ -2039,7 +2039,9 @@ class Expr:
             self.need(v, TEXT, "split by")
             by = self.need(self.primary(), TEXT, "split by")
             a, b, line = v.run, by.run, self.line
-            return builtin("stellanova::split({a0}, {a1}, {line})", "list of text", lambda env: split(a(env), b(env), line), [v, by], line)
+            out = builtin("stellanova::split({a0}, {a1}, {line})", "list of text", lambda env: split(a(env), b(env), line), [v, by], line)
+            out.ir = lambda f: f.op(f"call ptr @cn_split(ptr {machine.emit(f, v)}, ptr {machine.emit(f, by)}, i32 {line})")
+            return out
         return v
 
     def inline_command(self, given=None):
@@ -2470,7 +2472,10 @@ class Expr:
             self.take("with")
             between = self.need(self.operand(), TEXT, "join ... with")
             a, b = v.run, between.run
-            return builtin("stellanova::join({a0}, {a1})", TEXT, lambda env: b(env).join(text(x) for x in a(env)), [v, between])
+            out = builtin("stellanova::join({a0}, {a1})", TEXT, lambda env: b(env).join(text(x) for x in a(env)), [v, between])
+            if element(v.kind) == TEXT:
+                out.ir = lambda f: f.op(f"call ptr @cn_join_texts(ptr {machine.emit(f, v)}, ptr {machine.emit(f, between)})")
+            return out
         if self.at("sorted"):
             start = self.i
             self.i += 1
@@ -2542,6 +2547,8 @@ class Expr:
                 raise ScriptError(line, f"'sorted' needs a list of numbers or text, but this is {kind_name(v.kind)}.")
             a = v.run
             out = builtin("stellanova::sorted({a0})", v.kind, lambda env: sorted(a(env)), [v])
+            if element(v.kind) == NUMBER:
+                out.ir = lambda f: f.op(f"call ptr @cn_sorted_numbers(ptr {machine.emit(f, v)})")
             return reversed_list(out) if self.biggest_first() else out
         if tok == "items" and self.peek(1) not in ITEM_NOT_INDEX and not self.names.match(self.t, self.i)[0]:
             self.i += 1  # 'items 2 to 5 of names'

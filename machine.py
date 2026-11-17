@@ -22,7 +22,7 @@ THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set 
 
 
 # library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
-FALLIBLE = {"cn_list_at_slow", "cn_list_put_slow", "cn_own_item", "cn_own_entry", "cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
+FALLIBLE = {"cn_split", "cn_list_at_slow", "cn_list_put_slow", "cn_own_item", "cn_own_entry", "cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
 ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
@@ -165,6 +165,9 @@ declare double @cn_place_size(ptr)
 declare ptr @cn_thing(ptr)
 declare ptr @cn_text_kept(ptr, i64, ptr)
 declare ptr @cn_deep(ptr)
+declare ptr @cn_sorted_numbers(ptr)
+declare ptr @cn_join_texts(ptr, ptr)
+declare ptr @cn_split(ptr, ptr, i32)
 declare void @cn_assign(ptr, ptr)
 declare ptr @cn_list_at_slow(ptr, double, i32)
 declare void @cn_list_put_slow(ptr, double, ptr, i32)
@@ -265,6 +268,13 @@ def zero_const(kind):
     return {"double": number(0.0), "i1": "false"}.get(ll_type(kind), "null")
 
 
+NUMS_AT_BY_TARGET = {"wasm": 28}  # where machine.h's Full keeps nums: after V (16 bytes) and the text (a std::string: 12 bytes in WASI's C++, 32 in the others)
+
+
+def nums_at():
+    return NUMS_AT_BY_TARGET.get(TARGET, 48)
+
+
 class Fn:
     """One function being written: its instructions, its names' places, and the loops and 'try:'s it is inside."""
 
@@ -349,7 +359,7 @@ class Fn:
         """Where a list's plain numbers are (machine.h's Nums, just after V): (numbers flag, data, count, room, size type)."""
         word, size = (4, "i32") if TARGET == "wasm" else (8, "i64")
         at = lambda k: self.op(f"getelementptr inbounds i8, ptr {lst}, i64 {k}")
-        return at(3), at(16), at(16 + word), at(16 + 2 * word), size
+        return at(3), at(nums_at()), at(nums_at() + word), at(nums_at() + 2 * word), size
 
     def add_number(self, lst, d):
         """Adds a number to a list: in place while it holds plain numbers and has room (the runtime otherwise)."""
@@ -392,7 +402,7 @@ class Fn:
         Branches to the slow label when it isn't there (a list of plain numbers, not a whole number, out of range)."""
         flag, _, _, _, size = self.nums_place(lst)
         word = 4 if size == "i32" else 8
-        start = 16 + 3 * word  # (machine.h's Full: boxed is just after nums; a vector begins with its first and last places)
+        start = nums_at() + 3 * word  # (machine.h's Full: boxed is just after nums; a vector begins with its first and last places)
         whole, ranged, fast, slow = self.label("bwhole"), self.label("brange"), self.label("bfast"), self.label("bslow")
         self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), whole, slow)
         self.place(whole)
