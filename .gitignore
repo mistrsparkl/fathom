@@ -20,3 +20,6 @@ tutorial/__pycache__/
 
 # libraries 'stellanova get' got
 libraries/got/
+
+# local tool caches
+.token-optimizer/
