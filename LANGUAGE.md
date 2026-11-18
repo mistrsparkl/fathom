@@ -485,7 +485,8 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `etch a block with (middle, width, height, depth, "brown")` | A box of any size. |
 | `etch a ball with (middle, radius, "yellow")` | A ball. |
 | `etch a triangle in space with (a, b, c, "yellow")` | A flat triangle between three places, seen from both sides. |
-| `etch the model with ("ship.obj", middle, 2, 45, "")` | A 3D model from an .obj file, its middle at that place, twice its size, turned 45 degrees around the vertical. With `""` it keeps the colours of its .mtl file (others are light grey). A colour paints all of it. |
+| `etch the model with ("ship.obj", middle, 2, 45, "")` | A 3D model from an .obj, .gltf or .glb file, its middle at that place, twice its size, turned 45 degrees around the vertical. With `""` it keeps the colours of its .mtl file (others are light grey). A colour paints all of it. |
+| `etch the moving model with ("walker.glb", middle, 1, 0, "", "walk", seconds)` | A .gltf or .glb model with its bones posed by one of its motions (`"walk"`), that many seconds in. The motion loops, so keep counting the seconds up. `""` for the motion plays its first one. |
 | `etch the picture in space with ("door.png", corner, across, down)` | A picture laid on the world like a texture: its top left at `corner`, its top edge along `across` and its left edge along `down` (both places, as directions and lengths). It is drawn as up to 48 by 48 cells of colour. See-through dots are left out. |
 | `shine the light from 1 horizontal 2 vertical -1 depth` | Where the light comes from (the shapes facing it are brightest). |
 | `set the eye view to 90` | How wide the eye sees, top to bottom, in degrees (10 to 150; it starts at 60). |

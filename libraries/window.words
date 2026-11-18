@@ -28,6 +28,9 @@ include: <fstream>
 include: <sstream>
 include: <filesystem>
 include: <map>
+include: <array>
+include: <set>
+include: <cctype>
 link: user32
 link: gdi32
 link: opengl32
@@ -1672,14 +1675,472 @@ code:
   		view_angle = degrees;
   	}
 
-  	// ---- models (.obj files, with their .mtl colours)
   	struct Model { std::vector<V3> points; std::vector<std::pair<std::vector<int>, int>> faces; std::vector<COLORREF> colours; };  // faces: points, colour (-1: none)
+  	// ---- glTF models (.gltf and .glb): their skeletons and motions
+  	using M4 = std::array<double, 16>;
+  	inline const M4 ident4{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+  	inline bool is_gltf(const std::string& file)
+  	{
+  		std::string low;
+  		for (char c : file)
+  			low += (char)std::tolower((unsigned char)c);
+  		auto ends = [&](const std::string& e) { return low.size() >= e.size() && low.compare(low.size() - e.size(), e.size(), e) == 0; };
+  		return ends(".gltf") || ends(".glb");
+  	}
+  	inline M4 m4_mul(const M4& a, const M4& b)
+  	{
+  		M4 r{};
+  		for (int c = 0; c < 4; ++c)
+  			for (int w = 0; w < 4; ++w)
+  				r[c * 4 + w] = a[w] * b[c * 4] + a[4 + w] * b[c * 4 + 1] + a[8 + w] * b[c * 4 + 2] + a[12 + w] * b[c * 4 + 3];
+  		return r;
+  	}
+  	inline M4 m4_trs(const std::vector<double>& t, const std::vector<double>& q, const std::vector<double>& s)
+  	{
+  		double x = q[0], y = q[1], z = q[2], w = q[3];
+  		return {(1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + z * w) * s[0], 2 * (x * z - y * w) * s[0], 0,
+  		        2 * (x * y - z * w) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + x * w) * s[1], 0,
+  		        2 * (x * z + y * w) * s[2], 2 * (y * z - x * w) * s[2], (1 - 2 * (x * x + y * y)) * s[2], 0,
+  		        t[0], t[1], t[2], 1};
+  	}
+  	inline V3 m4_apply(const M4& m, const std::vector<double>& p)
+  	{
+  		return {m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]};
+  	}
+  	using Rows = std::vector<std::vector<double>>;
+  	struct GltfNode { std::vector<double> t{0, 0, 0}, r{0, 0, 0, 1}, s{1, 1, 1}; bool has_matrix = false; M4 matrix{}; std::vector<int> kids; int mesh = -1, skin = -1; };
+  	struct GltfPart { Rows points, joints, weights; std::vector<int> order; int colour = -1; };
+  	struct GltfChannel { int node, path; std::vector<double> times; Rows values; bool step; };  // path: 0 move, 1 turn, 2 size
+  	struct GltfClip { std::string name; double length = 0; std::vector<GltfChannel> channels; };
+  	struct Gltf { std::string file; std::vector<GltfNode> nodes; std::vector<std::vector<GltfPart>> meshes; std::vector<std::pair<std::vector<int>, std::vector<M4>>> skins; std::vector<GltfClip> clips; std::vector<int> roots; std::vector<COLORREF> colours; };
+  	inline Gltf& gltf(const std::string& file, int line)
+  	{
+  		using stellanova::SavedData;
+  		static std::map<std::string, Gltf> loaded;
+  		auto found = loaded.find(file);
+  		if (found != loaded.end())
+  			return found->second;
+  		auto whole = [](const std::filesystem::path& path, std::string& into) {
+  			std::ifstream in(path, std::ios::binary);
+  			if (!in)
+  				return false;
+  			into.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  			return true;
+  		};
+  		std::string raw, kept, json;
+  		if (!whole(std::filesystem::u8path(file), raw))
+  			stellanova::fail(line, "there is no model called \"" + file + "\".");
+  		auto bad = [&]() { stellanova::fail(line, "the model \"" + file + "\" isn't a glTF model I can read."); };
+  		auto u32 = [&](size_t at) { if (at + 4 > raw.size()) bad(); uint32_t v; std::memcpy(&v, raw.data() + at, 4); return (size_t)v; };
+  		if (raw.compare(0, 4, "glTF") == 0)
+  		{
+  			size_t n = u32(12);
+  			if (20 + n > raw.size())
+  				bad();
+  			json = raw.substr(20, n);
+  			if (raw.size() >= 28 + n)
+  			{
+  				size_t m = u32(20 + n);
+  				kept = raw.substr(28 + n, m);
+  			}
+  		}
+  		else
+  			json = raw;
+  		SavedData doc;
+  		stellanova::SavedReader reader{json};
+  		if (!reader.value(doc) || doc.type != SavedData::Table)
+  			bad();
+  		// small readers that stop with a plain message on anything odd
+  		auto list = [&](const SavedData& d, const char* key) -> const std::vector<SavedData>& {
+  			static const std::vector<SavedData> none;
+  			const SavedData* p = d.part(key);
+  			if (!p)
+  				return none;
+  			if (p->type != SavedData::List)
+  				bad();
+  			return p->items;
+  		};
+  		auto has = [&](const SavedData& d, const char* key) { return d.part(key) != nullptr; };
+  		auto num = [&](const SavedData& d, const char* key, double usual) {
+  			const SavedData* p = d.part(key);
+  			if (!p)
+  				return usual;
+  			if (p->type != SavedData::Number)
+  				bad();
+  			return p->number;
+  		};
+  		auto index = [&](const SavedData& d, const char* key, size_t below) {
+  			double x = num(d, key, -1);
+  			if (!(x >= 0 && x < (double)below) || x != std::floor(x))
+  				bad();
+  			return (size_t)x;
+  		};
+  		auto words = [&](const SavedData& d, const char* key, const std::string& usual) {
+  			const SavedData* p = d.part(key);
+  			if (!p)
+  				return usual;
+  			if (p->type != SavedData::Text)
+  				bad();
+  			return p->words;
+  		};
+  		auto numbers = [&](const SavedData& d, const char* key, std::vector<double> usual, size_t size) {
+  			const SavedData* p = d.part(key);
+  			if (!p)
+  				return usual;
+  			std::vector<double> out;
+  			for (const SavedData& x : list(d, key))
+  			{
+  				if (x.type != SavedData::Number)
+  					bad();
+  				out.push_back(x.number);
+  			}
+  			if (size && out.size() < size)
+  				bad();
+  			return out;
+  		};
+  		auto item = [&](const std::vector<SavedData>& from, size_t k) -> const SavedData& {
+  			if (k >= from.size() || from[k].type != SavedData::Table)
+  				bad();
+  			return from[k];
+  		};
+  		std::vector<std::string> bufs;
+  		auto folder = std::filesystem::u8path(file).parent_path();
+  		for (const SavedData& b : list(doc, "buffers"))
+  		{
+  			if (b.type != SavedData::Table)
+  				bad();
+  			if (!has(b, "uri"))
+  				bufs.push_back(kept);
+  			else if (std::string uri = words(b, "uri", ""); uri.compare(0, 5, "data:") == 0)
+  			{
+  				std::string out;
+  				int bits = 0, have = 0;
+  				for (char c : uri.substr(uri.find(',') == std::string::npos ? uri.size() : uri.find(',') + 1))
+  				{
+  					const char* all = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  					const char* at = c ? std::strchr(all, c) : nullptr;
+  					if (!at)
+  						continue;  // '=' at the end
+  					bits = bits << 6 | (int)(at - all), have += 6;
+  					if (have >= 8)
+  						out += (char)(bits >> (have -= 8) & 255);
+  				}
+  				bufs.push_back(out);
+  			}
+  			else  // shortcut: names with %20 aren't decoded, decode them if a model needs it
+  			{
+  				std::string out;
+  				if (!whole(folder / std::filesystem::u8path(uri), out))
+  					stellanova::fail(line, "the model \"" + file + "\" needs the file \"" + uri + "\" beside it.");
+  				bufs.push_back(out);
+  			}
+  		}
+  		const auto& accessors = list(doc, "accessors");
+  		const auto& views = list(doc, "bufferViews");
+  		auto read = [&](size_t k) {
+  			const SavedData& a = item(accessors, k);
+  			std::string type = words(a, "type", "");
+  			size_t n = type == "SCALAR" ? 1 : type == "VEC2" ? 2 : type == "VEC3" ? 3 : type == "VEC4" ? 4 : type == "MAT4" ? 16 : 0;
+  			int kind = (int)num(a, "componentType", 0);
+  			size_t one = kind == 5120 || kind == 5121 ? 1 : kind == 5122 || kind == 5123 ? 2 : kind == 5125 || kind == 5126 ? 4 : 0;
+  			double count = num(a, "count", -1);
+  			if (!n || !one || !(count >= 0 && count < 1e8))
+  				bad();
+  			Rows out((size_t)count, std::vector<double>(n, 0.0));
+  			if (!has(a, "bufferView"))
+  				return out;
+  			const SavedData& v = item(views, index(a, "bufferView", views.size()));
+  			const std::string& data = bufs.at(index(v, "buffer", bufs.size()));
+  			size_t stride = (size_t)num(v, "byteStride", 0);
+  			if (!stride)
+  				stride = one * n;
+  			size_t start = (size_t)num(v, "byteOffset", 0) + (size_t)num(a, "byteOffset", 0);
+  			bool normal = has(a, "normalized") && a.part("normalized")->type == SavedData::YesNo && a.part("normalized")->yes;
+  			for (size_t i = 0; i < out.size(); ++i)
+  				for (size_t e = 0; e < n; ++e)
+  				{
+  					size_t at = start + i * stride + e * one;
+  					if (at + one > data.size())
+  						bad();
+  					const char* p = data.data() + at;
+  					double x = 0, top = 1;
+  					if (kind == 5120) { int8_t b; std::memcpy(&b, p, 1); x = b, top = 127; }
+  					else if (kind == 5121) { uint8_t b; std::memcpy(&b, p, 1); x = b, top = 255; }
+  					else if (kind == 5122) { int16_t b; std::memcpy(&b, p, 2); x = b, top = 32767; }
+  					else if (kind == 5123) { uint16_t b; std::memcpy(&b, p, 2); x = b, top = 65535; }
+  					else if (kind == 5125) { uint32_t b; std::memcpy(&b, p, 4); x = b; }
+  					else { float b; std::memcpy(&b, p, 4); x = b; }
+  					out[i][e] = normal && kind != 5126 ? std::max(x / top, -1.0) : x;
+  				}
+  			return out;
+  		};
+  		Gltf g;
+  		g.file = file;
+  		const auto& nodes = list(doc, "nodes");
+  		for (size_t i = 0; i < nodes.size(); ++i)
+  		{
+  			const SavedData& nd = item(nodes, i);
+  			GltfNode n;
+  			n.t = numbers(nd, "translation", n.t, 3), n.r = numbers(nd, "rotation", n.r, 4), n.s = numbers(nd, "scale", n.s, 3);
+  			if (has(nd, "matrix"))
+  			{
+  				auto m = numbers(nd, "matrix", {}, 16);
+  				n.has_matrix = true;
+  				std::copy(m.begin(), m.begin() + 16, n.matrix.begin());
+  			}
+  			for (double k : numbers(nd, "children", {}, 0))
+  				n.kids.push_back((int)k);
+  			n.mesh = has(nd, "mesh") ? (int)index(nd, "mesh", list(doc, "meshes").size()) : -1;
+  			n.skin = has(nd, "skin") ? (int)index(nd, "skin", list(doc, "skins").size()) : -1;
+  			g.nodes.push_back(n);
+  		}
+  		const auto& materials = list(doc, "materials");
+  		for (size_t i = 0; i < materials.size(); ++i)
+  		{
+  			const SavedData* pbr = item(materials, i).part("pbrMetallicRoughness");
+  			auto f = pbr && pbr->type == SavedData::Table ? numbers(*pbr, "baseColorFactor", {}, 0) : std::vector<double>{};
+  			auto dot = [&](size_t k) { return (int)std::lround(std::max(0.0, std::min(1.0, f[k])) * 255); };
+  			g.colours.push_back(f.size() >= 3 ? RGB(dot(0), dot(1), dot(2)) : RGB(200, 200, 200));
+  		}
+  		for (const SavedData& me : list(doc, "meshes"))
+  		{
+  			if (me.type != SavedData::Table)
+  				bad();
+  			std::vector<GltfPart> parts;
+  			const auto& prims = list(me, "primitives");
+  			for (size_t i = 0; i < prims.size(); ++i)
+  			{
+  				const SavedData& p = item(prims, i);
+  				const SavedData* at = p.part("attributes");
+  				if (!at || at->type != SavedData::Table)
+  					bad();
+  				if (num(p, "mode", 4) != 4 || !has(*at, "POSITION"))
+  					continue;  // only triangles are drawn
+  				GltfPart part;
+  				part.points = read(index(*at, "POSITION", accessors.size()));
+  				if (has(p, "indices"))
+  					for (const auto& k : read(index(p, "indices", accessors.size())))
+  						part.order.push_back((int)k[0]);
+  				else
+  					for (size_t k = 0; k < part.points.size(); ++k)
+  						part.order.push_back((int)k);
+  				for (int k : part.order)
+  					if (k < 0 || k >= (int)part.points.size())
+  						stellanova::fail(line, "the model \"" + file + "\" has a face with a corner that isn't there.");
+  				if (has(*at, "JOINTS_0") && has(*at, "WEIGHTS_0"))
+  				{
+  					part.joints = read(index(*at, "JOINTS_0", accessors.size()));
+  					part.weights = read(index(*at, "WEIGHTS_0", accessors.size()));
+  					if (part.joints.size() < part.points.size() || part.weights.size() < part.points.size())
+  						bad();
+  				}
+  				part.colour = has(p, "material") ? (int)index(p, "material", materials.size()) : -1;
+  				parts.push_back(std::move(part));
+  			}
+  			g.meshes.push_back(std::move(parts));
+  		}
+  		const auto& skins = list(doc, "skins");
+  		for (size_t i = 0; i < skins.size(); ++i)
+  		{
+  			const SavedData& s = item(skins, i);
+  			std::vector<int> joints;
+  			for (double k : numbers(s, "joints", {}, 0))
+  			{
+  				if (!(k >= 0 && k < (double)g.nodes.size()))
+  					bad();
+  				joints.push_back((int)k);
+  			}
+  			std::vector<M4> ibm(joints.size(), ident4);
+  			if (has(s, "inverseBindMatrices"))
+  			{
+  				Rows m = read(index(s, "inverseBindMatrices", accessors.size()));
+  				if (m.size() < joints.size() || (!m.empty() && m[0].size() != 16))
+  					bad();
+  				for (size_t k = 0; k < joints.size(); ++k)
+  					std::copy(m[k].begin(), m[k].end(), ibm[k].begin());
+  			}
+  			g.skins.push_back({joints, ibm});
+  		}
+  		const auto& animations = list(doc, "animations");
+  		for (size_t i = 0; i < animations.size(); ++i)
+  		{
+  			const SavedData& an = item(animations, i);
+  			GltfClip clip;
+  			clip.name = words(an, "name", "");
+  			const auto& samplers = list(an, "samplers");
+  			const auto& channels = list(an, "channels");
+  			for (size_t c = 0; c < channels.size(); ++c)
+  			{
+  				const SavedData& ch = item(channels, c);
+  				const SavedData* tg = ch.part("target");
+  				if (!tg || tg->type != SavedData::Table)
+  					bad();
+  				std::string path = words(*tg, "path", "");
+  				if ((path != "translation" && path != "rotation" && path != "scale") || !has(*tg, "node"))
+  					continue;  // morph weights don't move
+  				const SavedData& sm = item(samplers, index(ch, "sampler", samplers.size()));
+  				GltfChannel one;
+  				one.node = (int)index(*tg, "node", g.nodes.size());
+  				one.path = path == "translation" ? 0 : path == "rotation" ? 1 : 2;
+  				for (const auto& x : read(index(sm, "input", accessors.size())))
+  					one.times.push_back(x[0]);
+  				one.values = read(index(sm, "output", accessors.size()));
+  				std::string how = words(sm, "interpolation", "LINEAR");
+  				if (how == "CUBICSPLINE")  // shortcut: curved keys play as straight lines, follow the curves if motions look stiff
+  				{
+  					Rows middle;
+  					for (size_t k = 1; k < one.values.size(); k += 3)
+  						middle.push_back(one.values[k]);
+  					one.values = middle;
+  				}
+  				one.step = how == "STEP";
+  				if (one.times.empty() || one.values.size() < one.times.size() || one.values[0].size() < (one.path == 1 ? 4u : 3u))
+  					bad();
+  				clip.length = std::max(clip.length, one.times.back());
+  				clip.channels.push_back(std::move(one));
+  			}
+  			g.clips.push_back(std::move(clip));
+  		}
+  		const auto& scenes = list(doc, "scenes");
+  		if (!scenes.empty())
+  			for (double k : numbers(item(scenes, (size_t)num(doc, "scene", 0)), "nodes", {}, 0))
+  				g.roots.push_back((int)k);
+  		else
+  		{
+  			std::set<int> inside;
+  			for (const auto& n : g.nodes)
+  				inside.insert(n.kids.begin(), n.kids.end());
+  			for (int k = 0; k < (int)g.nodes.size(); ++k)
+  				if (!inside.count(k))
+  					g.roots.push_back(k);
+  		}
+  		return loaded[file] = std::move(g);
+  	}
+  	inline std::vector<double> gltf_sample(const GltfChannel& ch, double at)
+  	{
+  		const auto& times = ch.times;
+  		const auto& vals = ch.values;
+  		if (at <= times[0])
+  			return vals[0];
+  		if (at >= times.back())
+  			return vals[times.size() - 1];
+  		size_t k = 0;
+  		while (times[k + 1] <= at)
+  			++k;
+  		const auto& a = vals[k];
+  		std::vector<double> b = vals[k + 1];
+  		if (ch.step)
+  			return a;
+  		double f = (at - times[k]) / (times[k + 1] - times[k]);
+  		if (ch.path != 1)
+  			return {a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f};
+  		double d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  		if (d < 0)
+  		{
+  			for (double& x : b)
+  				x = -x;
+  			d = -d;
+  		}
+  		std::vector<double> q(4);
+  		double th = std::acos(std::min(d, 1.0));
+  		for (int i = 0; i < 4; ++i)
+  			q[i] = d > 0.9995 ? a[i] + (b[i] - a[i]) * f : a[i] * (std::sin((1 - f) * th) / std::sin(th)) + b[i] * (std::sin(f * th) / std::sin(th));
+  		double size = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+  		if (size == 0)
+  			size = 1;
+  		for (double& x : q)
+  			x /= size;
+  		return q;
+  	}
+  	inline Model gltf_posed(const Gltf& g, const GltfClip* clip, double at, int line)
+  	{
+  		// The model's points and faces, with each bone where the motion has it at that time.
+  		std::vector<GltfNode> nodes = g.nodes;
+  		if (clip)
+  		{
+  			if (clip->length > 0)
+  				at = std::fmod(at, clip->length);
+  			for (const auto& ch : clip->channels)
+  			{
+  				auto v = gltf_sample(ch, at);
+  				(ch.path == 0 ? nodes[(size_t)ch.node].t : ch.path == 1 ? nodes[(size_t)ch.node].r : nodes[(size_t)ch.node].s) = v;
+  			}
+  		}
+  		std::vector<M4> world(nodes.size());
+  		std::vector<bool> placed(nodes.size(), false);
+  		std::vector<int> done;
+  		std::vector<std::pair<int, M4>> waiting;
+  		for (auto r = g.roots.rbegin(); r != g.roots.rend(); ++r)
+  			waiting.push_back({*r, ident4});
+  		while (!waiting.empty())
+  		{
+  			auto [i, parent] = waiting.back();
+  			waiting.pop_back();
+  			if (i < 0 || i >= (int)nodes.size() || placed[(size_t)i])
+  				stellanova::fail(line, "the model \"" + g.file + "\" has a part inside itself.");
+  			const GltfNode& n = nodes[(size_t)i];
+  			world[(size_t)i] = m4_mul(parent, n.has_matrix ? n.matrix : m4_trs(n.t, n.r, n.s));
+  			placed[(size_t)i] = true;
+  			done.push_back(i);
+  			for (auto k = n.kids.rbegin(); k != n.kids.rend(); ++k)
+  				waiting.push_back({*k, world[(size_t)i]});
+  		}
+  		Model m;
+  		m.colours = g.colours;
+  		for (int i : done)
+  		{
+  			const GltfNode& n = nodes[(size_t)i];
+  			if (n.mesh < 0)
+  				continue;
+  			std::vector<M4> bones;
+  			if (n.skin >= 0)
+  			{
+  				const auto& [joints, ibm] = g.skins[(size_t)n.skin];
+  				for (size_t k = 0; k < joints.size(); ++k)
+  					bones.push_back(m4_mul(placed[(size_t)joints[k]] ? world[(size_t)joints[k]] : ident4, ibm[k]));
+  			}
+  			for (const GltfPart& part : g.meshes[(size_t)n.mesh])
+  			{
+  				int first = (int)m.points.size();
+  				for (size_t v = 0; v < part.points.size(); ++v)
+  				{
+  					const auto& p = part.points[v];
+  					if (n.skin < 0 || part.joints.empty())
+  					{
+  						m.points.push_back(m4_apply(world[(size_t)i], p));
+  						continue;
+  					}
+  					V3 out{0, 0, 0};
+  					double total = 0;
+  					for (size_t e = 0; e < part.joints[v].size() && e < part.weights[v].size(); ++e)
+  					{
+  						double w = part.weights[v][e], j = part.joints[v][e];
+  						if (!(w > 0))
+  							continue;
+  						if (!(j >= 0 && j < (double)bones.size()))
+  							stellanova::fail(line, "the model \"" + g.file + "\" has a point held by a bone that isn't there.");
+  						V3 q = m4_apply(bones[(size_t)j], p);
+  						out = {out.x + w * q.x, out.y + w * q.y, out.z + w * q.z};
+  						total += w;
+  					}
+  					m.points.push_back(total > 0 ? V3{out.x / total, out.y / total, out.z / total} : m4_apply(world[(size_t)i], p));
+  				}
+  				for (size_t k = 0; k + 2 < part.order.size(); k += 3)
+  					m.faces.push_back({{first + part.order[k], first + part.order[k + 1], first + part.order[k + 2]}, part.colour});
+  			}
+  		}
+  		return m;
+  	}
+
+  	// ---- models (.obj files, with their .mtl colours)
   	inline Model& model(const std::string& file, int line)
   	{
   		static std::map<std::string, Model> models;
   		auto found = models.find(file);
   		if (found != models.end())
   			return found->second;
+  		if (is_gltf(file))
+  			return models[file] = gltf_posed(gltf(file, line), nullptr, 0, line);
   		std::ifstream in(std::filesystem::u8path(file));
   		if (!in)
   			stellanova::fail(line, "there is no model called \"" + file + "\".");
@@ -1743,10 +2204,8 @@ code:
   		}
   		return models[file] = std::move(m);
   	}
-  	inline void etch_model(const std::string& file, const FVector& middle, double size, double turn, const std::string& col, int line)
+  	inline void etch_faces(const Model& m, const FVector& middle, double size, double turn, const std::string& col, int line)
   	{
-  		need_open(line);
-  		Model& m = model(file, line);
   		COLORREF own = col.empty() ? RGB(200, 200, 200) : colour(col, line);
   		double t = turn * pi3 / 180.0, ct = std::cos(t), st = std::sin(t);
   		for (const auto& [face, which] : m.faces)
@@ -1759,6 +2218,32 @@ code:
   			}
   			face3(pts, col.empty() && which >= 0 ? m.colours[(size_t)which] : own);
   		}
+  	}
+
+  	inline void etch_model(const std::string& file, const FVector& middle, double size, double turn, const std::string& col, int line)
+  	{
+  		need_open(line);
+  		etch_faces(model(file, line), middle, size, turn, col, line);
+  	}
+  	inline void etch_moving_model(const std::string& file, const FVector& middle, double size, double turn, const std::string& col, const std::string& motion, double seconds, int line)
+  	{
+  		need_open(line);
+  		if (!is_gltf(file))
+  			stellanova::fail(line, "only .gltf and .glb models move, and \"" + file + "\" isn't one. Use: etch the model with (\"" + file + "\", middle, size, turn, colour)");
+  		const Gltf& g = gltf(file, line);
+  		if (g.clips.empty())
+  			stellanova::fail(line, "the model \"" + file + "\" has no motions.");
+  		const GltfClip* found = motion.empty() ? &g.clips[0] : nullptr;
+  		std::string names;
+  		for (const auto& c : g.clips)
+  		{
+  			if (!found && c.name == motion)
+  				found = &c;
+  			names += (names.empty() ? "\"" : ", \"") + c.name + "\"";
+  		}
+  		if (!found)
+  			stellanova::fail(line, "the model \"" + file + "\" has no motion called \"" + motion + "\". It has: " + names);
+  		etch_faces(gltf_posed(g, found, seconds, line), middle, size, turn, col, line);
   	}
 
   	// ---- a picture laid on the world
@@ -2444,6 +2929,9 @@ python:
   def model(file):
       if file in MODELS:
           return MODELS[file]
+      if is_gltf(file):
+          MODELS[file] = gltf_posed(gltf(file), None, 0)
+          return MODELS[file]
       try:
           rows = open(file, encoding="utf-8", errors="replace").read().splitlines()
       except OSError:
@@ -2483,7 +2971,9 @@ python:
 
   def etch_model(file, middle, size, turn, col):
       need_open()
-      points, faces = model(file)
+      etch_faces(*model(file), middle, size, turn, col)
+
+  def etch_faces(points, faces, middle, size, turn, col):
       own = "#c8c8c8" if not col else colour(col)
       t = turn * PI3 / 180.0
       ct, st = math.cos(t), math.sin(t)
@@ -2491,6 +2981,209 @@ python:
       for face, which in faces:
           pts = [(mx + size * (points[k][0] * ct + points[k][2] * st), my + size * points[k][1], mz + size * (-points[k][0] * st + points[k][2] * ct)) for k in face]
           face3(pts, which if not col and which else own)
+
+  # glTF models (.gltf and .glb): their skeletons and motions
+  GLTFS = {}
+  IDENT4 = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+  def is_gltf(file):
+      return file.lower().endswith((".gltf", ".glb"))
+
+  def m4_mul(a, b):
+      return [a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3] for c in range(4) for r in range(4)]
+
+  def m4_trs(t, q, s):
+      x, y, z, w = q
+      return [(1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + z * w) * s[0], 2 * (x * z - y * w) * s[0], 0.0,
+              2 * (x * y - z * w) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + x * w) * s[1], 0.0,
+              2 * (x * z + y * w) * s[2], 2 * (y * z - x * w) * s[2], (1 - 2 * (x * x + y * y)) * s[2], 0.0,
+              t[0], t[1], t[2], 1.0]
+
+  def m4_apply(m, p):
+      return [m[k] * p[0] + m[4 + k] * p[1] + m[8 + k] * p[2] + m[12 + k] for k in range(3)]
+
+  def gltf(file):
+      if file in GLTFS:
+          return GLTFS[file]
+      import json, struct, base64
+      try:
+          raw = open(file, "rb").read()
+      except OSError:
+          raise RunError(0, 'there is no model called "' + file + '".')
+      try:
+          kept = b""
+          if raw[:4] == b"glTF":
+              n = struct.unpack_from("<I", raw, 12)[0]
+              doc = json.loads(raw[20:20 + n].decode("utf-8"))
+              if len(raw) >= 28 + n:
+                  kept = raw[28 + n:28 + n + struct.unpack_from("<I", raw, 20 + n)[0]]
+          else:
+              doc = json.loads(raw.decode("utf-8"))
+          bufs = []
+          for b in doc.get("buffers", []):
+              uri = b.get("uri")
+              if uri is None:
+                  bufs.append(kept)
+              elif uri.startswith("data:"):
+                  bufs.append(base64.b64decode(uri.split(",", 1)[1]))
+              else:  # shortcut: names with %20 aren't decoded, decode them if a model needs it
+                  try:
+                      bufs.append(open(os.path.join(os.path.dirname(file), uri), "rb").read())
+                  except OSError:
+                      raise RunError(0, 'the model "' + file + '" needs the file "' + uri + '" beside it.')
+          sizes = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
+          kinds = {5120: ("b", 127), 5121: ("B", 255), 5122: ("h", 32767), 5123: ("H", 65535), 5125: ("I", 1), 5126: ("f", 1)}
+          def read(k):
+              a = doc["accessors"][k]
+              n, (fmt, top) = sizes[a["type"]], kinds[a["componentType"]]
+              if "bufferView" not in a:
+                  return [[0] * n for _ in range(a["count"])]
+              v = doc["bufferViews"][a["bufferView"]]
+              stride = v.get("byteStride") or struct.calcsize(fmt) * n
+              start = v.get("byteOffset", 0) + a.get("byteOffset", 0)
+              out = [list(struct.unpack_from("<%d%s" % (n, fmt), bufs[v["buffer"]], start + i * stride)) for i in range(a["count"])]
+              if a.get("normalized") and fmt != "f":
+                  out = [[max(x / top, -1.0) for x in row] for row in out]
+              return out
+          nodes = [{"t": nd.get("translation", [0, 0, 0]), "r": nd.get("rotation", [0, 0, 0, 1]), "s": nd.get("scale", [1, 1, 1]), "m": nd.get("matrix"),
+                    "kids": nd.get("children", []), "mesh": nd.get("mesh"), "skin": nd.get("skin")} for nd in doc.get("nodes", [])]
+          colours = []
+          for mt in doc.get("materials", []):
+              f = mt.get("pbrMetallicRoughness", {}).get("baseColorFactor")
+              colours.append("#%02x%02x%02x" % tuple(int(round(max(0.0, min(1.0, x)) * 255)) for x in f[:3]) if f else None)
+          meshes = []
+          for me in doc.get("meshes", []):
+              parts = []
+              for p in me.get("primitives", []):
+                  at = p["attributes"]
+                  if p.get("mode", 4) != 4 or "POSITION" not in at:
+                      continue  # only triangles are drawn
+                  pts = read(at["POSITION"])
+                  order = [i[0] for i in read(p["indices"])] if "indices" in p else list(range(len(pts)))
+                  if any(not 0 <= i < len(pts) for i in order):
+                      raise RunError(0, 'the model "' + file + '" has a face with a corner that isn\'t there.')
+                  skinned = "JOINTS_0" in at and "WEIGHTS_0" in at
+                  m = p.get("material")
+                  parts.append((pts, order, read(at["JOINTS_0"]) if skinned else None, read(at["WEIGHTS_0"]) if skinned else None,
+                                colours[m] if m is not None else None))
+              meshes.append(parts)
+          skins = [(s["joints"], read(s["inverseBindMatrices"]) if "inverseBindMatrices" in s else [IDENT4] * len(s["joints"])) for s in doc.get("skins", [])]
+          clips = []
+          for an in doc.get("animations", []):
+              chans, length = [], 0.0
+              for ch in an.get("channels", []):
+                  tg, sm = ch["target"], an["samplers"][ch["sampler"]]
+                  if tg.get("path") not in ("translation", "rotation", "scale") or "node" not in tg:
+                      continue  # morph weights don't move
+                  times, vals = [x[0] for x in read(sm["input"])], read(sm["output"])
+                  how = sm.get("interpolation", "LINEAR")
+                  if how == "CUBICSPLINE":
+                      vals = vals[1::3]  # shortcut: curved keys play as straight lines, follow the curves if motions look stiff
+                  if not times or len(vals) < len(times) or not 0 <= tg["node"] < len(nodes):
+                      raise ValueError
+                  chans.append((tg["node"], tg["path"], times, vals, how == "STEP"))
+                  length = max(length, times[-1])
+              clips.append((an.get("name", ""), length, chans))
+          scenes = doc.get("scenes")
+          if scenes:
+              roots = scenes[doc.get("scene", 0)].get("nodes", [])
+          else:
+              inside = {k for nd in nodes for k in nd["kids"]}
+              roots = [i for i in range(len(nodes)) if i not in inside]
+          if any(not (nd["mesh"] is None or 0 <= nd["mesh"] < len(meshes)) or not (nd["skin"] is None or 0 <= nd["skin"] < len(skins)) for nd in nodes)                   or any(len(ibm) < len(js) or any(not 0 <= j < len(nodes) for j in js) for js, ibm in skins):
+              raise ValueError
+      except RunError:
+          raise
+      except (ValueError, KeyError, IndexError, TypeError, AttributeError, struct.error):
+          raise RunError(0, 'the model "' + file + '" isn\'t a glTF model I can read.')
+      GLTFS[file] = {"file": file, "nodes": nodes, "meshes": meshes, "skins": skins, "clips": clips, "roots": roots}
+      return GLTFS[file]
+
+  def gltf_sample(times, vals, step, turning, at):
+      if at <= times[0]:
+          return vals[0]
+      if at >= times[-1]:
+          return vals[len(times) - 1]
+      k = 0
+      while times[k + 1] <= at:
+          k += 1
+      a, b = vals[k], vals[k + 1]
+      if step:
+          return a
+      f = (at - times[k]) / (times[k + 1] - times[k])
+      if not turning:
+          return [a[i] + (b[i] - a[i]) * f for i in range(3)]
+      d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+      if d < 0:
+          b, d = [-x for x in b], -d
+      if d > 0.9995:
+          q = [a[i] + (b[i] - a[i]) * f for i in range(4)]
+      else:
+          th = math.acos(d)
+          sa, sb = math.sin((1 - f) * th) / math.sin(th), math.sin(f * th) / math.sin(th)
+          q = [a[i] * sa + b[i] * sb for i in range(4)]
+      size = math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]) or 1.0
+      return [x / size for x in q]
+
+  def gltf_posed(g, clip, at):
+      # The model's points and faces, with each bone where the motion has it at that time.
+      nodes, file = g["nodes"], g["file"]
+      moved = {}
+      if clip is not None:
+          name, length, chans = clip
+          if length > 0:
+              at = math.fmod(at, length)
+          for node, path, times, vals, step in chans:
+              moved[(node, path)] = gltf_sample(times, vals, step, path == "rotation", at)
+      world = [None] * len(nodes)
+      done = []
+      waiting = [(i, IDENT4) for i in reversed(g["roots"])]
+      while waiting:
+          i, parent = waiting.pop()
+          if not 0 <= i < len(nodes) or world[i] is not None:
+              raise RunError(0, 'the model "' + file + '" has a part inside itself.')
+          n = nodes[i]
+          local = n["m"] if n["m"] is not None else m4_trs(moved.get((i, "translation"), n["t"]), moved.get((i, "rotation"), n["r"]), moved.get((i, "scale"), n["s"]))
+          world[i] = m4_mul(parent, local)
+          done.append(i)
+          waiting.extend((k, world[i]) for k in reversed(n["kids"]))
+      points, faces = [], []
+      for i in done:
+          n = nodes[i]
+          if n["mesh"] is None:
+              continue
+          bones = None
+          if n["skin"] is not None:
+              joints, ibm = g["skins"][n["skin"]]
+              bones = [m4_mul(world[j] if world[j] is not None else IDENT4, ibm[k]) for k, j in enumerate(joints)]
+          for pts, order, joints_v, weights_v, col in g["meshes"][n["mesh"]]:
+              first = len(points)
+              for v, p in enumerate(pts):
+                  if bones is None or joints_v is None:
+                      points.append(m4_apply(world[i], p))
+                      continue
+                  out, total = [0.0, 0.0, 0.0], 0.0
+                  for j, w in zip(joints_v[v], weights_v[v]):
+                      if w > 0:
+                          if j >= len(bones):
+                              raise RunError(0, 'the model "' + file + '" has a point held by a bone that isn\'t there.')
+                          q = m4_apply(bones[j], p)
+                          out, total = [out[k] + w * q[k] for k in range(3)], total + w
+                  points.append([x / total for x in out] if total > 0 else m4_apply(world[i], p))
+              faces.extend(([first + order[k], first + order[k + 1], first + order[k + 2]], col) for k in range(0, len(order) - 2, 3))
+      return points, faces
+
+  def etch_moving_model(file, middle, size, turn, col, motion, seconds):
+      need_open()
+      if not is_gltf(file):
+          raise RunError(0, 'only .gltf and .glb models move, and "' + file + '" isn\'t one. Use: etch the model with ("' + file + '", middle, size, turn, colour)')
+      g = gltf(file)
+      if not g["clips"]:
+          raise RunError(0, 'the model "' + file + '" has no motions.')
+      found = [c for c in g["clips"] if c[0] == motion] if motion else g["clips"][:1]
+      if not found:
+          raise RunError(0, 'the model "' + file + '" has no motion called "' + motion + '". It has: ' + ", ".join('"' + c[0] + '"' for c in g["clips"]))
+      etch_faces(*gltf_posed(g, found[0], seconds), middle, size, turn, col)
 
   def picture_in_space(file, corner, across, down):
       need_open()
@@ -2664,6 +3357,9 @@ to etch a triangle in space, given first (a place) and second (a place) and thir
 to etch the model, given file (text) and middle (a place) and size (a number) and turn (a number) and colour (text) = stellanova_window::etch_model({file}, {middle}, {size}, {turn}, {colour}, {line})
   runs: etch_model({file}, {middle}, {size}, {turn}, {colour})
   web: await stellanova_window_web.etchModel({file}, {middle}, {size}, {turn}, {colour}, {line})
+to etch the moving model, given file (text) and middle (a place) and size (a number) and turn (a number) and colour (text) and motion (text) and seconds (a number) = stellanova_window::etch_moving_model({file}, {middle}, {size}, {turn}, {colour}, {motion}, {seconds}, {line})
+  runs: etch_moving_model({file}, {middle}, {size}, {turn}, {colour}, {motion}, {seconds})
+  web: await stellanova_window_web.etchMovingModel({file}, {middle}, {size}, {turn}, {colour}, {motion}, {seconds}, {line})
 to etch the picture in space, given file (text) and corner (a place) and across (a place) and down (a place) = stellanova_window::picture_in_space({file}, {corner}, {across}, {down}, {line})
   runs: picture_in_space({file}, {corner}, {across}, {down})
   web: await stellanova_window_web.pictureInSpace({file}, {corner}, {across}, {down}, {line})
@@ -3014,9 +3710,214 @@ javascript:
       if (!r.ok) throw new Error("missing");
       return r.text();
     },
+    async readBytes(file) {
+      if (!this.page) return new Uint8Array(require("fs").readFileSync(file));
+      const r = await fetch(file);
+      if (!r.ok) throw new Error("missing");
+      return new Uint8Array(await r.arrayBuffer());
+    },
+    // glTF models (.gltf and .glb): their skeletons and motions
+    isGltf: (file) => /\.(gltf|glb)$/i.test(file),
+    ident4: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    m4Mul(a, b) {
+      const r = new Array(16);
+      for (let c = 0; c < 4; c++)
+        for (let w = 0; w < 4; w++) r[c * 4 + w] = a[w] * b[c * 4] + a[4 + w] * b[c * 4 + 1] + a[8 + w] * b[c * 4 + 2] + a[12 + w] * b[c * 4 + 3];
+      return r;
+    },
+    m4Trs(t, [x, y, z, w], s) {
+      return [(1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + z * w) * s[0], 2 * (x * z - y * w) * s[0], 0,
+              2 * (x * y - z * w) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + x * w) * s[1], 0,
+              2 * (x * z + y * w) * s[2], 2 * (y * z - x * w) * s[2], (1 - 2 * (x * x + y * y)) * s[2], 0,
+              t[0], t[1], t[2], 1];
+    },
+    m4Apply: (m, p) => [0, 1, 2].map((k) => m[k] * p[0] + m[4 + k] * p[1] + m[8 + k] * p[2] + m[12 + k]),
+    gltfs: new Map(),
+    async gltf(file, line) {
+      if (this.gltfs.has(file)) return this.gltfs.get(file);
+      let raw;
+      try { raw = await this.readBytes(file); } catch { stellanova.fail(line, `there is no model called "${file}".`); }
+      const bad = () => stellanova.fail(line, `the model "${file}" isn't a glTF model I can read.`);
+      const folder = file.includes("/") || file.includes("\\") ? file.replace(/[^/\\]*$/, "") : "";
+      let doc, kept = new Uint8Array(0);
+      const words = (b) => new TextDecoder().decode(b);
+      try {
+        const head = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+        if (words(raw.subarray(0, 4)) === "glTF") {
+          const n = head.getUint32(12, true);
+          doc = JSON.parse(words(raw.subarray(20, 20 + n)));
+          if (raw.length >= 28 + n) kept = raw.slice(28 + n, 28 + n + head.getUint32(20 + n, true));
+        } else doc = JSON.parse(words(raw));
+      } catch { bad(); }
+      if (!doc || typeof doc !== "object") bad();
+      const bufs = [];
+      for (const b of doc.buffers ?? []) {
+        if (b.uri === undefined) bufs.push(kept);
+        else if (String(b.uri).startsWith("data:")) {
+          const s = atob(b.uri.split(",")[1] ?? "");
+          bufs.push(Uint8Array.from(s, (c) => c.charCodeAt(0)));
+        } else {  // shortcut: names with %20 aren't decoded, decode them if a model needs it
+          try { bufs.push(await this.readBytes(folder + b.uri)); } catch { stellanova.fail(line, `the model "${file}" needs the file "${b.uri}" beside it.`); }
+        }
+      }
+      const sizes = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+      const kinds = { 5120: [1, "getInt8", 127], 5121: [1, "getUint8", 255], 5122: [2, "getInt16", 32767], 5123: [2, "getUint16", 65535], 5125: [4, "getUint32", 1], 5126: [4, "getFloat32", 1] };
+      const read = (k) => {
+        const a = doc.accessors[k], n = sizes[a.type], [one, get, top] = kinds[a.componentType];
+        if (!n || !one || !(a.count >= 0)) throw new Error("bad");
+        if (a.bufferView === undefined) return Array.from({ length: a.count }, () => new Array(n).fill(0));
+        const v = doc.bufferViews[a.bufferView], data = bufs[v.buffer];
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        const stride = v.byteStride || one * n, start = (v.byteOffset ?? 0) + (a.byteOffset ?? 0), out = [];
+        for (let i = 0; i < a.count; i++) {
+          const row = [];
+          for (let e = 0; e < n; e++) {
+            const x = view[get](start + i * stride + e * one, true);
+            row.push(a.normalized && get !== "getFloat32" ? Math.max(x / top, -1) : x);
+          }
+          out.push(row);
+        }
+        return out;
+      };
+      let g;
+      try {
+        const nodes = (doc.nodes ?? []).map((nd) => ({ t: nd.translation ?? [0, 0, 0], r: nd.rotation ?? [0, 0, 0, 1], s: nd.scale ?? [1, 1, 1], m: nd.matrix ?? null,
+                                                      kids: nd.children ?? [], mesh: nd.mesh ?? null, skin: nd.skin ?? null }));
+        const colours = (doc.materials ?? []).map((mt) => {
+          const f = mt.pbrMetallicRoughness?.baseColorFactor;
+          return f ? "#" + f.slice(0, 3).map((x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, "0")).join("") : null;
+        });
+        const meshes = [];
+        for (const me of doc.meshes ?? []) {
+          const parts = [];
+          for (const p of me.primitives ?? []) {
+            const at = p.attributes;
+            if ((p.mode ?? 4) !== 4 || at.POSITION === undefined) continue;  // only triangles are drawn
+            const pts = read(at.POSITION);
+            const order = p.indices !== undefined ? read(p.indices).map((i) => i[0]) : pts.map((_, i) => i);
+            if (order.some((i) => !(i >= 0 && i < pts.length))) stellanova.fail(line, `the model "${file}" has a face with a corner that isn't there.`);
+            const skinned = at.JOINTS_0 !== undefined && at.WEIGHTS_0 !== undefined;
+            parts.push([pts, order, skinned ? read(at.JOINTS_0) : null, skinned ? read(at.WEIGHTS_0) : null, p.material !== undefined ? colours[p.material] : null]);
+          }
+          meshes.push(parts);
+        }
+        const skins = (doc.skins ?? []).map((s) => [s.joints, s.inverseBindMatrices !== undefined ? read(s.inverseBindMatrices) : s.joints.map(() => this.ident4)]);
+        const clips = [];
+        for (const an of doc.animations ?? []) {
+          const chans = [];
+          let length = 0;
+          for (const ch of an.channels ?? []) {
+            const tg = ch.target, sm = an.samplers[ch.sampler];
+            if (!["translation", "rotation", "scale"].includes(tg.path) || tg.node === undefined) continue;  // morph weights don't move
+            const times = read(sm.input).map((x) => x[0]);
+            let vals = read(sm.output);
+            const how = sm.interpolation ?? "LINEAR";
+            if (how === "CUBICSPLINE") vals = vals.filter((_, i) => i % 3 === 1);  // shortcut: curved keys play as straight lines, follow the curves if motions look stiff
+            if (!times.length || vals.length < times.length || !(tg.node >= 0 && tg.node < nodes.length)) throw new Error("bad");
+            chans.push([tg.node, tg.path, times, vals, how === "STEP"]);
+            length = Math.max(length, times[times.length - 1]);
+          }
+          clips.push([an.name ?? "", length, chans]);
+        }
+        let roots;
+        if (doc.scenes?.length) roots = doc.scenes[doc.scene ?? 0].nodes ?? [];
+        else {
+          const inside = new Set(nodes.flatMap((nd) => nd.kids));
+          roots = nodes.map((_, i) => i).filter((i) => !inside.has(i));
+        }
+        if (nodes.some((nd) => !(nd.mesh === null || nd.mesh >= 0 && nd.mesh < meshes.length) || !(nd.skin === null || nd.skin >= 0 && nd.skin < skins.length))
+            || skins.some(([js, ibm]) => ibm.length < js.length || js.some((j) => !(j >= 0 && j < nodes.length)))) throw new Error("bad");
+        g = { file, nodes, meshes, skins, clips, roots };
+      } catch (e) {
+        if (e instanceof Error && e.message === "bad" || e instanceof TypeError || e instanceof RangeError) bad();
+        throw e;
+      }
+      this.gltfs.set(file, g);
+      return g;
+    },
+    gltfSample(times, vals, step, turning, at) {
+      if (at <= times[0]) return vals[0];
+      if (at >= times[times.length - 1]) return vals[times.length - 1];
+      let k = 0;
+      while (times[k + 1] <= at) k++;
+      const a = vals[k];
+      let b = vals[k + 1];
+      if (step) return a;
+      const f = (at - times[k]) / (times[k + 1] - times[k]);
+      if (!turning) return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * f);
+      let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3], q;
+      if (d < 0) b = b.map((x) => -x), d = -d;
+      if (d > 0.9995) q = [0, 1, 2, 3].map((i) => a[i] + (b[i] - a[i]) * f);
+      else {
+        const th = Math.acos(d), sa = Math.sin((1 - f) * th) / Math.sin(th), sb = Math.sin(f * th) / Math.sin(th);
+        q = [0, 1, 2, 3].map((i) => a[i] * sa + b[i] * sb);
+      }
+      const size = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]) || 1;
+      return q.map((x) => x / size);
+    },
+    gltfPosed(g, clip, at, line) {
+      // The model's points and faces, with each bone where the motion has it at that time.
+      const nodes = g.nodes, moved = new Map();
+      if (clip) {
+        const [, length, chans] = clip;
+        if (length > 0) at %= length;
+        for (const [node, path, times, vals, step] of chans) moved.set(node + path, this.gltfSample(times, vals, step, path === "rotation", at));
+      }
+      const world = new Array(nodes.length).fill(null), done = [], waiting = [...g.roots].reverse().map((i) => [i, this.ident4]);
+      while (waiting.length) {
+        const [i, parent] = waiting.pop();
+        if (!(i >= 0 && i < nodes.length) || world[i] !== null) stellanova.fail(line, `the model "${g.file}" has a part inside itself.`);
+        const n = nodes[i];
+        const local = n.m ?? this.m4Trs(moved.get(i + "translation") ?? n.t, moved.get(i + "rotation") ?? n.r, moved.get(i + "scale") ?? n.s);
+        world[i] = this.m4Mul(parent, local);
+        done.push(i);
+        for (const k of [...n.kids].reverse()) waiting.push([k, world[i]]);
+      }
+      const points = [], faces = [];
+      for (const i of done) {
+        const n = nodes[i];
+        if (n.mesh === null) continue;
+        let bones = null;
+        if (n.skin !== null) {
+          const [joints, ibm] = g.skins[n.skin];
+          bones = joints.map((j, k) => this.m4Mul(world[j] ?? this.ident4, ibm[k]));
+        }
+        for (const [pts, order, jointsV, weightsV, col] of g.meshes[n.mesh]) {
+          const first = points.length;
+          pts.forEach((p, v) => {
+            if (!bones || !jointsV) return points.push(this.m4Apply(world[i], p));
+            let out = [0, 0, 0], total = 0;
+            jointsV[v].forEach((j, e) => {
+              const w = weightsV[v][e];
+              if (!(w > 0)) return;
+              if (j >= bones.length) stellanova.fail(line, `the model "${g.file}" has a point held by a bone that isn't there.`);
+              const q = this.m4Apply(bones[j], p);
+              out = [0, 1, 2].map((k) => out[k] + w * q[k]), total += w;
+            });
+            points.push(total > 0 ? out.map((x) => x / total) : this.m4Apply(world[i], p));
+          });
+          for (let k = 0; k + 2 < order.length; k += 3) faces.push([[first + order[k], first + order[k + 1], first + order[k + 2]], col]);
+        }
+      }
+      return [points, faces];
+    },
+    async etchMovingModel(file, middle, size, turn, col, motion, seconds, line) {
+      this.needOpen(line);
+      if (!this.isGltf(file)) stellanova.fail(line, `only .gltf and .glb models move, and "${file}" isn't one. Use: etch the model with ("${file}", middle, size, turn, colour)`);
+      const g = await this.gltf(file, line);
+      if (!g.clips.length) stellanova.fail(line, `the model "${file}" has no motions.`);
+      const found = motion ? g.clips.find((c) => c[0] === motion) : g.clips[0];
+      if (!found) stellanova.fail(line, `the model "${file}" has no motion called "${motion}". It has: ` + g.clips.map((c) => `"${c[0]}"`).join(", "));
+      const [points, faces] = this.gltfPosed(g, found, seconds, line);
+      await this.etchFaces(points, faces, middle, size, turn, col, line);
+    },
     models: new Map(),
     async model(file, line) {
       if (this.models.has(file)) return this.models.get(file);
+      if (this.isGltf(file)) {
+        this.models.set(file, this.gltfPosed(await this.gltf(file, line), null, 0, line));
+        return this.models.get(file);
+      }
       let rows;
       try { rows = (await this.readText(file)).split(/\r?\n/); } catch { stellanova.fail(line, `there is no model called "${file}".`); }
       const points = [], faces = [], named = {};
@@ -3052,6 +3953,9 @@ javascript:
     async etchModel(file, middle, size, turn, col, line) {
       this.needOpen(line);
       const [points, faces] = await this.model(file, line);
+      await this.etchFaces(points, faces, middle, size, turn, col, line);
+    },
+    async etchFaces(points, faces, middle, size, turn, col, line) {
       const own = col ? this.colour(col, line) : "#c8c8c8", t = (turn * Math.PI) / 180, ct = Math.cos(t), st = Math.sin(t);
       const [mx, my, mz] = this.parts(middle);
       for (const [face, which] of faces) {

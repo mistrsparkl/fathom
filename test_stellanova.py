@@ -504,6 +504,62 @@ def program_checks():
             out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "three.stella"], cwd=d, capture_output=True, text=True)
             assert "no mistakes found" in out.stdout, out.stdout
 
+    # glTF models: a bone bends its arm, the same every way; .glb too.
+    def bending_arm(glb):
+        import struct, base64, json
+        pts = [(x, y, 0.0) for y in (0, 1, 2) for x in (-0.5, 0.5)]
+        tris = [0, 1, 3, 0, 3, 2, 2, 3, 5, 2, 5, 4]
+        tris += tris[::-1]  # both sides
+        pieces = [b"".join(struct.pack("<3f", *p) for p in pts), bytes([0, 0, 0, 0] * 4 + [1, 0, 0, 0] * 2), struct.pack("<24f", *[1, 0, 0, 0] * 6),
+                  struct.pack("<24H", *tris), struct.pack("<32f", 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1),
+                  struct.pack("<3f", 0, 1, 2), struct.pack("<12f", 0, 0, 0, 1, 0, 0, 0.7071068, 0.7071068, 0, 0, 0, 1)]
+        views, at = [], 0
+        for p in pieces:
+            views.append({"buffer": 0, "byteOffset": at, "byteLength": len(p)})
+            at += len(p)
+        data = b"".join(pieces)
+        acc = lambda v, kind, n, count: {"bufferView": v, "componentType": kind, "type": n, "count": count}
+        doc = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0, 1]}],
+               "nodes": [{"mesh": 0, "skin": 0}, {"children": [2]}, {"translation": [0, 1, 0]}],
+               "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "JOINTS_0": 1, "WEIGHTS_0": 2}, "indices": 3, "material": 0}]}],
+               "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [1, 0, 0, 1]}}],
+               "skins": [{"joints": [1, 2], "inverseBindMatrices": 4}],
+               "animations": [{"name": "bend", "channels": [{"sampler": 0, "target": {"node": 2, "path": "rotation"}}],
+                               "samplers": [{"input": 5, "output": 6}]}],
+               "accessors": [acc(0, 5126, "VEC3", 6), acc(1, 5121, "VEC4", 6), acc(2, 5126, "VEC4", 6), acc(3, 5123, "SCALAR", 24),
+                             acc(4, 5126, "MAT4", 2), acc(5, 5126, "SCALAR", 3), acc(6, 5126, "VEC4", 3)],
+               "bufferViews": views, "buffers": [{"byteLength": len(data)}]}
+        if not glb:
+            doc["buffers"][0]["uri"] = "data:application/octet-stream;base64," + base64.b64encode(data).decode()
+            return json.dumps(doc)
+        words = json.dumps(doc).encode()
+        words += b" " * (-len(words) % 4)
+        return b"glTF" + struct.pack("<II", 2, 28 + len(words) + len(data)) + struct.pack("<I", len(words)) + b"JSON" + words + struct.pack("<I", len(data)) + b"BIN\x00" + data
+    arm = ('genesis:\n  open a world with ("arm", 160, 120)\n  place the eye at 0 horizontal 1 vertical -6 depth\n  shine the light from 0 horizontal 0 vertical -1 depth\n'
+           '  consume the window with "black"\n  etch the moving model with ("arm.gltf", 0 horizontal 0 vertical 0 depth, 1, 0, "", "bend", 3)\n'
+           '  etch the model with ("arm.glb", 3 horizontal 0 vertical 0 depth, 1, 0, "")\n  reveal the frame\n'
+           '  try:\n    etch the moving model with ("arm.gltf", 0 horizontal 0 vertical 0 depth, 1, 0, "", "wave", 0)\n  if that went wrong:\n    scrawl the wound\n'
+           '  try:\n    etch the moving model with ("box.obj", 0 horizontal 0 vertical 0 depth, 1, 0, "", "", 0)\n  if that went wrong:\n    scrawl the wound\n'
+           '  try:\n    etch the model with ("broken.gltf", 0 horizontal 0 vertical 0 depth, 1, 0, "")\n  if that went wrong:\n    scrawl the wound\n'
+           '  end the world\nand the universe said i love you\n')
+    out = both(arm, others={"arm.gltf": bending_arm(False), "arm.glb": bending_arm(True), "broken.gltf": '{"meshes": [{"primitives": [{"attributes": {"POSITION": 7}}]}]}'})
+    assert out.stdout == ('the model "arm.gltf" has no motion called "wave". It has: "bend"\n'
+                          'only .gltf and .glb models move, and "box.obj" isn\'t one. Use: etch the model with ("box.obj", middle, size, turn, colour)\n'
+                          'the model "broken.gltf" isn\'t a glTF model I can read.\n'), repr(out.stdout + out.stderr)
+    if compiler and os.name == "nt":
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "arm.stella").write_text(arm, encoding="utf-8")
+            (Path(d) / "arm.gltf").write_text(bending_arm(False), encoding="utf-8")
+            (Path(d) / "arm.glb").write_bytes(bending_arm(True))
+            (Path(d) / "broken.gltf").write_text("{\"meshes\": []}", encoding="utf-8")
+            assert translate.build(Path(d) / "arm.stella", Path(d) / "arm.exe") is None
+            subprocess.run([str(Path(d) / "arm.exe")], cwd=d, env=dict(os.environ, STELLANOVA_DEMO_FRAMES="f.raw"), timeout=60, capture_output=True)
+            frame = (Path(d) / "f.raw").read_bytes()[-160 * 120 * 4:]
+            red = [k // 4 % 160 for k in range(0, len(frame), 4) if frame[k + 2] > 100 and frame[k + 1] < 60 and frame[k] < 60]
+            arm_cols = [c for c in red if c < 100]  # the bent one; the .glb one stands to the right
+            assert arm_cols and 80 - min(arm_cols) > 1.5 * (max(arm_cols) - 80), (min(arm_cols), max(arm_cols))  # bent to one side
+            assert any(c > 110 for c in red), "the .glb model is missing"
+
     # Pictures: read, change, save, load.
     out = both(''.join([
                'use: pictures\n'
@@ -1591,7 +1647,7 @@ def program_checks():
     assert out.stdout == "ok\n", repr(out.stdout)
     assert perr('genesis:\n  open a world with "x", 10, 10\n  etch a triangle with 1, 2\n' + END)[1] == (
         "I don't know 'etch a triangle with'. Words that start with 'etch': etch a ball, etch a block, etch a box, etch a circle, etch a cube, etch a line, "
-        "etch a square, etch a triangle in space, etch the ground, etch the kept shapes, etch the model, etch the picture, etch the picture in space, etch the picture turned, etch the sheet frame, etch words.")
+        "etch a square, etch a triangle in space, etch the ground, etch the kept shapes, etch the model, etch the moving model, etch the picture, etch the picture in space, etch the picture turned, etch the sheet frame, etch words.")
 
     # within: close enough to touch.
     out = both('genesis:\n  set birth to 0 horizontal 0 vertical\n  set coin to 3 horizontal 4 vertical\n'
