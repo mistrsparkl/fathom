@@ -1,69 +1,69 @@
 genesis:|Where a program begins.
-and the universe said i love you|Ends a command, a description or genesis (unindented).
+and the universe said i love you|Ends genesis, a command or a kind of thing. It isn't pushed in.
 to … :|Makes a command of your own.
 to … returning|A command that gives back a value.
-usually|An input's usual value, used when a call leaves it out: name (text, usually "friend").
+usually|What an input is when you leave it out: name (text, usually "friend").
 a … has:|Describes a new kind of thing and its parts.
 is a kind of|A kind of thing that has everything another kind has: a dog is a kind of pet:
 is anything that can|A shared ability: a speaker is anything that can speak.
 the world remembers:|Names every command can use and change.
 use:|Brings in a library (use: window) or another script (use: shapes.stella).
-whisper:|A note for people; the computer skips it.
+whisper:|A note for people. The computer skips it.
 set … to|Gives a name a value.
 scrawl|Shows text or values.
-ask|Asks the person a question; the answer goes into a name.
+ask|Asks a question and keeps the answer in a name.
 add … to|Adds to a number, or puts an item at the end of a list.
 insert … at … in|Puts an item in a list at a place: insert "tea" at 2 in drinks.
 remove … from|Takes an item out of a list.
 inscribe … into file|Makes or replaces a file with this text.
-if|Does the indented lines only when this is so.
-otherwise|What to do when the 'if' above wasn't so (otherwise if … for another test).
-repeat … times|Does the indented lines this many times.
-as long as|Does the indented lines again and again while this is so.
-for each … in|Does the indented lines once for each item of a list.
-for each … from … to|Does the indented lines for each number from one to another (by 5 to count in steps).
-depending on|Picks lines by a value: each indented line starts with a value, then anything else.
-whenever|Lines that run each time something becomes so, after genesis's other lines.
+if|Runs the pushed-in lines only if this is true.
+otherwise|What to do if the 'if' above wasn't true. Use otherwise if … to test something else.
+repeat … times|Runs the pushed-in lines this many times.
+as long as|Keeps running the pushed-in lines while this is true.
+for each … in|Runs the pushed-in lines once for each item in a list.
+for each … from … to|Runs the pushed-in lines for each number in a range. Add by 5 to count in fives.
+depending on|Picks what to do from a value. Each line under it starts with a value, and anything else catches the rest.
+whenever|Lines that run every time something turns true.
 every … seconds|Lines that run every few seconds.
 every frame|Lines that run for each picture drawn in a window game.
-try|Lines that might go wrong; what to do instead goes under 'if that went wrong:'.
-if that went wrong|After 'try:': what to do when it went wrong (the wound says why).
-the wound|Inside 'if that went wrong:', the reason, as text.
-raise an error with|Stops with a problem of your own (try: can catch it).
+try|Lines that might go wrong. What to do if they do goes under 'if that went wrong:'.
+if that went wrong|Goes after 'try:'. What to do if it went wrong. The wound says why.
+the wound|What went wrong, as text. Use it inside 'if that went wrong:'.
+raise an error with|Stops with a problem you make up. try: can catch it.
 return|Gives a value back from a command.
 each … becomes|A command written where it is used: scores changed by each s becomes s times 2.
-cease|Stops the command (or the program, in genesis).
-break free|Leaves the loop it is in.
-move on|Skips to the next round of the loop.
-meanwhile|Starts a command going on its own; the next line carries on straight away.
-wait for the others|Waits for every 'meanwhile' command to finish.
+cease|Leaves the command early. In genesis it ends the program.
+break free|Gets out of the loop.
+move on|Skips to the loop's next go.
+meanwhile|Starts a command running by itself, and carries on without waiting.
+wait for the others|Waits until every 'meanwhile' command has finished.
 conjure a … as|Makes a new thing of a kind and names it.
-no …|Nothing: a thing that isn't there (set target to no enemy).
-is nothing|Whether a thing name holds nothing.
-is something|Whether a thing name holds a thing.
-check|Stops with 'this check failed' when this isn't so (stellanova test runs 'to test …:' commands).
-save … to file|Keeps any value in a file (as JSON).
+no …|Nothing there: set target to no enemy.
+is nothing|Whether a name holds nothing.
+is something|Whether a name holds something.
+check|Fails if this isn't true. stellanova test runs every 'to test …:' command.
+save … to file|Saves any value to a file, as JSON.
 load … from file|Puts a saved value back into a name.
 as saved text|A value written out as JSON text.
 as text|A value as text.
 a list of|A new empty list of a kind of value.
 a list containing|A list with these items.
-a table of|A new empty table (names to values).
+a table of|A new empty table, which looks values up by name.
 entry … of|One entry of a table.
 item … of|One item of a list, counted from 1.
 items … to … of|A list of some of the items.
-first … of|The first few items of a list (or letters of text).
-last … of|The last few items of a list (or letters of text).
+first … of|The first few items of a list, or letters of some text.
+last … of|The last few items of a list, or letters of some text.
 last item of|The last item of a list.
-the size of|How many items, letters or entries; how far a place is from 0.
+the size of|How many items, letters or entries. For a place, how far it is from 0.
 contains|Whether a list holds an item, text holds some text, or a table has an entry.
 is one of|Whether a value is any of these: answer is one of ("yes", "y").
 unique|A copy of a list without repeats.
 shuffled|A copy of a list in a random order.
-sorted|A copy of a list, smallest first (sorted pets by age for things).
+sorted|A copy of a list, smallest first. For your own things: sorted pets by age.
 reversed|A copy of a list, back to front.
 join … with|A list made into one text, with this between the items.
-position of … in|Where something first appears, counted from 1 (0 if it isn't there).
+position of … in|Where something first shows up, counting from 1. It's 0 if it isn't there.
 replace … with … in|Text with every one of some text replaced.
 split by|Text cut into a list of text at each of these.
 trimmed|Text without spaces or line breaks at either end.
@@ -90,60 +90,60 @@ falls below|Less than.
 is at least|More than or the same as.
 is at most|Less than or the same as.
 is within … of|Close enough: existence is within 30 of coin.
-plus|Adds numbers (or joins text).
+plus|Adds numbers, or joins text together.
 minus|Takes one number from another.
 times|Multiplies.
 divided by|Divides.
 a quotation mark|The " letter, for text that holds one.
 new line|A line break, as text.
 invoke|Runs a command held in a name.
-whisper|Shows a message for the person writing the program, not the one using it.
+whisper|A note for whoever's writing the program.
 to the power|A number to a power: 2 to the power 10.
 bitwise and|The bits of whole numbers: 12 bitwise and 10 (also bitwise or, bitwise exclusive or).
 shifted left by|Moves a whole number's bits: 1 shifted left by 4 is 16 (also shifted right by).
-big plus|Whole numbers of any size, as text (library big numbers): big plus with ("123", "456"); also big minus, big times, big divided by, big remainder, big power, big compare.
+big plus|Whole numbers of any size, as text (library big numbers). big plus with ("123", "456"). Also big minus, big times, big divided by, big remainder, big power, big compare.
 of anything|Kinds for any kind: a stack of anything has: ... then conjure a stack of numbers.
-the bytes of the text|Text as UTF-8 bytes, numbers from 0 to 255 (library letters); the text of the bytes turns them back.
-raise a|A kind of problem of your own: raise a fuel problem with "empty"; caught by if that went wrong with a fuel problem:
+the bytes of the text|Text as UTF-8 bytes, numbers from 0 to 255 (library letters). The text of the bytes turns them back.
+raise a|A kind of problem of your own: raise a fuel problem with "empty". Caught by if that went wrong with a fuel problem:
 if that went wrong with|After try: takes one kind of problem only: if that went wrong with a fuel problem:
 use the library|C functions from any .dll: use the library "user32.dll": then lines like to beep, given ... = bool Beep(unsigned, unsigned)
 use python|A Python package's functions (running directly): use python "statistics": then lines like to middle of, given xs (a list of numbers), returning a number = median
-connect to|TCP (library network): connect to with ("example.com", 80) gives a connection; then send on, receive from, receive a line from, close the connection.
-listen on port|A TCP server (library network): set listener to listen on port 8080, then accept a connection on listener.
-connect a websocket to|A WebSocket (library network): connect a websocket to "ws://localhost:8080"; send on and receive from take whole messages.
-open the udp port|UDP (library network): open the udp port 9000; send udp with (u, host, port, text); receive udp from u.
+connect to|TCP (library network). connect to with ("example.com", 80) gives a connection. Then send on, receive from, receive a line from, close the connection.
+listen on port|A TCP server (library network). set listener to listen on port 8080, then accept a connection on listener.
+connect a websocket to|A WebSocket (library network). connect a websocket to "ws://localhost:8080". Send on and receive from take whole messages.
+open the udp port|UDP (library network). open the udp port 9000. Send udp with (u, host, port, text). Receive udp from u.
 holding the lock|Only one command at a time runs the indented lines: holding the lock "total":
 stellanova get|Gets a library (.words file, .zip, or GitHub user/project) for any program to use: (in a terminal) stellanova get user/project
-eased with|Bends progress 0 to 1 (library animation): eased with ("out", progress); styles linear, in, out, in out, back, overshoot, bounce, elastic.
-tweened with|A number part way (library animation): tweened with (from, to, progress, "in out").
-progress of with|How far along, 0 to 1 (library animation): progress of with (start, seconds, now).
-sheet frame with|Which sprite sheet frame to show now (library animation): sheet frame with (frames, per second, seconds).
+eased with|Bends progress 0 to 1 (library animation). eased with ("out", progress). Styles linear, in, out, in out, back, overshoot, bounce, elastic.
+tweened with|A number part way (library animation). tweened with (from, to, progress, "in out").
+progress of with|How far along, 0 to 1 (library animation). progress of with (start, seconds, now).
+sheet frame with|Which sprite sheet frame to show now (library animation). sheet frame with (frames, per second, seconds).
 etch the sheet frame|One frame of a sprite sheet: etch the sheet frame with ("walk.png", frame, across, down, x, y).
-step the physics with|Moves every body on (use: physics.stella): step the physics with (world, 1 divided by 60).
+step the physics with|Moves every body on (use: physics.stella). step the physics with (world, 1 divided by 60).
 include the body with|Adds a body to a physics world: include the body with (w, a box at with (x, y, width, height)).
-a tone with|A sound wave (library sound making): a tone with ("sine", 440, seconds, loudness).
-save the sound with|Writes a sound to a .wav file (library sound making): save the sound with (sound, "beep.wav").
-record the sound|Records from the microphone (library sound making): record the sound 3 (seconds).
-the picture in the file|Reads a picture to change (library pictures): the picture in the file "cat.png" gives its number.
-colour the dot with|Changes one dot (library pictures): colour the dot with (picture, x, y, "#ff8800").
-the dot at with|One dot's colour (library pictures): the dot at with (picture, x, y).
-save the picture with|Writes a .png (library pictures): save the picture with (picture, "out.png").
+a tone with|A sound wave (library sound making). a tone with ("sine", 440, seconds, loudness).
+save the sound with|Writes a sound to a .wav file (library sound making). save the sound with (sound, "beep.wav").
+record the sound|Records from the microphone (library sound making). record the sound 3 (seconds).
+the picture in the file|Reads a picture to change (library pictures). the picture in the file "cat.png" gives its number.
+colour the dot with|Changes one dot (library pictures). colour the dot with (picture, x, y, "#ff8800").
+the dot at with|One dot's colour (library pictures). the dot at with (picture, x, y).
+save the picture with|Writes a .png (library pictures). save the picture with (picture, "out.png").
 etch the model with|A 3D model (.obj): etch the model with ("ship.obj", middle, size, turn, "") keeps its .mtl colours.
 etch a triangle in space with|A 3D triangle: etch a triangle in space with (a, b, c, "yellow").
 etch the picture in space with|A picture laid in 3D, like a texture: etch the picture in space with ("door.png", corner, across, down).
 shine the light from|Where the 3D light comes from: shine the light from 1 horizontal 2 vertical -1 depth.
 set the eye view to|How wide the eye sees, in degrees: set the eye view to 90.
 shade the shapes with|A shader: shade the shapes with the command tint (given a place and a colour, returning a colour).
-the hash of with|A fingerprint of text (library hashing): the hash of with ("sha256", "hello").
-the signature of with|An HMAC (library hashing): the signature of with ("sha256", key, message).
-encrypted with|Keeps text secret with a password (library encryption): encrypted with (message, password).
-decrypted with|Gets an encrypted message back (library encryption): decrypted with (secret, password).
-a random code of|Random bytes nobody can guess, as hexadecimal text (library encryption): a random code of 16.
-the json at with|A part of JSON text by its path (library json): the json at with (answer, "days[2].high").
-the json changed at with|JSON with one part changed (library json): the json changed at with (json, "score", "12").
-pack the zip with|Packs files and folders into a .zip (library zip): pack the zip with (a list of ("saves", "a.txt"), "backup.zip").
-unpack the zip with|Unpacks a .zip into a folder (library zip): unpack the zip with ("backup.zip", "restored").
-send an email with|Sends email (library email): send an email with ("smtp.gmail.com:587", user, password, to, subject, message).
-open a form with|Opens a desktop form (library forms): open a form with ("Pets", 320, 240).
-add a button with|A button on the form (library forms): add a button with (name, words, x, y, width, height).
-wait for a click|Waits for a button on the form; gives its name (library forms).
+the hash of with|A fingerprint of text (library hashing). the hash of with ("sha256", "hello").
+the signature of with|An HMAC (library hashing). the signature of with ("sha256", key, message).
+encrypted with|Keeps text secret with a password (library encryption). encrypted with (message, password).
+decrypted with|Gets an encrypted message back (library encryption). decrypted with (secret, password).
+a random code of|Random bytes nobody can guess, as hexadecimal text (library encryption). a random code of 16.
+the json at with|A part of JSON text by its path (library json). the json at with (answer, "days[2].high").
+the json changed at with|JSON with one part changed (library json). the json changed at with (json, "score", "12").
+pack the zip with|Packs files and folders into a .zip (library zip). pack the zip with (a list of ("saves", "a.txt"), "backup.zip").
+unpack the zip with|Unpacks a .zip into a folder (library zip). unpack the zip with ("backup.zip", "restored").
+send an email with|Sends email (library email). send an email with ("smtp.gmail.com:587", user, password, to, subject, message).
+open a form with|Opens a desktop form (library forms). open a form with ("Pets", 320, 240).
+add a button with|A button on the form (library forms). add a button with (name, words, x, y, width, height).
+wait for a click|Waits for a button on the form. Gives its name (library forms).

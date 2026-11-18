@@ -1,8 +1,8 @@
 # Learning Stellanova
 
-This walks through Stellanova from the very first line to a small game. Every program here really works: the self-check runs each one and compares what it prints with what is written under it.
+This goes from your first line all the way to a small game. Every program in here actually runs. The tests run each one and check it prints what's written underneath.
 
-To run a program, save it in a file ending in `.stella` (for example `hello.stella`) and type:
+Save a program in a file that ends in `.stella`, like `hello.stella`, and run it with:
 
 ```
 stellanova hello.stella
@@ -20,11 +20,11 @@ and the universe said i love you
 Hello!
 ```
 
-A program is made of **commands**. `genesis:` is where every program begins (`genesis:` means the same). The lines that belong to it are indented (moved right) under it, and it ends with the line `and the universe said i love you`.
+Programs are made of commands. Every program starts at `genesis:`. The lines that belong to it are pushed in two spaces, and it finishes with `and the universe said i love you`.
 
-`scrawl` shows something on the screen. Text goes between quote marks.
+`scrawl` puts something on the screen. Text goes in quote marks.
 
-Words in square brackets inside text are filled in with what they hold:
+If you put a name in square brackets inside some text, you get whatever that name holds:
 
 ```stellanova
 genesis:
@@ -38,7 +38,7 @@ and the universe said i love you
 Hello, Sam! You have 3 coins, and 4 after this one.
 ```
 
-Only brackets holding words are filled in, so a pattern like `"[0-9]"` stays as it is. To show brackets around words, double them: `"[[NaN]]"` shows `[NaN]`.
+It only does that when there are words in the brackets, so something like `"[0-9]"` is left alone. If you really want brackets around a word, double them up. `"[[NaN]]"` shows `[NaN]`.
 
 ## 2. Remembering things
 
@@ -56,7 +56,7 @@ This is Sam.
 Next year Sam will be 12.
 ```
 
-`set ... to ...` remembers a value under a name. A name can be several words, like `best score`. `scrawl` can show several things one after another, with commas between them.
+`set ... to ...` stores a value under a name. Names can be more than one word, like `best score`. You can give `scrawl` a few things at once with commas between them.
 
 ## 3. Choosing
 
@@ -76,9 +76,9 @@ and the universe said i love you
 It's hot.
 ```
 
-`if` does its indented lines only when the thing after it is yes. `otherwise if` and `otherwise` are tried in turn when the ones above them were no.
+`if` only runs its pushed-in lines when what comes after it is true. If it isn't, Stellanova tries the `otherwise if`, and then the `otherwise`.
 
-When the choice is about one value, `depending on` reads better:
+When you're choosing based on one value, `depending on` is nicer:
 
 ```stellanova
 genesis:
@@ -97,11 +97,11 @@ Wear a coat.
 And boots.
 ```
 
-Each line under it is a value (or several, with commas), a `:`, then what to do. `anything else:` is for every other value.
+Each line under it has a value, or a few with commas, then a `:` and what to do. `anything else:` catches the rest.
 
 ### Testing your commands
 
-A `check` line says something that should be so. Put checks in commands whose names start with `test`:
+A `check` line says something that ought to be true. Put your checks in commands whose names start with `test`:
 
 ```stellanova
 to double, given x (a number), returning a number:
@@ -122,18 +122,18 @@ and the universe said i love you
 42
 ```
 
-`stellanova test maths.stella` runs every test (not genesis) and shows which passed:
+`stellanova test maths.stella` runs the tests instead of genesis and tells you how they went:
 
 ```
 ✓ test doubling
 1 test: 1 passed, 0 failed.
 ```
 
-A check that isn't so says which line and what failed: `✗ test doubling: line 7: this check failed: double with 0 is 1`.
+When a check fails you get the line and what went wrong, like `✗ test doubling: line 7: this check failed: double with 0 is 1`.
 
 ### Watching a program run
 
-`stellanova watch` runs a program and shows each line as it happens, with the names it changed:
+`stellanova watch` runs a program one line at a time and shows you the names that change:
 
 ```
 > stellanova watch hot.stella
@@ -166,11 +166,11 @@ Hip hip hooray!
 5 times 7 is 35
 ```
 
-`repeat` does its lines a number of times. `for each n from 1 to 5` does them once for each number, with `n` being that number. There is also `as long as ...:`, which keeps going while something is yes.
+`repeat` runs its lines a set number of times. `for each n from 1 to 5` runs them once per number, and `n` is the number it's on. `as long as ...:` keeps going for as long as something stays true.
 
 ### Whenever and every
 
-A command can say what to do whenever something happens, and every so often. Those lines start once the command's other lines are done, and go on until the program ends:
+You can tell a command what to do whenever something happens, or every so often. Those lines kick in after the rest of the command is done and keep going until the program ends:
 
 ```stellanova
 genesis:
@@ -193,7 +193,7 @@ tick 3
 That's three.
 ```
 
-In a game, `every frame:` holds what happens each frame (moving, drawing), and `whenever key pressed "space":` what a key does. The frame is shown after each round on its own, and it all stops when the window is closed.
+Games use this a lot. `every frame:` is where moving and drawing go, and `whenever key pressed "space":` is what a key does. The frame gets shown after each round by itself, and it all stops when someone closes the window.
 
 ## 5. Lists
 
@@ -218,7 +218,7 @@ Don't drop the eggs!
 The first thing is milk.
 ```
 
-A list keeps several values in order. Items are counted from 1.
+A list holds a bunch of values in order. The first item is item 1, not 0.
 
 ## 6. Your own commands
 
@@ -244,11 +244,11 @@ Hello, Ann!
 Double 21 is 42
 ```
 
-A command can take **inputs** (after `given`, each with its kind in brackets) and can **return** an answer. Putting a job in its own command gives it a name, so the program reads like a list of what happens.
+Commands can take inputs. They go after `given`, with what kind they are in brackets. A command can also hand back an answer with `return`. Splitting your program into commands means genesis ends up reading like a list of what happens.
 
 ### Usual values
 
-An input can have a usual value. Leave it out when calling, and the command gets that value:
+You can give an input a usual value. If you leave it out when you call the command, it uses that:
 
 ```stellanova
 to greet, given name (text, usually "friend") and count (a number, usually 1):
@@ -270,7 +270,7 @@ Hello, Jo!
 Hello, Jo!
 ```
 
-Inputs with a usual value go last. The value is written out: text, a number, `yes` or `no`.
+Inputs with usual values have to go last, and the value has to be written out: some text, a number, `yes` or `no`.
 
 ## 7. Your own kinds of things
 
@@ -294,11 +294,11 @@ a pet (name: Rex, age: 3)
 Rex is 3 years old.
 ```
 
-`a pet has:` describes a new kind of thing and its parts. After that, `conjure a pet` makes one, and `the name of rex` is one of its parts.
+`a pet has:` makes up a new kind of thing and lists its parts. Then `conjure a pet` makes one, and `the name of rex` gets at one of its parts.
 
 ## 8. Asking
 
-Programs can ask the person using them a question:
+A program can ask whoever's using it a question:
 
 ```
 genesis:
@@ -308,17 +308,17 @@ genesis:
 and the universe said i love you
 ```
 
-`ask` shows the question and waits for an answer. With `(a number)` it keeps asking until a number is typed.
+`ask` shows the question and waits. Add `(a number)` and it'll keep asking until it gets one.
 
 ## 9. When things go wrong
 
-A mistake in the script is found before it runs, and explained in plain words:
+Mistakes in your script get caught before it runs, and the message tries to say what to do about it:
 
 ```
 guess.stella line 4: I don't know 'scroe'. Did you mean 'score'?
 ```
 
-A problem while it runs stops it with the line where it happened. To carry on instead, use `try:`:
+If something goes wrong while it's running, it stops and tells you the line. Wrap it in `try:` if you'd rather keep going:
 
 ```stellanova
 genesis:
@@ -335,7 +335,7 @@ No luck: there is no file called "missing.txt" (or it can't be opened).
 Still going.
 ```
 
-Your own commands can go wrong on purpose with `raise an error`, and `try:` catches that the same way:
+You can make your own commands fail on purpose with `raise an error`, and `try:` catches those too:
 
 ```stellanova
 to fly, given fuel (a number):
@@ -357,7 +357,7 @@ Grounded: not enough fuel (only 3)
 
 ## 10. A game
 
-Programs can open a world (a window) and etch in it. This is a whole game: a ball you move with the arrow keys.
+A program can open a window, which Stellanova calls a world, and draw in it. Here's a whole game. It's a ball you move around with the arrow keys:
 
 ```
 genesis:
@@ -376,17 +376,17 @@ genesis:
 and the universe said i love you
 ```
 
-`300 horizontal 200 vertical` is a place on the screen: 300 across, 200 down. `birth` is where the ball starts, and `existence` is where it is now. `the existence of horizontal` is how far across it is, and `the existence of vertical` how far down. Space sends it back to its birth (a small white dot). `consume the window` paints over everything etched before, ready for the next picture, and `reveal the frame` puts the picture on the screen (60 times a second).
+`300 horizontal 200 vertical` is a spot on the screen, 300 across and 200 down. `birth` is where the ball starts and `existence` is where it is right now. Setting `birth` puts `existence` there too. `the existence of horizontal` is how far across the ball is, and `the existence of vertical` is how far down.
 
-Setting `birth` also makes `existence` start at the same place.
+Space sends the ball back to where it started, which is the little white dot. `consume the window` paints over the last frame so you can draw the next one, and `reveal the frame` puts it on screen. That happens 60 times a second.
 
-The window words come from a **library**, a set of extra words. Libraries load by themselves when you use their words.
+The window words come from a library, which is just a set of extra words. You don't have to load it. Using one of its words is enough.
 
-`examples/dodge.stella` is a bigger game: dodge the falling balls.
+For a bigger game, look at `examples/dodge.stella`. You dodge falling balls.
 
 ## 11. Kinds of kinds
 
-A dog is a kind of pet: it has everything a pet has, and more. A command for pets works on dogs too, unless dogs have their own version:
+A dog is a kind of pet. It has everything a pet has, plus some more. Any command that works on pets works on dogs too, unless you've written a dog version:
 
 ```stellanova
 a pet has:
@@ -423,7 +423,7 @@ Rex barks and knows 1 tricks.
 
 ## 12. Commands as values
 
-`the command double` is the command itself, not its answer. You can keep it, give it to another command, and do it later with `invoke`:
+`the command double` gives you the command itself instead of running it. You can store it, pass it to another command, and run it later with `invoke`:
 
 ```stellanova
 to double, given x (a number), returning a number:
@@ -449,7 +449,7 @@ and the universe said i love you
 
 ## 13. Two things at once
 
-`meanwhile` starts a command and carries straight on. `wait for the others` waits until they are all done:
+`meanwhile` starts a command and moves on without waiting for it. `wait for the others` waits until they've all finished:
 
 ```stellanova
 to note down, given name (text):
@@ -470,7 +470,7 @@ hello from first / hello from second
 
 ## 14. Talking to other programs
 
-Websites and other programs often speak JSON. `as saved text` writes anything as JSON, and `load ... from the text` reads it back. `patterns` find text by its shape:
+A lot of websites and programs talk in JSON. `as saved text` turns anything into JSON, and `load ... from the text` reads it back in. Patterns let you find bits of text by what they look like:
 
 ```stellanova
 genesis:
@@ -492,14 +492,13 @@ and the universe said i love you
 31, 7
 ```
 
-The `web` library gets and sends pages (`web page`, `send to the web page`), `server` makes your program a web server, `folders` works with files and folders, and `computer` runs other programs (`the output of the command "dir"`). LANGUAGE.md has them all.
+There's more in the libraries. `web` fetches and sends pages, `server` turns your program into a web server, `folders` deals with files and folders, and `computer` runs other programs, like `the output of the command "dir"`. LANGUAGE.md covers all of them.
 
 ## 15. Grammar for people
 
-Stellanova is written for people to read, so it asks for grammar in a few places: `the` before a part
-(`the size of`, `the title of`), and `a` or `an` after `conjure` and before `list containing`.
-The computer checks it is there, then skips it: `the`, `a` and `an` change nothing.
-A command's inputs can also go on their own lines, under `use:`:
+Stellanova is meant to be read by people, so it wants proper grammar in a few spots. You need `the` before a part, as in `the size of` or `the title of`. You need `a` or `an` after `conjure` and before `list containing`.
+The computer checks they're there and then ignores them. They don't change what the program does.
+If a command has a lot of inputs, you can put them on their own lines under `use:`:
 
 ```stellanova
 a notice has:
@@ -534,7 +533,7 @@ and the universe said i love you
 5
 ```
 
-Leave out `the` in `scrawl size of kept notices` and Stellanova says: Write 'the size of', not 'size of'.
+Write `scrawl size of kept notices` without the `the` and Stellanova will tell you: Write 'the size of', not 'size of'.
 
 ## 16. Tidy programs
 
@@ -568,12 +567,12 @@ Al, Rex, Tomas
 CAFÉ no
 ```
 
-`sorted costs by amount` puts the smallest first; `, biggest first` turns it round. `by each n becomes ...` sorts by anything worked out from each item, and things that come out the same keep their order. `padded to 6 letters` puts spaces after text so columns line up. Text words count letters, not bytes, so `upper case of` works in every alphabet. `folder "saves" exists`, like `file "notes.txt" exists`, is yes or no.
+`sorted costs by amount` puts the smallest first, and adding `, biggest first` flips it. You can sort by anything you work out from each item with `by each n becomes ...`. Items that tie stay in the order they were in.
 
-Two more for bigger programs. A part written `amount (a number, hidden)` can only be used by the commands for that kind (`to pay, for a cost, ...:`), so nothing else can change it by mistake. And in a program made of several scripts, `to tidy, privately:` keeps a command to the script it is in: other scripts can't use it, and can have a `tidy` of their own.
+`padded to 6 letters` adds spaces after some text so your columns line up. Text words count letters, not bytes, so `upper case of` works with any alphabet. `folder "saves" exists` is yes or no, and so is `file "notes.txt" exists`.
+
+Two things that help with bigger programs. If you write a part as `amount (a number, hidden)`, only that kind's own commands (like `to pay, for a cost, ...:`) can touch it, so nothing else changes it by accident. And if your program is split over several scripts, `to tidy, privately:` keeps the command inside its own script. Other scripts can't use it, and they can have their own `tidy`.
 
 ## Where next
 
-- `LANGUAGE.md` lists everything the language can do.
-- Type `stellanova` on its own to try lines out one at a time.
-- `stellanova build game.stella` makes a program into an `.exe` that runs on its own and fast.
+LANGUAGE.md has everything the language can do. Type `stellanova` by itself to try lines out one at a time. And `stellanova build game.stella` turns your program into an `.exe` that runs fast and on its own.

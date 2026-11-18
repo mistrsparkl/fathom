@@ -1,6 +1,6 @@
 # Stellanova
 
-A programming language written in plain English words.
+Stellanova is a programming language you write in plain English. Here's a guessing game:
 
 ```
 genesis:
@@ -15,36 +15,49 @@ genesis:
 and the universe said i love you
 ```
 
-## Getting it
+## Installing
 
-On Windows, paste this into PowerShell:
+Windows, in PowerShell:
 
 ```
 irm https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.ps1 | iex
 ```
 
-It gets Python if you don't have it, installs Stellanova and the `stellanova` command, and adds **Stellanova Studia** to the Start menu. Open Studia and press **Learn** to start the course. To remove it, use Apps & features.
+Linux:
 
-Or by hand: install [Python 3](https://www.python.org/downloads/), `git clone https://github.com/mistrsparkl/stellanova`, and add the folder to your PATH.
+```
+curl -fsSL https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.sh | sh
+```
 
-## Using it
+That gets you the `stellanova` command and Stellanova Studia, the editor. It'll grab Python if you don't have it, and the compiler stuff that makes programs fast. Open Studia and hit Learn if you're new.
 
-- `stellanova game.stella` runs a program. Nothing else is needed but Python 3. With LLVM, it runs as fast machine code: the first run after a change takes about half a second longer.
-- `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
-- `stellanova wasm game.stella` makes the same machine code as WebAssembly: `node game.mjs` runs it (see LANGUAGE.md).
-- `stellanova unity <project>`, `stellanova unreal <project>` or `stellanova godot <project>` lets that game engine run Stellanova programs (`use: engine`; see `libraries/engine.words`).
-- `stellanova` on its own lets you try lines out one at a time.
-- `stellanova check game.stella` looks for mistakes without running it.
-- `stellanova tidy game.stella` puts its spacing right: two spaces for each step in, one empty line between parts.
-- `stellanova test game.stella` runs its `to test ...:` commands and shows which `check` lines failed.
-- `stellanova watch game.stella` runs it line by line, showing each line and the names it changes.
+You can uninstall it from Apps & features on Windows, or with `sh ~/.local/share/stellanova/uninstall.sh` on Linux.
 
-Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.
+If you'd rather not use the installer, clone this repo and put the folder on your PATH. You only need Python 3.
 
-**Stellanova Studia** (`editor/studia`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studia`. Press **Learn** for a short course.
+## Commands
 
-**Visual Studio Code**: `py -3 editor/make_vsix.py`, then `code --install-extension editor/stellanova.vsix`. It colours `.stella` files, shows mistakes while you type, completes words and explains a word when the mouse is on it. The setting `stellanova.home` is the folder with `stellanova.py`, if it has moved since the extension was made.
+```
+stellanova game.stella          run it
+stellanova                      try lines out one at a time
+stellanova check game.stella    find mistakes without running
+stellanova tidy game.stella     fix the spacing
+stellanova test game.stella     run its tests
+stellanova watch game.stella    step through it line by line
+stellanova build game.stella    make an .exe
+stellanova wasm game.stella     make WebAssembly
+```
 
-Checking Stellanova itself: `py -3 test_stellanova.py` runs every test program both ways (directly and built) and checks they print exactly the same.
+Programs get built into machine code when LLVM is around, which is a lot faster. The first run after you change something takes about half a second longer while it builds.
 
-`stellanova build game.stella` makes an .exe with LLVM (install it: `winget install LLVM.LLVM`). The runtime is `runtime/machine.cpp`.
+You can also use Stellanova inside Unity, Unreal and Godot. Run `stellanova unity <project>` (or `unreal`, or `godot`) and it sets the project up. There's more in `libraries/engine.words`.
+
+## Where things are
+
+New? Read TUTORIAL.md. LANGUAGE.md has everything. There are example programs in `examples/` and the libraries are in `libraries/`.
+
+Studia lives in `editor/studia`, and it's written in Stellanova too. To run it from the repo: `npm install` once, then `npm start`.
+
+There's also a VS Code extension: `py -3 editor/make_vsix.py`, then `code --install-extension editor/stellanova.vsix`.
+
+`py -3 test_stellanova.py` runs the tests.
