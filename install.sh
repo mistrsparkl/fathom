@@ -9,8 +9,10 @@ url="${STELLANOVA_TAR:-https://github.com/mistrsparkl/stellanova/releases/latest
 echo "Installing Stellanova..."
 
 # Python runs it. clang and these headers make programs fast (without them they still run, just slower).
-want="python3 clang libx11-dev libfreetype-dev libpng-dev libpulse-dev libgl-dev"
+# libnss3 and ALSA are for Studia's window.
+want="python3 clang libx11-dev libfreetype-dev libpng-dev libpulse-dev libgl-dev libnss3"
 if command -v apt-get >/dev/null 2>&1; then
+    if apt-cache show libasound2t64 >/dev/null 2>&1; then want="$want libasound2t64"; else want="$want libasound2"; fi
     need=""
     for p in $want; do dpkg -s "$p" >/dev/null 2>&1 || need="$need $p"; done
     if [ -n "$need" ]; then

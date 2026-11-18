@@ -29,6 +29,31 @@ if (-not (Test-Python)) {
     if (-not (Test-Python)) { throw "Python couldn't be installed. Get it from https://www.python.org/downloads/ and run this again." }
 }
 
+# Fast runs build programs into machine code. That needs LLVM and Microsoft's C++ tools.
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$haveLlvm = (Test-Path "$env:ProgramFiles\LLVM\bin\clang++.exe") -or [bool](Get-Command clang++ -ErrorAction SilentlyContinue)
+$haveCpp = (Test-Path $vswhere) -and [bool](& $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+if ((-not ($haveLlvm -and $haveCpp)) -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+    $answer = $env:STELLANOVA_FAST
+    if (-not $answer) {
+        Write-Host ''
+        Write-Host 'Programs run a lot faster with LLVM and Microsoft''s C++ tools (a few GB, and Windows will ask to allow them).'
+        $answer = Read-Host 'Get them now? [Y/n]'
+    }
+    if ($answer -notmatch '^[nN0]') {
+        if (-not $haveLlvm) {
+            Write-Host 'Getting LLVM...'
+            winget install -e --id LLVM.LLVM --silent --accept-package-agreements --accept-source-agreements | Out-Null
+        }
+        if (-not $haveCpp) {
+            Write-Host 'Getting Microsoft''s C++ tools (this one takes a while)...'
+            winget install -e --id Microsoft.VisualStudio.2022.BuildTools --silent --accept-package-agreements --accept-source-agreements `
+                --override '--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended' | Out-Null
+        }
+    }
+    else { Write-Host 'Skipped. Programs still run, just slower. Run this again any time to get them.' }
+}
+
 $work = Join-Path $env:TEMP ('stellanova-' + [guid]::NewGuid())
 New-Item -ItemType Directory $work | Out-Null
 try {
