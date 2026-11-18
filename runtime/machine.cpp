@@ -1461,6 +1461,17 @@ extern "C"
 			f->nums.push_back(0);
 		return v;
 	}
+	V* cn_thing_zeroed(const char* spec, const char* zeros)  // a new thing, its number and text parts a shared 0 and "" (zeros: n, t or - for each part)
+	{
+		V* v = cn_thing(spec);
+		Full* f = full(v);
+		V* zero = cn_zero_part(false);
+		V* empty = cn_zero_part(true);
+		for (size_t k = 0; zeros[k]; ++k)
+			if (zeros[k] != '-')
+				f->boxed[k] = share(zeros[k] == 't' ? empty : zero);
+		return v;
+	}
 	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
 	{
 		GUARDED(nullptr,

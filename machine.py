@@ -162,6 +162,7 @@ declare ptr @cn_deep(ptr)
 declare void @cn_entry_put_number(ptr, ptr, double)
 declare ptr @cn_sorted_numbers(ptr)
 declare ptr @cn_sorted_texts(ptr)
+declare ptr @cn_thing_zeroed(ptr, ptr)
 declare ptr @cn_join_texts(ptr, ptr)
 declare ptr @cn_split(ptr, ptr, i32)
 declare void @cn_assign(ptr, ptr)
@@ -573,13 +574,11 @@ class Fn:
                 return self.op("call ptr @cn_table_new()")
             if kind in ABLE:
                 return "null"
-            thing = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
+            zeros = "".join("n" if part_kind == NUMBER else "t" if part_kind == TEXT else "-" for _, _, part_kind in THINGS[kind])
+            thing = self.op(f"call ptr @cn_thing_zeroed(ptr {self.spec(kind)}, ptr {self.module.bytes_const(zeros.encode())})")
             for k, (_, _, part_kind) in enumerate(THINGS[kind]):
-                if part_kind in (NUMBER, TEXT):  # a shared 0 or "", not a new value for each thing
-                    part = self.op(f"call ptr @cn_zero_part(i1 {'true' if part_kind == TEXT else 'false'})")
-                else:
-                    part = self.box(self.zero(part_kind), part_kind)
-                self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {part})")
+                if part_kind not in (NUMBER, TEXT):  # (those are a shared 0 or "" already, not a new value for each thing)
+                    self.put(f"call void @cn_field_put(ptr {thing}, i32 {k}, ptr {self.box(self.zero(part_kind), part_kind)})")
             return thing
         finally:
             if into is not None:
@@ -671,7 +670,7 @@ class Fn:
         made = f"  {value} = call ptr @"
         for line in reversed(self.lines[-8:]):
             if line.startswith(made):
-                return line[len(made):].startswith(("cn_thing(", "cn_list_new(", "cn_dup("))
+                return line[len(made):].startswith(("cn_thing(", "cn_thing_zeroed(", "cn_list_new(", "cn_dup("))
         return False
 
     def slot(self, cpp, kind):
