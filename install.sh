@@ -2,6 +2,8 @@
 # Installs Stellanova for this user. Run:
 #   curl -fsSL https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.sh | sh
 set -e
+# (all in main, so a piped script is read in full before anything runs)
+main() {
 place="$HOME/.local/share/stellanova"
 bin="$HOME/.local/bin"
 url="${STELLANOVA_TAR:-https://github.com/mistrsparkl/stellanova/releases/latest/download/stellanova-linux.tar.gz}"
@@ -17,7 +19,7 @@ if command -v apt-get >/dev/null 2>&1; then
     for p in $want; do dpkg -s "$p" >/dev/null 2>&1 || need="$need $p"; done
     if [ -n "$need" ]; then
         echo "Getting$need (sudo will ask for your password)..."
-        sudo apt-get install -y $need || echo "Couldn't get them all. Stellanova still works, but programs run slower."
+        sudo apt-get install -y $need < /dev/null || echo "Couldn't get them all. Stellanova still works, but programs run slower."
     fi
 elif ! command -v python3 >/dev/null 2>&1; then
     echo "Stellanova needs Python 3. Install it with your package manager, then run this again."
@@ -64,3 +66,5 @@ case ":$PATH:" in
         echo "  Or in a new terminal (after logging in again):  stellanova hello.stella" ;;
 esac
 echo "  To remove it:  sh $place/uninstall.sh"
+}
+main "$@"
