@@ -6076,9 +6076,20 @@ def main(argv):
         have = listed.read_text(encoding="utf-8").split() if listed.exists() else []
         if "res://addons/stellanova/stellanova.gdextension" not in have:
             listed.write_text("".join(line + "\n" for line in have + ["res://addons/stellanova/stellanova.gdextension"]), encoding="utf-8")
+        # The editor plugin, on: it puts the programs into exported games.
+        settings = (project / "project.godot").read_text(encoding="utf-8")
+        mine = '"res://addons/stellanova/plugin.cfg"'
+        if mine not in settings:
+            on = re.search(r'^\[editor_plugins\]\s*\nenabled=PackedStringArray\(', settings, re.M)
+            if on:
+                rest = settings[on.end():]
+                settings = settings[:on.end()] + mine + ("" if rest.startswith(")") else ", ") + rest
+            else:
+                settings = settings.rstrip("\n") + f"\n\n[editor_plugins]\n\nenabled=PackedStringArray({mine})\n"
+            (project / "project.godot").write_text(settings, encoding="utf-8")
         (into / "home.txt").write_text(f"{HERE}\n{sys.executable}\n", encoding="utf-8")  # (and the Python to run it with)
         print("Stellanova is in addons/stellanova. Put .stella files in the project, add a StellanovaScript node under an object "
-              "and choose the file as its program.")
+              "and choose the file as its program. Exported games get the programs too.")
         return 0
     if len(args) == 2 and args[0] == "unity":  # sets a Unity project up for Stellanova programs
         project = Path(args[1])

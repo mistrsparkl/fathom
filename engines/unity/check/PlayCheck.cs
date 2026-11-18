@@ -1,3 +1,4 @@
+// The check scene for engines/check/words.stella: Run plays it in the editor, Build makes it into a game. Run by check.py.
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -5,36 +6,45 @@ using UnityEngine;
 
 public static class PlayCheck
 {
-    static string said = "";
-    static int frames;
+    static void MakeScene()
+    {
+        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+        var program = AssetDatabase.LoadAssetAtPath<StellanovaProgram>("Assets/words.stella");
+        Shape(PrimitiveType.Cube, "Box", new Vector3(8, 0, 0));
+        Shape(PrimitiveType.Cube, "Target", Vector3.zero).AddComponent<StellanovaScript>().program = program;
+        Shape(PrimitiveType.Sphere, "Player", new Vector3(0, 4, 0)).AddComponent<Rigidbody>();
+        Shape(PrimitiveType.Cube, "Mover", new Vector3(1, 2, 3)).AddComponent<StellanovaScript>().program = program;
+        new GameObject("Report").AddComponent<CheckReport>();
+        EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), "Assets/Check.unity");
+    }
+
+    static GameObject Shape(PrimitiveType shape, string name, Vector3 at)
+    {
+        var made = GameObject.CreatePrimitive(shape);
+        made.name = name;
+        made.transform.position = at;
+        return made;
+    }
 
     public static void Run()
     {
-        Application.logMessageReceived += (m, s, t) => said += t + ": " + m + "\n";
-        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
-        var coin = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        coin.name = "Coin";
-        coin.AddComponent<StellanovaScript>().program = AssetDatabase.LoadAssetAtPath<StellanovaProgram>("Assets/coin.stella");
-        var player = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        player.name = "Player";
-        player.transform.position = new Vector3(0, 4, 0);
-        player.AddComponent<Rigidbody>();
+        MakeScene();
+        File.Delete("check.txt");
         EditorSettings.enterPlayModeOptionsEnabled = true;
         EditorSettings.enterPlayModeOptions = EnterPlayModeOptions.DisableDomainReload | EnterPlayModeOptions.DisableSceneReload;
-        EditorApplication.update += Watch;
+        EditorApplication.update += () =>
+        {
+            if (File.Exists("check.txt"))
+                EditorApplication.Exit(0);
+        };
         EditorApplication.EnterPlaymode();
     }
 
-    static void Watch()
+    public static void Build()
     {
-        if (!EditorApplication.isPlaying || (Time.time < 3 && ++frames < 100000))
-            return;
-        foreach (var g in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
-            said += $"{g.name} at {g.transform.position} turn {g.transform.eulerAngles.y:0}\n";
-        said += $"player colour {GameObject.Find("Player").GetComponent<Renderer>().material.color}\n";
-        File.WriteAllText("check.txt", said);
-        EditorApplication.update -= Watch;
-        EditorApplication.Exit(0);
+        MakeScene();
+        var made = BuildPipeline.BuildPlayer(new[] { "Assets/Check.unity" }, "game/Check.exe", BuildTarget.StandaloneWindows64, BuildOptions.None);
+        EditorApplication.Exit(made.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
     }
 }

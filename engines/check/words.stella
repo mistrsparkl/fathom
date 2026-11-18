@@ -1,0 +1,51 @@
+whisper: Every engine word, for the engine checks (engines/*/check/check.py). The scene: Mover at 1 horizontal 2 vertical 3 depth,
+whisper: Box (no program), Target (this program too) and Player, a ball falling onto Target. expected.txt is what it must say.
+use: engine
+use: maths
+
+the world remembers:
+  frames (a number)
+  hits (a number)
+and the universe said i love you
+
+to begin:
+  if object name of me is "Mover":
+    show every word
+and the universe said i love you
+
+to show every word:
+  scrawl "name ", object name of me
+  scrawl "start ", place of me
+  put the object with me, 4 horizontal 5 vertical 6 depth
+  scrawl "put ", place of me
+  move the object with me, 1 horizontal 0 vertical 0 depth
+  scrawl "moved ", place of me
+  turn the object with me, 90
+  scrawl "turn ", round (turn of me)
+  set box to the object named "Box"
+  scrawl "box ", object name of box
+  scrawl "nobody ", the object named "Nobody"
+  set made to copy the object with (box, 0 horizontal 10 vertical 0 depth)
+  scrawl "copy ", place of made, " ", made is not box
+  remove the object made
+  colour the object with box, "blue"
+  scrawl "keys ", key held "space", " ", key pressed "space"
+  scrawl "frame time ", frame time is at least 0
+  scrawl "problem next"
+  scrawl place of 0
+  scrawl "not reached"
+and the universe said i love you
+
+to every frame, given seconds (a number):
+  if object name of me is "Mover":
+    set frames to frames plus 1
+    if frames is 10:
+      scrawl "frames 10 ", seconds exceeds 0
+and the universe said i love you
+
+to touched, given other (a number):
+  set hits to hits plus 1
+  if hits is 1:
+    scrawl "touched ", object name of me, " by ", object name of other
+    colour the object with other, "red"
+and the universe said i love you

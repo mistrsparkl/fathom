@@ -1,0 +1,14 @@
+name Mover
+start 1 horizontal 2 vertical 3 depth
+put 4 horizontal 5 vertical 6 depth
+moved 5 horizontal 5 vertical 6 depth
+turn 90
+box Box
+nobody 0
+copy 0 horizontal 10 vertical 0 depth yes
+keys no no
+frame time yes
+problem next
+problem: Line 35: this is 0, which means there is nothing there.
+frames 10 yes
+touched Target by Player

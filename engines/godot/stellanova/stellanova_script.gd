@@ -74,21 +74,28 @@ static func node_of(number: float) -> Node:
 static func _load(path: String) -> int:
 	if _programs.has(path):
 		return _programs[path]
-	var suffix := ".dll" if OS.get_name() == "Windows" else ".so"
-	var script := ProjectSettings.globalize_path(path)
-	var made := script.get_basename() + suffix
-	if OS.has_feature("editor"):
-		if FileAccess.file_exists(script) and (not FileAccess.file_exists(made) or FileAccess.get_modified_time(made) < FileAccess.get_modified_time(script)):
-			_build(script)
-	else:  # (an exported game keeps the plugins next to itself)
-		made = OS.get_executable_path().get_base_dir().path_join(path.get_file().get_basename() + suffix)
+	var made := made_for(path) if OS.has_feature("editor") else \
+		OS.get_executable_path().get_base_dir().path_join(path.get_file().get_basename() + _suffix())  # (an exported game keeps them next to itself)
 	var number := 0
-	if FileAccess.file_exists(made):
+	if made != "" and FileAccess.file_exists(made):
 		number = Stellanova.open(made)
 	if number == 0:
 		push_error("Stellanova: %s isn't built: look above for its mistakes." % path)
 	_programs[path] = number
 	return number
+
+
+static func _suffix() -> String:
+	return ".dll" if OS.get_name() == "Windows" else ".so"
+
+
+## The plugin made from a .stella file (made again first if the file changed), or "" when it couldn't be made.
+static func made_for(path: String) -> String:
+	var script := ProjectSettings.globalize_path(path)
+	var made := script.get_basename() + _suffix()
+	if FileAccess.file_exists(script) and (not FileAccess.file_exists(made) or FileAccess.get_modified_time(made) < FileAccess.get_modified_time(script)):
+		_build(script)
+	return made if FileAccess.file_exists(made) else ""
 
 
 static func _build(script: String) -> void:
@@ -182,7 +189,7 @@ class Answers:
 			"colour":
 				var look := StandardMaterial3D.new()
 				look.albedo_color = Color.from_string(text, Color.WHITE)
-				for mesh in [spot] + spot.find_children("*", "MeshInstance3D"):
+				for mesh in [spot] + spot.find_children("*", "MeshInstance3D", true, false):  # (false: made while running too)
 					if mesh is MeshInstance3D:
 						mesh.material_override = look
 		return 0
