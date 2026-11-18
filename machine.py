@@ -1172,7 +1172,7 @@ def sysroot():
 
 def target_flags():
     if TARGET == "linux":
-        return ["-I/usr/include/freetype2"]  # (where FreeType keeps its headers, for the window library)
+        return ["-I/usr/include/freetype2", "-fPIC"]  # FreeType's headers; -fPIC so plugins can link it
     if TARGET != "wasm":
         return ["-fms-extensions"]
     root = sysroot()
@@ -1188,7 +1188,7 @@ def runtime_object():
     """runtime/machine.cpp compiled once (again only when it or stellanova.h changes)."""
     runtime = HERE / "runtime"
     return compile_once(runtime / "machine.cpp", runtime / "built" / f"stellanova_machine{object_suffix()}",
-                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h"])
+                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h", HERE / "machine.py"])
 
 
 def make_exe(ll_text_, exe, work, units=None, plugin=False):
@@ -1224,7 +1224,7 @@ def make_exe(ll_text_, exe, work, units=None, plugin=False):
                 str(WASI / "libclang_rt-34.0" / "wasm32-unknown-wasip1-threads" / "libclang_rt.builtins.a"), "-Wl,-z,stack-size=8388608",
                 "-Wl,--import-memory,--export-memory,--shared-memory,--max-memory=4294967296"]  # memory shared by threads ('meanwhile')
     elif TARGET == "linux":
-        link = ["-pthread"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
+        link = ["-pthread", "-fPIC"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
     if plugin:
         link += ["-shared"] + (["-Wl,/EXPORT:stellanova_call", "-Wl,/EXPORT:stellanova_has"] if TARGET == "windows" else [])
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
