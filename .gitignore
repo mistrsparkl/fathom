@@ -23,3 +23,6 @@ libraries/got/
 
 # local tool caches
 .token-optimizer/
+
+# release zips
+dist/

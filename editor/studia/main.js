@@ -19,9 +19,17 @@ function older(made, from) {
 }
 
 function remake() {
-  const run = (...words) => execFileSync("py", ["-3", compiler, ...words], { cwd: here, windowsHide: true });
-  if (older(path.join(screens, "screens.js"), path.join(here, "screens.stella"))) run("web", "screens.stella", "ui");
-  if (older(systemExe, path.join(here, "system.stella"))) run("build", "system.stella");
+  // a failed remake is fine while an older copy is there (an install without LLVM)
+  const make = (made, from, ...words) => {
+    if (!older(made, from)) return;
+    try {
+      execFileSync("py", ["-3", compiler, ...words], { cwd: here, windowsHide: true });
+    } catch (e) {
+      if (!fs.existsSync(made)) throw e;
+    }
+  };
+  make(path.join(screens, "screens.js"), path.join(here, "screens.stella"), "web", "screens.stella", "ui");
+  make(systemExe, path.join(here, "system.stella"), "build", "system.stella");
 }
 
 function freePort() {

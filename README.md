@@ -17,13 +17,15 @@ and the universe said i love you
 
 ## Getting it
 
-You need [Python 3](https://www.python.org/downloads/). Then:
+On Windows, paste this into PowerShell:
 
 ```
-git clone https://github.com/mistrsparkl/stellanova
+irm https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.ps1 | iex
 ```
 
-Add the `stellanova` folder to your PATH so the `stellanova` command works anywhere (or use `py -3 stellanova.py run game.stella`). New to it? Open Stellanova Studia (below) and press **Learn**.
+It gets Python if you don't have it, installs Stellanova and the `stellanova` command, and adds **Stellanova Studia** to the Start menu. Open Studia and press **Learn** to start the course. To remove it, use Apps & features.
+
+Or by hand: install [Python 3](https://www.python.org/downloads/), `git clone https://github.com/mistrsparkl/stellanova`, and add the folder to your PATH.
 
 ## Using it
 
