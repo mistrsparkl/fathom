@@ -278,12 +278,12 @@ def zero_const(kind):
 
 def nums_at():
     """Where Full keeps nums (machine.cpp checks)."""
-    return 32 if TARGET == "wasm" else 48
+    return 16
 
 
 def boxed_at():
     """Where it keeps boxed (just after nums)."""
-    return 80 if TARGET == "wasm" else 104
+    return 64
 
 
 class Fn:
@@ -368,9 +368,9 @@ class Fn:
 
     def nums_place(self, lst):
         """Where a list's plain numbers are."""
-        word, size = (4, "i32") if TARGET == "wasm" else (8, "i64")
+        word = 4 if TARGET == "wasm" else 8  # (a pointer, then Few's 32-bit count and room)
         at = lambda k: self.op(f"getelementptr inbounds i8, ptr {lst}, i64 {k}")
-        return at(3), at(nums_at()), at(nums_at() + word), at(nums_at() + 2 * word), size
+        return at(3), at(nums_at()), at(nums_at() + word), at(nums_at() + word + 4), "i32"
 
     def add_number(self, lst, d):
         """Adds a number in place when it can."""
@@ -410,7 +410,7 @@ class Fn:
     def item_place(self, lst, index):
         """Item index of a boxed list, if there."""
         flag, _, _, _, size = self.nums_place(lst)
-        word = 4 if size == "i32" else 8
+        word = 4 if TARGET == "wasm" else 8
         start = boxed_at()  # (a vector begins with its first place)
         whole, ranged, fast, slow = self.label("bwhole"), self.label("brange"), self.label("bfast"), self.label("bslow")
         self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), whole, slow)

@@ -24,13 +24,15 @@ struct V  // every value starts like this; numbers are only this
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 template <typename T>
 struct Few  // numbers or values, laid out for machine code
 {
 	T* data = few;  // (a few kept here, with no allocation)
-	size_t count = 0, room = 4;
+	uint32_t count = 0, room = 4;  // (32 bits: a smaller value; machine code reads them as i32)
 	T few[4];
 	Few() = default;
 	Few(const Few& o) { *this = o; }
@@ -55,11 +57,22 @@ struct Few  // numbers or values, laid out for machine code
 		return *this;
 	}
 	~Few() { if (data != few) std::free(data); }
+	static void too_many()
+	{
+		std::fputs("Stellanova: a list can't hold more than 2147483647 items.\n", stderr);
+		std::abort();
+	}
 	void reserve(size_t n)
 	{
 		if (n <= room)
 			return;
-		room = n < 8 ? 8 : n;
+		if (n > 0x7fffffffu)  // (machine code indexes with signed 32 bits)
+		{
+			if (room == 0x7fffffffu)
+				too_many();
+			n = 0x7fffffffu;
+		}
+		room = static_cast<uint32_t>(n < 8 ? 8 : n);
 		if (data == few)
 		{
 			T* bigger = static_cast<T*>(std::malloc(room * sizeof(T)));
@@ -72,7 +85,7 @@ struct Few  // numbers or values, laid out for machine code
 	void push_back(T x)
 	{
 		if (count == room)
-			reserve(room * 2);
+			reserve(static_cast<size_t>(room) * 2);
 		data[count++] = x;
 	}
 	void insert(T* at, T x)
@@ -89,10 +102,12 @@ struct Few  // numbers or values, laid out for machine code
 	}
 	void resize(size_t n)
 	{
+		if (n > 0x7fffffffu)
+			too_many();
 		reserve(n);
 		for (size_t k = count; k < n; ++k)
 			data[k] = T();
-		count = n;
+		count = static_cast<uint32_t>(n);
 	}
 	void clear() { count = 0; }
 	void release() { if (data != few) std::free(data); data = few, count = 0, room = 4; }
@@ -144,7 +159,6 @@ struct Table  // made when the first entry is put in
 
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
-	std::string s;  // text: first (a text is made smaller, as only this: TextValue)
 	Nums nums;  // plain numbers, at a fixed place
 	Items boxed;  // items or parts, in order: use cn_items
 	const ThingKind* kind = nullptr;
@@ -163,10 +177,12 @@ inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Fu
 	std::sort(out.begin(), out.end(), [](auto* a, auto* b) { return a->first < b->first; });
 	return out;
 }
-struct TextValue : V { std::string s; };  // a text: only Full's first part (its other parts are never touched)
-struct ThingValue : V { std::string s; Nums nums; Items boxed; const ThingKind* kind = nullptr; Table table; };  // a thing: only Full's parts up to table
+struct TextValue : V { std::string s; };  // a text: its own small value (Full has no text)
+struct ThingValue : V { Nums nums; Items boxed; const ThingKind* kind = nullptr; Table table; };  // a thing: only Full's parts up to table
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
 inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
+inline std::string& text_of(V* v) { return static_cast<TextValue*>(v)->s; }  // a text value's words
+inline const std::string& text_of(const V* v) { return static_cast<const TextValue*>(v)->s; }
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
@@ -210,7 +226,7 @@ T cn_to_cpp(V* v)
 	else if constexpr (std::is_same_v<T, bool>)
 		return v->d != 0;
 	else if constexpr (std::is_same_v<T, std::string>)
-		return full(v)->s;
+		return text_of(v);
 	else if constexpr (std::is_same_v<T, FVector>)
 		return FVector(full(v)->x, full(v)->y, full(v)->z);
 	else if constexpr (std::is_same_v<T, FVector2D>)

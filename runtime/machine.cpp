@@ -4,12 +4,11 @@
 #include "stellanova.h"
 #include "machine.h"
 #include <cstddef>
-static_assert(offsetof(Full, s) == offsetof(TextValue, s), "a text is the start of a Full");
 static_assert(offsetof(Full, nums) == offsetof(ThingValue, nums) && offsetof(Full, boxed) == offsetof(ThingValue, boxed) && offsetof(Full, kind) == offsetof(ThingValue, kind) && offsetof(Full, table) == offsetof(ThingValue, table), "a thing is the start of a Full");
 #ifdef __wasm__
-static_assert(offsetof(Full, nums) == 32 && offsetof(Full, boxed) == 80, "machine.py's nums_at and boxed_at need changing");
+static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 64, "machine.py's nums_at and boxed_at need changing");
 #else
-static_assert(offsetof(Full, nums) == 48 && offsetof(Full, boxed) == 104, "machine.py's nums_at and boxed_at need changing");
+static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 64, "machine.py's nums_at and boxed_at need changing");
 #endif
 
 #if defined(__linux__) || defined(__wasm__)
@@ -69,18 +68,20 @@ namespace gc
 	static std::mutex collecting;
 	static std::atomic<bool>& stopping = cn_stopping;
 
+	static thread_local Thread* quick = nullptr;  // me() without the guarded lookup of a thread_local that has a destructor
 	struct Mine
 	{
 		Thread* t = nullptr;
 		~Mine()  // the thread is ending
 		{
+			quick = nullptr;
 			if (!t)
 				return;
 			{
 				std::lock_guard<std::mutex> hold(stop_lock);
 				std::lock_guard<std::mutex> heap(lock);
 				all.insert(all.end(), t->made.begin(), t->made.end());  // what it made may still be held elsewhere
-				for (int k = 0; k < 3; ++k)
+				for (int k = 0; k < 4; ++k)
 					spare[k].insert(spare[k].end(), t->ready[k].begin(), t->ready[k].end());
 				threads.erase(std::find(threads.begin(), threads.end(), t));
 				delete t;
@@ -92,6 +93,8 @@ namespace gc
 
 	static Thread* me()
 	{
+		if (quick)
+			return quick;
 		if (!mine.t)
 		{
 			Thread* t = new Thread;
@@ -126,7 +129,7 @@ namespace gc
 			threads.push_back(t);
 			mine.t = t;
 		}
-		return mine.t;
+		return quick = mine.t;
 	}
 
 #ifdef __wasm__
@@ -252,7 +255,6 @@ namespace gc
 			{
 				ThingValue* f = static_cast<ThingValue*>(v);
 				f->d = 0;
-				f->s.clear();
 				if (f->boxed.capacity() > 1024)
 					f->boxed.release();
 				f->boxed.clear();
@@ -268,9 +270,6 @@ namespace gc
 			{
 				Full* f = full(v);  // (from a block too: kept to be used again, never deleted)
 				f->d = f->x = f->y = f->z = 0;
-				if (f->s.capacity() > 4096)
-					std::string().swap(f->s);
-				f->s.clear();
 				if (f->boxed.capacity() > 1024)
 					f->boxed.release();
 				f->boxed.clear();
@@ -544,7 +543,7 @@ static V* fresh(char tag)
 V* cn_make_text(std::string s)
 {
 	V* v = fresh('t');
-	full(v)->s = std::move(s);
+	text_of(v) = std::move(s);
 	return v;
 }
 
@@ -587,7 +586,7 @@ static std::string show(const V* v)
 	{
 	case 'n': return stellanova::text(v->d);
 	case 'y': return v->d != 0 ? "yes" : "no";
-	case 't': return full(v)->s;
+	case 't': return text_of(v);
 	case 'p': return stellanova::text(full(v)->x) + " horizontal " + stellanova::text(full(v)->y) + " vertical " + stellanova::text(full(v)->z) + " depth";
 	case 'f': return stellanova::text(full(v)->x) + " horizontal " + stellanova::text(full(v)->y) + " vertical";
 	case 'c': return "a command";
@@ -629,7 +628,7 @@ static bool same(const V* a, const V* b)
 	switch (a->tag)
 	{
 	case 'n': case 'y': return a->d == b->d;
-	case 't': return full(a)->s == full(b)->s;
+	case 't': return text_of(a) == text_of(b);
 	case 'p': case 'f': return full(a)->x == full(b)->x && full(a)->y == full(b)->y && full(a)->z == full(b)->z;
 	case 'k':
 		if (full(a)->kind->name != full(b)->kind->name)
@@ -724,7 +723,7 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 	{
 	case 'n': stellanova::save(out, v->d, line); break;
 	case 'y': stellanova::save(out, v->d != 0, line); break;
-	case 't': stellanova::save(out, full(v)->s, line); break;
+	case 't': stellanova::save(out, text_of(v), line); break;
 	case 'p': stellanova::save(out, FVector(full(v)->x, full(v)->y, full(v)->z), line); break;
 	case 'f': stellanova::save(out, FVector2D(full(v)->x, full(v)->y), line); break;
 	case 'c': stellanova::fail(line, "I can't save a command in a file."); break;
@@ -855,7 +854,7 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 
 // machine.py's add_number and list_number use these places.
 static_assert(offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's nums_place and count_holders need changing");
-static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == 2 * sizeof(void*), "machine.py's nums_place needs changing");
+static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == sizeof(void*) + 4, "machine.py's nums_place needs changing");
 
 // Items, boxed (plain number lists get boxed).
 Items& cn_items(const V* v)
@@ -881,7 +880,7 @@ Items& cn_items(const V* v)
 static std::pair<const std::string, V*>* entry_of(V* table, V* key)  // the entry named key, or nullptr
 {
 	Full* t = full(table);
-	const std::string& name = full(key)->s;
+	const std::string& name = text_of(key);
 	if (t->last && t->last->first == name)
 		return t->last;
 	auto it = t->table.find(name);
@@ -1008,19 +1007,19 @@ extern "C"
 	}
 
 	bool cn_failed() { return failed; }
-	void cn_raise(int line, V* message) { cn_set_problem({line, full(message)->s}); }
-	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, full(message)->s, full(kind)->s}); }
-	bool cn_problem_is(V* kind) { return pending.kind == full(kind)->s; }
+	void cn_raise(int line, V* message) { cn_set_problem({line, text_of(message)}); }
+	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, text_of(message), text_of(kind)}); }
+	bool cn_problem_is(V* kind) { return pending.kind == text_of(kind); }
 	void cn_lock(V* name)  // 'holding the lock': waits parked
 	{
-		std::recursive_mutex& m = stellanova::named_lock(full(name)->s);
+		std::recursive_mutex& m = stellanova::named_lock(text_of(name));
 		if (!m.try_lock())
 		{
 			Parked waiting;
 			m.lock();
 		}
 	}
-	void cn_unlock(V* name) { stellanova::named_lock(full(name)->s).unlock(); }
+	void cn_unlock(V* name) { stellanova::named_lock(text_of(name)).unlock(); }
 	V* cn_problem_text()  // what went wrong (and it's dealt with)
 	{
 		failed = false;
@@ -1032,8 +1031,8 @@ extern "C"
 	V* cn_text_number(double d) { return cn_make_text(stellanova::text(d)); }
 	V* cn_text_yesno(bool b) { return cn_make_text(b ? "yes" : "no"); }
 	V* cn_show(V* v) { return cn_make_text(show(v)); }
-	V* cn_join(V* a, V* b) { return cn_make_text(full(a)->s + full(b)->s); }
-	V* cn_join_number(V* a, double b) { return cn_make_text(full(a)->s + stellanova::text(b)); }
+	V* cn_join(V* a, V* b) { return cn_make_text(text_of(a) + text_of(b)); }
+	V* cn_join_number(V* a, double b) { return cn_make_text(text_of(a) + stellanova::text(b)); }
 	void cn_share(V* v)  // a text name was read: what it holds may be held elsewhere now
 	{
 		if (v)
@@ -1044,28 +1043,28 @@ extern "C"
 		V* a = *slot;
 		if (a && a->owned)
 		{
-			full(a)->s += full(b)->s;
+			text_of(a) += text_of(b);
 			return;
 		}
-		V* grown = cn_make_text((a ? full(a)->s : std::string()) + full(b)->s);
+		V* grown = cn_make_text((a ? text_of(a) : std::string()) + text_of(b));
 		grown->owned = true;
 		*slot = grown;
 	}
-	bool cn_same_text(V* a, V* b) { return full(a)->s == full(b)->s; }
-	void cn_say(V* t) { stellanova::say({full(t)->s}); }
+	bool cn_same_text(V* a, V* b) { return text_of(a) == text_of(b); }
+	void cn_say(V* t) { stellanova::say({text_of(t)}); }
 	V* cn_ask_text(V* question)
 	{
 		std::string answer;
 		{
 			Parked waiting;
-			answer = stellanova::ask_text(full(question)->s);
+			answer = stellanova::ask_text(text_of(question));
 		}
 		return cn_make_text(answer);
 	}
-	double cn_ask_number(V* question) { Parked waiting; return stellanova::ask_number(full(question)->s); }
-	bool cn_ask_yes_no(V* question) { Parked waiting; return stellanova::ask_yes_no(full(question)->s); }
-	double cn_letters(V* t) { return stellanova::letters(full(t)->s); }
-	double cn_to_number(V* t, int line) { GUARDED(0.0, return stellanova::to_number(full(t)->s, line);) }
+	double cn_ask_number(V* question) { Parked waiting; return stellanova::ask_number(text_of(question)); }
+	bool cn_ask_yes_no(V* question) { Parked waiting; return stellanova::ask_yes_no(text_of(question)); }
+	double cn_letters(V* t) { return stellanova::letters(text_of(t)); }
+	double cn_to_number(V* t, int line) { GUARDED(0.0, return stellanova::to_number(text_of(t), line);) }
 
 	// numbers
 	long long cn_repeats(double count) { return std::isfinite(count) ? static_cast<long long>(count) : 0; }
@@ -1304,7 +1303,7 @@ extern "C"
 	{
 		return thing && std::string(names).find("|" + full(thing)->kind->name + "|") != std::string::npos;
 	}
-	bool cn_text_contains(V* t, V* part) { return full(t)->s.find(full(part)->s) != std::string::npos; }
+	bool cn_text_contains(V* t, V* part) { return text_of(t).find(text_of(part)) != std::string::npos; }
 	bool cn_table_has(V* table, V* key) { return entry_of(table, key) != nullptr; }
 	V* cn_list_random(V* list, int line)
 	{
@@ -1341,14 +1340,14 @@ extern "C"
 		GUARDED(cn_box_number(0),
 			auto* e = entry_of(table, key);
 			if (!e)
-				stellanova::fail(line, "there is no entry \"" + full(key)->s + "\" in the table.");
+				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
 			return e->second;)
 	}
 	void cn_entry_put(V* table, V* key, V* x)
 	{
 		auto* e = entry_of(table, key);
 		if (!e)
-			e = full(table)->last = &*full(table)->table.try_emplace(full(key)->s).first;
+			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first;
 		V* old = e->second;
 		e->second = share(x);
 		release(old);
@@ -1357,7 +1356,7 @@ extern "C"
 	{
 		auto* e = entry_of(table, key);
 		if (!e)
-			e = full(table)->last = &*full(table)->table.try_emplace(full(key)->s).first;
+			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first;
 		if (e->second && e->second->tag == 'n' && e->second->owned)
 		{
 			e->second->d = d;
@@ -1374,7 +1373,7 @@ extern "C"
 		GUARDED(nullptr,
 			auto* e = entry_of(table, key);
 			if (!e)
-				stellanova::fail(line, "there is no entry \"" + full(key)->s + "\" in the table.");
+				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
 			if (e->second && e->second->shared)
 			{
 				release(e->second);
@@ -1386,8 +1385,8 @@ extern "C"
 	{
 		full(table)->last = nullptr;
 		GUARDED(,
-			if (!full(table)->table.erase(full(key)->s))
-				stellanova::fail(line, "there is no entry \"" + full(key)->s + "\" in the table to remove.");)
+			if (!full(table)->table.erase(text_of(key)))
+				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table to remove.");)
 	}
 	V* cn_keys(V* table)
 	{
@@ -1457,8 +1456,7 @@ extern "C"
 		f->kind = kind;
 		f->boxed.resize(kind->fields.size());
 		f->numbers = true;  // number parts kept plain
-		for (size_t k = 0; k < kind->fields.size(); ++k)
-			f->nums.push_back(0);
+		f->nums.resize(kind->fields.size());
 		return v;
 	}
 	V* cn_thing_zeroed(const char* spec, const char* zeros)  // a new thing, its number and text parts a shared 0 and "" (zeros: n, t or - for each part)
@@ -1475,18 +1473,18 @@ extern "C"
 	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
 	{
 		GUARDED(nullptr,
-			std::string all = is_file ? stellanova::read_file(full(from)->s, line) : full(from)->s;
+			std::string all = is_file ? stellanova::read_file(text_of(from), line) : text_of(from);
 			stellanova::SavedReader reader{all};
 			stellanova::SavedData d;
 			V* out = nullptr;
 			bool ok = reader.value(d);
 			reader.space();
 			if (!ok || reader.i != all.size() || !loaded_into(d, shape, out))
-				stellanova::fail(line, (is_file ? "the file \"" + full(from)->s + "\"" : std::string("the text")) + " doesn't hold " + full(kind)->s + ".");
+				stellanova::fail(line, (is_file ? "the file \"" + text_of(from) + "\"" : std::string("the text")) + " doesn't hold " + text_of(kind) + ".");
 			return out;)
 	}
 	V* cn_saved_text(V* v, V* shape, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, shape, line));) }
-	void cn_save_file(V* v, V* path, V* shape, int line) { GUARDED(, stellanova::write_file(full(path)->s, saved_of(v, shape, line) + "\n", line);) }
+	void cn_save_file(V* v, V* path, V* shape, int line) { GUARDED(, stellanova::write_file(text_of(path), saved_of(v, shape, line) + "\n", line);) }
 	void cn_able_kind(const char* able, V* shape)  // at the start: a kind a saved speaker may be loaded as
 	{
 		std::string name(able);
@@ -1505,7 +1503,7 @@ extern "C"
 			std::vector<std::pair<const std::string*, V*>> keyed;
 			keyed.reserve(xs.size());
 			for (V* x : xs)
-				keyed.emplace_back(&full(full(x)->boxed[at])->s, x);
+				keyed.emplace_back(&text_of(full(x)->boxed[at]), x);
 			std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return *a.first < *b.first; });
 			for (size_t i = 0; i < xs.size(); ++i)
 				xs[i] = keyed[i].second;
@@ -1530,7 +1528,7 @@ extern "C"
 			order[k] = k;
 		std::vector<V*> ks(cn_items(keys).begin(), cn_items(keys).end());
 		std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-			return ks[a]->tag == 't' ? full(ks[a])->s < full(ks[b])->s : ks[a]->d < ks[b]->d;
+			return ks[a]->tag == 't' ? text_of(ks[a]) < text_of(ks[b]) : ks[a]->d < ks[b]->d;
 		});
 		V* out = cn_list_new();
 		for (size_t k : order)
@@ -1551,7 +1549,7 @@ extern "C"
 	{
 		V* out = copy_of(list);
 		static const std::string none;
-		auto words = [](const V* x) -> const std::string& { return x ? full(x)->s : none; };
+		auto words = [](const V* x) -> const std::string& { return x ? text_of(x) : none; };
 		Items& xs = cn_items(out);
 		std::stable_sort(xs.begin(), xs.end(), [&](const V* a, const V* b) { return words(a) < words(b); });
 		return out;
@@ -1559,24 +1557,24 @@ extern "C"
 	V* cn_join_texts(V* list, V* between)  // 'join names with ", "' for a list of text
 	{
 		const Items& items = cn_items(list);
-		const std::string& by = full(between)->s;
+		const std::string& by = text_of(between);
 		size_t size = items.empty() ? 0 : by.size() * (items.size() - 1);
 		for (const V* x : items)
-			size += full(x)->s.size();
+			size += text_of(x).size();
 		std::string out;
 		out.reserve(size);
 		for (size_t k = 0; k < items.size(); ++k)
 		{
 			if (k)
 				out += by;
-			out += full(items[k])->s;
+			out += text_of(items[k]);
 		}
 		return cn_make_text(std::move(out));
 	}
 	V* cn_split(V* text, V* by, int line)  // 'whole split by ","'
 	{
-		const std::string& s = full(text)->s;
-		const std::string& b = full(by)->s;
+		const std::string& s = text_of(text);
+		const std::string& b = text_of(by);
 		GUARDED(cn_list_new(), if (b.empty()) stellanova::fail(line, "I can't split text by empty text.");)
 		V* out = cn_list_new();
 		Items& items = full(out)->boxed;
@@ -1606,7 +1604,7 @@ extern "C"
 		{
 			std::string out;
 			for (double k = 0; k < n; ++k)
-				out += full(x)->s;
+				out += text_of(x);
 			return cn_make_text(out);
 		}
 		V* out = cn_list_new();
@@ -1615,7 +1613,10 @@ extern "C"
 			const Nums& from = full(x)->nums;
 			Nums& to = full(out)->nums;
 			full(out)->numbers = true;
-			to.reserve(from.count * static_cast<size_t>(std::max(0.0, std::ceil(n))));
+			double want = from.count * std::max(0.0, std::ceil(n));
+			if (want > 0x7fffffff)
+				Nums::too_many();
+			to.reserve(static_cast<size_t>(want));
 			for (double k = 0; k < n; ++k)
 			{
 				std::memcpy(to.data + to.count, from.data, from.count * sizeof(double));
