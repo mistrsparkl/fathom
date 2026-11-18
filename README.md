@@ -15,6 +15,18 @@ genesis:
 and the universe said i love you
 ```
 
+## Getting it
+
+You need [Python 3](https://www.python.org/downloads/). Then:
+
+```
+git clone https://github.com/mistrsparkl/stellanova
+```
+
+Add the `stellanova` folder to your PATH so the `stellanova` command works anywhere (or use `py -3 stellanova.py run game.stella`). New to it? Open Stellanova Studia (below) and press **Learn**.
+
+## Using it
+
 - `stellanova game.stella` runs a program. Nothing else is needed but Python 3. With LLVM, it runs as fast machine code: the first run after a change takes about half a second longer.
 - `stellanova build game.stella` makes it into a fast `.exe` of machine code (needs LLVM: `winget install LLVM.LLVM`).
 - `stellanova wasm game.stella` makes the same machine code as WebAssembly: `node game.mjs` runs it (see LANGUAGE.md).
@@ -27,7 +39,7 @@ and the universe said i love you
 
 Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.
 
-**Stellanova Studia** (`editor/studia`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studia`.
+**Stellanova Studia** (`editor/studia`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studia`. Press **Learn** for a short course.
 
 **Visual Studio Code**: `py -3 editor/make_vsix.py`, then `code --install-extension editor/stellanova.vsix`. It colours `.stella` files, shows mistakes while you type, completes words and explains a word when the mouse is on it. The setting `stellanova.home` is the folder with `stellanova.py`, if it has moved since the extension was made.
 
