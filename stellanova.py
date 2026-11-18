@@ -2243,8 +2243,7 @@ class Expr:
             if seq.writable and v.kind == NUMBER:  # in place, in the machine code itself
                 v.ir_store = lambda f, x: f.write_number_item(machine.owned(f, seq), machine.emit(f, index), x, line)
             elif seq.writable:
-                v.ir_own = lambda f: f.call("ptr", "cn_own_item", ("ptr", machine.owned(f, seq)), ("double", machine.emit(f, index)),
-                                            ("i32", line), checked=True)
+                v.ir_own = lambda f: f.own_item(machine.owned(f, seq), machine.emit(f, index), line)
                 v.ir_store = lambda f, x: f.write_item(machine.owned(f, seq), machine.emit(f, index), f.box(x, v.kind), line, v.kind)
             if JS:  # a JavaScript call can't be set, so the item is put in by the runtime
                 v.cpp_assign, v.cpp_close = f"stellanova::put_at({seq.cpp}, {strip_parens(index.cpp)}, {line}, ", ")"
@@ -2564,6 +2563,8 @@ class Expr:
             out = builtin("stellanova::sorted({a0})", v.kind, lambda env: sorted(a(env)), [v])
             if element(v.kind) == NUMBER:
                 out.ir = lambda f: f.op(f"call ptr @cn_sorted_numbers(ptr {machine.emit(f, v)})")
+            else:
+                out.ir = lambda f: f.op(f"call ptr @cn_sorted_texts(ptr {machine.emit(f, v)})")
             return reversed_list(out) if self.biggest_first() else out
         if tok == "items" and self.peek(1) not in ITEM_NOT_INDEX and not self.names.match(self.t, self.i)[0]:
             self.i += 1  # 'items 2 to 5 of names'

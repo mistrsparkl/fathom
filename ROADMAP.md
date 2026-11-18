@@ -25,7 +25,7 @@ Reaching other stuff
 
 Libraries
 - [x] Animation, physics, sound making, pictures
-- [x] 3D: models, textures, shaders, lights, cameras
+- [x] 3D: models (.obj, .gltf, .glb with bones and motions), textures, shaders, lights, cameras
 - [x] Zip, hashing, encryption, JSON paths, email
 - [x] Desktop forms
 - [x] Dates, XML and HTML, command-line options

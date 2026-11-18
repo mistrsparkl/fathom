@@ -1536,6 +1536,15 @@ extern "C"
 			std::stable_sort(f->boxed.begin(), f->boxed.end(), [](const V* a, const V* b) { return a->d < b->d; });
 		return out;
 	}
+	V* cn_sorted_texts(V* list)  // 'sorted names' for a list of text (stable; bytes of UTF-8 sort as Python's letters do)
+	{
+		V* out = copy_of(list);
+		static const std::string none;
+		auto words = [](const V* x) -> const std::string& { return x ? full(x)->s : none; };
+		Items& xs = cn_items(out);
+		std::stable_sort(xs.begin(), xs.end(), [&](const V* a, const V* b) { return words(a) < words(b); });
+		return out;
+	}
 	V* cn_join_texts(V* list, V* between)  // 'join names with ", "' for a list of text
 	{
 		const Items& items = cn_items(list);

@@ -161,6 +161,7 @@ declare ptr @cn_text_kept(ptr, i64, ptr)
 declare ptr @cn_deep(ptr)
 declare void @cn_entry_put_number(ptr, ptr, double)
 declare ptr @cn_sorted_numbers(ptr)
+declare ptr @cn_sorted_texts(ptr)
 declare ptr @cn_join_texts(ptr, ptr)
 declare ptr @cn_split(ptr, ptr, i32)
 declare void @cn_assign(ptr, ptr)
@@ -437,6 +438,22 @@ class Fn:
         self.jump(done)
         self.place(done)
         return self.op(f"phi ptr [ {a}, %{fast} ], [ {b}, %{slow_end} ]")
+
+    def own_item(self, lst, index, line):
+        """Item index of pets, about to be changed: in place unless it is held elsewhere too."""
+        at, fast, slow = self.item_place(lst, index)
+        done, plain = self.label("iown"), self.label("iplain")
+        a = self.op(f"load ptr, ptr {at}")
+        self.branch(self.op(f"icmp eq ptr {a}, null"), slow, plain)
+        self.place(plain)
+        shared = self.op(f"load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {a}, i64 4')}")  # (V's shared count)
+        self.branch(self.op(f"icmp eq i8 {shared}, 0"), done, slow)
+        self.place(slow)
+        b = self.call("ptr", "cn_own_item", ("ptr", lst), ("double", index), ("i32", line), checked=True)
+        slow_end = self.here
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi ptr [ {a}, %{plain} ], [ {b}, %{slow_end} ]")
 
     def write_item(self, lst, index, x, line, kind=None):
         """'set item i of pets to p', in place when it can."""
