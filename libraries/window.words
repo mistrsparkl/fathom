@@ -76,6 +76,7 @@ code:
   	inline bool pointer_held = false, pointer_fresh = false;  // 'hold the pointer': hidden, and brought back to the middle each frame
   	inline bool pointer_hidden = false;
   	inline double moved_x = 0, moved_y = 0, last_mouse_x = 0, last_mouse_y = 0;
+  	inline bool mouse_seen = false;
   	inline int width = 0, height = 0;
   	inline std::chrono::steady_clock::time_point last_frame;
   	enum { VK_BACK = 0x08, VK_TAB = 0x09, VK_RETURN = 0x0D, VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_ESCAPE = 0x1B, VK_SPACE = 0x20,
@@ -507,11 +508,12 @@ code:
   			mouse_x_now = width / 2;
   			mouse_y_now = height / 2;
   		}
-  		else if (!pointer_held)
+  		else if (!pointer_held && mouse_seen)
   		{
   			moved_x = mouse_x_now - last_mouse_x;
   			moved_y = mouse_y_now - last_mouse_y;
   		}
+  		mouse_seen = mouse_seen || mouse_x_now || mouse_y_now;  // its first place isn't a move
   		last_mouse_x = mouse_x_now;
   		last_mouse_y = mouse_y_now;
   		if (demo)
@@ -784,6 +786,7 @@ code:
   	inline double wheel_fresh = 0, wheel_now = 0;  // notches the wheel turned (away from you is more)
   	inline bool pointer_held = false, pointer_fresh = false;  // fresh: the jump to the middle isn't a move
   	inline double moved_x = 0, moved_y = 0, last_mouse_x = 0, last_mouse_y = 0;
+  	inline bool mouse_seen = false;
   	inline int width = 0, height = 0;
   	inline LARGE_INTEGER last_frame{};
 
@@ -1048,11 +1051,12 @@ code:
   			mouse_x_now = width / 2;
   			mouse_y_now = height / 2;
   		}
-  		else if (!pointer_held)
+  		else if (!pointer_held && mouse_seen)
   		{
   			moved_x = mouse_x_now - last_mouse_x;
   			moved_y = mouse_y_now - last_mouse_y;
   		}
+  		mouse_seen = mouse_seen || mouse_x_now || mouse_y_now;  // its first place isn't a move
   		last_mouse_x = mouse_x_now;
   		last_mouse_y = mouse_y_now;
   		if (demo)
