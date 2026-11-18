@@ -26,6 +26,7 @@ extern "C" char __stack_high;  // where WebAssembly's stack starts (set by the l
 #endif
 #include <atomic>
 #include <condition_variable>
+#include <utility>
 
 // ---- the collector: frees what nobody can reach; threads stop at safe points. Abilities: kind -> shape, for saving
 static std::map<std::string, std::map<std::string, V*>> able_kinds;
