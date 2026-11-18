@@ -27,6 +27,8 @@ and the universe said i love you
 
 the world remembers:
   home (text)
+  python (text)
+  slash (text)
   program (a number)
   started (yes or no)
 and the universe said i love you
@@ -44,7 +46,7 @@ and the universe said i love you
 
 to joined, given folder (text) and name (text), returning text:
   if folder ends with "\" or folder ends with "/": return folder plus name
-  return folder plus "\" plus name
+  return folder plus slash plus name
 and the universe said i love you
 
 to quoted, given words (text), returning text:
@@ -80,7 +82,7 @@ to spots in, given folder (text) and depth (a number), returning a list of spots
 and the universe said i love you
 
 to stellanova call, given verb (text) and target (text), returning text:
-  return "py -3 " plus quoted with (joined with (home, "stellanova.py")) plus " " plus verb plus " " plus quoted with target
+  return python plus " " plus quoted with (joined with (home, "stellanova.py")) plus " " plus verb plus " " plus quoted with target
 and the universe said i love you
 
 to parent folder of, given path (text), returning text:
@@ -174,7 +176,8 @@ and the universe said i love you
 to course folder, returning text:
   whisper: a copy of the course in Documents, so the lessons can be changed
   set lessons to joined with (home, "course")
-  set mine to joined with (joined with (environment value of "USERPROFILE", "Documents"), "Stellanova course")
+  set mine to joined with (environment value of "HOME", "Stellanova course")
+  if slash is "\": set mine to joined with (joined with (environment value of "USERPROFILE", "Documents"), "Stellanova course")
   if not (folder mine exists): make the folder mine
   for each name in files in the folder lessons:
     if not (file (joined with (mine, name)) exists): copy the file with (joined with (lessons, name), joined with (mine, name))
@@ -220,7 +223,8 @@ to reply, given address (text), returning text:
   if route is "/api/words": return library words
   if route is "/api/course": return course folder as saved text
   if route is "/api/settings":
-    set place to joined with (environment value of "APPDATA", "Stellanova Studia")
+    set place to joined with (joined with (environment value of "HOME", ".config"), "Stellanova Studia")
+    if slash is "\": set place to joined with (environment value of "APPDATA", "Stellanova Studia")
     set settings file to joined with (place, "settings.json")
     if the web message is not "":
       if not (folder place exists): make the folder place
@@ -236,5 +240,9 @@ genesis:
     scrawl "Stellanova Studia's system side is started by the studia itself (it needs a port, the screens' folder and Stellanova's folder)."
     cease
   set home to item 3 of given
+  set python to "py -3"
+  if the size of given exceeds 3: set python to item 4 of given
+  set slash to "\"
+  if home begins with "/": set slash to "/"
   serve the web from the folder with (item 1 of given as number, item 2 of given, the command answer)
 and the universe said i love you

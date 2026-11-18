@@ -1,5 +1,6 @@
 """Makes dist/stellanova-windows.zip for install.ps1. Upload: py -3 installer/make_release.py v0.1.0"""
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -37,8 +38,15 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6, strict_tim
     z.writestr("VERSION", VERSION)
 print(f"{out} ({out.stat().st_size // 1_000_000} MB)")
 
+assets = [str(out)]
+linux = HOME / "dist" / "stellanova-linux.tar.gz"
+if shutil.which("wsl"):  # the Linux one is made in WSL
+    here = "/mnt/" + HOME.drive[0].lower() + HOME.as_posix()[2:]
+    subprocess.run(["wsl", "-d", "Ubuntu", "--", "python3", f"{here}/installer/make_release_linux.py", VERSION], check=True)
+    assets.append(str(linux))
+
 if VERSION != "dev":
     gh = r"C:\Program Files\GitHub CLI\gh.exe"
-    subprocess.run([gh, "release", "create", VERSION, str(out), "--title", f"Stellanova {VERSION}",
-                    "--notes", "Install: irm https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.ps1 | iex"],
-                   cwd=HOME, check=True)
+    notes = ("Windows, in PowerShell: irm https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.ps1 | iex\n\n"
+             "Linux: curl -fsSL https://raw.githubusercontent.com/mistrsparkl/stellanova/main/install.sh | sh")
+    subprocess.run([gh, "release", "create", VERSION, *assets, "--title", f"Stellanova {VERSION}", "--notes", notes], cwd=HOME, check=True)

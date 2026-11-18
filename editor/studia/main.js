@@ -11,7 +11,9 @@ const here = __dirname;
 const home = path.resolve(here, "..", "..");
 const compiler = path.join(home, "stellanova.py");
 const screens = path.join(here, "ui");
-const systemExe = path.join(here, "system.exe");
+const windows = process.platform === "win32";
+const systemExe = path.join(here, windows ? "system.exe" : "system");
+const python = windows ? ["py", "-3"] : ["python3"];
 let system = null;
 
 function older(made, from) {
@@ -23,7 +25,7 @@ function remake() {
   const make = (made, from, ...words) => {
     if (!older(made, from)) return;
     try {
-      execFileSync("py", ["-3", compiler, ...words], { cwd: here, windowsHide: true });
+      execFileSync(python[0], [...python.slice(1), compiler, ...words], { cwd: here, windowsHide: true });
     } catch (e) {
       if (!fs.existsSync(made)) throw e;
     }
@@ -57,7 +59,7 @@ function answering(port, until = Date.now() + 15000) {
 async function start() {
   remake();
   const port = await freePort();
-  system = spawn(systemExe, [String(port), screens, home], { windowsHide: true, stdio: "ignore" });
+  system = spawn(systemExe, [String(port), screens, home, python.join(" ")], { windowsHide: true, stdio: "ignore" });
   await answering(port);
   const win = new BrowserWindow({
     width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Stellanova Studia",

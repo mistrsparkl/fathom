@@ -26,3 +26,6 @@ libraries/got/
 
 # release zips
 dist/
+
+# Studia built on Linux
+editor/studia/system

@@ -128,6 +128,7 @@ whisper: ---- helpers
 
 to joined path, given base (text) and name (text), returning text:
   if base ends with "\" or base ends with "/": return base plus name
+  if base begins with "/": return base plus "/" plus name
   return base plus "\" plus name
 and the universe said i love you
 
