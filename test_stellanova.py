@@ -504,6 +504,15 @@ def program_checks():
             out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "three.stella"], cwd=d, capture_output=True, text=True)
             assert "no mistakes found" in out.stdout, out.stdout
 
+    # A command that calls itself forever says so when built, instead of vanishing.
+    if compiler:
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "deep.stella").write_text('to deep, given n (a number), returning a number:\n  return (deep with n) plus 1\nand the universe said i love you\n\ngenesis:\n  scrawl "start"\n  scrawl deep with 1\nand the universe said i love you\n', encoding="utf-8")
+            exe = Path(d) / ("deep" if translate.machine.TARGET == "linux" else "deep.exe")
+            assert translate.build(Path(d) / "deep.stella", exe) is None
+            out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+            assert (out.stdout, out.stderr, out.returncode) == ("start\n", "commands called each other too many times in a row (they may never stop).\n", 1), (out.stdout, out.stderr, out.returncode)
+
     # glTF models: a bone bends its arm, the same every way; .glb too.
     def bending_arm(glb):
         import struct, base64, json
@@ -1558,8 +1567,8 @@ def program_checks():
         "'changed by' needs a command given a number returning something, not a command given text returning text."
 
     # Kept shapes, daylight, the pointer.
-    out = both('use: window\n\ngenesis:\n  open a world with "Kept", 640, 480\n  start keeping the shapes as "land"\n  for each x from -5 to 5:\n    for each z from 0 to 10:\n      etch a cube with (x horizontal 0 vertical z depth, 1, "green")\n  etch a ball with (0 horizontal 2 vertical 4 depth, 0.7, "yellow")\n  stop keeping the shapes\n  try:\n    stop keeping the shapes\n  if that went wrong:\n    scrawl the wound\n  try:\n    etch the kept shapes "sea"\n  if that went wrong:\n    scrawl the wound\n  try:\n    set the daylight to 2\n  if that went wrong:\n    scrawl the wound\n  set frames to 0\n  as long as the world lives and frames falls below 5:\n    set frames to frames plus 1\n    place the eye at 0 horizontal 3 vertical -6 depth\n    aim the eye with (frames times 0.3, -15)\n    consume the window with "#87ceeb"\n    set the daylight to 1 minus frames divided by 200\n    etch the kept shapes "land"\n    etch words with "right " plus mouse right clicked plus " wheel " plus mouse wheel turned, 10, 10, "white"\n    reveal the frame\n  scrawl "moved ", mouse moved across, " ", mouse moved down\n  forget the kept shapes "land"\n  try:\n    etch the kept shapes "land"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
-    assert out.stdout == 'no shapes are being kept. Start with: start keeping the shapes as "land"\nthere are no shapes kept as "sea".\nthe daylight is from 0 (dark) to 1 (full), not 2.\nmoved 0 0\nthere are no shapes kept as "land".\n', repr(out.stdout)
+    out = both('use: window\n\ngenesis:\n  open a world with "Kept", 640, 480\n  start keeping the shapes as "land"\n  for each x from -5 to 5:\n    for each z from 0 to 10:\n      etch a cube with (x horizontal 0 vertical z depth, 1, "green")\n  etch a ball with (0 horizontal 2 vertical 4 depth, 0.7, "yellow")\n  stop keeping the shapes\n  try:\n    stop keeping the shapes\n  if that went wrong:\n    scrawl the wound\n  try:\n    etch the kept shapes "sea"\n  if that went wrong:\n    scrawl the wound\n  try:\n    set the daylight to 2\n  if that went wrong:\n    scrawl the wound\n  set frames to 0\n  as long as the world lives and frames falls below 5:\n    set frames to frames plus 1\n    place the eye at 0 horizontal 3 vertical -6 depth\n    aim the eye with (frames times 0.3, -15)\n    consume the window with "#87ceeb"\n    set the daylight to 1 minus frames divided by 200\n    etch the kept shapes "land"\n    etch words with "right " plus mouse right clicked plus " wheel " plus mouse wheel turned, 10, 10, "white"\n    reveal the frame\n  scrawl "moved ", (mouse moved across) is (mouse moved across), " ", (mouse moved down) is (mouse moved down)\n  forget the kept shapes "land"\n  try:\n    etch the kept shapes "land"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
+    assert out.stdout == 'no shapes are being kept. Start with: start keeping the shapes as "land"\nthere are no shapes kept as "sea".\nthe daylight is from 0 (dark) to 1 (full), not 2.\nmoved yes yes\nthere are no shapes kept as "land".\n', repr(out.stdout)
 
     # Places can have negative parts written straight in.
     out = both('genesis:\n  scrawl 1 horizontal -2 vertical -3 depth, " / ", 5 horizontal -1 vertical\n  set x to 3\n'

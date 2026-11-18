@@ -14,6 +14,13 @@ static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 64, "machin
 #if defined(__linux__) || defined(__wasm__)
 #include <pthread.h>
 #include <setjmp.h>
+#endif
+#ifdef __linux__
+#include <signal.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#endif
+#if defined(__linux__) || defined(__wasm__)
 #elif !defined(__wasm__)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -900,9 +907,55 @@ static size_t index_of(const V* list, double number, int line)
 
 extern "C"
 {
+	static const char too_deep[] = "commands called each other too many times in a row (they may never stop).\n";
+#ifdef _WIN32
+	static LONG CALLBACK on_crash(EXCEPTION_POINTERS* e)  // (runs on the stack kept back by SetThreadStackGuarantee)
+	{
+		if (e->ExceptionRecord->ExceptionCode != EXCEPTION_STACK_OVERFLOW)
+			return EXCEPTION_CONTINUE_SEARCH;
+		std::cout << std::flush;
+		DWORD wrote;
+		WriteFile(GetStdHandle(STD_ERROR_HANDLE), too_deep, sizeof too_deep - 1, &wrote, nullptr);
+		ExitProcess(1);
+	}
+#elif defined(__linux__)
+	static char* stack_high = nullptr;
+	static size_t stack_size = 0;
+	static void on_crash(int, siginfo_t* info, void*)  // (runs on its own small stack)
+	{
+		char* at = static_cast<char*>(info->si_addr);
+		if (stack_size && at <= stack_high && at + stack_size + 65536 >= stack_high)
+		{
+			std::cout << std::flush;
+			if (write(2, too_deep, sizeof too_deep - 1) < 0)
+				_exit(1);
+			_exit(1);
+		}
+		signal(SIGSEGV, SIG_DFL);  // any other crash: as it would have been
+	}
+#endif
 	void cn_begin(int count, char** given)
 	{
 		stellanova::begin({}, count, given);
+#ifdef _WIN32
+		ULONG room = 64 * 1024;  // kept back so the message can still be written
+		SetThreadStackGuarantee(&room);
+		AddVectoredExceptionHandler(1, on_crash);
+#elif defined(__linux__)
+		char here;
+		stack_high = &here;
+		rlimit most{};
+		if (getrlimit(RLIMIT_STACK, &most) == 0 && most.rlim_cur != RLIM_INFINITY)
+			stack_size = static_cast<size_t>(most.rlim_cur);
+		static char spare[64 * 1024];
+		stack_t alt{};
+		alt.ss_sp = spare, alt.ss_size = sizeof spare;
+		sigaltstack(&alt, nullptr);
+		struct sigaction on{};
+		on.sa_sigaction = on_crash;
+		on.sa_flags = SA_SIGINFO | SA_ONSTACK;
+		sigaction(SIGSEGV, &on, nullptr);
+#endif
 	}
 	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
 	int cn_end()

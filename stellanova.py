@@ -6092,7 +6092,7 @@ def main(argv):
             sys.stdout.flush()
             sys.stderr.flush()
             # Exit straight away, so nothing is tidied from the wrong thread.
-            os._exit(code)
+            os._exit(code if code < 2 ** 31 else code - 2 ** 32)  # (a Windows crash code is above what _exit takes)
         exe = script.with_suffix("" if machine.TARGET == "linux" else ".exe")
         problem = build(script, exe)
         if problem:

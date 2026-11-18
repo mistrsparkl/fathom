@@ -233,6 +233,7 @@ class Module:
     def finish(self, files, plugin=None):
         """The module's LLVM code; plugins start with stellanova_start."""
         start = Fn(self, "main", [], None)
+        start.here = "entry"  # (its lines go straight after main's entry:)
         for cpp, kind in self.shared.items():
             self.constants.append(f"@g.{cpp} = internal global {ll_type(kind)} {zero_const(kind)}")
             start.put(f"store {ll_type(kind)} {start.zero(kind)}, ptr @g.{cpp}")
@@ -561,7 +562,7 @@ class Fn:
             if t != "ptr":
                 return zero_const(kind)
             if kind == TEXT:
-                return self.text_const("")
+                return self.text_const("", quick=into is None)
             if kind.startswith("command("):  # no command in it yet (invoking it is a problem)
                 return "null"
             if kind == PLACE:
@@ -756,14 +757,24 @@ class Fn:
         if mutable:
             self.release(old)
 
-    def text_const(self, s):
-        """Program text: made once."""
+    def text_const(self, s, quick=True):
+        """Program text: made once (quick: read straight from its slot once made)."""
         const, size = self.module.text(s)
         slot = const.replace("@s", "@ts")
         if slot not in self.module.text_slots:
             self.module.text_slots.add(slot)
             self.module.constants.append(f"{slot} = internal global ptr null")
-        return self.op(f"call ptr @cn_text_kept(ptr {const}, i64 {size}, ptr {slot})")
+        if not quick:
+            return self.op(f"call ptr @cn_text_kept(ptr {const}, i64 {size}, ptr {slot})")
+        a = self.op(f"load atomic ptr, ptr {slot} acquire, align {4 if TARGET == 'wasm' else 8}")
+        start, make, done = self.here, self.label("tmake"), self.label("tdone")
+        self.branch(self.op(f"icmp eq ptr {a}, null"), make, done)
+        self.place(make)
+        b = self.op(f"call ptr @cn_text_kept(ptr {const}, i64 {size}, ptr {slot})")
+        end = self.here
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi ptr [ {a}, %{start} ], [ {b}, %{end} ]")
 
     def as_text(self, value, kind):
         if kind == TEXT:
@@ -852,15 +863,20 @@ def loop(f, test, body, step=None):
     head = len(f.lines)
     f.put("call void @cn_statement()")  # each round: what the last round made may be freed
     cond = test()
+    tested = len(f.lines)
     f.branch(cond, inside, out)
     f.place(inside)
+    first = len(f.lines)
     f.loops.append((nxt, out))
     emit(f, body)
     f.loops.pop()
     f.place(nxt)
     if step:
         step()
-    if f.lines[head] == "  call void @cn_statement()" and makes_nothing(f.lines[head + 1:]):
+    if (f.lines[head] == "  call void @cn_statement()" and makes_nothing(f.lines[head + 1:tested]) and first < len(f.lines)
+            and f.lines[first] == "  call void @cn_statement()" and makes_nothing(f.lines[f.lines.index(f"{nxt}:", first):])):
+        del f.lines[head]  # the body's first line does it each round (the test and the step make nothing)
+    elif f.lines[head] == "  call void @cn_statement()" and makes_nothing(f.lines[head + 1:]):
         del f.lines[head]  # a loop that calls nothing only checks for a collector
         poll, wait = f.label("poll"), f.label("wait")
         f.jump(poll)
