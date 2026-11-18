@@ -1843,7 +1843,7 @@ def main():
     cpp = run("settings:\n  limit: 30 degrees\n\nto check, given goal (a place):\n  set gap to flat (goal minus centre of mass)\n"
               '  if the size of gap exceeds limit: cease\n  move turn rate toward 10 by at most 2 times frame time\n' + END)
     assert "constexpr double limit = 30.0;" in cpp, cpp
-    assert "void ATerranovaCreatureBody::Check(const FVector& goal)" in cpp, cpp
+    assert "void ACreatureBody::Check(const FVector& goal)" in cpp, cpp
     assert "if ((gap).Size() > Stellanova_probe::limit)" in cpp, cpp
     assert "TurnRateDegS = FMath::Clamp(10.0, TurnRateDegS - " in cpp, cpp
 

@@ -2,8 +2,8 @@ note: Words that scripts which are "part of: creature body" can use.
 note: Each line is: the words = what they mean in C++, their type, and "read only" if a script may not change them.
 note: Types are: number, yes or no, place, flat.
 
-class: ATerranovaCreatureBody
-header: TerranovaCreatureBody.h
+class: ACreatureBody
+header: CreatureBody.h
 
 fallen = bFallen, yes or no, read only
 wandering = bWander, yes or no
