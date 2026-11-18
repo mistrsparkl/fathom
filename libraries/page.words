@@ -1,7 +1,4 @@
-note: Words for web pages: finding and making the parts of a page, changing them, and answering what the person does.
-note: Use them in a program with:  use: page   and make it with:  stellanova web <script.stella>
-note: Every element of the page is a number (0 means none), so elements fit in names, lists and kinds of things.
-note: Sizes and places are in dots (CSS pixels), counted from the top left of the window.
+note: Web pages. Use: use: page  Build: stellanova web script.stella  Elements are numbers.
 
 web only
 
@@ -111,7 +108,7 @@ to scrolled down in the element, given element (a number), returning a number
 to scrolled across in the element, given element (a number), returning a number
   web: stellanova_page::get({element}, {line}).scrollLeft
 
-note: ---- answering the person: 'whenever with (button, "click", the command pressed)' where pressed is given the event
+note: ---- answering the person
 to listen for an event, given element (a number) and happening (text) and then (a command given a number)
   web: stellanova_page::whenever({element}, {happening}, {then}, {line})
 to the pointer x coordinate of, given event (a number), returning a number
@@ -147,13 +144,13 @@ to every, given seconds (a number) and then (a command)
 to wait for the next frame
   web: (await new Promise((done) => requestAnimationFrame(done)))
 
-note: ---- moving smoothly: a property goes from one value to another ('ease-out', 'linear', or any CSS easing)
+note: ---- moving smoothly
 to animate, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
   web: stellanova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
 to animate and wait, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
   web: (await stellanova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
 
-note: ---- drawing on a canvas element: start drawing on it, then shapes and dots
+note: ---- drawing on a canvas
 to start drawing on, given element (a number) and sharpness (a number)
   web: stellanova_page::draw_on({element}, {sharpness}, {line})
 drawing width = 0, number, read only
@@ -202,7 +199,7 @@ to loudness bands of, given element (a number) and bands (a number), returning a
   web: stellanova_page::bands({element}, {bands}, {line})
 
 javascript:
-  // Elements are numbers in a program; this keeps which number is which (weakly, so taken-away elements are let go).
+  // element numbers (held weakly)
   const stellanova_page = {
     known: new Map(),
     numbered: new WeakMap(),
@@ -235,7 +232,7 @@ javascript:
       const el = stellanova_page.get(n, line);
       el.scrollTop = el.scrollHeight;
     },
-    // events: each one the person makes gets a number for the command answering it
+    // each event gets a number
     events: new Map(),
     next_event: 1,
     event(n, line) {
@@ -319,7 +316,7 @@ javascript:
       if (!stellanova_page.canvas) stellanova.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
       return stellanova_page.canvas;
     },
-    // a whole file fetched into the page, so a song can be moved about in freely
+    // a whole file, so a song can be moved about in
     copies: new Map(),
     async copy(address, line) {
       if (stellanova_page.copies.has(address)) return stellanova_page.copies.get(address);

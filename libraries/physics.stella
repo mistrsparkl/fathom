@@ -1,6 +1,4 @@
-whisper: Physics for boxes: bodies that fall, slide, land on things and bounce. Written in Stellanova itself.
-whisper: Use it in a program with:  use: physics.stella
-whisper: x and y are a body's top left corner (y grows downward, as on the window). Speeds are per second.
+whisper: Physics for boxes. Use: use: physics.stella  x, y is the top left; speeds are per second.
 
 a body has:
   x (a number)
@@ -63,8 +61,7 @@ to push the body, for a physics world, given which (a number) and across (a numb
   set item which of bodies to b
 and the universe said i love you
 
-whisper: Each moving body falls, then moves across and is stopped by anything it hits, then moves down the same way.
-whisper: Bodies are moved one at a time, so each meets the others where they are now.
+whisper: Each body falls, then moves across, then down, stopped by what it hits.
 to step the physics, for a physics world, given seconds (a number):
   for each k from 1 to the size of bodies:
     set b to item k of bodies

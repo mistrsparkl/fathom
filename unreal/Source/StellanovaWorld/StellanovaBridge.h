@@ -1,4 +1,4 @@
-// What a Stellanova program (on its own thread) and Unreal (on the game thread) share.
+// What a program's thread and Unreal's game thread share.
 #pragma once
 #include "CoreMinimal.h"
 #include <condition_variable>
@@ -20,7 +20,7 @@ namespace stellanova_unreal
 
 	struct Flat  // flat drawing on top of the picture, in dots from the top left
 	{
-		int kind;  // 0 a box (x, y, width, height), 1 a circle (x, y, radius), 2 a line (x, y to w, h), 3 words (x, y, text size)
+		int kind;  // 0 box, 1 circle, 2 line, 3 words
 		float x, y, w, h;
 		FLinearColor colour;
 		std::string words;

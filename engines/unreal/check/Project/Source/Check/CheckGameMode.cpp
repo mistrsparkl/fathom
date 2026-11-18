@@ -1,5 +1,4 @@
-// The check scene: engines/check/words.stella on Mover and Target, and a ball falling onto Target.
-// After 3 seconds, what the program said and every object go into check.txt. Run by check.py, in the editor and packaged.
+// The check scene. Writes check.txt after 3 seconds.
 #include "CheckGameMode.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/StaticMesh.h"

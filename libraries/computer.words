@@ -1,4 +1,4 @@
-note: Words for the computer itself (Windows or Linux). Use them in a program with:  use: computer
+note: The computer itself. Use: use: computer
 
 code:
   #ifdef _WIN32
@@ -166,7 +166,7 @@ to end the program, given code (a number) = stellanova_computer::end_program({co
   runs: end_program({code})
   web: stellanova::leave({code})
 
-note: ---- programs running alongside: start one, read what it writes as it goes, type answers into it, stop it
+note: ---- programs running alongside
 
 include: <map>
 include: <memory>

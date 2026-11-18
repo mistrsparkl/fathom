@@ -21,7 +21,7 @@ code:
   #ifndef _WIN32
   namespace stellanova_web
   {
-  	// Linux: the system's curl does the asking (its words given straight to it, never through a shell).
+  	// Linux: the system's curl, never through a shell
   	inline bool curl(std::vector<std::string> words, std::string* out, bool fail_on_error = true)
   	{
   		words.insert(words.begin(), {"curl", fail_on_error ? "-sSfL" : "-sSL", "-A", "Stellanova", "--max-time", "60"});

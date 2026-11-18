@@ -1,7 +1,4 @@
-note: A window to draw in, for games and pictures. Use it in a program with:  use: window
-note: Places in the window are counted in dots (pixels) from its top left corner: x goes right, y goes down.
-note: Colours are names (black, white, red, green, blue, yellow, orange, purple, pink, brown, grey) or "#rrggbb".
-note: Built programs draw with Windows' own drawing (GDI), or on Linux into an X11 window; programs run directly draw with Tkinter; on the web the window is a canvas in the page.
+note: A window for games and pictures. Use: use: window  Places are dots from the top left.
 
 code:
   #ifdef _WIN32
@@ -52,7 +49,7 @@ code:
   #ifdef __linux__
   namespace stellanova_window
   {
-  	// Linux: an X11 window showing a picture kept in memory (drawn here, dot by dot), text from FreeType, pictures from libpng.
+  	// Linux: an X11 window, FreeType text, libpng pictures
   	typedef uint32_t COLORREF;  // as Windows has it: 0x00bbggrr
   	typedef long LONG;
   	struct POINT { long x, y; };
@@ -89,9 +86,7 @@ code:
   	constexpr int GetBValue(COLORREF c) { return c >> 16 & 255; }
   	inline uint32_t dot(COLORREF c) { return (uint32_t)GetRValue(c) << 16 | (uint32_t)GetGValue(c) << 8 | (uint32_t)GetBValue(c); }
 
-  	// Recording a game for a video (built programs only): STELLANOVA_DEMO_FRAMES names a file that gets every frame
-  	// (raw BGRA, width x height), and STELLANOVA_DEMO_KEYS a file of "frame key down|up" lines (or "frame quit") played
-  	// as if pressed. The window stays hidden and every frame counts as exactly 1/60 of a second.
+  	// Recording for video (built only): STELLANOVA_DEMO_FRAMES and STELLANOVA_DEMO_KEYS.
   	struct DemoKey { long frame; int key; bool down; };
   	inline FILE* demo_frames = nullptr;
   	inline std::vector<DemoKey> demo_keys;
@@ -194,7 +189,7 @@ code:
   		return 0;
   	}
 
-  	// ---- drawing into the picture (right and bottom edges not included, as on Windows)
+  	// ---- drawing into the picture
   	inline void fill_row(int y, int x0, int x1, uint32_t c)
   	{
   		if (y < 0 || y >= height)
@@ -725,7 +720,7 @@ code:
   				blend(x0 + i, y0 + j, p->argb[(size_t)j * p->w + i]);
   	}
 
-  	// The picture's middle at x, y; size 2 is twice as big; angle in degrees, turning clockwise.
+  	// Middle at x, y; size 2 is twice as big; angle clockwise.
   	inline void draw_picture_turned(const std::string& file, double x, double y, double size, double angle, int line)
   	{
   		need_window(line);
@@ -787,14 +782,12 @@ code:
   	inline double mouse_x_now = 0, mouse_y_now = 0;
   	inline bool right_fresh = false, right_clicked = false, right_down = false;
   	inline double wheel_fresh = 0, wheel_now = 0;  // notches the wheel turned (away from you is more)
-  	inline bool pointer_held = false, pointer_fresh = false;  // fresh: just held, so the jump to the middle isn't a move  // 'hold the pointer': hidden, and brought back to the middle each frame
+  	inline bool pointer_held = false, pointer_fresh = false;  // fresh: the jump to the middle isn't a move
   	inline double moved_x = 0, moved_y = 0, last_mouse_x = 0, last_mouse_y = 0;
   	inline int width = 0, height = 0;
   	inline LARGE_INTEGER last_frame{};
 
-  	// Recording a game for a video (built programs only): STELLANOVA_DEMO_FRAMES names a file that gets every frame
-  	// (raw BGRA, width x height), and STELLANOVA_DEMO_KEYS a file of "frame key down|up" lines (or "frame quit") played
-  	// as if pressed. The window stays hidden and every frame counts as exactly 1/60 of a second.
+  	// Recording for video (built only): STELLANOVA_DEMO_FRAMES and STELLANOVA_DEMO_KEYS.
   	struct DemoKey { long frame; int key; bool down; };
   	inline FILE* demo_frames = nullptr;
   	inline std::vector<DemoKey> demo_keys;
@@ -1138,7 +1131,7 @@ code:
   		g.DrawImage(image, (int)std::lround(x), (int)std::lround(y), (int)image->GetWidth(), (int)image->GetHeight());
   	}
 
-  	// The picture's middle at x, y; size 2 is twice as big; angle in degrees, turning clockwise.
+  	// Middle at x, y; size 2 is twice as big; angle clockwise.
   	inline void draw_picture_turned(const std::string& file, double x, double y, double size, double angle, int line)
   	{
   		need_window(line);
@@ -1183,10 +1176,7 @@ code:
 code:
   namespace stellanova_window
   {
-  	// The 3D words: the eye (camera) at a place, turned and tilted. Across is horizontal, up is vertical, away is depth.
-  	// Shapes wait in items3 until something flat is etched or the frame is revealed. Then the graphics card draws them
-  	// (OpenGL, with a depth buffer) into a hidden picture that is laid over the window; without OpenGL they are
-  	// drawn far ones first instead.
+  	// 3D: shapes wait, then OpenGL draws them over the window (far first without it).
   	struct V3 { double x, y, z; };
   	struct Kept;
   	struct Item3 { bool round; std::vector<V3> pts; V3 c; double r; COLORREF col; double far_first; V3 n{0, 0, 0}; Kept* kept = nullptr; };
@@ -1198,8 +1188,8 @@ code:
   	inline std::vector<Item3> items3;
   	inline double eye_x = 0, eye_y = 1.5, eye_z = -6, eye_turn = 0, eye_tilt = 0;
   	inline const double near3 = 0.05, far3 = 1000, pi3 = 3.14159265358979323846;
-  	inline double sun[3] = {0.371, 0.743, -0.557};  // toward the light: up, a little right and behind ('shine the light from')
-  	inline double view_angle = 60;  // how wide the eye sees, top to bottom, in degrees ('set the eye view to')
+  	inline double sun[3] = {0.371, 0.743, -0.557};  // toward the light
+  	inline double view_angle = 60;  // how wide the eye sees, in degrees
   	inline std::function<std::string(FVector, std::string)> shader;  // 'shade the shapes with': gives each shape its colour
 
   	inline void need_open(int line)
@@ -1356,7 +1346,7 @@ code:
   		}
   	}
 
-  	// ---- the graphics card (OpenGL 1.1, in every Windows, plus a framebuffer to draw into without showing it)
+  	// ---- the graphics card (OpenGL 1.1)
   #ifndef APIENTRY
   #define APIENTRY
   #endif
@@ -1554,7 +1544,7 @@ code:
   				draw(item);
   				continue;
   			}
-  			Kept& k = *item.kept;  // kept shapes go to the graphics card once, and are drawn from there after
+  			Kept& k = *item.kept;  // kept shapes go to the card once
   			if (!k.list)
   				k.list = glGenLists(1);
   			if (k.fresh)
@@ -1567,7 +1557,7 @@ code:
   			}
   			glCallList(k.list);
   		}
-  		if (daylight < 1)  // darken what was drawn: each colour times the daylight (empty places stay empty)
+  		if (daylight < 1)  // darken by the daylight
   		{
   			glDisable(GL_DEPTH_TEST);
   			glMatrixMode(GL_PROJECTION);
@@ -1645,7 +1635,7 @@ code:
   		{
   			double cx = (f.a.x + f.c.x) / 2, cy = (f.a.y + f.c.y) / 2, cz = (f.a.z + f.c.z) / 2;
   			if (keeping.empty() && f.n.x * (eye_x - cx) + f.n.y * (eye_y - cy) + f.n.z * (eye_z - cz) <= 0)
-  				continue;  // facing away from the eye (kept shapes keep every face: the eye will move)
+  				continue;  // facing away from the eye
   			double lit = f.n.x * sun[0] + f.n.y * sun[1] + f.n.z * sun[2];
   			polygon3({f.a, f.b, f.c, f.d}, shade(col, 0.6 + 0.4 * std::max(0.0, lit)), 0, f.n);
   		}
@@ -1767,7 +1757,7 @@ code:
   		}
   	}
 
-  	// ---- a picture laid on a flat part of the world, as a grid of coloured cells
+  	// ---- a picture laid on the world
   	inline void picture_in_space(const std::string& file, const FVector& corner, const FVector& across, const FVector& down, int line)
   	{
   		need_open(line);
@@ -2645,7 +2635,7 @@ mouse held = stellanova_window::mouse_down, yes or no, read only
   runs: win["down"]
   web: stellanova_window_web.down
 
-note: 3D. The eye is where the picture is seen from. Across is horizontal, up is vertical (more is higher), away is depth.
+note: 3D: the eye is where the picture is seen from.
 to place the eye at, given where (a place) = stellanova_window::place_eye({where})
   runs: place_eye({where})
   web: stellanova_window_web.placeEye({where})
@@ -2692,8 +2682,7 @@ the graphics card draws = stellanova_window::on_graphics_card(), yes or no, read
   runs: graphics_card()
   web: false
 
-note: Kept shapes: etch 3D shapes once, between 'start keeping the shapes as "land"' and 'stop keeping the shapes', and they aren't drawn yet.
-note: Then 'etch the kept shapes "land"' draws them all, every frame, much faster than etching them one by one (the graphics card keeps them).
+note: Kept shapes: etched once, drawn every frame, much faster.
 to start keeping the shapes as, given name (text) = stellanova_window::start_keeping({name}, {line})
   runs: start_keeping({name})
   web: stellanova_window_web.startKeeping({name}, {line})
@@ -2710,7 +2699,7 @@ to set the daylight to, given amount (a number) = stellanova_window::set_dayligh
   runs: set_daylight({amount})
   web: stellanova_window_web.setDaylight({amount}, {line})
 
-note: The pointer: 'hold the pointer' hides it and keeps it in the window, for looking around; 'mouse moved across' and 'mouse moved down' say how far it was moved since the last frame, in dots.
+note: The pointer: hold it for looking around.
 to hold the pointer = (stellanova_window::need_window({line}), stellanova_window::pointer_fresh = !stellanova_window::pointer_held, stellanova_window::pointer_held = true)
   runs: hold_pointer(True)
   web: stellanova_window_web.holdPointer(true, {line})
@@ -2739,7 +2728,7 @@ to colour from, given red (a number) and green (a number) and blue (a number), r
 
 javascript:
   const stellanova_window_web = {
-    // A window is a canvas in the page. With node (no screen) it is a window nobody sees: everything is checked, nothing is shown.
+    // On the web a window is a canvas in the page.
     colours: { black: "#000000", white: "#ffffff", red: "#dc2828", green: "#28b446", blue: "#325ae6", yellow: "#f5d228", orange: "#f58c1e",
                purple: "#8c3cc8", pink: "#f078b4", brown: "#825028", grey: "#808080", gray: "#808080" },
     keys: new Set(["left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"]),
@@ -2933,7 +2922,7 @@ javascript:
       this.draw(line, (g) => g.drawImage(im, (k % across) * w, Math.floor(k / across) * h, w, h, Math.round(x), Math.round(y), w, h));
     },
 
-    // ---- 3D: shapes wait until something flat is drawn or the frame is revealed, then are drawn far ones first
+    // ---- 3D: drawn far ones first
     eye: { x: 0, y: 1.5, z: -6, turn: 0, tilt: 0 },
     items: [], kept: new Map(), keeping: null, daylight: 1, sun: [0.371, 0.743, -0.557], angle: 60, shader: null, NEAR: 0.05,
     parts: (p) => [p.X, p.Y, p.Z || 0],

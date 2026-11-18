@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-os.environ["STELLANOVA_DIRECT"] = "1"  # direct runs here run the old way, so each test compares it with the built program
+os.environ["STELLANOVA_DIRECT"] = "1"  # direct runs use the interpreter here, to compare with built ones
 sys.path.insert(0, str(HERE))
 import stellanova as translate
 translate.LOGIC = Path(__file__).resolve().parent / "examples"
@@ -19,7 +19,7 @@ os.environ["STELLANOVA_GOT"] = tempfile.mkdtemp()  # libraries got while testing
 
 
 def smtp_catcher(port, got):
-    """Answers SMTP on 127.0.0.1:port; each message's text is added to got (for the email library's test)."""
+    """A tiny SMTP server for the email test."""
     import socket
     import threading
     listener = socket.socket()
@@ -62,7 +62,7 @@ def smtp_catcher(port, got):
 
 
 def web_stub(port):
-    """A tiny web server that says back the way, path, X-Pet and Content-Type headers and message; /missing is a 404."""
+    """A tiny web server that says back what it got."""
     import http.server
     import threading
 
@@ -84,7 +84,7 @@ def web_stub(port):
 
 
 def websocket_echo(port):
-    """A tiny WebSocket echo server (ws://127.0.0.1:port/), for the network library's test."""
+    """A tiny WebSocket echo server."""
     import base64
     import hashlib
     import socket
@@ -157,7 +157,7 @@ def error(body, part_of="this is part of: creature body\n\n"):
 
 
 def tutorial_checks():
-    """Every program in TUTORIAL.md has no mistakes, and the ones with an output block print exactly that."""
+    """TUTORIAL.md programs print what they show."""
     import re
     import subprocess
     doc = (HERE / "TUTORIAL.md").read_text(encoding="utf-8")
@@ -178,7 +178,7 @@ def tutorial_checks():
                 assert out.stdout == blocks[k + 1][1] and not out.stderr, f"TUTORIAL.md:\n{body}\nprinted:\n{out.stdout}{out.stderr}"
                 ran += 1
     assert ran >= 8, ran
-    # every whole program in LANGUAGE.md (one with genesis:) has no mistakes either
+    # whole programs in LANGUAGE.md have no mistakes
     whole = [b for b in re.findall(r"^```\n(.*?)^```", (HERE / "LANGUAGE.md").read_text(encoding="utf-8"), re.S | re.M)
              if re.search(r"^genesis:", b, re.M)]
     for body in whole:
@@ -235,8 +235,7 @@ def program_checks():
     assert perr('genesis:\n  otherwise: cease\n' + END)[1] == "'otherwise' needs an 'if' line just above it, at the same indent."
     assert perr('use: nothing here\ngenesis:\n  cease\n' + END)[1].startswith("There is no library called 'nothing here'. Libraries: animation, big numbers, computer, database, email, encryption, engine, folders, forms, hashing, json, letters, maths, network, page, patterns, pictures, screen, server, sound, sound making, spreadsheet, time, web, window, zip")
 
-    # Run real programs both ways: directly.
-    # Both must print exactly the same, so the two halves of every piece of the language agree.
+    # Real programs run both ways must print the same.
     import subprocess
     try:
         compiler = None if os.environ.get("STELLANOVA_NO_BUILD") else translate.machine.find_clang()
@@ -306,7 +305,7 @@ def program_checks():
                "maybe\n YES \nn\n").stdout
     assert out == "Again? Please type yes or no.\nAgain? yes\nSure? yes\n", repr(out)
 
-    # try: / if that went wrong: catches problems the same both ways, even from inside commands and libraries.
+    # try: catches problems the same both ways.
     out = both('use: web\ngenesis:\n  for each n from 1 to 3:\n    try:\n      scrawl item n of a list of (10, 20)\n'
                '    if that went wrong:\n      scrawl "Oops: ", the wound\n  try:\n    set x to contents of file "nope.txt"\n'
                '    scrawl "not here"\n  if that went wrong:\n    scrawl the wound\n  try:\n    risky\n  if that went wrong:\n'
@@ -325,7 +324,7 @@ def program_checks():
     assert out.stdout == "0.67 2.68 1235 -1.3\n", repr(out.stdout)
     assert out.stderr == "Line 3: I can round to 0 to 15 places, not 1.5.\n", repr(out.stderr)
 
-    # insert, and commands written where they are used (keeping copies of the names they use).
+    # insert, and commands written where used.
     out = both('to do twice, given f (a command given a number returning a number) and x (a number), returning a number:\n'
                '  return invoke f with (invoke f with x)\n' + END +
                'genesis:\n  set drinks to a list of ("milk", "juice")\n  insert "tea" at 2 in drinks\n  insert "water" at 1 in drinks\n'
@@ -362,7 +361,7 @@ def program_checks():
     assert out.stdout == "104, 105, 33\nhi!!\n", repr(out.stdout)
     assert out.stderr == "Line 7: a byte is a whole number from 0 to 255, not 300.\n", repr(out.stderr)
 
-    # Kinds of problem: each 'if that went wrong with a ...' takes its own; the rest go on.
+    # Kinds of problem.
     out = both(''.join([
                'to fill up, given litres (a number):\n'
                '  if litres exceeds 50:\n'
@@ -401,7 +400,7 @@ def program_checks():
                           "other: there is no item 9 in a list of 1 item. Items are counted from 1.\n"), repr(out.stdout)
     assert out.stderr == "Line 5: litres can't be less than 0\n", repr(out.stderr)
 
-    # Commands for a kind of thing, kept as values: they change a copy and give it back.
+    # Commands for a kind, kept as values.
     out = both(''.join([
                'a pet has:\n'
                '  name (text)\n'
@@ -439,7 +438,7 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
-    # Markup, written in Stellanova (libraries/markup.stella): HTML's loose ways (no </li>, <br>, bare values, script kept as it is) and XML
+    # Markup: HTML's loose ways, and XML.
     out = both('use: markup.stella\n\ngenesis:\n'
                '  set page to "<!DOCTYPE html><html><body><!-- note --><p class=\'intro\'>Fish &amp; chips<br>today</p><ul><li><a href=" plus '
                'a quotation mark plus "/one" plus a quotation mark plus ">One</a><li><a href=two>Two</a></ul><script>if (a < b) x();</script></body></html>"\n'
@@ -452,7 +451,7 @@ def program_checks():
                '  for each item in parts named with (feed, "item"):\n    scrawl attribute with (item, "id"), ": ", all words in item\n' + END)
     assert out.stdout == "/one One\ntwo Two\nintro [Fish & chipstoday] 1\n2 if (a < b) x();\n1: A\n2: B <b>\n", repr(out.stdout)
 
-    # Options, written in Stellanova (libraries/options.stella): '--name' and '--name=value' after the script, plain words, '--' ending options
+    # Options: --name, --name=value, plain words, --.
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "o.stella").write_text('use: options.stella\n\ngenesis:\n  scrawl has option "loud", " ", has option "quiet", " [", option value "size", '
                                           '"] [", option value with ("name", "nobody"), "] [", option value "loud", "]"\n  scrawl plain words\n' + END, encoding="utf-8")
@@ -463,7 +462,7 @@ def program_checks():
             assert translate.build(Path(d) / "o.stella", Path(d) / "o.exe") is None
             assert subprocess.run([str(Path(d) / "o.exe"), *typed], capture_output=True, text=True, cwd=d).stdout == said
 
-    # Physics, written in Stellanova (libraries/physics.stella): a box falls, bounces off a wall and lands.
+    # Physics: a box falls, bounces and lands.
     out = both(''.join([
                'use: physics.stella\n'
                '\n'
@@ -486,8 +485,7 @@ def program_checks():
     assert out.stdout == "122 280 yes\nno\n", repr(out.stdout + out.stderr)
     assert translate.plural_word("body") == "bodies" and translate.plural_word("box") == "boxes" and translate.plural_word("day") == "days"
 
-    # 3D: models (.obj with .mtl colours), triangles, pictures laid in space, the light, the eye's view, a shader command.
-    # Built, with its frames kept: the model's colours and the shader's show in the last frame.
+    # 3D: models, triangles, pictures, light, the eye, shaders.
     if compiler and os.name == "nt":
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "three.stella").write_text('to tint, given where (a place) and colour (text), returning text:\n  if (where of horizontal) exceeds 3:\n    return "#0000ff"\n  return colour\nand the universe said i love you\n\ngenesis:\n  open a world with ("3d", 160, 120)\n  repeat 3 times:\n    consume the window with "black"\n    place the eye at 0 horizontal 0 vertical -6 depth\n    set the eye view to 60\n    shine the light from 0 horizontal 0 vertical -1 depth\n    etch the model with ("cube.obj", -2 horizontal 0 vertical 0 depth, 0.8, 30, "")\n    etch a triangle in space with (1 horizontal 1 vertical 0 depth, 2 horizontal -1 vertical 0 depth, 0 horizontal -1 vertical 0 depth, "yellow")\n    etch the picture in space with ("sheet.png", 2.5 horizontal 1 vertical 0 depth, 2 horizontal 0 vertical 0 depth, 0 horizontal -1 vertical 0 depth)\n    shade the shapes with the command tint\n    etch a ball with (4 horizontal 0 vertical 0 depth, 0.3, "white")\n    stop shading the shapes\n    reveal the frame\n  end the world\nand the universe said i love you\n'.replace('"sheet.png"', '"cube.png"'), encoding="utf-8")
@@ -506,7 +504,7 @@ def program_checks():
             out = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "three.stella"], cwd=d, capture_output=True, text=True)
             assert "no mistakes found" in out.stdout, out.stdout
 
-    # Pictures: dots read and changed, saved as .png and read back, made from a list of numbers.
+    # Pictures: read, change, save, load.
     out = both(''.join([
                'use: pictures\n'
                'use: maths\n'
@@ -669,7 +667,7 @@ def program_checks():
                ]))
     assert out.stdout == 'clicked done, chose Tom, loud: yes\n[]\n', repr(out.stdout + out.stderr)
 
-    # Making sounds: tones, notes, mixing, effects, and .wav files written and read back.
+    # Making sounds and .wav files.
     out = both(''.join([
                'use: sound making\n'
                '\n'
@@ -715,7 +713,7 @@ def program_checks():
                           "elastic: 0 0.912 1.016 1.006 1\n15 6.25\n0.25 1 0\n0.25 0.5 0.5\n3 4 1\n50 horizontal 15 vertical 2 depth\n"), repr(out.stdout)
     assert out.stderr.startswith('Line 14: there is no easing called "wobbly".'), repr(out.stderr)
 
-    # Getting libraries: a .words file or a .zip of them, kept for every program; dropping one.
+    # Getting and dropping libraries.
     with tempfile.TemporaryDirectory() as d:
         import zipfile
         words = 'to greeting for, given who (text), returning text = std::string("hello, ") + {who}\n  runs: "hello, " + {who}\n  web: "hello, " + {who}\n'
@@ -735,7 +733,7 @@ def program_checks():
         assert "Dropped the library 'greet'" in say("drop", "greet")
         assert "There is no library called 'greet'" in say("check", "g.stella")
 
-    # Commands going alongside share the world's names, taking turns with a lock (a problem inside lets it go).
+    # Commands alongside share names, taking turns with a lock.
     out = both(''.join([
                'the world remembers:\n'
                '  total (a number)\n'
@@ -770,14 +768,14 @@ def program_checks():
     assert out.stdout == "inside the lock\nthe other one has it\n60000\n", repr(out.stdout + out.stderr)
     assert "can't leave it partway" in perr('to f:\n  holding the lock "a":\n    return\n' + END + 'genesis:\n  f\n' + END)[1]
 
-    # Values shared until one is changed: a change never shows up in a copy (lists, tables, things, and what they hold).
+    # A change never shows up in a copy.
     out = both('a dot has:\n  x (a number)\n  tags (a list of text)\n  inner (a list of numbers)\nand the universe said i love you\n\nto nudge, for a dot:\n  set x to x plus 1\n  add "n" to tags\nand the universe said i love you\n\nto grow, given xs (a list of numbers):\n  set mine to xs\n  add 99 to mine\n  scrawl "inside ", mine\nand the universe said i love you\n\ngenesis:\n  conjure a dot as d\n  add "a" to the tags of d\n  add 1 to the inner of d\n  set e to d\n  set the x of e to 5\n  add "b" to the tags of e\n  add 2 to the inner of e\n  scrawl the x of d, " ", the tags of d, " ", the inner of d\n  scrawl the x of e, " ", the tags of e, " ", the inner of e\n  set ds to a list of dots\n  add d to ds\n  add d to ds\n  set the x of item 1 of ds to 7\n  add "c" to the tags of item 2 of ds\n  scrawl the x of item 1 of ds, " ", the x of item 2 of ds, " ", the tags of item 1 of ds, " ", the tags of item 2 of ds, " ", the tags of d\n  for each p in ds:\n    set q to p\n    set the x of q to 100\n    add "z" to the tags of q\n    scrawl the tags of q, " ", the tags of p\n  scrawl the x of item 1 of ds, " ", the tags of item 1 of ds\n  nudge item 1 of ds\n  nudge d\n  scrawl the x of item 1 of ds, " ", the tags of item 1 of ds, " ", the x of item 2 of ds, " ", the tags of d\n  set xs to a list of (1, 2)\n  set ys to xs\n  grow xs\n  scrawl xs, " ", ys\n  set t to a table of lists of numbers\n  set entry "a" of t to xs\n  add 5 to entry "a" of t\n  set item 1 of entry "a" of t to 42\n  scrawl xs, " ", entry "a" of t\n  set u to t\n  add 6 to entry "a" of u\n  scrawl entry "a" of t, " ", entry "a" of u\n  set nest to a list of lists of numbers\n  add xs to nest\n  add xs to nest\n  add 8 to item 1 of nest\n  set item 1 of item 2 of nest to 0\n  scrawl nest, " ", xs\n  set copy to nest\n  for each row in copy:\n    set r to row\n    add 3 to r\n    scrawl r, " ", row\n  scrawl nest, " ", copy\nand the universe said i love you\n')
     assert out.stdout == '0 a 1\n5 a, b 1, 2\n7 0 a a, c a\na, z a\na, c, z a, c\n7 a\n8 a, n 0 a, n\ninside 1, 2, 99\n1, 2 1, 2\n1, 2 42, 2, 5\n42, 2, 5 42, 2, 5, 6\n(1, 2, 8), (0, 2) 1, 2\n1, 2, 8, 3 1, 2, 8\n0, 2, 3 0, 2\n(1, 2, 8), (0, 2) (1, 2, 8), (0, 2)' + chr(10), out.stdout
     out = both('genesis:\n  set t to a table of numbers\n  set entry "a" of t to 1\n  set u to t\n  set entry "a" of t to 2\n'
                '  set entry "a" of u to entry "a" of u plus 10\n  set x to entry "a" of t\n  set entry "a" of t to 3\n  scrawl t, " ", u, " ", x\n'
                '  set ts to a list of tables of numbers\n  add t to ts\n  set entry "a" of item 1 of ts to 9\n  scrawl t, " ", ts\n' + END)
     assert out.stdout == "a: 3 a: 11 2\na: 3 (a: 9)\n", out.stdout
-    if compiler:  # threads making values (and text written in the program) while the collector runs as often as it can
+    if compiler:  # threads making values while the collector runs often
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "busy.stella").write_text(
                 'a pet has:\n  name (text)\n' + END + '\nto churn, given name (text):\n  set pets to a list of pets\n'
@@ -789,7 +787,7 @@ def program_checks():
                                  env=dict(os.environ, STELLANOVA_COLLECT_OFTEN="1"))
             assert sorted(ran.stdout.split()) == sorted("a a-3000 b b-3000 c c-3000".split()), ran
 
-    # Lists of numbers (kept as plain numbers in built programs): every list word still works on them.
+    # Lists of plain numbers: every list word works.
     out = both('genesis:\n  set xs to a list of numbers\n  for each n from 1 to 5:\n    add n times 2 to xs\n  insert 7 at 2 in xs\n'
                '  remove item 1 from xs\n  set item 1 of xs to 0.5\n'
                '  scrawl xs, " ", the size of xs, " ", item 3 of xs, " ", last item of xs, " ", sum of xs\n  set ys to xs\n  add 100 to ys\n'
@@ -799,7 +797,7 @@ def program_checks():
     assert out.stdout == "0.5, 4, 6, 8, 10 5 6 10 28.5\nno yes yes\n0.5, 4, 8, 10\n1.5, 5, 9, 11\n8, 10\n128.5\n", repr(out.stdout)
     assert out.stderr == "Line 20: there is no item 9 in a list of 4 items. Items are counted from 1.\n", repr(out.stderr)
 
-    # Text growing in place ('set s to s plus ...'): every other holder still sees what it had.
+    # Text growing in place.
     out = both(''.join([
                'to shout, given words (text), returning text:\n'
                '  set said to words\n'
@@ -911,7 +909,7 @@ def program_checks():
         out = both('use the library "kernel32.dll":\n  to nothing here, returning a number = int NoSuchFunction()\nand the universe said i love you\ngenesis:\n  scrawl nothing here\n' + END)
         assert out.stderr == 'Line 5: the library "kernel32.dll" has no function called NoSuchFunction.\n', repr(out.stderr)
 
-    # Kinds for any kind: a copy of 'a stack of anything' for each kind it is used with.
+    # Kinds for any kind.
     out = both(''.join([
                'a stack of anything has:\n'
                '  items (a list of anything)\n'
@@ -955,7 +953,7 @@ def program_checks():
                ]))
     assert out.stdout == "7\na stack of numbers (items: 3)\nhello\nRex\n1\n", repr(out.stdout)
 
-    # List maths, and sorting things by one of their parts (ties keep their order).
+    # List maths, and stable sorting by a part.
     out = both('a pet has:\n  name (text)\n  age (a number)\n' + END +
                'genesis:\n  set xs to a list of (4, 1.5, 9, 2)\n  set sum to 1\n'
                '  scrawl sum of xs, " ", average of xs, " ", biggest of xs, " ", smallest of xs, " ", sum of a list of numbers, " ", sum\n'
@@ -968,7 +966,7 @@ def program_checks():
                           "a pet (name: Ann, age: 9), a pet (name: Bo, age: 3), a pet (name: Rex, age: 3)\n"), repr(out.stdout)
     assert out.stderr == "Line 12: the list is empty, so it has no average.\n", repr(out.stderr)
 
-    # save ... to file / load ... from file: every kind, written exactly the same both ways.
+    # save and load: the same both ways.
     out = both('a pet has:\n  name (text)\n  age (a number)\n  tricks (a list of text)\n' + END +
                'a home has:\n  owner (a pet)\n  pets (a list of pets)\n  spot (a place)\n' + END +
                'genesis:\n  set q to a quotation mark\n  set h to conjure a home\n'
@@ -1003,7 +1001,7 @@ def program_checks():
     assert perr("genesis:\n  scrawl\n" + END)[1] == "'scrawl' needs something to show, like: scrawl \"hello\"."
     assert perr("genesis:\n  say 1\n" + END)[1] == "'say' is now 'scrawl', like: scrawl \"hello\"."
 
-    # Things with a birth get an existence; setting birth (of a thing, or on its own) moves existence there.
+    # birth and existence.
     out = both('a ball has:\n  birth (a flat place)\n  speed (a number)\n' + END +
                'genesis:\n  set b to conjure a ball\n  set the birth of b to 10 horizontal 20 vertical\n'
                '  set the existence of b of horizontal to 99\n  scrawl b\n  set the birth of b to 1 horizontal 2 vertical\n'
@@ -1023,7 +1021,7 @@ def program_checks():
                '  scrawl frame time exceeds 0.01 and frame time falls below 0.5\n  end the world\n' + END)
     assert out.stdout == "yes\n", repr(out.stdout)
 
-    # Commands for a kind of thing change the thing itself, even one inside a list.
+    # Commands for a kind change the thing itself.
     out = both('a ball has:\n  birth (a flat place)\n  speed (a flat place)\n  bounces (a number)\nand the universe said i love you\n\nto bounce, for a ball:\n  set the speed of vertical to the speed of vertical times -1\n  set bounces to bounces plus 1\nand the universe said i love you\n\nto move along, for a ball, given steps (a number):\n  repeat steps times:\n    set existence to existence plus speed\nand the universe said i love you\n\nto how far, for a ball, returning a number:\n  return the size of (existence minus birth)\nand the universe said i love you\n\nto restart, for a ball:\n  set birth to 0 horizontal 0 vertical\n  set ball to ball\nand the universe said i love you\n\ngenesis:\n  set b to conjure a ball\n  set the birth of b to 10 horizontal 10 vertical\n  set the speed of b to 3 horizontal 4 vertical\n  move along with (b, 2)\n  bounce b\n  scrawl b\n  scrawl how far b\n  set balls to a list of balls\n  add b to balls\n  bounce item 1 of balls\n  restart item 1 of balls\n  scrawl item 1 of balls\nand the universe said i love you\n')
     assert out.stdout == ("a ball (birth: 10 horizontal 10 vertical, existence: 16 horizontal 18 vertical, "
                           "speed: 3 horizontal -4 vertical, bounces: 1)\n10\n"
@@ -1039,7 +1037,7 @@ def program_checks():
     assert perr("genesis:\n  set birth to 1 horizontal 1 vertical\n  scrawl existence touches a side\n" + END)[1] == \
         "'touches a side' needs to know how big the thing is: set radius first, like 'set radius to 20'."
 
-    # Two things touch when their circles (existence and radius) overlap; a place uses the radius in reach.
+    # Touching: circles overlap.
     out = both('a ball has:\n  birth (a flat place)\n  radius (a number)\n' + END +
                'to near, for a ball, given other (a ball), returning a yes or no:\n  return existence touches other\n' + END +
                'genesis:\n  set c to conjure a ball\n  set b to conjure a ball\n  set the birth of c to 0 horizontal 0 vertical\n'
@@ -1049,7 +1047,7 @@ def program_checks():
     assert out.stdout == "no\nyes\nyes\nno\n", repr(out.stdout)
     assert perr("genesis:\n  scrawl 3 touches 4\n" + END)[1] == "'touches' needs a thing or a place, not a number."
 
-    # Kinds of kinds: a dog has all of a pet's parts and does a pet's commands, unless it has its own version.
+    # Kinds of kinds.
     kinds = ('a pet has:\n  name (text)\n  age (a number)\n' + END + 'a dog is a kind of pet that has:\n  tricks (a list of text)\n' + END +
              'a puppy is a kind of dog:\n' + END + 'a cat is a kind of pet that also has:\n  lives (a number)\n' + END +
              'to speak, for a pet:\n  scrawl name, " makes a sound"\n' + END +
@@ -1061,7 +1059,7 @@ def program_checks():
                '  scrawl grow with (d, 3), " ", grow with (c, 2), " ", grow with (u, 1)\n  scrawl d\n  scrawl c\n  scrawl u\n' + END)
     assert out.stdout == ("Blob makes a sound\nRex says woof and knows 1 tricks\nBit says woof and knows 0 tricks\nTom makes a sound\n3 2 1\n"
                           "a dog (name: Rex, age: 3, tricks: sit)\na cat (name: Tom, age: 2, lives: 9)\na puppy (name: Bit, age: 1, tricks: (nothing))\n"), repr(out.stdout)
-    # A dog can go where a pet goes (inputs, lists, names, return) as a pet: a copy with just a pet's parts.
+    # A dog used as a pet.
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\na dog is a kind of pet that has:\n  tricks (a list of text)\nand the universe said i love you\n\na puppy is a kind of dog:\nand the universe said i love you\n\nto show, given p (a pet):\n  scrawl "pet: ", p\nand the universe said i love you\n\nto oldest, given pets (a list of pets), returning a pet:\n  set best to conjure a pet\n  for each p in pets:\n    if the age of p exceeds the age of best: set best to p\n  return best\nand the universe said i love you\n\nto adopt, given name (text), returning a pet:\n  set d to conjure a dog\n  set the name of d to name\n  set the age of d to 2\n  return d\nand the universe said i love you\n\ngenesis:\n  set d to conjure a dog\n  set the name of d to "Rex"\n  set the age of d to 5\n  add "sit" to the tricks of d\n  show d\n  set u to conjure a puppy\n  set the name of u to "Bit"\n  set the age of u to 1\n  set shelter to a list of pets\n  add d to shelter\n  add u to shelter\n  add adopt with "Jo" to shelter\n  scrawl shelter\n  scrawl oldest with shelter\n  set p to conjure a pet\n  set p to u\n  scrawl p\n  set item 1 of shelter to u\n  scrawl item 1 of shelter\n  scrawl d\nand the universe said i love you\n')
     assert out.stdout == 'pet: a pet (name: Rex, age: 5)\na pet (name: Rex, age: 5), a pet (name: Bit, age: 1), a pet (name: Jo, age: 2)\na pet (name: Rex, age: 5)\na pet (name: Bit, age: 1)\na pet (name: Bit, age: 1)\na dog (name: Rex, age: 5, tricks: sit)\n', repr(out.stdout)
     assert perr(kinds + 'genesis:\n  set d to conjure a dog\n  set d to conjure a pet\n' + END)[1] == "'d' holds a dog, not a pet."
@@ -1072,7 +1070,7 @@ def program_checks():
     assert perr(kinds + 'to speak, for a cat, given loud (yes or no):\n  cease\n' + END + 'genesis:\n  cease\n' + END)[1] == \
         "Every version of 'speak' must take the same inputs and return the same kind."
 
-    # Commands as values: kept in names, lists and parts, given to and given back by commands, done with 'invoke'.
+    # Commands as values.
     out = both('a button has:\n  label (text)\n  press (a command)\nand the universe said i love you\n\nto double, given x (a number), returning a number:\n  return x times 2\nand the universe said i love you\n\nto half, given x (a number), returning a number:\n  return x divided by 2\nand the universe said i love you\n\nto greet, given who (text):\n  scrawl "Hello, ", who\nand the universe said i love you\n\nto apply to all, given f (a command given a number returning a number) and items (a list of numbers), returning a list of numbers:\n  set out to a list of numbers\n  for each item in items: add invoke f with item to out\n  return out\nand the universe said i love you\n\nto chooser, given big (yes or no), returning a command given a number returning a number:\n  if big: return the command double\n  return the command half\nand the universe said i love you\n\ngenesis:\n  set f to the command double\n  scrawl invoke f with 21\n  scrawl apply to all with (the command half, a list of (1, 2, 3))\n  set steps to a list of (the command double, the command half, the command round)\n  for each step in steps: scrawl invoke step with 16\n  invoke the command greet with "Sam"\n  set g to the command greet\n  invoke g with "Jo"\n  scrawl invoke (chooser with yes) with 5, " ", invoke (chooser with no) with 5\n  scrawl f\n  set b to conjure a button\n  try:\n    invoke the press of b\n  if that went wrong:\n    scrawl the wound\n  set h to a list of commands given a number returning a number\n  scrawl the size of h\n  set p to the command power of\n  scrawl invoke p with (2, 10)\n  set the press of b to the command hi\n  invoke the press of b\n  scrawl b\nand the universe said i love you\n\nto hi:\n  scrawl "hi!"\nand the universe said i love you\n')
     assert out.stdout == "42\n0.5, 1, 1.5\n32\n8\n16\nHello, Sam\nHello, Jo\n10 2.5\na command\nthere is no command in it yet: set it to one first, like 'set f to the command double'.\n0\n1024\nhi!\na button (label: , press: a command)\n", repr(out.stdout)
     assert perr('to hi:\n  cease\n' + END + 'genesis:\n  scrawl the command hi is the command hi\n' + END)[1] == \
@@ -1103,14 +1101,14 @@ def program_checks():
     assert out.stdout == "umbrella\ncoat\nboots\nenjoy the sun\neight\n", repr(out.stdout)
     assert perr('genesis:\n  depending on 1:\n    anything else: scrawl 1\n' + END)[1] == "Put at least one choice before 'anything else:'."
 
-    # whenever / every: after the other lines, again and again until the program ends
+    # whenever / every
     out = both('genesis:\n  set ticks to 0\n  every 0.05 seconds:\n    set ticks to ticks plus 1\n    scrawl "tick [ticks]"\n'
                '  whenever ticks exceeds 2:\n    scrawl "past two"\n  whenever ticks is 4:\n    scrawl "bye"\n    end the program with 0\n'
                '  scrawl "watching"\nand the universe said i love you\n')
     assert out.stdout == "watching\ntick 1\ntick 2\ntick 3\npast two\ntick 4\nbye\n", repr(out.stdout)
     assert perr('genesis:\n  every banana:\n    scrawl 1\n' + END)[1] == "Write 'every 2 seconds:' or 'every frame:'."
 
-    # stellanova watch: each line as it runs, the names it changed, and each if's answer
+    # stellanova watch
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "w.stella").write_text('genesis:\n  set coins to 3\n  if coins exceeds 2:\n    scrawl "rich"\n'
                                           '  for each n from 1 to 2:\n    add n to coins\nand the universe said i love you\n', encoding="utf-8")
@@ -1119,7 +1117,7 @@ def program_checks():
     assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
                      "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
 
-    # stellanova debug: stops, stepping into, over and out of commands, names; and the studia's marked lines
+    # stellanova debug, and Studia's marked lines
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "d.stella").write_text('to double, given x (a number), returning a number:\n  set y to x times 2\n  return y\n'
                                           'and the universe said i love you\n\ngenesis:\n  set total to 0\n  for each n from 1 to 3:\n'
@@ -1136,7 +1134,7 @@ def program_checks():
         assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked
         assert shown.splitlines()[-1] == "12", shown
 
-    # stellanova profile: the program runs, then the lines that took the time, with how often each ran
+    # stellanova profile
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "p.stella").write_text('to slow sum, given n (a number), returning a number:\n  set total to 0\n  for each k from 1 to n:\n'
                                           '    set total to total plus k times k\n  return total\nand the universe said i love you\n\n'
@@ -1146,7 +1144,7 @@ def program_checks():
     assert shown[:4] == ["9045050", "9045050", "", "Where the time went (the 20 slowest lines, by their own time):"], shown
     runs = {int(l.split()[0]): int(l.split()[1]) for l in shown[5:]}
     assert runs == {2: 2, 3: 2, 4: 600, 5: 2, 9: 1, 10: 1}, runs
-    # stellanova wasm: WebAssembly, run by node's WASI, the same as running directly (the collector working hard)
+    # stellanova wasm
     if node and (translate.machine.WASI / "wasi-sysroot-34.0").exists():
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "w.stella").write_text(
@@ -1175,7 +1173,7 @@ def program_checks():
             ran = subprocess.run([node, "m.mjs"], capture_output=True, text=True, cwd=d)
             assert (ran.stdout, ran.returncode) == ("1\n", 0), ran
 
-    # stellanova check: a program for a web page is checked as one (and a real mistake in it is still found)
+    # stellanova check on a web program
     with tempfile.TemporaryDirectory() as d:
         page = 'use: page\n\ngenesis:\n  set the text with (the element "#count", "Hi")\nand the universe said i love you\n'
         (Path(d) / "c.stella").write_text(page, encoding="utf-8")
@@ -1186,7 +1184,7 @@ def program_checks():
         said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "check", "c.stella"], capture_output=True, text=True,
                               encoding="utf-8", cwd=d).stdout
         assert "nope" in said and "no mistakes" not in said, said
-        # tidy: two spaces a step (a tab is 4 spaces), no spaces at line ends, one empty line between parts; the file's own line ends kept
+        # tidy: two spaces a step, no trailing spaces, line ends kept
         (Path(d) / "t.stella").write_bytes(b'to greet, given who (text):   \r\n    if who is "x":\r\n\t\tscrawl "hi   there"\r\n'
                                            b'    scrawl who\r\nand the universe said i love you\r\ngenesis:\r\n\r\n\r\n   greet with "x"\r\n' + END.encode() + b'\r\n\r\n')
         said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "tidy", "t.stella"], capture_output=True, text=True, cwd=d).stdout
@@ -1196,7 +1194,7 @@ def program_checks():
                                                        b'and the universe said i love you\r\n'), (Path(d) / "t.stella").read_bytes()
         said = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "tidy", "t.stella"], capture_output=True, text=True, cwd=d).stdout
         assert said == "t.stella: already tidy.\n", said
-        if node:  # the VS Code extension shows the same mistake on its line, completes words and explains them on hover
+        if node:  # the VS Code extension
             (Path(d) / "e.stella").write_text('to greet, given who (text):\n  scrawl who\n' + END + 'genesis:\n'
                                               '  scrawl days between with ("2026-01-01", "2026-01-03")\n  scrawl nope\n' + END, encoding="utf-8")
             said = subprocess.run([node, str(HERE / "editor" / "check_extension.js"), str(Path(d) / "e.stella")], capture_output=True,
@@ -1205,7 +1203,7 @@ def program_checks():
                 said[2] == "days between, given first (text) and last (text), returning a number", said
             assert not list(Path(d).glob(".*.checking.stella")), "the copy being checked is left behind"
 
-    # an if line counts every time it is tried, not only when its test is yes
+    # an if line counts every try
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "p.stella").write_text('genesis:\n  for each k from 1 to 10:\n    if k exceeds 8: scrawl k\nand the universe said i love you\n', encoding="utf-8")
         shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "profile", "p.stella"], capture_output=True, text=True,
@@ -1219,7 +1217,7 @@ def program_checks():
     assert out.stdout == "yes yes yes no\nagreed\n", repr(out.stdout)
     assert perr('genesis:\n  scrawl 2 is one of ("a", "b")\n' + END)[1].startswith("'is one of' needs choices of the same kind")
 
-    # a command with no inputs, followed by more words (it takes no input from them)
+    # a command with no inputs, then more words
     out = both('to greeting, returning text:\n  return "hi"\nand the universe said i love you\n\ngenesis:\n  scrawl greeting as saved text\n'
                'and the universe said i love you\n')
     assert out.stdout == '"hi"\n', repr(out.stdout)
@@ -1261,7 +1259,7 @@ def program_checks():
     out = both('genesis:\n  scrawl "[", "ab" repeated 3 times, "] [", "x" repeated 0 times, "]"\n  set row to a list of (0, 1) repeated 2 times\n  scrawl row\n  set rows to a list of lists of numbers\n  add a list of (1, 2) to rows\n  add a list of (3) to rows\n  scrawl flattened rows, " ", the size of flattened rows\n  set names to flattened a list of (a list of ("a", "b"), a list of ("c"))\n  scrawl names\n  try:\n    scrawl "a" repeated (0 minus 1) times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "[ababab] []\n0, 1, 0, 1\n1, 2, 3 3\na, b, c\n'repeated' needs a whole number of times, 0 or more, not -1.\n", repr(out.stdout)
 
-    # reversed, repeated and flattened on lists of things build too (they once made C++ that named a kind it didn't know)
+    # reversed, repeated and flattened on lists of things
     out = both('a pet has:\n  name (text)\nand the universe said i love you\n\ngenesis:\n  conjure a pet as rex\n  set the name of rex to "Rex"\n  conjure a pet as tom\n  set the name of tom to "Tom"\n  set pets to a list of pets\n  add rex to pets\n  add tom to pets\n  scrawl reversed pets\n  scrawl pets repeated 2 times\n  set groups to a list of lists of pets\n  add pets to groups\n  add reversed pets to groups\n  scrawl flattened groups\n  scrawl reversed a list of (1, 2, 3), " ", "ab" repeated 2 times, " ", flattened a list of (a list of (1), a list of (2, 3))\n  try:\n    scrawl pets repeated 0.5 times\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == "a pet (name: Tom), a pet (name: Rex)\na pet (name: Rex), a pet (name: Tom), a pet (name: Rex), a pet (name: Tom)\na pet (name: Rex), a pet (name: Tom), a pet (name: Tom), a pet (name: Rex)\n3, 2, 1 abab 1, 2, 3\n'repeated' needs a whole number of times, 0 or more, not 0.5.\n", repr(out.stdout)
 
@@ -1274,7 +1272,7 @@ def program_checks():
     # sorted by what each works out to
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set names to a list of ("Rex", "Al", "Tomas", "Bo", "Max")\n  scrawl sorted names by each n becomes the size of n\n  scrawl sorted names by each n becomes the size of n, biggest first\n  scrawl sorted a list of (3, -5, 1) by each x becomes x times x\n  set pets to a list of pets\n  for each n in names:\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  scrawl sorted pets by each p becomes letter 2 of the name of p\nand the universe said i love you\n')
     assert out.stdout == 'Al, Bo, Rex, Max, Tomas\nTomas, Rex, Max, Al, Bo\n1, 3, -5\na pet (name: Max, age: 3), a pet (name: Rex, age: 3), a pet (name: Al, age: 2), a pet (name: Tomas, age: 5), a pet (name: Bo, age: 2)\n', repr(out.stdout)
-    # text in any alphabet, and emoji: counted, cut and changed letter by letter
+    # any alphabet and emoji
     out = both('use: letters\n\ngenesis:\n  set word to "Ünïcødé 😀 Ωμέγα"\n  scrawl the size of word\n  scrawl letter 9 of word, " ", letter 1 of word, " ", letters 11 to 15 of word\n  scrawl upper case of word\n  scrawl lower case of word\n  scrawl position of "😀" in word, " ", position of "Ω" in word\n  scrawl word contains "😀", " ", word begins with "Ün", " ", word ends with "γα"\n  scrawl replace "😀" with "🙂" in word\n  scrawl word split by " "\n  scrawl "[", "ñ" padded to 3 letters, "] ", "é" repeated 3 times\n  scrawl "[", trimmed "  ñ  ", "]"\n  scrawl the words of "à la carte"\n  scrawl code of the letter "😀", " ", the letter with code 937\n  scrawl sorted a list of ("é", "e", "z", "Ω")\n  scrawl "😀😀" is "😀😀", " ", the size of ""\n  for each n from 1 to 3:\n    scrawl letter n of "a😀b"\nand the universe said i love you\n')
     assert out.stdout == '15\n😀 Ü Ωμέγα\nÜNÏCØDÉ 😀 ΩΜΈΓΑ\nünïcødé 😀 ωμέγα\n9 11\nyes yes yes\nÜnïcødé 🙂 Ωμέγα\nÜnïcødé, 😀, Ωμέγα\n[ñ  ] ééé\n[ñ]\nà, la, carte\n128512 Ω\ne, z, é, Ω\nyes 0\na\n😀\nb\n', repr(out.stdout)
     # markup: a new <li>, <td> or <p> ends the one before it, as in browsers
@@ -1342,7 +1340,7 @@ def program_checks():
                'and the universe said i love you\n')
     assert out.stdout == "tea costs 3.5\nBob's cake costs 12\n1\nthe database couldn't do it: there is no table called \"nowhere\", so make it first with CREATE TABLE (it said: no such table: nowhere).\n", repr(out.stdout)
 
-    # JSON from web services: other spellings of a part's name, null, and parts not asked for
+    # JSON from web services
     q = "plus a quotation mark plus"
     out = both('a forecast has:\n  city (text)\n  temperature (a number)\n  wind speed (a number)\nand the universe said i love you\n\n'
                f'genesis:\n  set reply to "{{" {q} "city" {q} ": " {q} "Oslo" {q} ", " {q} "temperature" {q} ": null, " {q} "Wind_Speed" {q} '
@@ -1364,13 +1362,13 @@ def program_checks():
     assert (tested.stdout, tested.returncode) == ("\u2713 test doubling\n\u2717 test names: line 11: this check failed: the size of names is 3\n"
                                                   "2 tests: 1 passed, 1 failed.\n", 1), (tested.stdout, tested.returncode)
 
-    # nothing: a thing that isn't there ('no enemy', 'is nothing', 'is something')
+    # nothing
     out = both('an enemy has:\n  name (text)\n  health (a number)\nand the universe said i love you\n\nto the weakest, given enemies (a list of enemys), returning an enemy:\n  set best to no enemy\n  for each e in enemies:\n    if best is nothing or the health of e falls below the health of best:\n      set best to e\n  return best\nand the universe said i love you\n\ngenesis:\n  set foes to a list of enemys\n  scrawl the weakest with foes\n  scrawl (the weakest with foes) is nothing\n  conjure an enemy as orc\n  set the name of orc to "orc"\n  set the health of orc to 5\n  add orc to foes\n  set target to the weakest with foes\n  scrawl target is something, " ", the name of target\n  add no enemy to foes\n  scrawl foes\n  scrawl foes as saved text\n  set back to a list of enemys\n  load back from the text (foes as saved text)\n  scrawl back, " ", back is foes\n  set target to no enemy\n  try:\n    scrawl the health of target\n  if that went wrong:\n    scrawl the wound\n  set the health of target to 3\nand the universe said i love you\n')
     assert out.stdout == ("nothing\nyes\nyes orc\na enemy (name: orc, health: 5), nothing\n[{\"name\": \"orc\", \"health\": 5}, null]\n"
                           "a enemy (name: orc, health: 5), nothing yes\nthis enemy is nothing, so it has no health.\n"), repr(out.stdout)
     assert out.stderr == "Line 35: this enemy is nothing, so it has no health.\n", repr(out.stderr)
 
-    # shared abilities: 'a speaker is anything that can speak and shout twice.'
+    # shared abilities
     out = both('a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\ngenesis:\n  conjure a dog as rex\n  set the name of rex to "Rex"\n  conjure a robot as robo\n  set the serial of robo to 42\n  set crowd to a list of speakers\n  add rex to crowd\n  add robo to crowd\n  for each s in crowd:\n    scrawl speak s\n    shout twice with (s, "hi")\n  scrawl crowd\n  set quiet to no speaker\n  scrawl quiet is nothing\n  set quiet to robo\n  scrawl speak quiet\n  set quiet to no speaker\n  scrawl speak quiet\nand the universe said i love you\n')
     assert out.stdout == ("Woof, I am Rex\nhi hi!\nBeep 42\nhihi\na dog (name: Rex), a robot (serial: 42)\nyes\nBeep 42\n"), repr(out.stdout)
     assert out.stderr == "Line 44: this speaker is nothing, so it can't speak.\n", repr(out.stderr)
@@ -1401,14 +1399,14 @@ def program_checks():
     assert perr(bank + 'genesis:\n  conjure an account as acct\n  set the balance of acct to 5\n' + END)[1] == \
         "The balance of an account is hidden: only commands for an account can use it."
 
-    # saving and loading speakers: each says which kind of thing it is ("is a")
+    # saving and loading speakers
     out = both('a dog has:\n  name (text)\nand the universe said i love you\n\na robot has:\n  serial (a number)\nand the universe said i love you\n\na speaker is anything that can speak and shout twice.\n\nto speak, for a dog, returning text:\n  return "Woof, I am [the name of the dog]"\nand the universe said i love you\n\nto speak, for a robot, returning text:\n  return "Beep [the serial of the robot]"\nand the universe said i love you\n\nto shout twice, for a dog, given word (text):\n  scrawl word, " ", word, "!"\nand the universe said i love you\n\nto shout twice, for a robot, given word (text):\n  scrawl word, word\nand the universe said i love you\n\na stage has:\n  title (text)\n  star (a speaker)\n  cast (a list of speakers)\nand the universe said i love you\n\ngenesis:\n  conjure a dog as rex\n  set the name of rex to "Rex"\n  conjure a robot as robo\n  set the serial of robo to 42\n  set crowd to a list of speakers\n  add rex to crowd\n  add robo to crowd\n  add no speaker to crowd\n  save crowd to file "crowd.json"\n  scrawl contents of file "crowd.json"\n  set back to a list of speakers\n  load back from file "crowd.json"\n  scrawl back is crowd\n  for each s in back:\n    if s is something: scrawl speak s\n  conjure a stage as show\n  set the title of show to "Tonight"\n  set the star of show to robo\n  set the cast of show to crowd\n  scrawl show as saved text\n  conjure a stage as again\n  load again from the text (show as saved text)\n  scrawl speak the star of again, " ", the size of the cast of again\n  scrawl rex as saved text\n  set odd to a list of speakers\n  try:\n    load odd from the text "[{[[]]}]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == ('[{"is a": "dog", "name": "Rex"}, {"is a": "robot", "serial": 42}, null]\n\nyes\nWoof, I am Rex\nBeep 42\n'
                           '{"title": "Tonight", "star": {"is a": "robot", "serial": 42}, "cast": [{"is a": "dog", "name": "Rex"}, '
                           '{"is a": "robot", "serial": 42}, null]}\nBeep 42 3\n{"name": "Rex"}\n'
                           "the text doesn't hold a list of speakers.\n"), repr(out.stdout)
 
-    # freeing values: over 262144 values are made, so built programs free some while others (kept in lists, tables, things) must live on
+    # freeing values while others live on
     out = both('a pet has:\n  name (text)\n  scores (a list of numbers)\nand the universe said i love you\n\n'
                'to make a pet, given n (a number), returning a pet:\n  conjure a pet as p\n  set the name of p to "pet " plus n\n'
                '  add n to the scores of p\n  return p\nand the universe said i love you\n\n'
@@ -1420,26 +1418,26 @@ def program_checks():
                '  scrawl the entry "k70000" of names\nand the universe said i love you\n')
     assert out.stdout == "7350315000 10 pet 70000 21000\npet 70000\n", repr(out.stdout)
 
-    # a library's own C++ threads calling a command: each thread joins the collector the first time it runs machine code
+    # library threads calling a command
     out = both('use: burst\n\nto label, given n (a number), returning text:\n  set parts to a list containing (n, n plus 1, n times 2)\n'
                '  return "item " plus the sum of parts\nand the universe said i love you\n\n'
                'genesis:\n  scrawl burst with (20000, the command label)\nand the universe said i love you\n',
                others={"burst.words": 'note: test: C++ threads of its own calling a command\n\ncode:\n  #include <thread>\n  namespace burst\n  {\n  \tinline double go(double count, std::function<std::string(double)> f)\n  \t{\n  \t\tstd::vector<std::thread> ts; std::vector<double> sizes(4);\n  \t\tfor (int k = 0; k < 4; k++) ts.emplace_back([&, k] { for (double n = 1; n <= count; n++) sizes[k] += static_cast<double>(f(n).size()); });\n  \t\tfor (auto& t : ts) t.join();\n  \t\treturn sizes[0] + sizes[1] + sizes[2] + sizes[3];\n  \t}\n  }\n\npython:\n  def burst_go(count, f):\n      return 4 * sum(len(f(float(n))) for n in range(1, int(count) + 1))\n\nto burst with, given count (a number) and f (a command given a number returning text), returning a number = burst::go({count}, {f})\n  runs: burst_go({count}, {f})\n'})
     assert out.stdout == "788904\n", repr(out.stdout)
 
-    # meanwhile: commands going alongside the rest, each with its own copy of the names; a problem in one stops everything.
+    # meanwhile: own names; a problem stops everything.
     out = both('to count up, given name (text) and delay (a number):\n  wait delay\n  inscribe name plus " done" into file name plus ".txt"\nand the universe said i love you\n\nto fail later:\n  wait 0.2 seconds\n  raise an error with "the helper broke"\nand the universe said i love you\n\ngenesis:\n  set started to seconds since the start\n  set names to a list of ("a", "b", "c")\n  for each who in names: meanwhile count up with who, 0.5\n  set names to a list of text\n  wait for the others\n  scrawl contents of file "a.txt", " ", contents of file "b.txt", " ", contents of file "c.txt"\n  scrawl seconds since the start minus started falls below 1.4\n  meanwhile count up with "d", 0.3\n  scrawl "main goes on"\n  meanwhile fail later\n  wait 1 seconds\n  scrawl "never"\nand the universe said i love you\n')
     assert (out.stdout, out.stderr) == ('a done b done c done\nyes\nmain goes on\n', 'Line 8: the helper broke\n'), repr((out.stdout, out.stderr))
     assert perr('genesis:\n  meanwhile 5\n' + END)[1] == "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'."
 
-    # The server library: a web server whose pages come from a command (with the computer and web libraries in the same program).
+    # The server library.
     out = both('to answer, given address (text), returning text:\n  if address is "/hello": return "Hello from Stellanova!"\n  return "You asked for " plus address\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8765, the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8765/hello"\n  scrawl web page "http://127.0.0.1:8765/scores?top=3"\n  end the program with 0\nand the universe said i love you\n'.replace('genesis:\n', 'genesis:\n  scrawl the size of user name exceeds 0\n'))
     assert out.stdout == 'yes\nHello from Stellanova!\nYou asked for /scores?top=3\n', repr(out.stdout)
-    # Files from a folder, what was sent with a request, and text inside addresses.
+    # Folder files, request messages and addresses.
     out = both('to answer, given address (text), returning text:\n  if address begins with "/echo": return "got " plus the web message\n  if address is "/f": answer with the file "site/index.html"\n  return "page " plus web decoded (letters 2 to the size of address of address)\nand the universe said i love you\n\ngenesis:\n  make the folder "site"\n  inscribe "body {}" into file "site/look.css"\n  inscribe "<p>home</p>" into file "site/index.html"\n  meanwhile serve the web from the folder with (8766, "site", the command answer)\n  wait 0.5\n  scrawl web page "http://127.0.0.1:8766/look.css"\n  scrawl web page "http://127.0.0.1:8766/"\n  scrawl web page "http://127.0.0.1:8766/a%20b+c"\n  scrawl web page "http://127.0.0.1:8766/f"\n  scrawl send to the web page with ("http://127.0.0.1:8766/echo", "héllo there")\n  scrawl web encoded "a b/é", " ", web decoded (web encoded "a b/é")\n  end the program with 0\nand the universe said i love you\n')
     assert out.stdout == 'body {}\n<p>home</p>\npage a b c\n<p>home</p>\ngot héllo there\na%20b%2F%C3%A9 a b/é\n', repr(out.stdout)
 
-    # Any web request: the way (GET, POST, PUT, DELETE...), a message and headers; a 404 is an answer, with its status
+    # Any web request, with its status.
     web_stub(8792)
     out = both('use: web\n\ngenesis:\n'
                '  scrawl ask the web with ("http://127.0.0.1:8792/a?b=1", "GET"), " ", the last web status\n'
@@ -1456,11 +1454,11 @@ def program_checks():
     out = both('use: server\nuse: web\n\nto answer, given address (text), returning text:\n  if address is "/gone":\n    answer with the status 404\n    return "no"\n  return the web way plus " " plus the web message\n' + END + 'genesis:\n  meanwhile serve the web with (8767, the command answer)\n  wait 0.5\n  scrawl ask the web with ("http://127.0.0.1:8767/", "PUT", "hi"), " ", the last web status\n  scrawl ask the web with ("http://127.0.0.1:8767/gone", "GET"), " ", the last web status\n  end the program with 0\n' + END)
     assert out.stdout == 'PUT hi 200\nno 404\n', repr(out.stdout)
 
-    # headers: the ones sent with a request, and the ones an answer came back with
+    # request and answer headers
     out = both('use: server\nuse: web\n\nto answer, given address (text), returning text:\n  return "pet is " plus the web header "X-Pet" plus "; " plus the web header "x-none"\nand the universe said i love you\n\ngenesis:\n  meanwhile serve the web with (8768, the command answer)\n  wait 0.5\n  scrawl ask the web with ("http://127.0.0.1:8768/", "GET", "", "X-Pet: dog")\n  scrawl the last web header "content-type", " [", the last web header "X-Nothing", "] ", the last web header "Content-Length"\n  scrawl ask the web with ("http://127.0.0.1:8768/data", "GET")\n  end the program with 0\nand the universe said i love you\n')
     assert out.stdout == 'pet is dog; \ntext/html; charset=utf-8 [] 12\npet is ; \n', repr(out.stdout)
 
-    # a slow visitor (one that never finishes asking) doesn't hold up the others
+    # a slow visitor doesn't hold up others
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / 'sv.stella').write_text('use: server\n\nto answer, given address (text), returning text:\n  return "got " plus address\nand the universe said i love you\n\ngenesis:\n  serve the web with (8771, the command answer)\nand the universe said i love you\n', encoding='utf-8')
         (Path(d) / 'slow.py').write_text('"""A slow client holds a connection open; a quick one must still be answered."""\nimport socket, sys, time, urllib.request\nslow = socket.create_connection(("127.0.0.1", 8771))\nslow.sendall(b"GET /slow HTTP/1.1\\r\\nHost: x\\r\\n")  # never finishes its request\nt = time.time()\nsaid = urllib.request.urlopen("http://127.0.0.1:8771/quick", timeout=5).read().decode()\nprint(said, "quick" if time.time() - t < 2 else "slow")\nslow.close()\n', encoding='utf-8')
@@ -1479,7 +1477,7 @@ def program_checks():
                 server.kill()
                 server.wait()
 
-    # Saved text: any value as JSON text, and back (for the web, or other programs).
+    # Saved text, both ways.
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set ages to a table of numbers\n  set entry "Rex" of ages to 3\n  set entry "Tom" of ages to 12.5\n  set words to ages as saved text\n  scrawl words\n  set back to a table of numbers\n  load back from the text words\n  scrawl back\n  set p to conjure a pet\n  set the name of p to "Rex " plus a quotation mark plus "the dog" plus a quotation mark\n  scrawl p as saved text\n  set q to conjure a pet\n  load q from the text "{" plus a quotation mark plus "name" plus a quotation mark plus ": " plus a quotation mark plus "Jo" plus a quotation mark plus ", " plus a quotation mark plus "age" plus a quotation mark plus ": 4}"\n  scrawl q\n  set nums to a list of numbers\n  load nums from the text "  [1, 2.5, -3]  "\n  scrawl nums\n  try:\n    load nums from the text "[1, oops]"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == '{"Rex": 3, "Tom": 12.5}\nRex: 3, Tom: 12.5\n{"name": "Rex \\"the dog\\"", "age": 0}\na pet (name: Jo, age: 4)\n1, 2.5, -3\nthe text doesn\'t hold a list of numbers.\n', repr(out.stdout)
 
@@ -1497,13 +1495,13 @@ def program_checks():
                '  scrawl lowest is at least 0 and lowest falls below 0.05 and highest falls below 1 and highest exceeds 0.95\n' + END)
     assert out.stdout == "yes\n", repr(out.stdout)
 
-    # changed by / kept by: a command done to every item of a list, or picking items.
+    # changed by / kept by.
     out = both('to double, given x (a number), returning a number:\n  return x times 2\nand the universe said i love you\n\nto big one, given x (a number), returning yes or no:\n  return x exceeds 3\nand the universe said i love you\n\nto shout, given word (text), returning text:\n  return upper case of word plus "!"\nand the universe said i love you\n\ngenesis:\n  set scores to a list of (1, 5, 2, 8)\n  scrawl scores changed by the command double\n  scrawl scores kept by the command big one\n  scrawl (scores kept by the command big one) changed by the command double\n  scrawl (the words of "hi there") changed by the command shout\n  scrawl the size of (a list of numbers kept by the command big one)\n  scrawl scores changed by the command round\nand the universe said i love you\n')
     assert out.stdout == '2, 10, 4, 16\n5, 8\n10, 16\nHI!, THERE!\n0\n1, 5, 2, 8\n', repr(out.stdout)
     assert perr('to half, given x (text), returning text:\n  return x\n' + END + 'genesis:\n  scrawl a list of (1, 2) changed by the command half\n' + END)[1] == \
         "'changed by' needs a command given a number returning something, not a command given text returning text."
 
-    # Kept shapes (etched once, drawn every frame), daylight, and the pointer's words.
+    # Kept shapes, daylight, the pointer.
     out = both('use: window\n\ngenesis:\n  open a world with "Kept", 640, 480\n  start keeping the shapes as "land"\n  for each x from -5 to 5:\n    for each z from 0 to 10:\n      etch a cube with (x horizontal 0 vertical z depth, 1, "green")\n  etch a ball with (0 horizontal 2 vertical 4 depth, 0.7, "yellow")\n  stop keeping the shapes\n  try:\n    stop keeping the shapes\n  if that went wrong:\n    scrawl the wound\n  try:\n    etch the kept shapes "sea"\n  if that went wrong:\n    scrawl the wound\n  try:\n    set the daylight to 2\n  if that went wrong:\n    scrawl the wound\n  set frames to 0\n  as long as the world lives and frames falls below 5:\n    set frames to frames plus 1\n    place the eye at 0 horizontal 3 vertical -6 depth\n    aim the eye with (frames times 0.3, -15)\n    consume the window with "#87ceeb"\n    set the daylight to 1 minus frames divided by 200\n    etch the kept shapes "land"\n    etch words with "right " plus mouse right clicked plus " wheel " plus mouse wheel turned, 10, 10, "white"\n    reveal the frame\n  scrawl "moved ", mouse moved across, " ", mouse moved down\n  forget the kept shapes "land"\n  try:\n    etch the kept shapes "land"\n  if that went wrong:\n    scrawl the wound\nand the universe said i love you\n')
     assert out.stdout == 'no shapes are being kept. Start with: start keeping the shapes as "land"\nthere are no shapes kept as "sea".\nthe daylight is from 0 (dark) to 1 (full), not 2.\nmoved 0 0\nthere are no shapes kept as "land".\n', repr(out.stdout)
 
@@ -1540,11 +1538,11 @@ def program_checks():
                '  scrawl "Dr Who" begins with "Dr", " ", "Dr Who" begins with "Who", " ", "Dr Who" ends with "Who", " ", "a" ends with "abc", " ", "x" begins with ""\n' + END)
     assert out.stdout == "[hi there] []\nyes no yes no yes\n", repr(out.stdout)
 
-    # The computer library: commands' output, the environment, ending with an exit number; maths words.
+    # The computer library.
     out = both('genesis:\n  scrawl the size of the words given\n  scrawl the output of the command "echo hello there"\n'
                '  scrawl environment value of "OS"\n  scrawl the size of current folder exceeds 2\n  end the program with 3\n  scrawl "never"\n' + END)
     assert (out.stdout, out.returncode) == ("0\nhello there\n\n" + os.environ.get("OS", "") + "\nyes\n", 3), repr((out.stdout, out.returncode))
-    # Programs running alongside: what they print and their errors as they go, their exit number, stopping them.
+    # Programs running alongside.
     talker, sleeper = ("echo hello; echo oops 1>&2; exit 3", "sleep 30") if sys.platform.startswith("linux") else ("cmd /c echo hello& echo oops 1>&2& exit 3", "ping -n 30 127.0.0.1")
     out = both('use: computer\ngenesis:\n  set p to start the program with ("' + talker + '", "")\n'
                '  set said to ""\n  set problems to ""\n  as long as the program is running p:\n'
@@ -1556,7 +1554,7 @@ def program_checks():
     assert out.stdout == "hello oops 3\nstopped\n", repr(out.stdout)
     assert out.stderr == "Line 17: there is no program 9 (start one with 'start the program').\n", repr(out.stderr)
 
-    # A kind holding a list of its own kind loads and saves (its shape holds itself).
+    # A kind holding a list of itself.
     tree = '[{"name": "a", "inside": [{"name": "b", "inside": [{}]}]}]'
     out = both('a spot has:\n  name (text)\n  inside (a list of spots)\n' + END + 'genesis:\n  set tree to a list of spots\n'
                '  load tree from file "tree.json"\n'
@@ -1603,7 +1601,7 @@ def program_checks():
     assert perr("genesis:\n  scrawl 1 is within 2 of 1 horizontal 2 vertical\n" + END)[1] == \
         "'within' compares two numbers or two places, not a number and a flat place."
 
-    # Places: horizontal, vertical and depth. Setting birth makes existence start there too.
+    # Places, birth and existence.
     out = both('genesis:\n  set birth to 300 horizontal 200 vertical\n'
                '  set the existence of horizontal to the existence of horizontal plus 5\n  scrawl birth, " / ", existence\n'
                '  set existence to birth\n  scrawl existence\n  set gravity to 0 horizontal -0.5 vertical\n'
@@ -1630,13 +1628,13 @@ def program_checks():
     assert perr('to begin:\n  cease\n' + END)[1] == "A program needs a 'genesis:' command: that is where it begins."
 
 
-    # Lists of lists and tables of lists: the inner ones are shown in brackets.
+    # Lists inside lists show in brackets.
     out = both('genesis:\n  set grid to a list of lists of numbers\n  add a list of (1, 2) to grid\n  add a list of numbers to grid\n'
                '  add a list of (3, 4) to grid\n  set item 1 of item 1 of grid to 9\n  scrawl grid, " / ", item 2 of item 3 of grid\n'
                '  set teams to a table of lists of text\n  set entry "red" of teams to a list of ("Ann", "Bo")\n  scrawl teams\n' + END)
     assert out.stdout == "(9, 2), (nothing), (3, 4) / 4\nred: (Ann, Bo)\n", repr(out.stdout)
 
-    # Numbers and text shown the same way both ways; if / otherwise chains; stop and return inside loops.
+    # Numbers and text shown the same both ways.
     out = both('genesis:\n  scrawl 1 divided by 3, " ", 10 divided by 4, " ", 2 times 0.1, " ", 1000000 times 1000000, " ", -0 times 1\n'
                '  scrawl the size of "héllo", " ", "a" plus 1 plus yes, " ", "x" is "x", " ", 3 is not 3\n'
                '  for each n from 1 to 4:\n    if n is 1: scrawl "one"\n    otherwise if n is 2:\n      scrawl "two"\n    otherwise: scrawl "many"\n'
@@ -1684,7 +1682,7 @@ def program_checks():
                '  wait 0.01 seconds\n  scrawl seconds since the start exceeds 0, " ", the current year exceeds 2000\n' + END).stdout
     assert out == "500 1024 2\n3 -3 3 314\nyes yes\n", repr(out)
 
-    # A window: opens, draws, shows frames and closes the same both ways (it flashes up for a moment).
+    # A window, the same both ways.
     out = both('use: window\ngenesis:\n  open a world with "Test ✓", 200, 100\n'
                '  scrawl the world lives, " ", mouse held, " ", key held "space"\n  repeat 3 times:\n'
                '    scrawl key pressed "space", " ", mouse clicked\n'
@@ -1716,12 +1714,11 @@ def program_checks():
                '  reveal the frame\n  etch the picture turned with "red.png", 50, 50, 0, 30\n' + END, others={"red.png": png(7, 3)})
     assert out.stderr == "Line 5: a picture's size must be more than 0 and at most 100, not 0.\n", repr(out.stderr)
 
-    # The web library, without needing the internet: a page that can't be reached fails the same both ways.
+    # The web library, offline.
     out = both('use: web\ngenesis:\n  scrawl web page "http://localhost:1/"\n' + END)
     assert out.stderr == 'Line 3: I couldn\'t get the web page "http://localhost:1/".\n', repr(out.stderr)
 
-    # Programs made of several scripts: used scripts bring their kinds and commands (not their start),
-    # are read once even when used twice, and errors name the script they are in.
+    # Programs made of several scripts.
     shapes = ('use: maths\nuse: helpers.stella\na square has:\n  side (a number)\n' + END +
               'genesis:\n  scrawl "shapes on its own"\n' + END +
               'to area of, given s (a square), returning a number:\n  return power of (the side of s, 2)\n' + END +
@@ -1742,7 +1739,7 @@ def program_checks():
             assert translate.where(e.line) == "bad.stella line 2", translate.where(e.line)
     assert perr('use: missing.stella\ngenesis:\n  cease\n' + END)[1] == "There is no script called 'missing.stella' next to probe.stella."
 
-    # Sound: a short silent .wav plays (and waits) the same both ways; a missing file is a plain error.
+    # Sound plays the same both ways.
     import io
     import wave
     silent = io.BytesIO()
@@ -1770,7 +1767,7 @@ def program_checks():
                '  return n times factorial of (n minus 1)\n' + END)
     assert out.stdout == "3628800 2432902008176640000\n", repr(out.stdout)
 
-    # Lists, kinds of things, returning, files, and a plain error while running.
+    # Lists, kinds, returning, files, errors.
     if True:
         ran = both('a pet has:\n  name (text)\n  ages (a list of numbers)\n' + END +
                           'genesis:\n  set p to conjure a pet\n  set the name of p to "Rex"\n  add 3 to the ages of p\n  add 4 to the ages of p\n'
@@ -1788,7 +1785,7 @@ def program_checks():
         assert ran.stderr == "Line 22: there is no item 9 in a list of 4 items. Items are counted from 1.\n", repr(ran.stderr)
         assert ran.returncode == 1
 
-    # Grammar: needed where English needs it, then skipped, so both forms mean the same.
+    # Grammar: both forms mean the same.
     out = both('a notice has:\n  id (a number)\n  title (text)\n' + END +
                'to tell, use:\n  the title (text)\n  a count (a number)\n\n  conjure a notice as new notification\n'
                '  set the title of new notification to title\n  add count to the id of new notification\n'
@@ -1822,7 +1819,7 @@ def program_checks():
 
 
 def plain_word_checks():
-    """Mistake messages use plain words: no programmer words (a DLL's 'function', and a system's own words passed on, aside)."""
+    """Mistakes use plain words."""
     import re
     jargon = re.compile(r"\b(std|nullptr|NoneType|None|null|undefined|NaN|int|float|double|bool|string|str|vector|dict|tuple|array|"
                         r"exception|errno|Traceback|pointer|segfault|boolean|integer|variable|argument|parameter|index|syntax|"
@@ -1865,7 +1862,7 @@ def main():
                  "to calm down, given by (a number):\n  set walk speed to walk speed minus by\n" + END)
     assert "TurnRateDegS = HalfOf(10.0);" in called and "\tCalmDown(2.0);" in called, called
     assert "//   double HalfOf(double x);" in called, called
-    # Try-it mode: each typed line is done straight away; names are kept; blocks end with an empty line.
+    # Try-it mode.
     typed = iter(['set name to "Sam"', 'scrawl "Hi " plus name', "5 plus 3 times 2", "repeat 2 times:", "scrawl name", "",
                   "scrawl nme", "scrawl item 3 of a list of (1)", "use: maths", "round 2.6", "break free", "5 exceeds 3", "scrawl the size of today", "bye"])
     import contextlib
@@ -1888,7 +1885,7 @@ def main():
 
 
 def course_checks():
-    """The course's lessons: each is fine as it is (but lesson 6, which asks for triple), and the ones without a window run."""
+    """The course's lessons."""
     import subprocess
     said = {"01 hello": "Hello!\n", "02 names": "This is Sam.\nSam has 3 coins.\n", "03 choosing": "It's hot.\n",
             "05 lists": "I need 3 things: milk, eggs, bread\n- milk\n- eggs\n- bread\nDon't drop the eggs!\n",
@@ -1915,7 +1912,7 @@ def course_checks():
 
 
 def plugin_checks():
-    """'stellanova plugin' makes a program a game engine can call (engines/host/host.cpp is a tiny engine)."""
+    """'stellanova plugin' (engines/host/host.cpp is a tiny engine)."""
     import subprocess
     clang = shutil.which("clang++") or r"C:\Program Files\LLVM\bin\clang++.exe"
     if not Path(clang).exists():
@@ -1949,7 +1946,7 @@ def plugin_checks():
 
 
 def built_run_checks():
-    """'stellanova x.stella' runs a built copy (kept for next time), and the old way when it can't be built."""
+    """'stellanova x.stella' runs a kept built copy."""
     import subprocess
     if not shutil.which("clang++") and not Path(r"C:\Program Files\LLVM\bin\clang++.exe").exists():
         return

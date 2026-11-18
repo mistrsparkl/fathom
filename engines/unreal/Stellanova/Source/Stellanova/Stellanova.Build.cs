@@ -8,7 +8,7 @@ public class Stellanova : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
-		// The programs' plugins go with a packaged game (they are made into the project's Stellanova folder).
+		// Packaged games get the built programs.
 		if (Target.ProjectFile != null)
 		{
 			string programs = Path.Combine(Target.ProjectFile.Directory.FullName, "Stellanova");
@@ -17,7 +17,7 @@ public class Stellanova : ModuleRules
 		}
 	}
 
-	// Each .stella file newer than its plugin is made again first, so a packaged game has every program as it is now.
+	// Rebuilds .stella files newer than their plugin.
 	static void MakeChanged(string programs)
 	{
 		string home = Path.Combine(programs, "home.txt");  // Stellanova's folder, then the Python that runs it

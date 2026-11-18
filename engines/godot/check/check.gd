@@ -1,4 +1,4 @@
-# The check scene: engines/check/words.stella on Mover and Target, and a ball falling onto Target. Run by check.py.
+# The check scene. Run by check.py.
 extends Node
 
 var _time := 0.0

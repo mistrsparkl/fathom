@@ -1,7 +1,4 @@
-note: Words for talking to other programs over the network: TCP connections, UDP messages and WebSockets.
-note: Use them in a program with:  use: network
-note: Each connection is a number. Text goes as UTF-8; 'bytes' words send and take numbers from 0 to 255.
-note: On the web, only the WebSocket words work (a web page can't open other connections).
+note: TCP, UDP and WebSockets. Use: use: network  Each connection is a number.
 
 code:
   #define NOMINMAX
@@ -132,7 +129,7 @@ code:
   		return take(l, n);
   	}
 
-  	// WebSockets (ws:// only): a TCP connection that says hello like a web page, then sends messages in frames
+  	// WebSockets (ws:// only)
   	inline void send_frame(Link& l, int opcode, const std::string& data, int line)
   	{
   		std::string f(1, (char)(0x80 | opcode));

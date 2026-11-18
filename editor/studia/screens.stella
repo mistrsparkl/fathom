@@ -1,5 +1,4 @@
-whisper: Stellanova Studia's screens: the editing box, tabs, files, words, mistakes and running programs.
-whisper: Made into ui/screens.js with:  stellanova web screens.stella ui
+whisper: Studia's screens. Build: stellanova web screens.stella ui
 
 use: page
 use: web
@@ -125,7 +124,7 @@ a debug stop has:
   stops (a list of numbers)
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- small helpers
+whisper: ---- helpers
 
 to joined path, given base (text) and name (text), returning text:
   if base ends with "\" or base ends with "/": return base plus name
@@ -170,7 +169,7 @@ to tell the system, given route (text) and message (text), returning text:
   return send to the web page with (route, message)
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- colouring a line
+whisper: ---- colouring a line
 
 to learn the classes:
   for each w in ("if otherwise repeat times for each in from by try return returning given usually whenever every depending cease break free move on went wrong meanwhile anything else") split by " ":
@@ -246,7 +245,7 @@ to coloured, given line (text), returning text:
   return made
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- the selection
+whisper: ---- the selection
 
 to selecting, returning yes or no:
   return mark row is not row or mark column is not column
@@ -292,7 +291,7 @@ to drop the mark:
   set mark column to column
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- changing the text (every change goes through 'put words')
+whisper: ---- changing the text (all through 'put words')
 
 to swap lines, given top row (a number) and taking (a number) and putting (a list of text):
   whisper: the lines from top row on (taking of them) become putting
@@ -323,7 +322,7 @@ to put words, given what (text):
       set column to (the size of piece) plus 1
       set piece to piece plus behind
     add piece to fitted
-  whisper: undo keeps only the lines that changed; letters typed one after another on a line are one step
+  whisper: undo keeps only changed lines; typing on one line is one step
   set merged to no
   if single and typing run and opening is closing and the size of back exceeds 0:
     set last one to the size of back
@@ -400,7 +399,7 @@ to redo:
   step with (moment, no)
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- moving the caret
+whisper: ---- moving the caret
 
 to go to, given r (a number) and c (a number) and keeping (yes or no):
   set row to clamp r between 1 and (the size of body)
@@ -459,7 +458,7 @@ to select the word here:
   show
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- drawing the box
+whisper: ---- drawing the box
 
 to show:
   if current is 0: cease
@@ -485,7 +484,7 @@ to show:
 and the universe said i love you
 
 to paint the rows:
-  whisper: only the rows in sight (and a few around them) are drawn, so long files stay quick
+  whisper: only rows in sight are drawn
   if current is 0: cease
   set scrolled to scrolled down in the element code box
   set shown start to larger of 1 and ((round down (scrolled divided by 20)) minus 4)
@@ -533,7 +532,7 @@ to on key, given event (a number):
   set key to key of the event event
   set control to control held in the event event
   set shift to shift held in the event event
-  whisper: held back before any command runs: commands on a web page wait their turn, and the browser wouldn't
+  whisper: held back so commands on the page run in turn
   set handled to key is one of ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", "Backspace", "Delete", "Enter", "Tab", "Escape", "F5", "F6", "F7", "F8", "F9", "F10", "F11")
   if control and not (key is one of ("c", "x", "v", "C", "X", "V", "Control")): set handled to yes
   if handled: hold back the event event
@@ -679,7 +678,7 @@ to on sleep, given event (a number):
   hide the suggestions
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- suggestions
+whisper: ---- suggestions
 
 to the word before the caret, returning text:
   set line to item row of body
@@ -763,7 +762,7 @@ to on pick press, given event (a number):
   take the pick
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- the words panel
+whisper: ---- the words panel
 
 to load the words:
   set labels to a list of text
@@ -899,7 +898,7 @@ to on open folder press, given event (a number):
   request a name with ("Folder to open, like C:\Users\me\Games", "open")
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- sheets (open files) and tabs
+whisper: ---- open files and tabs
 
 to keep the sheet:
   if current is 0: cease
@@ -1030,7 +1029,7 @@ to save the sheet:
   show the tabs
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- settings: the folder and open files, remembered for next time
+whisper: ---- settings
 
 to remember the settings:
   conjure a memory as remembered
@@ -1043,7 +1042,7 @@ to remember the settings:
     set ignored to ""
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- mistakes: looked for when typing stops for a moment
+whisper: ---- mistakes, checked when typing stops
 
 to look for mistakes:
   if current is 0 or looking: cease
@@ -1115,7 +1114,7 @@ to on mistakes tab press, given event (a number):
   show the pane with "mistakes"
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- running programs
+whisper: ---- running programs
 
 to show output, given words (text) and look (text):
   if words is "": cease
@@ -1278,7 +1277,7 @@ to paused at, given marked (text):
 and the universe said i love you
 
 to without debug lines, given words (text), returning text:
-  whisper: the marked lines a debugged program prints are stops for the studia, not output; a half line waits for the rest
+  whisper: marked lines are debug stops, not output
   set all to debug carry plus words
   set debug carry to ""
   if not (all contains "@@debug "): return all
@@ -1398,7 +1397,7 @@ to on window key, given event (a number):
     save the sheet
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- the beat: mistakes after a pause in typing, and the running program's output
+whisper: ---- the beat: mistakes and output
 
 to tick:
   set calm to calm plus 1
@@ -1406,7 +1405,7 @@ to tick:
   if running: poll the program
 and the universe said i love you
 
-whisper: ---------------------------------------------------------------- starting up
+whisper: ---- starting up
 
 to hook up, given selector (text) and happening (text) and then (a command given a number):
   listen for an event with (the element selector, happening, then)

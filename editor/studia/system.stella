@@ -1,5 +1,4 @@
-whisper: Stellanova Studia's system side: it reads and writes files, looks for mistakes and runs programs for the screens.
-whisper: The shell starts it with three words: the port to answer on, the screens' folder, and Stellanova's own folder.
+whisper: Studia's system side: files, mistakes and running programs. Given: port, screens folder, Stellanova folder.
 
 use: server
 use: computer
@@ -33,7 +32,7 @@ the world remembers:
 and the universe said i love you
 
 to query value, given address (text) and wanted (text), returning text:
-  whisper: the value after "wanted=" in an address like /api/read?path=C%3A%5CUsers
+  whisper: the value of wanted in an address
   set mark to the position of "?" in address
   if mark is 0 or mark is the size of address: return ""
   set rest to letters (mark plus 1) to (the size of address) of address
@@ -99,7 +98,7 @@ to short name of, given path (text), returning text:
   return letters (cut plus 1) to (the size of path) of path
 and the universe said i love you
 
-whisper: ---- mistakes: the text is checked as a copy next to the file, so 'use:' still finds what it uses
+whisper: ---- mistakes (checked as a copy next to the file, so 'use:' works)
 
 to check, given path (text) and words (text), returning text:
   set name to short name of path
@@ -108,7 +107,7 @@ to check, given path (text) and words (text), returning text:
   inscribe words into file draft
   set said to the output of the command (stellanova call with ("check", draft) plus " 2>&1")
   erase the file draft
-  whisper: a program still being written has no genesis yet: Run says so, typing doesn't need to
+  whisper: no genesis yet is fine while typing
   if said contains "A program needs a 'genesis:' command": return ""
   return said
 and the universe said i love you
@@ -140,7 +139,7 @@ to poll, returning text:
   return state as saved text
 and the universe said i love you
 
-whisper: ---- the words of each library, from its .words file, for the screens' suggestions
+whisper: ---- library words, for suggestions
 
 to library words, returning text:
   set found to a list of library words

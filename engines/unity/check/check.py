@@ -1,5 +1,4 @@
-"""Tries Stellanova in Unity itself: makes a project, sets it up, plays engines/check/words.stella in the editor, then builds
-the game and plays that too. Run: py -3 engines/unity/check/check.py   (needs Unity 6 and Unity Hub signed in; not in the test suite)"""
+"""Plays words.stella in Unity, then in a built game. Run: py -3 engines/unity/check/check.py"""
 import shutil
 import subprocess
 import sys

@@ -1,8 +1,4 @@
-"""Speaks lines with a natural voice (Microsoft Edge's online voices) and keeps each as an .mp3 next to a .json of
-when each word is said. Lines already spoken are kept, so only new or changed lines are sent.
-
-    py -3 voice.py lines.json      lines.json: a list of texts; prints a list of {"file", "seconds", "words"}
-"""
+"""Speaks lines with Edge's voices. py -3 voice.py lines.json"""
 import asyncio
 import hashlib
 import json
@@ -19,7 +15,7 @@ KEPT = HERE / "out" / "voice"
 
 
 def spoken(text):
-    """How the voice should say it: Stellanova's own words are read the way a person would read them."""
+    """How the voice reads Stellanova's words."""
     return text.replace("stellanova.py", "stellanova dot p y").replace(".stella", " dot stella").replace(".exe", " dot e x e")
 
 

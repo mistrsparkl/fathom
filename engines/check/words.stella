@@ -1,5 +1,4 @@
-whisper: Every engine word, for the engine checks (engines/*/check/check.py). The scene: Mover at 1 horizontal 2 vertical 3 depth,
-whisper: Box (no program), Target (this program too) and Player, a ball falling onto Target. expected.txt is what it must say.
+whisper: Every engine word, for the engine checks. expected.txt is what it must say.
 use: engine
 use: maths
 

@@ -1,8 +1,6 @@
-// What a program made into machine code (by machine.py) calls: plain C functions over stellanova.h.
-// Compiled once into runtime/built/stellanova_machine.obj; a program's own code never becomes C++.
+// What machine code calls: plain C functions over stellanova.h.
 //
-// Numbers are doubles and yes/no is a bool. Everything else (text, lists, tables, places, things) is a V*:
-// made here, copied when stored (as Python and C++ copy), and shown and compared the way Python does.
+// Numbers are doubles; everything else is a V*, copied when stored.
 #include "stellanova.h"
 #include "machine.h"
 #include <cstddef>
@@ -29,13 +27,7 @@ extern "C" char __stack_high;  // where WebAssembly's stack starts (set by the l
 #include <atomic>
 #include <condition_variable>
 
-// ---------------------------------------------------------------- freeing values
-// Now and then, while values are being made, the values nobody can reach any more are freed (a collector).
-// Reachable: what any thread holds on its stack or in its registers, the world's shared names (cn_root), the values
-// made since a thread's current line began (cn_statement), and everything inside those.
-// A thread stops for the collector only at safe points (making a value, starting a line). A thread inside a library
-// word (waiting, reading the web...) is 'parked' with its registers kept, so the collector never waits for it.
-// 'a speaker is anything that can speak': ability -> each kind that can (by name) -> its shape, for saving and loading
+// ---- the collector: frees what nobody can reach; threads stop at safe points. Abilities: kind -> shape, for saving
 static std::map<std::string, std::map<std::string, V*>> able_kinds;
 
 extern "C" std::atomic<bool> cn_stopping{false};  // a collector waits for every thread (loops look at it without a call)
@@ -56,19 +48,19 @@ namespace gc
 		char* sp = nullptr;
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
-		std::vector<V*> made;  // made while running, not yet in all (the collector moves them there): no lock needed
-		std::vector<V*> ready[4];  // freed values this thread took from spare to use again (by size: see size_of)
-		size_t since = 0;  // made since it last added to made_since (counted here first: an atomic add each time is slow)
+		std::vector<V*> made;  // made while running, not yet in all
+		std::vector<V*> ready[4];  // freed values ready to use again
+		size_t since = 0;  // counted here first (an atomic add each time is slow)
 	};
 	static std::mutex lock;  // every value, the roots, and each thread's young values
 	static std::mutex stop_lock;  // the threads and their states
 	static std::condition_variable stop_cv;
 	static std::vector<Thread*> threads;
 	static std::vector<V*> all;
-	static std::vector<V*> spare[4];  // freed values, ready to be used again: numbers and yes/no, text, the rest, things
+	static std::vector<V*> spare[4];  // freed values: numbers, text, the rest, things
 	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : tag == 'k' ? 3 : 2; }
 	static std::vector<std::pair<const char*, size_t>> roots;
-	static std::vector<V*> kept;  // values held by library C++ (commands given to library words): always kept
+	static std::vector<V*> kept;  // values held by library C++
 	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
 	static std::atomic<size_t> made_since{0};
 	static const size_t batch = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 1 : 64;
@@ -137,8 +129,7 @@ namespace gc
 	}
 
 #ifdef __wasm__
-	// Only names a command keeps in memory (cn_slot) are on this stack; values only in WebAssembly's own locals can't
-	// be seen, so the values each command running now made stay young until it gives back (cn_enter, cn_leave).
+	// WebAssembly locals can't be seen, so values stay young until the command gives back.
 	[[clang::noinline]] static void keep_registers(Thread* t)
 	{
 		volatile char here = 0;
@@ -177,7 +168,7 @@ namespace gc
 		Block b{static_cast<const char*>(from), static_cast<const char*>(from) + count * size, size};
 		blocks.insert(std::upper_bound(blocks.begin(), blocks.end(), b, [](const Block& a, const Block& c) { return a.from < c.from; }), b);
 	}
-	static V* value_at(V* c)  // c, if it is the address of a value (freed ones too: marking those does no harm)
+	static V* value_at(V* c)  // c, if it is a value's address
 	{
 		const char* p = reinterpret_cast<const char*>(c);
 		auto it = std::upper_bound(blocks.begin(), blocks.end(), p, [](const char* q, const Block& b) { return q < b.from; });
@@ -188,7 +179,7 @@ namespace gc
 	}
 	static void mark_and_sweep()
 	{
-		for (Thread* x : threads)  // (every thread is stopped or parked; parked ones put what they make straight into all)
+		for (Thread* x : threads)  // (every thread is stopped or parked)
 		{
 			all.insert(all.end(), x->made.begin(), x->made.end());
 			x->made.clear();
@@ -326,7 +317,7 @@ namespace gc
 		stop_cv.notify_all();
 	}
 
-	static V* small_value()  // numbers and yes/no come from big blocks, not one allocation each (they are never deleted, only used again)
+	static V* small_value()  // numbers and yes/no come from big blocks, reused, never deleted
 	{
 		static V* block = nullptr;
 		static size_t left = 0;
@@ -351,7 +342,7 @@ namespace gc
 		}
 		return &block[--left];
 	}
-	static V* full_value()  // the same for every other value: one allocation each is slow (Windows' heap takes ~150ns)
+	static V* full_value()  // the same for other values (one allocation each is slow)
 	{
 		static Full* block = nullptr;
 		static size_t left = 0;
@@ -382,7 +373,7 @@ namespace gc
 #ifdef __wasm__
 	static const bool stored_now = false;
 #else
-	static thread_local bool stored_now = false;  // the value being made goes straight into a name, list or thing (cn_own): not young
+	static thread_local bool stored_now = false;  // stored straight away: not young
 #endif
 	static V* track(char tag)  // a new value (a freed one used again when there is one)
 	{
@@ -390,7 +381,7 @@ namespace gc
 		if (t->state == 0 && stopping)
 			stop_here(t);
 		V* v;
-		if (t->state == 0)  // running: the collector waits for this thread before it looks, so no lock is needed
+		if (t->state == 0)  // running: no lock needed
 		{
 			int size = size_of(tag);
 			std::vector<V*>& ready = t->ready[size];
@@ -415,7 +406,7 @@ namespace gc
 				collect(t);
 			return v;
 		}
-		{  // parked (inside a library word): a collector may be looking now, so as before, under the lock
+		{  // parked: under the lock
 			std::lock_guard<std::mutex> hold(lock);
 			std::vector<V*>& from = spare[size_of(tag)];
 			if (!from.empty())
@@ -437,7 +428,7 @@ namespace gc
 
 extern "C"
 {
-	void cn_statement()  // a line begins: values made for the line before are now only kept if something holds them
+	void cn_statement()  // a line begins: last line's values kept only if held
 	{
 		gc::Thread* t = gc::me();
 		if (gc::stopping)
@@ -449,12 +440,12 @@ extern "C"
 #endif
 	}
 #ifdef __wasm__
-	void cn_enter()  // a command begins: what its caller's line made stays young until that line ends
+	void cn_enter()  // a command begins: the caller's line values stay young
 	{
 		gc::Thread* t = gc::me();
 		t->marks.push_back(t->young.size());
 	}
-	void cn_leave(V* given)  // a command gives back: only what it gives back stays young, for the caller's line
+	void cn_leave(V* given)  // a command gives back: only its answer stays young
 	{
 		gc::Thread* t = gc::me();
 		t->young.resize(std::min(t->marks.back(), t->young.size()));
@@ -462,9 +453,9 @@ extern "C"
 		if (given)
 			t->young.push_back(given);
 	}
-	void cn_slot(void*) {}  // a name's place: given here, it stays in memory, where the collector looks
+	void cn_slot(void*) {}  // a name's place, for the collector
 #endif
-	void cn_park()  // going into a library word that may wait: the collector needn't wait for this thread
+	void cn_park()  // into a library word that may wait
 	{
 		gc::Thread* t = gc::me();
 		gc::keep_registers(t);
@@ -479,7 +470,7 @@ extern "C"
 	{
 		gc::Thread* t = gc::me();
 		t->state = 0;
-		if (!gc::stopping)  // (both are seq_cst: a collector starting now sees this thread running and waits for it)
+		if (!gc::stopping)  // (seq_cst: a starting collector waits for this thread)
 			return;
 		gc::keep_registers(t);  // (a thread new to machine code has none kept yet)
 		std::unique_lock<std::mutex> hold(gc::stop_lock);
@@ -502,7 +493,7 @@ extern "C"
 		V* none = nullptr;
 		return slot->compare_exchange_strong(none, v) ? v : none;  // (two threads at once: the first one's is used)
 	}
-	V* cn_zero_part(bool text)  // a new thing's 0 or "" part: one shared value (numbers and text never change in place)
+	V* cn_zero_part(bool text)  // a shared 0 or "" part
 	{
 		static V* zero[2] = {};
 		static std::once_flag made[2];
@@ -518,10 +509,10 @@ extern "C"
 		std::lock_guard<std::mutex> hold(gc::lock);
 		gc::roots.push_back({from, static_cast<size_t>(size)});
 	}
-	void cn_hold_push(V* list, V* x)  // a library word filling a list (it may be parked while the collector looks)
+	void cn_hold_push(V* list, V* x)  // a library word filling a list
 	{
 		if (full(list)->numbers && full(list)->nums.empty())
-			full(list)->numbers = false;  // (a library word's lists are new: boxing one here would wait on the lock it holds)
+			full(list)->numbers = false;  // (new lists: boxing here would deadlock)
 		std::lock_guard<std::mutex> hold(gc::lock);
 		full(list)->boxed.push_back(x);
 	}
@@ -556,10 +547,8 @@ V* cn_make_text(std::string s)
 	return v;
 }
 
-// ---------------------------------------------------------------- problems
-// A problem doesn't jump anywhere: it is kept here, and the machine code checks cn_failed() after each step that may fail,
-// then goes to the 'if that went wrong:' lines, or leaves the command (and so on, up to the program, which reports it).
-extern "C" thread_local bool cn_failed_flag = false;  // each command going alongside ('meanwhile') has its own (machine code reads it)
+// ---- problems: kept here; machine code checks cn_failed() after each step
+extern "C" thread_local bool cn_failed_flag = false;  // one per thread
 #define failed cn_failed_flag
 static thread_local stellanova::Problem pending;
 
@@ -667,7 +656,7 @@ static bool same(const V* a, const V* b)
 }
 
 static bool never_changes(char tag) { return tag == 'n' || tag == 'y' || tag == 't' || tag == 'c'; }
-static V* share(V* v)  // v is held in one more place now: whoever changes it later copies it first (cn_own)
+static V* share(V* v)  // held in one more place: copy before changing
 {
 	if (v && !never_changes(v->tag) && v->shared < 255)
 		v->shared++;
@@ -678,7 +667,7 @@ static void release(V* v)  // one place that held v holds something else now
 	if (v && v->shared && v->shared < 255)
 		v->shared--;
 }
-static V* copy_of(const V* v)  // a copy that can be changed: what it holds is shared, and copied only when that is changed
+static V* copy_of(const V* v)  // a copy that shares until changed
 {
 	if (!v)
 		return nullptr;
@@ -723,7 +712,7 @@ static V* deep_copy(const V* v)  // for a command going alongside: nothing share
 	return out;
 }
 
-// A value written out as JSON, as stellanova.h's save() writes it (a thing's parts by their names, in order).
+// A value as JSON, like stellanova.h's save().
 static std::string saved_of(const V* v, const V* shape, int line)  // shape: the kind it is saved as (nullptr: as it is)
 {
 	std::string out;
@@ -781,14 +770,14 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 	return out;
 }
 
-// 'load X from ...': saved data read into a new value shaped like shape (a list's or table's one item shows its items' kind)
+// 'load X from ...' into a value shaped like shape
 static V* empty_like(const V* shape)
 {
 	if (shape->tag == 'l' || shape->tag == 'm')
 		return fresh(shape->tag);
 	if (shape->tag != 'k')
 		return copy_of(shape);
-	V* v = fresh('k');  // part by part, not copy_of: a shape may hold itself (a spot's list of spots)
+	V* v = fresh('k');  // part by part: a shape may hold itself
 	full(v)->kind = full(shape)->kind;
 	for (const V* x : cn_items(shape))
 		cn_items(v).push_back(empty_like(x));
@@ -863,11 +852,11 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 	}
 }
 
-// machine.py's add_number and list_number find a list's plain numbers at these places.
+// machine.py's add_number and list_number use these places.
 static_assert(offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's nums_place and count_holders need changing");
 static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == 2 * sizeof(void*), "machine.py's nums_place needs changing");
 
-// A list's or thing's items, boxed: a list of plain numbers is boxed first (and stays boxed).
+// Items, boxed (plain number lists get boxed).
 Items& cn_items(const V* v)
 {
 	Full* f = const_cast<Full*>(full(v));
@@ -945,10 +934,9 @@ extern "C"
 	}
 	void cn_wait_for_others() { Parked waiting; stellanova::wait_for_others(); }
 
-	// A program made into a plugin for a game engine ('stellanova plugin game.stella'): the engine calls its commands.
-	// (stellanova_start, made with the program, stellanova_call and stellanova_has are what the plugin shows the engine.)
+	// ---- plugins for game engines: stellanova_start, stellanova_call, stellanova_has
 	using EngineOutput = void (*)(const char* text, int is_problem);  // what the program shows, and what went wrong
-	// An engine word ('put 3 at ...'): its name, its numbers and text; numbers back go in answers (3 for a place), text in answer_text.
+	// An engine word: name, numbers, text; answers come back in answers and answer_text.
 	using EngineWord = double (*)(const char* word, const double* numbers, int count, const char* text, double* answers, char* answer_text, int room);
 	EngineWord cn_engine = nullptr;
 	double cn_me = 0;  // the engine's object the program is answering now ('me')
@@ -962,7 +950,7 @@ extern "C"
 			stellanova::show_hook = [out](const std::string& s, bool problem) { out(s.c_str(), problem ? 1 : 0); };
 		gc::me();
 	}
-	int cn_plugin_settle()  // after the engine's call: 0, or 2 when something went wrong (said through the output)
+	int cn_plugin_settle()  // 0, or 2 if something went wrong
 	{
 		if (!failed)
 			return 0;
@@ -970,7 +958,7 @@ extern "C"
 		failed = false;
 		return 2;
 	}
-	// 0 when it ran, 1 when the program has no such command (with that many numbers), 2 when something went wrong in it.
+	// 0 ran, 1 no such command, 2 something went wrong.
 	int stellanova_call(const char* name, double me, const double* numbers, int count, double* answer)
 	{
 		auto found = plugin_commands.find(name);
@@ -1022,7 +1010,7 @@ extern "C"
 	void cn_raise(int line, V* message) { cn_set_problem({line, full(message)->s}); }
 	void cn_raise_kind(int line, V* message, V* kind) { cn_set_problem({line, full(message)->s, full(kind)->s}); }
 	bool cn_problem_is(V* kind) { return pending.kind == full(kind)->s; }
-	void cn_lock(V* name)  // 'holding the lock "total":' (waiting for it is parked, so the collector can still run)
+	void cn_lock(V* name)  // 'holding the lock': waits parked
 	{
 		std::recursive_mutex& m = stellanova::named_lock(full(name)->s);
 		if (!m.try_lock())
@@ -1032,7 +1020,7 @@ extern "C"
 		}
 	}
 	void cn_unlock(V* name) { stellanova::named_lock(full(name)->s).unlock(); }
-	V* cn_problem_text()  // what went wrong, inside 'if that went wrong:' (and the problem is dealt with)
+	V* cn_problem_text()  // what went wrong (and it's dealt with)
 	{
 		failed = false;
 		return cn_make_text(pending.message);
@@ -1050,7 +1038,7 @@ extern "C"
 		if (v)
 			v->owned = false;
 	}
-	void cn_append(V** slot, V* b)  // 'set s to s plus b': in place when only s holds it, so a growing text isn't copied each time
+	void cn_append(V** slot, V* b)  // in place when only s holds it
 	{
 		V* a = *slot;
 		if (a && a->owned)
@@ -1101,7 +1089,7 @@ extern "C"
 	}
 	double cn_unbox_number(V* v) { return v->d; }
 	bool cn_unbox_yesno(V* v) { return v->d != 0; }
-	// a command value: its machine code, and in its items, copies of the names it uses ('each x becomes x times k')
+	// a command value: its code, plus copies of the names it uses
 	V* cn_command_make(void* code)
 	{
 		V* v = fresh('c');
@@ -1110,7 +1098,7 @@ extern "C"
 	}
 	static thread_local V* closure_now = nullptr;
 	V* cn_closure_env() { return closure_now; }  // read first thing by the command's machine code
-	void* cn_command_or_fail(void* command, int line)  // gives the machine code to call ('invoke f' when f holds no command yet: a problem)
+	void* cn_command_or_fail(void* command, int line)  // the code to call
 	{
 		V* v = static_cast<V*>(command);
 		if (!v)
@@ -1134,7 +1122,7 @@ extern "C"
 #endif
 		return out;
 	}
-	void cn_assign(V** slot, V* from)  // a thing put where only one thing of its kind is held: its parts copied in (no new value)
+	void cn_assign(V** slot, V* from)  // a thing's parts copied in
 	{
 		V* to = *slot;
 		if (to == from)
@@ -1177,7 +1165,7 @@ extern "C"
 	// lists and tables
 	V* cn_list_new() { return fresh('l'); }
 	V* cn_table_new() { return fresh('m'); }
-	// A list stays plain numbers (nums) while it holds only numbers: its first item decides.
+	// A list stays plain numbers while it holds only numbers.
 	void cn_list_add_number(V* list, double d)
 	{
 		Full* f = full(list);
@@ -1439,7 +1427,7 @@ extern "C"
 	}
 	double cn_place_size(V* v) { return std::sqrt(full(v)->x * full(v)->x + full(v)->y * full(v)->y + full(v)->z * full(v)->z); }
 
-	// things: spec is "pet\x01name\x01ages" (its kind, then the names of its parts)
+	// spec: "pet\x01name\x01ages"
 	V* cn_thing(const char* spec)
 	{
 		static std::map<const char*, ThingKind*> kinds;
@@ -1467,7 +1455,7 @@ extern "C"
 		Full* f = full(v);
 		f->kind = kind;
 		f->boxed.resize(kind->fields.size());
-		f->numbers = true;  // its number parts are kept plain, where machine code reads and changes them itself
+		f->numbers = true;  // number parts kept plain
 		for (size_t k = 0; k < kind->fields.size(); ++k)
 			f->nums.push_back(0);
 		return v;
@@ -1492,7 +1480,7 @@ extern "C"
 		std::string name(able);
 		able_kinds[name.substr(0, name.find('\x01'))][full(shape)->kind->name] = shape;
 	}
-	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age': a copy, in order of one part (a number or text), ties kept in order
+	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age', stable
 	{
 		V* out = copy_of(list);
 		for (const V* x : cn_items(out))
@@ -1523,7 +1511,7 @@ extern "C"
 			xs[i] = keyed[i].second;
 		return out;
 	}
-	V* cn_sorted_by_keys(V* list, V* keys)  // 'sorted names by each n becomes ...': in order of keys (numbers or text), ties kept in order
+	V* cn_sorted_by_keys(V* list, V* keys)  // 'sorted ... by each n becomes ...', stable
 	{
 		std::vector<size_t> order(count_of(list));
 		for (size_t k = 0; k < order.size(); ++k)
@@ -1692,7 +1680,7 @@ extern "C"
 		}
 		f->nums[static_cast<size_t>(k)] = d;
 	}
-	// A shape's pieces are shared, not copied: a shape may hold itself (a spot's list of spots) before it is finished.
+	// A shape's pieces are shared: it may hold itself.
 	void cn_field_shape(V* thing, int k, V* x) { cn_items(thing)[static_cast<size_t>(k)] = x; }
 	void cn_shape_item(V* list, V* x) { cn_items(list).push_back(x); }
 	void cn_shape_entry(V* table, V* x) { full(table)->table[""] = x; }
@@ -1705,7 +1693,7 @@ extern "C"
 		f->boxed[static_cast<size_t>(k)] = share(x);
 		release(old);
 	}
-	void cn_replace(V* thing, V* with)  // 'set ball to ...' inside a command for a ball: the caller's ball itself changes
+	void cn_replace(V* thing, V* with)  // the caller's ball itself changes
 	{
 		V* fresh_copy = copy_of(with);
 		bool marked = thing->marked, shared = thing->shared;

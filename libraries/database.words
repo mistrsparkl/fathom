@@ -1,14 +1,10 @@
-note: Words for databases (SQLite files, which many programs can read). Use them in a program with:  use: database
-note: Write a ? where a value goes and give the values as a list of text, so text from people can't change the command.
-note: Answers come back as text, one list per row ("" for an empty cell).
-note: shortcut: each word opens and closes the file, fine for small programs; keep it open between words if they need to be faster.
-note: On the web this works with node (its own SQLite); a web page has no databases.
+note: SQLite databases. Use: use: database  Put ? where a value goes.
 
 code:
   #ifdef _WIN32
   #include <winsqlite/winsqlite3.h>
   #elif defined(__linux__)
-  // Linux: the system's own SQLite (libsqlite3.so.0), whose header may not be there
+  // Linux: the system's SQLite
   extern "C"
   {
   	struct sqlite3;
@@ -181,7 +177,7 @@ to rows from the database with values, given file (text) and question (text) and
 
 javascript:
   const stellanova_database = {
-    split(command) {  // shortcut: splits at ; outside quotes and notes, so a trigger's BEGIN ... END breaks; use exec for those if needed
+    split(command) {  // shortcut: splits at ; so BEGIN ... END breaks
       const parts = [];
       let now = "", quote = null;
       for (let k = 0; k < command.length; k++) {

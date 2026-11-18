@@ -1,6 +1,4 @@
-whisper: Reading XML and HTML into parts. Written in Stellanova itself. Use it in a program with:  use: markup.stella
-whisper: 'read markup text' gives the whole of it: a part with no name, holding the outermost parts.
-whisper: HTML's loose ways are taken too: <br> and <img> need no closing, and a closing that doesn't fit ends the parts open inside it.
+whisper: Reads XML and HTML. Use: use: markup.stella
 
 a markup part has:
   name (text)
@@ -112,7 +110,7 @@ to read inside, for a markup reader, given part (a markup part), returning a mar
       skip past with (the markup reader, ">")
       if lower case of ending is lower case of the name of whole: return whole
       if the name of whole is not "":
-        whisper: it closes a part further out: this one ends here, and the one it closes reads it again
+        whisper: a closing tag for a part further out ends this one
         set spot to back
         return whole
     otherwise:
@@ -120,7 +118,7 @@ to read inside, for a markup reader, given part (a markup part), returning a mar
       set spot to spot plus 1
       set coming to lower case of name here the markup reader
       set spot to back
-      whisper: as in browsers, a new <li> ends the <li> before it (and <p>, <td>, <tr>... the same way)
+      whisper: a new <li> ends the one before, like browsers
       if ends before with (lower case of the name of whole, coming): return whole
       set spot to spot plus 1
       add read element the markup reader to the parts of whole

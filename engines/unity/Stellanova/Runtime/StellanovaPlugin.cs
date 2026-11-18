@@ -1,5 +1,4 @@
-// A Stellanova program made with 'stellanova plugin': loaded once, its commands called by StellanovaScript,
-// its engine words ('use: engine') answered here with Unity's objects.
+// A Stellanova plugin, and Unity's answers to its engine words.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -31,7 +30,7 @@ public sealed class StellanovaPlugin
 
     StellanovaPlugin(string name) { this.name = name; }
 
-    // The program called name (its .dll is in StreamingAssets/Stellanova), started the first time; null if it can't be.
+    // Loads the program called name, or null.
     public static StellanovaPlugin Load(string name)
     {
         if (loaded.TryGetValue(name, out var known))
@@ -45,7 +44,7 @@ public sealed class StellanovaPlugin
             return loaded[name] = null;
         }
 #if UNITY_EDITOR
-        // A copy is loaded, so the program can be built again while the editor holds this one.
+        // Loads a copy, so the program can be rebuilt.
         string copy = Path.Combine(Application.temporaryCachePath, $"{name}_{DateTime.Now.Ticks}{Native.Suffix}");
         File.Copy(path, copy, true);
         path = copy;
@@ -63,7 +62,7 @@ public sealed class StellanovaPlugin
         return plugin;
     }
 
-    // Calls one of the program's commands for an object (nothing happens if the program hasn't got it).
+    // Calls a command for an object, if the program has it.
     public void Call(string command, GameObject me, params double[] numbers)
     {
         string key = command + "/" + numbers.Length;
@@ -73,7 +72,7 @@ public sealed class StellanovaPlugin
             call(Utf8(command), StellanovaObjects.Of(me), numbers, numbers.Length, out _);
     }
 
-    // When play stops: every program is let go, so the next play loads the newest build.
+    // When play stops, let every program go.
     public static void UnloadAll()
     {
         foreach (var plugin in loaded.Values)
@@ -153,7 +152,7 @@ public sealed class StellanovaPlugin
         return 0;
     }
 
-    static class Keys  // Stellanova's key names: letters, digits, left, right, up, down, space, enter, escape, shift, control, tab, backspace
+    static class Keys  // Key names Stellanova uses.
     {
 #if ENABLE_INPUT_SYSTEM
         static KeyControl Control(string name)

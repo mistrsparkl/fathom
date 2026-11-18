@@ -1,5 +1,4 @@
-note: Words for the numbers behind letters (Unicode). Use them in a program with:  use: letters
-note: "A" is 65, "a" is 97, " " is 32, "é" is 233, "😀" is 128512.
+note: Numbers behind letters. Use: use: letters
 
 code:
   namespace stellanova_letters

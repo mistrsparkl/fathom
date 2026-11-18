@@ -1,5 +1,4 @@
-// Runs a Stellanova program on this actor: 'to begin:' when play starts, 'to every frame, given seconds (a number):'
-// each frame, and 'to touched, given other (a number):' when it hits or overlaps another actor.
+// Runs a Stellanova program on this actor.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -14,11 +13,11 @@ class STELLANOVA_API UStellanovaComponent : public UActorComponent
 public:
 	UStellanovaComponent();
 
-	// The program: a .stella file in the project's Stellanova folder, without '.stella' (e.g. coin).
+	// The program's name in the project's Stellanova folder (e.g. coin).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stellanova")
 	FString Program;
 
-	// Calls one of the program's commands for this actor (nothing happens if the program hasn't got it).
+	// Calls a command for this actor, if the program has it.
 	UFUNCTION(BlueprintCallable, Category = "Stellanova")
 	void CallCommand(const FString& Command, const TArray<double>& Numbers);
 

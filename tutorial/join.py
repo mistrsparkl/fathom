@@ -1,8 +1,4 @@
-"""Joins the filmed lessons (out/parts/NN-name.mp4, in order) into one film, out/Stellanova Tutorial.mp4, with a
-chapter for each lesson (named by its 'title:' line), so players can jump between them.
-
-    py -3 join.py
-"""
+"""Joins the filmed lessons into one film. py -3 join.py"""
 import subprocess
 from pathlib import Path
 

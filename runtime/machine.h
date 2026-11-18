@@ -1,5 +1,4 @@
-// The one kind of value machine code passes around for everything that isn't a number or yes/no (see machine.cpp).
-// Library words made into machine code (machine.py's library wrappers) turn these into C++ values and back.
+// The value machine code passes for everything but numbers and yes/no.
 #pragma once
 #include <algorithm>
 #include <functional>
@@ -15,22 +14,22 @@ struct ThingKind
 	std::vector<std::string> fields;
 };
 
-struct V  // every value begins like this, and a number or a yes/no is only this (so a million numbers stay small)
+struct V  // every value starts like this; numbers are only this
 {
-	char tag = 'n';  // n number, y yes or no, t text, l list, m table, p place, f flat place, k thing, c command
+	char tag = 'n';  // n number, y yes/no, t text, l list, m table, p place, f flat place, k thing, c command
 	bool marked = false;  // the collector reached it
 	bool owned = false;  // text only one name holds (cn_append): it may grow in place
-	bool numbers = false;  // a list holding only plain numbers (in Full's nums); a thing whose number parts are there
-	unsigned char shared = 0;  // how many more places hold it (255: too many to count): copied before it is changed if any
+	bool numbers = false;  // plain numbers kept in Full's nums
+	unsigned char shared = 0;  // how many more places hold it (255: many)
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 
 #include <cstdlib>
 #include <cstring>
 template <typename T>
-struct Few  // a list of numbers or values, laid out so machine code can read and change it itself (machine.py's nums_place)
+struct Few  // numbers or values, laid out for machine code
 {
-	T* data = few;  // (a few are kept right here: most things' parts and short lists, with no allocation)
+	T* data = few;  // (a few kept here, with no allocation)
 	size_t count = 0, room = 4;
 	T few[4];
 	Few() = default;
@@ -110,7 +109,7 @@ struct Few  // a list of numbers or values, laid out so machine code can read an
 using Nums = Few<double>;  // a list's plain numbers, or a thing's number parts
 using Items = Few<V*>;  // a list's items, or a thing's parts
 
-struct Table  // a table's entries: made only when the first is put in (most values aren't tables)
+struct Table  // made when the first entry is put in
 {
 	using Map = std::unordered_map<std::string, V*>;
 	std::unique_ptr<Map> m;
@@ -146,8 +145,8 @@ struct Table  // a table's entries: made only when the first is put in (most val
 struct Full : V  // every other value: text, lists, tables, places, things and commands
 {
 	std::string s;  // text: first (a text is made smaller, as only this: TextValue)
-	Nums nums;  // a list holding only numbers keeps them here instead, unboxed (numbers is set): at a fixed place
-	Items boxed;  // a list's items, or a thing's parts (in the order they were described): use cn_items. Next, at a fixed place
+	Nums nums;  // plain numbers, at a fixed place
+	Items boxed;  // items or parts, in order: use cn_items
 	const ThingKind* kind = nullptr;
 	Table table;  // (in no order: sorted_keys gives them in order)
 	double x = 0, y = 0, z = 0;  // a place
@@ -171,7 +170,7 @@ inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value t
 inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
-Items& cn_items(const V* v);  // a list's or thing's items, boxed (a list of plain numbers is boxed first)
+Items& cn_items(const V* v);  // items, boxed
 namespace stellanova { struct Problem; }
 void cn_set_problem(const stellanova::Problem& p);
 
@@ -188,15 +187,13 @@ extern "C"
 	void cn_hold_push(V* list, V* x);
 	void cn_hold_put(V* table, const char* key, V* x);
 }
-struct CnParked  // around a library word's own C++: it may wait, so the collector needn't wait for it
+struct CnParked  // around a library word that may wait
 {
 	CnParked() { cn_park(); }
 	~CnParked() { cn_unpark(); }
 };
 
-// ---------------------------------------------------------------- for library words
-// A library word's own C++ takes C++ values (std::string, std::vector<double>, FVector, ...): these turn machine
-// values into them and back. Only used where stellanova.h is included first.
+// ---- turning machine values into C++ values for library words, and back
 #ifdef STELLANOVA_CONVERSIONS
 template <typename T> struct cn_is_vector : std::false_type {};
 template <typename T> struct cn_is_vector<std::vector<T>> : std::true_type { using item = T; };
@@ -264,7 +261,7 @@ V* cn_from_cpp(const std::map<std::string, T>& table)
 	return out;
 }
 
-// A command given to a library word (like 'serve the web with (8080, the command answer)'): C++ calls its machine code.
+// A command given to a library word.
 extern "C" void* cn_command_or_fail(void* command, int line);
 extern "C" void cn_keep(V* v);  // held by C++ from now on: the collector keeps it
 void cn_rethrow();  // a problem in the command: thrown again, as a C++ problem
@@ -313,6 +310,6 @@ struct cn_is_function<std::function<R(A...)>> : std::true_type
 
 #ifdef __wasm__
 #include <system_error>
-// a library word starting threads of its own, in WebAssembly (where std::thread can't start one)
+// threads in WebAssembly
 #define ONE_THREAD "this word starts threads of its own, and a WebAssembly program has only one thread."
 #endif

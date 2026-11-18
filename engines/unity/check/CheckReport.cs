@@ -1,4 +1,4 @@
-// In the check scene: keeps what is logged, and after 3 seconds writes it and every object to check.txt (by the project or game).
+// Writes what was logged and every object to check.txt after 3 seconds.
 using System.IO;
 using UnityEngine;
 

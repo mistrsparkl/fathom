@@ -1,9 +1,4 @@
-note: Words for desktop forms: a window with buttons, fields to type in, labels, lists and tick boxes.
-note: Use them in a program with:  use: forms
-note: Each part has a name of your own. 'wait for a click' waits until a button is clicked and gives its name
-note: ("" once the form is closed). Places and sizes are in dots, from the form's top left corner.
-note: For tests and demos, the environment value STELLANOVA_FORM_SCRIPT can name a file of lines that act by themselves,
-note: one for each wait: "type <part> <text>", "choose <part> <item>", "tick <part>", "click <part>" or "close".
+note: Desktop forms. Use: use: forms
 
 code:
   #ifdef _WIN32
@@ -21,7 +16,7 @@ linux link: :libgobject-2.0.so.0
 
 code:
   #ifdef __linux__
-  // Linux: GTK 3's own parts (its functions declared here, so only the library itself is needed)
+  // Linux: GTK 3
   extern "C"
   {
   	int gtk_init_check(int*, char***);
@@ -585,8 +580,7 @@ to close the form = stellanova_forms::close()
 
 javascript:
   const stellanova_forms_web = {
-    // On a web page a form is a box of real buttons and fields in the page. With node it is one nobody sees,
-    // which STELLANOVA_FORM_SCRIPT can still fill in and click.
+    // On the web, a form is real buttons in the page.
     page: typeof document !== "undefined",
     form: null, closed: false, parts: new Map(), script: [], waiting: null,
     need(line) {

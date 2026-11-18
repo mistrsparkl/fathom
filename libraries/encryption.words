@@ -1,8 +1,4 @@
-note: Words for keeping text secret with a password. Use them in a program with:  use: encryption
-note: 'encrypted with (message, password)' gives text that can be kept or sent anywhere; only the same password
-note: turns it back, and any change to it is noticed. (ChaCha20-Poly1305, with a key made from the password by
-note: PBKDF2-SHA256, 100000 rounds, and a fresh random salt each time.) Text encrypted any way (directly, built,
-note: with node) can be decrypted any other way.
+note: Text kept secret with a password. Use: use: encryption
 
 include: <cstring>
 include: <random>

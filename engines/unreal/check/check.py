@@ -1,5 +1,4 @@
-"""Tries Stellanova in Unreal itself: builds a small project, sets it up, plays engines/check/words.stella in the editor, then
-packages the game and plays that too. Run: py -3 engines/unreal/check/check.py   (needs Unreal Engine 5.8; not in the test suite)"""
+"""Plays words.stella in Unreal, then in a packaged game. Run: py -3 engines/unreal/check/check.py"""
 import shutil
 import subprocess
 import sys

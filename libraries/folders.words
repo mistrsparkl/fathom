@@ -1,5 +1,4 @@
-note: Words for folders and files on the disk. Use them in a program with:  use: folders
-note: Names of files and folders are text, like "saves/slot 1.json". A name without a folder is in the current folder.
+note: Folders and files. Use: use: folders
 
 include: <filesystem>
 include: <algorithm>
@@ -247,7 +246,7 @@ javascript:
     },
   };
 
-note: Parts of a path, as text: "saves/slot 1.json" is in the folder "saves", its file name is "slot 1.json" and its extension "json".
+note: Parts of a path.
 code:
   namespace stellanova_folders
   {

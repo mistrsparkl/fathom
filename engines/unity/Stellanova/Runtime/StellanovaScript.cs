@@ -1,5 +1,4 @@
-// Runs a Stellanova program on this object: 'to begin:' when it starts, 'to every frame, given seconds (a number):'
-// each frame, and 'to touched, given other (a number):' when it bumps into (or enters) another object.
+// Runs a Stellanova program on this object.
 using UnityEngine;
 
 public class StellanovaScript : MonoBehaviour

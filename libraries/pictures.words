@@ -1,7 +1,4 @@
-note: Words for changing pictures: load one, read and change its dots, save it. Use them with:  use: pictures
-note: Each picture is a number. Dots are counted from 0, 0 (the top left), like the window's places.
-note: Colours are "#rrggbb" (or "#rrggbbaa", with how solid: ff is solid, 00 is see-through), or black, white,
-note: red, green, blue, yellow, grey or clear. Pictures are read from and saved to .png files.
+note: Changing pictures. Use: use: pictures  Each picture is a number.
 
 code:
   #ifdef _WIN32

@@ -1,4 +1,4 @@
-// The check scene for engines/check/words.stella: Run plays it in the editor, Build makes it into a game. Run by check.py.
+// The check scene: Run plays it, Build makes a game.
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;

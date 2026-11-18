@@ -1,6 +1,4 @@
-// Tries the extension in VS Code itself: node editor/in_vscode.js
-// It starts VS Code (a window of its own, with its own settings) with the extension loaded, opens a script with a
-// mistake in it, and checks the mistake is shown, words are offered and hover helps. Then VS Code closes.
+// Tries the extension in real VS Code. Use: node editor/in_vscode.js
 const fs = require("fs");
 const os = require("os");
 const path = require("path");

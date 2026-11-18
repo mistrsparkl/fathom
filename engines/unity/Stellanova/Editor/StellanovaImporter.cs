@@ -1,5 +1,4 @@
-// Each .stella file in Assets is made into a plugin when it is saved (stellanova plugin), kept in StreamingAssets/Stellanova
-// so built games have it too. Its mistakes show in the Console, like a C# script's.
+// Builds each .stella file into StreamingAssets/Stellanova when saved.
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
@@ -68,7 +67,7 @@ public class StellanovaImporter : ScriptedImporter
     }
 }
 
-// When play stops, the programs are let go: the next play uses their newest builds.
+// When play stops, let the programs go.
 [InitializeOnLoad]
 static class StellanovaPlayMode
 {

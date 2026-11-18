@@ -28,7 +28,7 @@ namespace
 {
 	stellanova_unreal::Frame Shown;  // the frame on the screen now (game thread only)
 
-	// Stellanova's metres (across, up, away) to Unreal's centimetres (forward, right, up).
+	// Metres to Unreal's centimetres.
 	FVector ToUnreal(double Across, double Up, double Away) { return FVector(Away * 100.0, Across * 100.0, Up * 100.0); }
 
 	const TPair<const char*, FKey> Keys[] = {
@@ -74,7 +74,7 @@ void AStellanovaEye::BeginPlay()
 		StellanovaMain();
 		auto& B = stellanova_unreal::bridge();
 		std::lock_guard<std::mutex> Hold(B.lock);
-		if (B.opened)  // a game that opened a world ends when its program does; otherwise its words stay on the screen
+		if (B.opened)  // a game that opened a world ends with its program
 			B.end_asked = true;
 	}).detach();  // the program runs on its own; 'reveal the frame' waits for Unreal
 }
@@ -208,7 +208,7 @@ void AStellanovaEye::Tick(float DeltaSeconds)
 	if (!Got)
 		return;
 
-	// The eye: Stellanova's turn is Unreal's yaw and its tilt is the pitch; 60 degrees from the top of the picture to the bottom.
+	// The eye: turn is yaw, tilt is pitch; 60 degrees tall.
 	const double* E = Shown.eye;
 	SetActorLocationAndRotation(ToUnreal(E[0], E[1], E[2]), FRotator(E[4], E[3], 0));
 	double Aspect = B.width_now / FMath::Max(1.0, B.height_now);
@@ -285,7 +285,7 @@ void AStellanovaGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	UWorld* World = GetWorld();
-	// The sun shines from up, a little right and behind, as in the window's 3D.
+	// The sun, as in the window's 3D.
 	FVector Light = ToUnreal(-0.371, -0.743, 0.557).GetSafeNormal();  // the way the light travels: away from the sun
 	ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(FVector::ZeroVector, Light.Rotation());
 	if (Sun)

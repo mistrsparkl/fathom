@@ -1,8 +1,4 @@
-note: Words for being a web server: other programs (and web browsers) on this computer can ask it for pages.
-note: Use them in a program with:  use: server
-note: The command it is given gets the address asked for (like "/hello" or "/scores?top=3") and gives back the page, as text.
-note: What a page is (a web page, a style sheet, a script, a picture) is told to the browser from the address's ending (.css, .js, .png ...).
-note: An answer that is saved text (starting with { or [) goes as data. 'answer with the status 404' says the page isn't there.
+note: A web server. Use: use: server  The command gets the address and gives back the page.
 
 code:
   #define NOMINMAX
@@ -104,7 +100,7 @@ code:
   		return out;
   	}
 
-  	// The file in folder that path names, if there is one (and it is inside the folder).
+  	// The file the path names inside folder, if any.
   	inline bool file_for(const std::string& folder, const std::string& path, std::string& bytes)
   	{
   		if (folder.empty())
@@ -169,15 +165,14 @@ code:
   		closesocket(client);
   	}
 
-  	// Requests are read and replies sent by threads of their own, so a slow one doesn't hold up the rest;
-  	// the program's answer command runs on this thread, one request at a time, so its names stay safe without locks.
+  	// Requests are read on their own threads; the answer command runs here, one at a time.
   	inline void serve_from(double port, const std::string& folder, const std::function<std::string(std::string)>& answer, int line)
   	{
   		WSADATA data;
   		WSAStartup(MAKEWORD(2, 2), &data);
   		SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   #ifndef _WIN32
-  		int again = 1;  // Linux: the port again straight after another server closed it (as Python's server does)
+  		int again = 1;  // Linux: reuse the port at once
   		setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &again, sizeof again);
   #endif
   		sockaddr_in where{};

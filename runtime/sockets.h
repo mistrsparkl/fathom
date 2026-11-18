@@ -1,4 +1,4 @@
-// Sockets for libraries: Winsock on Windows, the same names over POSIX sockets on Linux.
+// Sockets: Winsock on Windows, POSIX on Linux.
 #pragma once
 #ifdef _WIN32
 #include <winsock2.h>
@@ -23,6 +23,6 @@ typedef int BOOL;
 #define FALSE 0
 #define MAKEWORD(a, b) 0
 struct WSADATA {};
-// a closed socket must fail the send, not end the program (Linux sends SIGPIPE)
+// a closed socket fails the send (no SIGPIPE)
 inline int WSAStartup(int, WSADATA*) { signal(SIGPIPE, SIG_IGN); return 0; }
 #endif

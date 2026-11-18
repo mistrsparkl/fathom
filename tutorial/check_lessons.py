@@ -1,8 +1,4 @@
-"""Tries the lessons without filming them: follows each lesson's typing on a copy of the text, runs the programs the way
-the studia does, and shows what they print and which lines each zoom shows. A lesson whose program fails says so.
-
-    py -3 check_lessons.py lessons/*.lesson          (add -v to see every zoomed line)
-"""
+"""Checks lessons without filming. py -3 check_lessons.py lessons/*.lesson"""
 import re
 import shutil
 import subprocess

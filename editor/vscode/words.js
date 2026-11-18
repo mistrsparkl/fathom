@@ -1,8 +1,8 @@
-// What the editor knows without VS Code: where Stellanova is, its library words, and its mistakes.
+// Where Stellanova is, its library words and its mistakes.
 const fs = require("fs");
 const path = require("path");
 
-// The folder holding stellanova.py: the setting, a folder on PATH that has it, or where the extension was made.
+// The folder with stellanova.py.
 function home(setting) {
   const made = path.join(__dirname, "home.txt");
   const places = [setting, ...(process.env.PATH || "").split(path.delimiter),
@@ -10,7 +10,7 @@ function home(setting) {
   return places.find((p) => fs.existsSync(path.join(p, "stellanova.py"))) || null;
 }
 
-// Every library word, read from libraries/*.words the way the studia reads them.
+// Every library word, from libraries/*.words.
 function libraryWords(folder) {
   const found = [];
   for (const name of fs.readdirSync(folder).filter((n) => n.endsWith(".words")).sort()) {
@@ -44,7 +44,7 @@ function ownWords(text) {
   return found;
 }
 
-// 'x.stella line 12: I don't know 'nope'.' -> [{line: 12, message}] (line counted from 1)
+// Mistake lines to [{line, message}].
 function mistakes(said) {
   const found = [];
   for (const m of said.matchAll(/line (\d+): (.+)/g))

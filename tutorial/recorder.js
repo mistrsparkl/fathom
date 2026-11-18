@@ -1,7 +1,4 @@
-// Films lessons: opens Stellanova Studia in a hidden window, plays a lesson script in it (speaking, typing, running,
-// zooming in), and writes out/parts/<lesson>.mp4 with the voice. Run from editor/studia with:
-//     npx electron ../../tutorial/recorder.js <lesson files...>
-// See README.md in this folder for the lesson script format.
+// Films lessons from Studia. Run in editor/studia: npx electron ../../tutorial/recorder.js <lessons>
 
 const { app, BrowserWindow } = require("electron");
 const { spawn, execFileSync } = require("child_process");
@@ -19,7 +16,7 @@ const WIDTH = 1920, HEIGHT = 1080, FPS = 30;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const py = (...words) => execFileSync("py", ["-3", ...words], { encoding: "utf8", windowsHide: true, maxBuffer: 1 << 28 });
 
-// ---------------------------------------------------------------- reading a lesson
+// ---- reading a lesson
 
 function readLesson(file) {
   const lines = fs.readFileSync(file, "utf8").replace(/\r/g, "").split("\n");
@@ -46,7 +43,7 @@ function readLesson(file) {
   return { title, files, steps, name: path.basename(file, ".lesson"), folder: path.dirname(file) };
 }
 
-// ---------------------------------------------------------------- the studia, its system side, and a little file server
+// ---- Studia, its system side, and a file server
 
 function freePort() {
   return new Promise((resolve) => {
@@ -79,7 +76,7 @@ function serveOut(port) {  // games' films, for the page to play
   }).listen(port, "127.0.0.1");
 }
 
-// ---------------------------------------------------------------- what is laid over the studia: the camera, captions, cursor, cards
+// ---- the layer over Studia: camera, captions, cursor, cards
 
 const OVERLAY = String.raw`
 (() => {
@@ -132,7 +129,7 @@ const OVERLAY = String.raw`
     '<div id="film-card"></div>');
   const film = window.film = { s: 1, x: 0, y: 0, timers: [] };
   const W = innerWidth, H = innerHeight;
-  // where something is with the camera back at the start (a box in page dots)
+  // where something is, in page dots
   film.flat = (r) => ({ left: (r.left - film.x) / film.s, top: (r.top - film.y) / film.s, width: r.width / film.s, height: r.height / film.s });
   film.look = (box, most = 2.3) => {
     if (!box) { film.s = 1; film.x = 0; film.y = 0; }
@@ -145,7 +142,7 @@ const OVERLAY = String.raw`
     camera.style.transform = "translate(" + film.x + "px, " + film.y + "px) scale(" + film.s + ")";
   };
   film.box = (selector) => { const e = document.querySelector(selector); return e && film.flat(e.getBoundingClientRect()); };
-  // what a program printed: just its text, so a few short lines fill the screen
+  // just the printed text
   film.output = () => {
     const o = document.getElementById("output");
     const shown = o.getBoundingClientRect();
@@ -212,7 +209,7 @@ const OVERLAY = String.raw`
       width: box.width * film.s + pad * 2 + "px", height: box.height * film.s + pad * 2 + "px" });
     spot.classList.add("on");
   };
-  // the spot keeps measuring what it frames, so it stays put while the editor finishes scrolling
+  // keeps measuring so it stays put
   film.spotOn = null;
   film.spotAt = (what) => { film.spotOn = what; film.spotPaint(); };
   film.spotPaint = () => {
@@ -244,7 +241,7 @@ const OVERLAY = String.raw`
 })();
 `;
 
-// ---------------------------------------------------------------- filming
+// ---- filming
 
 class Film {
   constructor(file) {
@@ -275,7 +272,7 @@ class Film {
   }
 }
 
-// caption pieces: a few words at a time, at the times the voice says them
+// caption pieces, timed to the voice
 function captionChunks(text, words) {
   if (!words.length) return [{ text, at: 0, end: 3 }];
   const chunks = [];
@@ -285,7 +282,7 @@ function captionChunks(text, words) {
     chunks.push({ text: piece.map((w) => w.word).join(" "), at: piece[0].at, end: piece[piece.length - 1].at + piece[piece.length - 1].for });
     piece = [];
   };
-  // put the punctuation back: the voice's words come without it, so take each word from the text as written
+  // put punctuation back from the text
   const written = text.split(/\s+/).filter(Boolean);
   let k = 0;
   for (const w of words) {
@@ -304,7 +301,7 @@ function captionChunks(text, words) {
   return chunks;
 }
 
-// ---------------------------------------------------------------- one lesson
+// ---- one lesson
 
 async function film(lesson, filePort) {
   fs.rmSync(workspace, { recursive: true, force: true });
@@ -314,14 +311,14 @@ async function film(lesson, filePort) {
   fs.mkdirSync(path.join(appdata, "Stellanova Studia"), { recursive: true });
   fs.writeFileSync(path.join(appdata, "Stellanova Studia", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
 
-  // the voice first: every line spoken ahead, so the film knows how long each takes
+  // the voice first, so timings are known
   const said = lesson.steps.filter((s) => s.what === "say").map((s) => s.value);
   const linesFile = path.join(out, "lines.json");
   fs.writeFileSync(linesFile, JSON.stringify(said));
   const voices = JSON.parse(py(path.join(here, "voice.py"), linesFile));
   let spoken = 0;
 
-  // games are filmed ahead too, by the game itself (see STELLANOVA_DEMO_FRAMES in the window library)
+  // games are filmed ahead by the game itself
   for (const s of lesson.steps.filter((s) => s.what === "game")) {
     const [file, keys, title] = s.value.split("|").map((x) => x.trim());
     s.game = await filmGame(lesson, file, keys);
@@ -400,7 +397,7 @@ async function film(lesson, filePort) {
   for (const step of lesson.steps) {
     const v = step.value;
     try {
-      // everything else waits for the voice, so what's shown matches what's said
+      // wait for the voice
       if (!["say", "pause", "until finished", "until game ends"].includes(step.what)) await untilQuiet();
       switch (step.what) {
         case "say": {
@@ -509,11 +506,11 @@ async function film(lesson, filePort) {
           }
           break;
         }
-        case "stop at": {  // a click beside a line's number: the program will stop there when debugged
+        case "stop at": {  // a click beside a line number: a stop
           const spot = JSON.parse(await js(`(() => { const n = [...document.querySelectorAll(".row .num")].find((e) => e.textContent === ${JSON.stringify(v)}); const r = n.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width - 22, y: r.top + r.height / 2 }); })()`));
           await js(`film.cursorTo(${spot.x}, ${spot.y})`);
           await wait(600);
-          // the click, sent inside the page onto whatever is at that point (the studia reads mousedown on the code)
+          // the click, inside the page
           await js(`(() => { const c = document.getElementById("film-cursor"); c.classList.remove("click"); void c.offsetWidth; c.classList.add("click");
             const at = document.elementFromPoint(${spot.x}, ${spot.y});
             for (const type of ["mousedown", "mouseup"]) at.dispatchEvent(new MouseEvent(type, { clientX: ${spot.x}, clientY: ${spot.y}, button: 0, bubbles: true })); })()`);
@@ -549,7 +546,7 @@ async function film(lesson, filePort) {
         case "save": await key("s", ["control"]); await wait(400); break;
         case "game": {
           const g = step.game;
-          // plays on while the lesson carries on (to talk over it); "until game ends" waits for it
+          // plays on; "until game ends" waits
           gameDone = js(`film.game("http://127.0.0.1:${filePort}/${g.film}", ${JSON.stringify(g.title)}, ${g.width}, ${g.height})`);
           await wait(1500);
           break;
@@ -569,7 +566,7 @@ async function film(lesson, filePort) {
   win.destroy();
   system.kill();
 
-  // the sound track: each spoken line where it started, then put together with the picture
+  // the sound track
   const track = path.join(out, "parts", `${lesson.name}.placed.json`);
   fs.writeFileSync(track, JSON.stringify({ seconds: filmed.written / FPS, placed }));
   py(path.join(here, "sound.py"), track, path.join(out, "parts", `${lesson.name}.wav`));
@@ -578,7 +575,7 @@ async function film(lesson, filePort) {
   console.log(`filmed ${lesson.name}: ${(filmed.written / FPS / 60).toFixed(1)} minutes`);
 }
 
-// a game played by a list of key presses, filmed frame by frame by the game itself
+// a game played by key presses
 async function filmGame(lesson, file, keysFile) {
   const games = path.join(out, "games");
   fs.mkdirSync(games, { recursive: true });
@@ -586,7 +583,7 @@ async function filmGame(lesson, file, keysFile) {
   const source = path.join(lesson.folder, "files", file);
   const folder = path.join(games, name);
   fs.mkdirSync(folder, { recursive: true });
-  // the game and the scripts it uses; and no saves from an earlier filming, so it plays as a first game
+  // the game and its scripts, with no old saves
   for (const f of fs.readdirSync(path.dirname(source)).filter((f) => f.endsWith(".stella"))) fs.copyFileSync(path.join(path.dirname(source), f), path.join(folder, f));
   for (const f of fs.readdirSync(folder).filter((f) => f.endsWith(".save") || f.endsWith(".zip"))) fs.rmSync(path.join(folder, f));
   const exe = path.join(folder, name + ".exe");

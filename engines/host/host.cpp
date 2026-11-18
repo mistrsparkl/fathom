@@ -1,6 +1,4 @@
-// A tiny engine for a Stellanova plugin: the smallest example of what Unity, Unreal and Godot do with one.
-// It loads the plugin, starts it, then calls its commands, answering its engine words (here by printing them).
-// Build: clang++ -O1 host.cpp -o host.exe    Run: host.exe game.dll
+// A tiny engine for a plugin. Build: clang++ -O1 host.cpp -o host.exe  Run: host.exe game.dll
 #ifdef _WIN32
 #include <windows.h>
 #define OPEN(name) LoadLibraryA(name)

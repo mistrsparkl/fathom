@@ -1,11 +1,8 @@
-## Runs a Stellanova program on this node's parent: 'to begin:' when it is ready,
-## 'to every frame, given seconds (a number):' each frame, and 'to touched, given other (a number):'
-## when the parent (a RigidBody3D or an Area3D) meets another body.
-## Places: horizontal is X, vertical is Y and depth is away from the camera (-Z); turns go clockwise seen from above.
+## Runs a Stellanova program on its parent node. Places: X, Y, -Z.
 class_name StellanovaScript
 extends Node
 
-## A .stella file. In the editor it is made into its plugin when the game starts, if it changed.
+## A .stella file. Rebuilt when the game starts, if changed.
 @export_file("*.stella") var program: String
 
 static var _programs := {}  # a .stella path -> its program's number (0: it couldn't be loaded)
@@ -13,7 +10,7 @@ static var _nodes := {}  # each node a program knows is a number (0 is none)
 static var _numbers := {}  # a node's instance id -> its number
 static var _next := 1
 static var _answers: Answers
-static var _keys := {}  # a key -> [the frame it was last asked about, held the frame before, held then]
+static var _keys := {}  # key -> [frame asked, held before, held now]
 
 var _program := 0
 var _has := {}  # "every frame/1" -> does the program have it
@@ -89,7 +86,7 @@ static func _suffix() -> String:
 	return ".dll" if OS.get_name() == "Windows" else ".so"
 
 
-## The plugin made from a .stella file (made again first if the file changed), or "" when it couldn't be made.
+## The built plugin for a .stella file, or "".
 static func made_for(path: String) -> String:
 	var script := ProjectSettings.globalize_path(path)
 	var made := script.get_basename() + _suffix()

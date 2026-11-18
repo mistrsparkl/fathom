@@ -1,6 +1,4 @@
-"""Tries Stellanova in Godot itself: sets a project up, plays engines/check/words.stella in the editor, then exports the game
-and plays that too. Run: py -3 engines/godot/check/check.py
-(needs Godot 4.4 or later, winget install GodotEngine.GodotEngine, and its Windows export templates; not in the test suite)"""
+"""Plays words.stella in Godot, then in an exported game. Run: py -3 engines/godot/check/check.py"""
 import os
 import shutil
 import subprocess

@@ -1,5 +1,4 @@
-// Fingerprints of bytes (SHA-1, SHA-256, SHA-512, MD5), HMAC and PBKDF2, in plain C++: the same on Windows and in WebAssembly.
-// Used by the hashing and encryption libraries.
+// SHA-1, SHA-256, SHA-512, MD5, HMAC and PBKDF2 in plain C++.
 #pragma once
 #include <cstdint>
 #include <cstring>
@@ -14,7 +13,7 @@ namespace stellanova_digest
 	inline uint32_t rotr(uint32_t x, int n) { return (x >> n) | (x << (32 - n)); }
 	inline uint64_t rotr64(uint64_t x, int n) { return (x >> n) | (x << (64 - n)); }
 
-	// the message padded to whole blocks: a 1 bit, zeros, and its length in bits (big-endian, or little-endian for MD5)
+	// padded to whole blocks
 	inline Bytes padded(const uint8_t* data, size_t size, size_t block, size_t length_bytes, bool little)
 	{
 		Bytes m(data, data + size);
@@ -189,7 +188,7 @@ namespace stellanova_digest
 		return out;
 	}
 
-	// kind: "sha256", "sha512", "sha1" or "md5" (anything else: an empty answer, for the caller to complain about)
+	// kind: "sha256", "sha512", "sha1" or "md5"
 	inline Bytes digest(const std::string& kind, const uint8_t* data, size_t size)
 	{
 		if (kind == "sha256") return sha256(data, size);
@@ -218,7 +217,7 @@ namespace stellanova_digest
 		return digest(kind, outer.data(), outer.size());
 	}
 
-	// PBKDF2 with HMAC-SHA256: length bytes of key from a password and a salt
+	// PBKDF2 with HMAC-SHA256
 	inline Bytes pbkdf2_sha256(const std::string& password, const uint8_t* salt, size_t salt_size, int rounds, size_t length)
 	{
 		const uint8_t* p = reinterpret_cast<const uint8_t*>(password.data());

@@ -1,4 +1,4 @@
-// A .stella file in the Assets folder, as Unity keeps it (made by StellanovaImporter).
+// A .stella file in Assets.
 using UnityEngine;
 
 public class StellanovaProgram : ScriptableObject

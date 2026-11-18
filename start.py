@@ -1,5 +1,4 @@
-"""Starts Stellanova (stellanova.bat and run.bat call this). A script built before, with none of its files changed
-since, runs its built copy straight away, without reading stellanova.py; anything else goes on to stellanova.py."""
+"""Starts Stellanova: runs a kept built copy if nothing changed, else stellanova.py."""
 import hashlib
 import json
 import os
@@ -26,12 +25,12 @@ def install_stamp():
 
 
 def note_of(script):
-    """Where the note is that says which built copy a script has, and the files it was built from."""
+    """The note for a script's built copy."""
     return RUNS / (hashlib.sha256(str(script.resolve()).encode("utf-8")).hexdigest()[:24] + ".json")
 
 
 def kept_copy(script):
-    """The built copy of script, if it was built from the files as they are now (or None)."""
+    """The built copy, if still current (or None)."""
     try:
         note = json.loads(note_of(script).read_text(encoding="utf-8"))
         exe = RUNS / note["exe"]

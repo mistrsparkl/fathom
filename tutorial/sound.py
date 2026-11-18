@@ -1,7 +1,4 @@
-"""Makes a lesson's sound track: each spoken line placed at the second it started in the film.
-
-    py -3 sound.py placed.json out.wav      placed.json: {"seconds": total, "placed": [[start seconds, mp3], ...]}
-"""
+"""A lesson's sound track. py -3 sound.py placed.json out.wav"""
 import array
 import json
 import subprocess

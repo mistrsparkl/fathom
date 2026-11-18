@@ -1,8 +1,4 @@
-note: Words for sending email. Use them in a program with:  use: email
-note: 'send an email with (server, user, password, to, subject, message)'. The server is its address and port, like
-note: "smtp.gmail.com:587" (port 587 starts plain and switches to TLS; port 465 is TLS from the start). The user is
-note: the address it is sent from. Mail always goes over TLS, except to a server on this computer ("localhost:2525"),
-note: for testing. Many mail services want an app password here, not your usual one.
+note: Sending email. Use: use: email
 
 code:
   #ifdef _WIN32
@@ -121,7 +117,7 @@ code:
   		std::string said;
   		if (started)
   		{
-  			posix_spawn_file_actions_t acts;  // curl reads its settings (and so the password) from here, never from its command line
+  			posix_spawn_file_actions_t acts;  // curl reads the password from here, not its command line
   			posix_spawn_file_actions_init(&acts);
   			posix_spawn_file_actions_adddup2(&acts, in[0], 0);
   			posix_spawn_file_actions_adddup2(&acts, out[1], 1);

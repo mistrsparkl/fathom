@@ -1,5 +1,4 @@
-// Stellanova Studia's shell: a window for the screens (screens.stella) and the system side (system.stella).
-// Both are written in Stellanova; this only remakes them when their .stella changed, starts the system side and shows the window.
+// Studia's shell: rebuilds the screens and system side if changed, then opens the window.
 
 const { app, BrowserWindow } = require("electron");
 const { spawn, execFileSync } = require("child_process");
@@ -57,7 +56,7 @@ async function start() {
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
-  // For checking it: STUDIA_PLAY is a script given the window (to press keys like a person), STUDIA_SHOT saves a picture after STUDIA_SHOT_WAIT ms and closes.
+  // For tests: STUDIA_PLAY runs a script, STUDIA_SHOT saves a picture and closes.
   win.webContents.once("did-finish-load", () => {
     if (process.env.STUDIA_PLAY) win.webContents.on("console-message", (e) => console.log(e.message));
     if (process.env.STUDIA_PLAY) setTimeout(() => require(process.env.STUDIA_PLAY)(win), 1500);

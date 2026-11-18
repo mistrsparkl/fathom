@@ -1,5 +1,4 @@
-note: Whole numbers of any size, kept as text: "123456789012345678901234567890". Use them with:  use: big numbers
-note: Numbers are exact up to 9007199254740992; past that, these keep every digit. Give them text, get text back.
+note: Whole numbers of any size, as text. Use: use: big numbers
 
 code:
   namespace stellanova_big

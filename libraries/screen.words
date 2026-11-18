@@ -1,11 +1,4 @@
-note: Words for a whole screen of your own: a full-screen window drawn with see-through colours, smooth rounded shapes,
-note: real fonts, frosted glass, layers and line icons. For desktops, apps and anything with a look of its own.
-note: Use them in a program with:  use: screen   (running directly it needs Pillow: py -3 -m pip install pillow; on the web it is a canvas over the page)
-note: Sizes and places are in dots, counted from the top left. On a screen set to show things bigger (like 150%),
-note: a dot is bigger too, so a program looks the same everywhere and text stays sharp.
-note: Colours are "#rrggbb", or "#rrggbbaa" to see through them (aa: 00 is clear, ff is solid). 'colour of hue' makes them from a hue.
-note: For checking a program without anyone there, set STELLANOVA_SCREEN_PLAY to a file of steps (see LANGUAGE.md),
-note: STELLANOVA_SCREEN_SIZE to a size like 1600x900, and STELLANOVA_SCREEN_HIDDEN to 1.
+note: A full screen of your own: soft shapes, fonts, glass, layers. Use: use: screen
 
 runs only
 
@@ -918,7 +911,7 @@ to etch a shadow, given x (a number) and y (a number) and width (a number) and h
 to colour of hue, given hue (a number) and saturation (a number) and lightness (a number) and opacity (a number), returning text
   runs: hue_colour({hue}, {saturation}, {lightness}, {opacity})
   web: stellanova_screen.hue({hue}, {saturation}, {lightness}, {opacity})
-note: ---- layers: drawn once, then put on the screen as often as you like (fast); clips keep drawing inside a box
+note: ---- layers and clips
 to begin the layer, given name (text) and width (a number) and height (a number)
   runs: begin_layer({name}, {width}, {height})
   web: stellanova_screen.beginLayer({name}, {width}, {height}, {line})
@@ -992,8 +985,7 @@ to copy to the clipboard, given words (text)
 
 javascript:
   const stellanova_screen = {
-    // On a web page the screen is a canvas over the whole page. With node there is no screen: it is one nobody sees
-    // (STELLANOVA_SCREEN_SIZE and STELLANOVA_SCREEN_PLAY work as they do directly), checked but not drawn.
+    // On the web the screen is a canvas over the page.
     page: typeof document !== "undefined",
     isOpen: false, lives: false, askedClose: false, w: 0, h: 0, k: 1, dt: 1 / 60, last: 0,
     mx: 0, my: 0, held: new Set(), down: new Set(), up: new Set(), double: false, wheel: 0, keys: [], typed: "",
@@ -1079,7 +1071,7 @@ javascript:
       if (this.screen) this.screen.remove();
       this.screen = null;
     },
-    playSteps() {  // steps for checking a program without a person: wait, move, click, down, up, double, right, wheel, key, type, shot, quit
+    playSteps() {  // test steps: wait, move, click, down, up, double, right, wheel, key, type, shot, quit
       const steps = this.play, now = this.now();
       while (steps.length && now >= this.playAt) {
         const [what, ...rest] = steps.shift().split(" ");
@@ -1282,7 +1274,7 @@ javascript:
     },
     measurer: null,
     textWidth(words, size, style) {
-      if (!this.page) return words.length * size * 0.55;  // shortcut: node has no fonts, so this is a guess there; a page measures it
+      if (!this.page) return words.length * size * 0.55;  // shortcut: node has no fonts, so this guesses
       this.measurer ||= document.createElement("canvas").getContext("2d");
       this.measurer.font = this.font(size, style);
       return this.measurer.measureText(words).width / this.k;

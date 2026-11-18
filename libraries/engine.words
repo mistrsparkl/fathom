@@ -1,8 +1,4 @@
-note: Words for a program inside a game engine (Unity, Unreal or Godot). Use them in a program with:  use: engine
-note: Make the program into a plugin with:  stellanova plugin game.stella
-note: The engine calls the program's own commands: 'to begin:' when an object with the script starts,
-note: 'to every frame, given seconds (a number):' each frame, and 'to touched, given other (a number):' when it touches another.
-note: Objects are numbers. 'me' is the object the program is answering now. Places are across (horizontal), up (vertical) and away (depth).
+note: Words for game engines. Use: use: engine  Build: stellanova plugin game.stella
 
 code:
   extern "C"

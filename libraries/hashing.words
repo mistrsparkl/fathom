@@ -1,7 +1,4 @@
-note: Words for hashes: a short fingerprint of text or bytes that changes completely if anything in it changes.
-note: Use them in a program with:  use: hashing
-note: Kinds of hash: "sha256" (the usual one), "sha512", "sha1" and "md5" (old: fine for spotting changes, not for safety).
-note: Hashes come back as text in hexadecimal, like "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824".
+note: Hashes of text or bytes. Use: use: hashing
 
 include: "digest.h"
 

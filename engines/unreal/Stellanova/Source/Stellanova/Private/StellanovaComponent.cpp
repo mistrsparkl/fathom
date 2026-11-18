@@ -1,5 +1,4 @@
-// Loads Stellanova programs made with 'stellanova plugin' and answers their engine words ('use: engine') with actors.
-// Places: 1 in Stellanova is a metre (100 here); horizontal is Y, vertical is Z and depth is X.
+// Loads Stellanova plugins and answers their engine words. 1 unit = 1 metre; (h, v, d) = (Y, Z, X).
 #include "StellanovaComponent.h"
 #include "Components/MeshComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -71,7 +70,7 @@ namespace
 			UE_LOG(LogStellanova, Log, TEXT("%s"), *Said);
 	}
 
-	FKey KeyOf(const FString& Name)  // Stellanova's key names: letters, digits, left, right, up, down, space, enter, escape, shift, control, tab, backspace
+	FKey KeyOf(const FString& Name)  // Key names Stellanova uses.
 	{
 		static const TMap<FString, FName> Named = {
 			{TEXT("left"), TEXT("Left")}, {TEXT("right"), TEXT("Right")}, {TEXT("up"), TEXT("Up")}, {TEXT("down"), TEXT("Down")},
@@ -145,7 +144,7 @@ namespace
 #if WITH_EDITOR
 				Made->SetActorLabel(It->GetActorNameOrLabel());
 #endif
-				// A program added while the game runs isn't copied with the actor: the copy gets one too.
+				// The copy gets the program too.
 				TArray<UStellanovaComponent*> Theirs, Copied;
 				It->GetComponents(Theirs);
 				Made->GetComponents(Copied);
@@ -185,7 +184,7 @@ namespace
 	}
 
 #if WITH_EDITOR
-	// In the editor, a program is made into its plugin again whenever its .stella file is newer.
+	// In the editor, rebuild when the .stella file is newer.
 	void BuildIfChanged(const FString& Name)
 	{
 		FString Script = Folder() / Name + TEXT(".stella"), Made = Folder() / Name + TEXT(".dll");
@@ -224,7 +223,7 @@ namespace
 			return nullptr;
 		}
 #if WITH_EDITOR
-		// A copy is loaded, so the program can be built again while the editor holds this one.
+		// Loads a copy, so the program can be rebuilt.
 		FString Copy = FPaths::ConvertRelativePathToFull(FPaths::ProjectIntermediateDir() / TEXT("Stellanova") /
 			FString::Printf(TEXT("%s_%lld.dll"), *Name, FDateTime::Now().GetTicks()));
 		IFileManager::Get().Copy(*Copy, *Path);
@@ -318,7 +317,7 @@ void UStellanovaComponent::CallCommand(const FString& Command, const TArray<doub
 
 void UStellanovaComponent::Hit(AActor* Me, AActor* Other, FVector Push, const FHitResult& Where)
 {
-	// A hit is noticed every frame while the two touch: only a new touch (none for a quarter second) counts.
+	// Only a new touch counts (none for 0.25 s).
 	static TMap<TPair<uint32, uint32>, double> Last;
 	double Now = GetWorld()->GetTimeSeconds();
 	double& Then = Last.FindOrAdd({Me->GetUniqueID(), Other->GetUniqueID()}, -1);

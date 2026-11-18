@@ -1,13 +1,4 @@
-"""Stellanova's machine-code builder: turns a program into LLVM code, which clang makes into an .exe.
-
-Each piece of a program (a number, a sum, an 'if' line) carries an 'ir' function next to its Python and C++:
-ir(f) writes that piece's LLVM instructions into the function being made, f, and returns where the answer is.
-A piece without one raises Unsupported, and the program is built the older way (through C++) instead.
-
-Numbers are doubles and yes/no is i1. Everything else is a pointer to a value made by runtime/machine.cpp
-(compiled once into a library), which copies, shows and compares values exactly as Python does.
-A problem doesn't jump: the library keeps it, and the code checks cn_failed() after each step that may fail.
-"""
+"""Turns a program into LLVM code; clang makes the .exe. Values live in runtime/machine.cpp."""
 import os
 import re
 import struct
@@ -18,15 +9,15 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 NUMBER, YESNO, TEXT, PLACE, FLAT = "number", "yes or no", "text", "place", "flat"
-THINGS = {}  # 'thing pet' -> [(the part's C++ name, its words, its kind)], set by stellanova.py before writing
-HAS_KINDS_OF = lambda kind: True  # are there kinds of this kind of thing (with parts of their own)? Set by stellanova.py
+THINGS = {}  # 'thing pet' -> [(C++ name, words, kind)]
+HAS_KINDS_OF = lambda kind: True  # kinds of this kind? Set by stellanova.py
 
 
-# library functions that may find a problem (machine.cpp's GUARDED ones): the code looks at cn_failed() after each
+# library functions that may fail: check cn_failed() after each
 FALLIBLE = {"cn_split", "cn_list_at_slow", "cn_list_put_slow", "cn_own_item", "cn_own_entry", "cn_list_put_number", "cn_entry", "cn_entry_remove", "cn_list_at", "cn_list_at_number", "cn_list_last", "cn_list_put", "cn_list_random",
             "cn_list_remove_item", "cn_list_insert", "cn_power", "cn_bits", "cn_list_stat", "cn_random", "cn_rounded", "cn_to_number", "cn_command_or_fail",
             "cn_saved_text", "cn_save_file", "cn_load", "cn_something", "cn_sorted_by", "cn_able"}
-ABLE = {}  # shared abilities ('thing speaker') -> the kinds that can do them; an ability's empty value is nothing
+ABLE = {}  # ability -> the kinds that can do it
 
 
 class Unsupported(Exception):
@@ -34,29 +25,28 @@ class Unsupported(Exception):
 
 
 TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm": WebAssembly (WASI), for 'stellanova wasm'
-WASI = Path.home() / ".stellanova" / "wasi"  # wasi-sysroot-34.0 and libclang_rt-34.0, from github.com/WebAssembly/wasi-sdk
+WASI = Path.home() / ".stellanova" / "wasi"  # from github.com/WebAssembly/wasi-sdk
 
 
-# libraries whose words only work things out, never waiting: their calls needn't keep registers for the collector
+# libraries that never wait: no registers kept
 NEVER_WAIT = {"builtins", "maths", "letters", "patterns", "big numbers"}
 NO_VALUES = re.compile(r"call (?:void|double|i1) @(?:cn_user_|cn_list_add_number\(|cn_list_number\(|cn_list_at_number\(|cn_list_put_number\(|cn_part_number\(|cn_part_number_put\()|call ptr @cn_(?:text_kept|own|own_field|own_item|own_entry|list_at_slow)\(|call ptr @cn_something\(ptr null|call void @cn_(?:list_put_slow|assign)\("  # (adding a number to a list keeps it in the list)
                        r"|call (?:double|i1) @cn_w_\w+\((?:(?:double|i1|i32) [^,()]*(?:, )?)*\)$")  # a library word given and giving only numbers or yes/no
 
 
 def makes_nothing(lines):
-    """True when these lines make no values of their own: they call nothing, or only commands of the program's own
-    that give back a number, yes or no, or nothing (those free what they make themselves, and look for a collector)."""
+    """True when these lines make no values of their own."""
     return all("call " not in l or (TARGET != "wasm" and NO_VALUES.search(l)) for l in lines)
 
 
 def owned(f, v):
-    """v, about to be changed in place: a copy first wherever it is held elsewhere too (and kept where v is)."""
+    """Copy v first if it is held elsewhere."""
     own = getattr(v, "ir_own", None)
     return own(f) if own else emit(f, v)
 
 
 def emit(f, x, what="a part of the language"):
-    """Writes x's LLVM code into f (x is a Value or a statement's run); returns where its answer is."""
+    """Writes x's LLVM code into f; returns where its answer is."""
     write = getattr(x, "ir", None)
     if write is None:
         code = getattr(x, "cpp", None)  # a Value: its C++ says which piece it is
@@ -214,12 +204,12 @@ declare void @cn_slot(ptr)
 
 
 class Module:
-    """A whole program: its text constants, the names the whole program shares, and its functions."""
+    """A whole program: constants, shared names, functions."""
 
     def __init__(self):
         self.constants, self.functions, self.declared = [], [], []
         self.shared = {}  # 'the world remembers:' names: C++ name -> kind
-        self.units = {}  # built-in and library words the program uses: unit -> [head, {C function name: its C++}]
+        self.units = {}  # words used: unit -> [head, {C name: C++}]
         self.texts = {}
         self.text_slots = set()  # texts written in the program, each made once (see text_const)
 
@@ -239,8 +229,7 @@ class Module:
             self.declared.append(line)
 
     def finish(self, files, plugin=None):
-        """The module's LLVM code. plugin: [(words, function name, how many numbers, gives a number)] for the commands
-        a game engine may call: then the program is started by stellanova_start, not main."""
+        """The module's LLVM code; plugins start with stellanova_start."""
         start = Fn(self, "main", [], None)
         for cpp, kind in self.shared.items():
             self.constants.append(f"@g.{cpp} = internal global {ll_type(kind)} {zero_const(kind)}")
@@ -270,7 +259,7 @@ class Module:
 
 
 def c_bools(declarations):
-    """A C++ bool is one byte that must be 0 or 1, so a yes/no given to (or got from) the library is zero-extended."""
+    """A C++ bool is 0 or 1: zero-extend."""
     out = []
     for line in declarations.splitlines():
         if line.startswith("declare ") and "llvm." not in line:
@@ -286,7 +275,7 @@ def zero_const(kind):
 
 
 def nums_at():
-    """Where machine.h's Full keeps nums (after V and the text): machine.cpp checks these."""
+    """Where Full keeps nums (machine.cpp checks)."""
     return 32 if TARGET == "wasm" else 48
 
 
@@ -296,7 +285,7 @@ def boxed_at():
 
 
 class Fn:
-    """One function being written: its instructions, its names' places, and the loops and 'try:'s it is inside."""
+    """One function being written."""
 
     def __init__(self, module, name, inputs, gives):
         self.module, self.name, self.inputs, self.gives = module, name, inputs, gives
@@ -316,19 +305,19 @@ class Fn:
         return f"{hint}{self.n}"
 
     def put(self, line):
-        if self.ended:  # code after 'cease' or 'break free' is never reached, but still needs a block
+        if self.ended:  # unreachable code still needs a block
             self.place(self.label("dead"))
         self.lines.append("  " + line)
 
     def put_checked(self, line):
-        """put, and then a check when the line calls a library function that may fail (see FALLIBLE)."""
+        """put, then check if the call may fail."""
         self.put(line)
         m = re.search(r"@(cn_\w+)\(", line)
         if m and m.group(1) in FALLIBLE:
             self.check()
 
     def hold(self, value):
-        """value is used across the lines inside a loop or a lock: in WebAssembly it must be in memory, where the collector looks."""
+        """in WebAssembly, keep it in memory for the collector"""
         if TARGET == "wasm":
             self.n += 1
             self.entry.append(f"  %held{self.n} = alloca ptr")
@@ -341,7 +330,7 @@ class Fn:
         return r
 
     def call(self, gives, fn, *args, checked=False):
-        """A call into the library (args are (type, value) pairs); checked: it may fail, so look afterwards."""
+        """A call into the library."""
         given = ", ".join(f"{t} {v}" for t, v in args)
         if gives == "void":
             self.put_checked(f"call void @{fn}({given})")
@@ -353,7 +342,7 @@ class Fn:
         return out
 
     def check(self):
-        """If a problem happened, go to the 'if that went wrong:' lines, or leave this command."""
+        """On a problem, go to 'if that went wrong:' or leave."""
         if TARGET == "wasm":
             bad = self.op("call i1 @cn_failed()")
         else:  # (read straight from memory: no call)
@@ -376,13 +365,13 @@ class Fn:
         self.here = label
 
     def nums_place(self, lst):
-        """Where a list's plain numbers are (machine.h's Nums, just after V): (numbers flag, data, count, room, size type)."""
+        """Where a list's plain numbers are."""
         word, size = (4, "i32") if TARGET == "wasm" else (8, "i64")
         at = lambda k: self.op(f"getelementptr inbounds i8, ptr {lst}, i64 {k}")
         return at(3), at(nums_at()), at(nums_at() + word), at(nums_at() + 2 * word), size
 
     def add_number(self, lst, d):
-        """Adds a number to a list: in place while it holds plain numbers and has room (the runtime otherwise)."""
+        """Adds a number in place when it can."""
         flag, data, count, room, size = self.nums_place(lst)
         check, fast, slow, done = self.label("addcheck"), self.label("addfast"), self.label("addslow"), self.label("added")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), check, slow)
@@ -399,8 +388,7 @@ class Fn:
         self.place(done)
 
     def number_item(self, lst, index):
-        """Where item index (a number, from 1) of a list of plain numbers is: (pointer, fast label) when it's there.
-        Branches to the label it returns when it isn't (not plain numbers, not a whole number, out of range)."""
+        """Item index of a plain number list, if there."""
         flag, data, count, _, size = self.nums_place(lst)
         whole, ranged, fast, slow = self.label("idxwhole"), self.label("idxrange"), self.label("itemfast"), self.label("itemslow")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), whole, slow)
@@ -418,8 +406,7 @@ class Fn:
         return self.op(f"getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, {size} {at}"), fast, slow
 
     def item_place(self, lst, index):
-        """Where item index (a number, from 1) of a list of boxed items is: (pointer, fast label, slow label).
-        Branches to the slow label when it isn't there (a list of plain numbers, not a whole number, out of range)."""
+        """Item index of a boxed list, if there."""
         flag, _, _, _, size = self.nums_place(lst)
         word = 4 if size == "i32" else 8
         start = boxed_at()  # (a vector begins with its first place)
@@ -439,7 +426,7 @@ class Fn:
         return self.op(f"getelementptr inbounds ptr, ptr {first}, {size} {at}"), fast, slow
 
     def read_item(self, lst, index, line):
-        """'item i of pets': read in place when it's there, the runtime (and its message) otherwise."""
+        """'item i of pets', in place when it can."""
         at, fast, slow = self.item_place(lst, index)
         done = self.label("bread")
         a = self.op(f"load ptr, ptr {at}")
@@ -452,7 +439,7 @@ class Fn:
         return self.op(f"phi ptr [ {a}, %{fast} ], [ {b}, %{slow_end} ]")
 
     def write_item(self, lst, index, x, line, kind=None):
-        """'set item i of pets to p': in place when it's there, the runtime otherwise (x is a value: shared now)."""
+        """'set item i of pets to p', in place when it can."""
         at, fast, slow = self.item_place(lst, index)
         done = self.label("bput")
         if kind and kind.startswith("thing "):
@@ -469,7 +456,7 @@ class Fn:
         self.place(done)
 
     def read_number_item(self, lst, index, line):
-        """'item i of scores' for a list of numbers: read in place when it's there, the runtime (and its message) otherwise."""
+        """'item i of scores', in place when it can."""
         at, fast, slow = self.number_item(lst, index)
         done = self.label("itemread")
         a = self.op(f"load double, ptr {at}")
@@ -482,7 +469,7 @@ class Fn:
         return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow_end} ]")
 
     def write_number_item(self, lst, index, x, line):
-        """'set item i of scores to x' for a list of numbers: in place when it's there, the runtime otherwise."""
+        """'set item i of scores to x', in place when it can."""
         at, fast, slow = self.number_item(lst, index)
         done = self.label("itemput")
         self.put(f"store double {x}, ptr {at}")
@@ -507,7 +494,7 @@ class Fn:
         return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow} ]")
 
     def put_thing_number(self, thing, k, d):
-        """Sets number part k of a thing in place (the runtime first, if its number parts aren't kept plain)."""
+        """Sets number part k in place."""
         flag, data, _, _, _ = self.nums_place(thing)
         fast, slow, done = self.label("partput"), self.label("partplain"), self.label("partset")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
@@ -520,7 +507,7 @@ class Fn:
         self.place(done)
 
     def list_number(self, lst, k):
-        """Item k (from 0, always there) of a list of numbers, read in place while it holds plain numbers."""
+        """Item k (from 0) of a plain number list."""
         flag, data, _, _, size = self.nums_place(lst)
         fast, slow, done = self.label("numfast"), self.label("numslow"), self.label("numread")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
@@ -547,9 +534,9 @@ class Fn:
         self.ended = True
 
     def zero(self, kind, into=None):
-        """A new empty value of the kind (0, no, "", an empty list, a new thing with empty parts)."""
+        """A new empty value of the kind."""
         saved, ended = self.lines, self.ended
-        if into is not None:  # written somewhere else (the entry block): what comes before here doesn't matter
+        if into is not None:  # in the entry block
             self.lines, self.ended = into, False
         try:
             t = ll_type(kind)
@@ -582,8 +569,7 @@ class Fn:
                 self.lines, self.ended = saved, ended
 
     def shape(self, kind, made=None):
-        """What 'load X from' fills: an empty value of the kind, a list's or table's one item showing its items' kind.
-        A kind holding a list of its own kind (a spot with a list of spots) shares its shape: made has the ones being made."""
+        """What 'load X from' fills."""
         made = {} if made is None else made
         if kind in made:
             return made[kind]
@@ -597,7 +583,7 @@ class Fn:
             return out
         if kind.startswith("command("):
             raise Unsupported(kind)
-        if kind in ABLE:  # just the ability: the kinds it may be are kept by the library (see finish)
+        if kind in ABLE:  # just the ability
             return self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
         if kind in THINGS:
             thing = made[kind] = self.op(f"call ptr @cn_thing(ptr {self.spec(kind)})")
@@ -607,11 +593,11 @@ class Fn:
         return self.box(self.zero(kind), kind)
 
     def spec(self, kind):
-        """A kind of thing as the library reads it: its name and its parts' names, split by \\x01."""
+        """A kind as the library reads it."""
         return self.module.bytes_const("\x01".join([kind[6:]] + [" ".join(w) for _, w, _ in THINGS[kind]]).encode("utf-8"))
 
     def box(self, value, kind):
-        """A number or yes/no as a value a list or a thing can hold (other values already are one)."""
+        """A number or yes/no as a value."""
         if kind == NUMBER:
             return self.op(f"call ptr @cn_box_number(double {value})")
         if kind == YESNO:
@@ -625,7 +611,7 @@ class Fn:
         return value
 
     def copied(self, value, kind):
-        """Lists, tables, places and things are copied when they are stored (numbers, yes/no and text never change)."""
+        """Lists, tables, places and things are copied when stored."""
         if ll_type(kind) == "ptr" and kind != TEXT and not kind.startswith("command("):
             if self.fresh(value):
                 return value  # only just made, so nothing else holds it
@@ -633,7 +619,7 @@ class Fn:
         return value
 
     def share(self, value):
-        """value is held in one more place now: whoever changes it later copies it first (V's shared flag, 4 bytes in)."""
+        """Held in one more place now."""
         self.count_holders(value, "add")
 
     def release(self, value):
@@ -641,7 +627,7 @@ class Fn:
         self.count_holders(value, "sub")
 
     def count_holders(self, value, how):
-        """V's count of the other places that hold it (4 bytes in; 255 stays: too many to count)."""
+        """How many more places hold it."""
         mark, done = self.label("count"), self.label("counted")
         self.branch(self.op(f"icmp eq ptr {value}, null"), done, mark)
         self.place(mark)
@@ -654,7 +640,7 @@ class Fn:
         self.place(done)
 
     def something(self, thing, spec, k, line):
-        """thing, when it is something; when it is nothing, the runtime's problem ('this enemy is nothing, so ...')."""
+        """thing, or the "is nothing" problem."""
         bad, done = self.label("nothing"), self.label("something")
         self.branch(self.op(f"icmp eq ptr {thing}, null"), bad, done)
         self.place(bad)
@@ -664,7 +650,7 @@ class Fn:
         return thing
 
     def fresh(self, value):
-        """value was made by the line just before, by something that makes a new value of its own (deep, not shared)."""
+        """value is new (not shared)."""
         made = f"  {value} = call ptr @"
         for line in reversed(self.lines[-8:]):
             if line.startswith(made):
@@ -672,7 +658,7 @@ class Fn:
         return False
 
     def slot(self, cpp, kind):
-        """The place a name is kept, made (and given its starting value) the first time it is used."""
+        """A name's place, made on first use."""
         if cpp not in self.slots:
             t = ll_type(kind)
             where = f"%n.{cpp}"
@@ -692,13 +678,13 @@ class Fn:
         return value
 
     def append(self, cpp, parts):
-        """'set s to s plus a plus b' for a text name of this command: a and b added onto s, in place when only s holds it."""
+        """'set s to s plus ...' in place when it can."""
         texts = [self.as_text(emit(self, v), v.kind) for v in parts]
         for t in texts:
             self.put(f"call void @cn_append(ptr {self.where(cpp, TEXT)}, ptr {t})")
 
     def assign_thing(self, slot, value, kind):
-        """A thing put where one is held (cn_assign): for a kind that is only numbers, copied in by the machine code itself."""
+        """A thing put where one is held."""
         parts = THINGS.get(kind, [])
         if not parts or any(k != NUMBER for _, _, k in parts) or HAS_KINDS_OF(kind):
             self.put(f"call void @cn_assign(ptr {slot}, ptr {value})")
@@ -726,7 +712,7 @@ class Fn:
         self.place(done)
 
     def own(self, cpp, kind):
-        """A name's list, table, place or thing, about to be changed: copied first if it is held elsewhere too."""
+        """Copy before changing if held elsewhere."""
         if ll_type(kind) != "ptr" or kind == TEXT or kind.startswith("command("):
             return self.load(cpp, kind)
         where = self.where(cpp, kind)
@@ -755,7 +741,7 @@ class Fn:
             self.release(old)
 
     def text_const(self, s):
-        """Text written in the program: made the first time it is used, then the same value each time."""
+        """Program text: made once."""
         const, size = self.module.text(s)
         slot = const.replace("@s", "@ts")
         if slot not in self.module.text_slots:
@@ -785,11 +771,11 @@ class Fn:
             self.place(self.leave)
             self.finish_with(f"ret {gives} {zero_const(self.gives)}" if self.gives else "ret void")
         body = ["entry:"] + self.entry + ["  br label %start", "start:"] + self.lines
-        if TARGET != "wasm" and self.name != "main":  # a command may only call itself, so it looks for a collector as it begins
+        if TARGET != "wasm" and self.name != "main":  # look for a collector as it begins
             body[len(self.entry) + 1:len(self.entry) + 3] = [
                 "  %waiting = load atomic i8, ptr @cn_stopping monotonic, align 1", "  %wanted = icmp ne i8 %waiting, 0",
                 "  br i1 %wanted, label %wait, label %start", "wait:", "  call void @cn_statement()", "  br label %start", "start:"]
-        if TARGET == "wasm":  # see cn_enter in runtime/machine.cpp: what the collector can't see in WebAssembly's locals
+        if TARGET == "wasm":  # see cn_enter in runtime/machine.cpp
             slots = [l.split(" = ")[0].strip() for l in self.entry if l.endswith("= alloca ptr")]
             body[1 + len(self.entry):1 + len(self.entry)] = ["  call void @cn_enter()"] + [f"  call void @cn_slot(ptr {s})" for s in slots]
             body = [f"  call void @cn_leave(ptr {l.split()[2] if l.startswith('  ret ptr ') else 'null'})\n{l}" if l.startswith("  ret ") else l
@@ -798,8 +784,7 @@ class Fn:
 
 
 def function(module, name, inputs, gives, body, owner=None):
-    """Writes one command. inputs: [(C++ name, kind)]; body: the command's statements, as one run with .ir.
-    owner: the C++ name of the thing a command for a kind of thing is given (it is changed, not copied)."""
+    """Writes one command."""
     for _, kind in inputs:
         ll_type(kind)
     if gives:
@@ -812,10 +797,10 @@ def function(module, name, inputs, gives, body, owner=None):
     f.done()
 
 
-# ---------------------------------------------------------------- pieces the reader uses
+# ---- pieces the reader uses
 
 def short_circuit(f, left, right, is_or):
-    """'a or b' / 'a and b': b is only worked out when it matters, as in Python and C++."""
+    """'a or b' / 'a and b', short-circuit."""
     a = emit(f, left)
     start, more, end = f.here, f.label("more"), f.label("join")
     f.branch(a, end if is_or else more, more if is_or else end)
@@ -860,7 +845,7 @@ def loop(f, test, body, step=None):
     if step:
         step()
     if f.lines[head] == "  call void @cn_statement()" and makes_nothing(f.lines[head + 1:]):
-        del f.lines[head]  # a loop that calls nothing makes nothing to free: it only looks whether a collector waits
+        del f.lines[head]  # a loop that calls nothing only checks for a collector
         poll, wait = f.label("poll"), f.label("wait")
         f.jump(poll)
         f.place(poll)
@@ -890,7 +875,7 @@ def repeat(f, count, body):
 
 
 def count_from(f, cpp, lo, hi, body, by=None):
-    """'for each n from 1 to 10:', or '... by 5' (the end and the step are worked out once, before the first round)."""
+    """'for each n from 1 to 10' (end and step worked out once)."""
     f.store(cpp, NUMBER, emit(f, lo))
     last = f"%last{f.label('')}"
     f.entry.append(f"  {last} = alloca double")
@@ -913,7 +898,7 @@ def count_from(f, cpp, lo, hi, body, by=None):
 
 
 def each_in(f, cpp, kind, seq, body):
-    """'for each score in scores:' goes through a copy, so changing the list inside doesn't change the rounds."""
+    """'for each x in xs' over a copy."""
     items = f.hold(f.op(f"call ptr @cn_dup(ptr {emit(f, seq)})"))
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
     k = counter(f, "i")
@@ -943,7 +928,7 @@ def each_in(f, cpp, kind, seq, body):
 
 
 def invoke(f, command, args, ins, gives, line):
-    """Does the command a value holds. command: where it is; args: [(where, kind)] already worked out."""
+    """Does the command a value holds."""
     target = f.call("ptr", "cn_command_or_fail", ("ptr", command), ("i32", line))
     given = ", ".join(f"{ll_type(k)} {f.copied(x, k)}" for x, k in args)
     if gives:
@@ -956,12 +941,12 @@ def invoke(f, command, args, ins, gives, line):
 
 
 def by_command(f, seq, command, item, gives, keep, line):
-    """'scores kept by is big' / 'scores changed by doubled': a new list, made by doing the command to each item."""
+    """'kept by' / 'changed by'."""
     holder = f.hold(f.op("call ptr @cn_list_new()"))  # a pointer: the same in every block below
     items = f.hold(f.op(f"call ptr @cn_dup(ptr {seq})"))
     f.hold(command)  # (made on this line, perhaps: each round below starts a new one)
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
-    if TARGET == "wasm":  # what the line made before this stays young through the rounds below (see cn_enter)
+    if TARGET == "wasm":  # what the line made stays young (see cn_enter)
         f.put("call void @cn_enter()")
     k = counter(f, "m")
     top, inside, out_label = f.label("each"), f.label("doing"), f.label("done")
@@ -1002,8 +987,7 @@ def by_command(f, seq, command, item, gives, keep, line):
 
 
 def closure(f, name, inputs, gives, body):
-    """'each x becomes x times k': a function of its own, and a command value holding it and copies of the names it uses
-    (here k). When it is invoked, cn_command_or_fail says which value it was, and the function takes its names from there."""
+    """'each x becomes ...': a function plus copies of the names it uses."""
     g = Fn(f.module, name, inputs, gives)
     g.owner = None
     for cpp, kind in inputs:
@@ -1032,7 +1016,7 @@ def closure(f, name, inputs, gives, body):
 
 
 def meanwhile(f, piece):
-    """'meanwhile count up with 5': piece goes in a function of its own, run alongside, with copies of the names it uses."""
+    """'meanwhile ...': a function run alongside."""
     module = f.module
     module.alongside = getattr(module, "alongside", 0) + 1
     g = Fn(module, f"meanwhile_{module.alongside}", [("names", TEXT)], None)
@@ -1053,8 +1037,7 @@ def meanwhile(f, piece):
 
 
 def attempt(f, tried, problem_cpp, fixes):
-    """try: ... if that went wrong with a fuel problem: ... if that went wrong: ...   (problem_cpp: the name 'the problem'
-    is kept in; fixes: [(kind of problem or None, run, the kind as a text value)]). A problem none takes goes on."""
+    """try: ... if that went wrong ..."""
     handler, end = f.label("wrong"), f.label("tried")
     f.handlers.append(handler)
     emit(f, tried)
@@ -1078,24 +1061,18 @@ def attempt(f, tried, problem_cpp, fixes):
 
 
 def give_up(f):
-    """After a problem of the program's own ('raise an error with'): go where any problem goes."""
+    """After 'raise an error with'."""
     f.check()
 
 
-# ---------------------------------------------------------------- built-in words and library words
-# A built-in like 'trimmed x' or a library word like 'square root of' is one of Stellanova's own C++ functions.
-# Each becomes a small C function in the prebuilt library (made the first time a program needs it, kept after),
-# so a program calls it like any other library function: the program's own code still never becomes C++.
+# ---- built-in and library words: each is a small C function in a prebuilt library
 
 ONE_STEP = {"remainder_of": "frem", "round": "llvm.round.f64", "floor": "llvm.floor.f64", "ceil": "llvm.ceil.f64",
             "trunc": "llvm.trunc.f64", "sqrt": "llvm.sqrt.f64", "fabs": "llvm.fabs.f64"}  # library words machine code does itself
 
 
 def wrap(f, unit, head, template, args, gives, cpp_type, line):
-    """Calls the C function for one built-in (unit 'builtins') or library word (unit = the library's name).
-
-    template: its C++, with {a0} / {s0} for the inputs and {line} for the line number; head: what the unit's file
-    needs above its functions (a library's includes and code). Returns where the answer is (None for nothing)."""
+    """Calls the C function for a built-in or library word."""
     simple = re.fullmatch(r"(?:std|stellanova)::(\w+)\(\{[as]0\}(?:, \{[as]1\})?\)", template)
     if simple and simple.group(1) in ONE_STEP and gives == NUMBER and all(a.kind == NUMBER for a in args):
         op = ONE_STEP[simple.group(1)]  # one machine instruction, not a call (the same answers)
@@ -1137,18 +1114,18 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
     return f.call(ll_ret, name, *values, checked=True)
 
 
-WRAPPER_FORM = "3: one thread"  # change it when wrap() writes its C functions differently, so old ones are made again
+WRAPPER_FORM = "3: one thread"  # change when wrap() changes, so old ones are remade
 
 
 def unit_file(unit, head, wrappers):
-    """runtime/built/w_<unit>.cpp, holding every wrapper any program has needed so far (rewritten only when one is new)."""
+    """runtime/built/w_<unit>.cpp: every wrapper needed so far."""
     import hashlib
     path = HERE / "runtime" / "built" / f"w_{re.sub(r'[^a-z0-9]+', '_', unit)}.cpp"
     mark = "// head " + hashlib.sha1((head + WRAPPER_FORM).encode("utf-8")).hexdigest()
     have = {}
     if path.exists():
         old = path.read_text(encoding="utf-8")
-        if mark in old:  # the same library as before: keep the wrappers made for earlier programs
+        if mark in old:  # same library: keep the wrappers
             for m in re.finditer(r"// wrapper (\w+)\n(.*?)// end\n", old, re.S):
                 have[m.group(1)] = m.group(2)
     if all(n in have for n in wrappers):
@@ -1161,7 +1138,7 @@ def unit_file(unit, head, wrappers):
     return path
 
 
-# ---------------------------------------------------------------- making the .exe
+# ---- making the .exe
 
 def find_clang():
     for place in [os.environ.get("STELLANOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe", shutil.which("clang++")]:
@@ -1179,7 +1156,7 @@ def compile_once(src, out, newer_than):
         done = subprocess.run([find_clang(), "-c", "-O2", "-std=c++20", "-Wno-everything", *target_flags(),
                                "-I", str(HERE / "runtime"), str(src), "-o", str(out)], capture_output=True, text=True, stdin=subprocess.DEVNULL)
         if done.returncode:
-            if src.name.startswith("w_"):  # a kept wrapper that can't compile would break every later build: start that file again
+            if src.name.startswith("w_"):  # a wrapper that can't compile: start that file again
                 src.unlink(missing_ok=True)
             raise RuntimeError(f"Stellanova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
     return out
@@ -1215,8 +1192,7 @@ def runtime_object():
 
 
 def make_exe(ll_text_, exe, work, units=None, plugin=False):
-    """Turns the LLVM code into exe (a .dll, or .so, for a game engine when plugin). units: the module's built-in and library words.
-    Returns an error message, or None."""
+    """LLVM code to an exe (or .dll/.so plugin). Returns an error, or None."""
     ll = Path(work) / "program.ll"
     ll.write_text(ll_text_, encoding="utf-8")
     try:

@@ -1,6 +1,4 @@
-note: Words for .zip files: packing files into one, seeing what one holds, and unpacking it.
-note: Use them in a program with:  use: zip
-note: Folders can be packed too (with everything in them). Names inside are kept as they were given, like "saves/1.txt".
+note: .zip files. Use: use: zip
 
 include: <filesystem>
 include: <fstream>
@@ -32,7 +30,7 @@ code:
   		return c ^ 0xffffffff;
   	}
 
-  	// ---- inflate (RFC 1951): what packed zips (Python's, node's, Windows') hold
+  	// ---- inflate (RFC 1951)
   	struct Inflate
   	{
   		const uint8_t* in;
@@ -175,8 +173,7 @@ code:
   		}
   	};
 
-  	// ---- deflate: repeats found with a hash of 3 bytes, written with the fixed codes (RFC 1951)
-  	// shortcut: fixed codes only, a few percent bigger than zip tools' own; add dynamic codes if size matters
+  	// ---- deflate. shortcut: fixed codes only, a little bigger
   	inline Bytes deflate(const Bytes& in)
   	{
   		Bytes out;
@@ -262,7 +259,7 @@ code:
   	inline uint32_t get16(const Bytes& b, size_t at) { return b[at] | b[at + 1] << 8; }
   	inline uint32_t get32(const Bytes& b, size_t at) { return get16(b, at) | get16(b, at + 2) << 16; }
 
-  	// a folder: its files (sorted), then its folders (sorted), as Python's os.walk goes
+  	// a folder: files, then folders, sorted
   	inline void walk(const fs::path& p, std::vector<fs::path>& all)
   	{
   		if (!fs::is_directory(p)) { all.push_back(p); return; }

@@ -1,7 +1,4 @@
-note: Words for moving things smoothly: easing, tweens, waves and the frames of a sprite sheet.
-note: Use them in a program with:  use: animation
-note: Progress is a number from 0 (the start) to 1 (the end). Easing styles: "linear", "in", "out", "in out",
-note: "back" (pulls back first), "overshoot" (goes past, then settles), "bounce", "elastic".
+note: Easing, tweens, waves and sprite sheets. Use: use: animation
 
 code:
   namespace stellanova_animation

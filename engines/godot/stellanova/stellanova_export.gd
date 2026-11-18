@@ -1,5 +1,4 @@
-## Builds every .stella file in the project as the game is exported, and adds each to it.
-## shortcut: builds for this computer only (a Windows editor makes .dll files), so export for the system the editor runs on.
+## Adds every built .stella program to the export. shortcut: builds for this computer's system only.
 @tool
 class_name StellanovaExport
 extends EditorExportPlugin

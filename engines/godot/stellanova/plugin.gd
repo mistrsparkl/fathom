@@ -1,4 +1,4 @@
-## Puts each .stella program, made into a plugin, next to an exported game (StellanovaScript loads it from there).
+## Puts the built programs next to an exported game.
 @tool
 extends EditorPlugin
 

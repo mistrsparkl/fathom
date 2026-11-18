@@ -1,6 +1,4 @@
-note: Words for sound (Windows or Linux). Use them in a program with:  use: sound
-note: Sound files can be .wav or .mp3 files. Paths are from the folder the program runs in.
-note: Sounds play on top of each other, so a game can have many at once.
+note: Sound. Use: use: sound  .wav or .mp3 files.
 
 code:
   #ifdef _WIN32
@@ -17,7 +15,7 @@ code:
   #include <thread>
   #include <cstring>
   #include <sys/types.h>
-  extern "C"  // the system's MP3 reader (libmpg123.so.0), whose header may not be there
+  extern "C"  // the system's MP3 reader
   {
   	struct mpg123_handle_struct;
   	int mpg123_init();
@@ -43,7 +41,7 @@ code:
   #ifdef __linux__
   namespace stellanova_sound
   {
-  	// Linux: every sound playing, and the song, mixed into one PulseAudio stream (44100 frames a second, two sides).
+  	// Linux: everything playing, mixed into one PulseAudio stream
   	struct Clip { std::vector<float> frames; };  // left, right, left, right...
   	struct Voice
   	{
@@ -117,7 +115,7 @@ code:
   		mpg123_handle_struct* mh = mpg123_new(nullptr, nullptr);
   		if (!mh)
   			return nullptr;
-  		mpg123_param(mh, 2, 0x20, 0);  // MPG123_ADD_FLAGS, MPG123_QUIET: say nothing about files that aren't MP3s
+  		mpg123_param(mh, 2, 0x20, 0);  // quiet about files that aren't MP3s
   		long rate = 0;
   		int channels = 0, encoding = 0;
   		std::shared_ptr<Clip> clip;
@@ -321,7 +319,7 @@ code:
   		playing.clear();
   	}
 
-  	// one song at a time, that can be paused, moved about in and made quieter
+  	// one song at a time
   	inline bool song_open = false;
   	inline std::wstring song_status(const wchar_t* what)
   	{
@@ -670,7 +668,7 @@ to set the song loudness to, given level (a number) = stellanova_sound::song_lou
 
 javascript:
   const stellanova_sound_web = {
-    // On a web page sounds play through the browser. With node nothing is heard: files are checked, and waiting takes as long as the sound.
+    // On the web sounds play through the browser.
     page: typeof document !== "undefined",
     playing: [],
     now() { return Date.now() / 1000; },

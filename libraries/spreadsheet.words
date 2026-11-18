@@ -1,5 +1,4 @@
-note: Words for spreadsheets (CSV text, as spreadsheet programs save it). Use them in a program with:  use: spreadsheet
-note: Each row is a list of text, so 'item 2 of item 1 of rows' is the second cell of the first row.
+note: CSV spreadsheets. Use: use: spreadsheet  Each row is a list of text.
 
 code:
   namespace stellanova_spreadsheet

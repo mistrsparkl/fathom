@@ -1,6 +1,4 @@
-note: Words for patterns: finding and changing parts of text by their shape. Use them in a program with:  use: patterns
-note: A pattern is text that describes text: "[0-9]+" is one or more digits, "[a-z]+" a run of small letters,
-note: "." any letter, "a*" any number of a's, "^" the start and "$" the end, "(...)" a piece to keep.
+note: Finding and changing text by patterns. Use: use: patterns
 
 include: <regex>
 

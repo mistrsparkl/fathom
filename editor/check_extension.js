@@ -1,5 +1,4 @@
-// Runs the VS Code extension with a stand-in for VS Code: opens a script, prints the mistakes it shows and a hover.
-// node check_extension.js script.stella
+// Runs the extension with a fake VS Code. Use: node check_extension.js script.stella
 const Module = require("module");
 const fs = require("fs");
 const file = require("path").resolve(process.argv[2]);

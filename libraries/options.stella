@@ -1,6 +1,4 @@
-whisper: Options typed after a program's name, like:  stellanova tool.stella --size=3 --loud notes.txt
-whisper: Written in Stellanova itself. Use it in a program with:  use: options.stella
-whisper: An option is "--name" or "--name=value". Every word after "--" on its own is a plain word.
+whisper: Options after a program's name, like --size=3. Use: use: options.stella
 
 to option at, given name (text), returning a number:
   set words to the words given

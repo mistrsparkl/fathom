@@ -1,4 +1,4 @@
-// Mistakes shown while typing, word completion and help on hover for .stella files.
+// Mistakes, completion and hover help for .stella files.
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
@@ -15,7 +15,7 @@ function activate(context) {
   const problems = vscode.languages.createDiagnosticCollection("stellanova");
   const waiting = new Map();
 
-  // The text is checked as a copy next to the file, so 'use:' still finds what it uses.
+  // Checked as a copy next to the file, so 'use:' works.
   function check(doc) {
     if (doc.languageId !== "stellanova" || doc.uri.scheme !== "file" || !where()) return;
     const file = doc.uri.fsPath;

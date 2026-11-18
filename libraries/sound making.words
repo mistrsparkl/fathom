@@ -1,7 +1,4 @@
-note: Words for making sounds: tones, notes, mixing, effects, .wav files and recording from the microphone.
-note: Use them in a program with:  use: sound making
-note: A sound is a list of numbers from -1 to 1, 44100 of them for each second (one for each moment of the wave).
-note: Save one with 'save the sound', then play it with the sound library's 'play the sound'.
+note: Making sounds. Use: use: sound making  A sound is 44100 numbers from -1 to 1 a second.
 
 code:
   #ifdef _WIN32
@@ -446,7 +443,7 @@ javascript:
     },
   };
   const stellanova_recording = {
-    async record(seconds, line) {  // the page's microphone (the person is asked first), as 44100 numbers each second
+    async record(seconds, line) {  // the page's microphone
       if (!(seconds > 0 && seconds <= 600)) stellanova.fail(line, `a recording lasts more than 0 and at most 600 seconds, not ${stellanova.text(seconds)}.`);
       if (typeof navigator === "undefined" || !navigator.mediaDevices) stellanova.fail(line, "recording needs a web page with a microphone (node has none).");
       let stream;

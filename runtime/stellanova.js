@@ -1,6 +1,4 @@
-// What every Stellanova program made for the web uses: the same words as stellanova.h, in JavaScript.
-// stellanova.py writes programs that call these ('stellanova web game.stella'); they run in a web page
-// (load this file first) or with node. Messages and the way values are shown match the other two ways exactly.
+// The web's version of stellanova.h, for 'stellanova web'. Runs in a page or with node.
 "use strict";
 (function () {
   const inNode = typeof process !== "undefined" && !!(process.versions && process.versions.node) && typeof require === "function";
@@ -11,12 +9,12 @@
     constructor(line, message, kind = "") {
       super(message);
       this.line = line;
-      this.kind = kind;  // a kind of problem of the program's own ('raise a fuel problem with'), or ""
+      this.kind = kind;  // the program's own kind of problem, or ""
     }
   }
   const fail = (line, message, kind = "") => { throw new Problem(line, message, kind); };
   const problem_kind = (e) => (e instanceof Problem ? e.kind : "");
-  // 'holding the lock "total":' - commands take turns at the lines (they can wait inside them)
+  // 'holding the lock': commands take turns
   const locks = new Map();  // name -> the promise the next one waits for
   async function lock(name) {
     while (locks.has(name)) await locks.get(name).done;  // shortcut: not re-entrant, so the same lock inside itself waits forever
@@ -93,7 +91,7 @@
   }
   const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-  // ---- copying and comparing: lists, tables, places and things are values, copied when they are stored
+  // ---- copying and comparing
   function dup(v) {
     if (v === null || typeof v !== "object") return v;
     if (Array.isArray(v)) return v.map(dup);
@@ -149,7 +147,7 @@
     throw new Problem(0, "the program ended.");
   }
 
-  // ---- typing answers (node reads them from its input; a page asks with a small box)
+  // ---- typing answers
   function readLine() {
     if (!inNode) {
       const answer = typeof prompt === "function" ? prompt("") : null;
@@ -179,7 +177,7 @@
     return line.replace(/\r$/, "");
   }
 
-  // ---- saving and loading, as JSON, exactly as the other two ways write it
+  // ---- saving and loading as JSON
   function saved_number(x, line) {
     if (!Number.isFinite(x)) fail(line, "I can't save infinity or not a number.");
     if (x === Math.floor(x) && Math.abs(x) < 1e16) return (x === 0 ? 0 : x).toFixed(0);
@@ -207,7 +205,7 @@
     }
     return o + '"';
   }
-  function saved(v, line, kind = "") {  // kind: what it is saved as (a speaker also says which kind of thing it is)
+  function saved(v, line, kind = "") {  // kind it is saved as
     if (typeof v === "number") return saved_number(v, line);
     if (v === undefined) return "null";
     if (kind.startsWith("list of ") && Array.isArray(v)) return "[" + v.map((x) => saved(x, line, kind.slice(8))).join(", ") + "]";
@@ -263,7 +261,7 @@
     }
   }
 
-  // ---- files: only where there are files (node, or the Tidal shell's own words)
+  // ---- files (node only)
   function need_files(line) {
     if (!fs) fail(line, "a web page can't open files on the computer.");
   }
@@ -282,7 +280,7 @@
     return parts.map((p) => (p.endsWith("\r") ? p.slice(0, -1) : p));
   }
   const letters_in = (s) => Array.from(s);
-  // small and capital letters in every alphabet, in pairs (the same list is in stellanova.py and stellanova.h)
+  // small and capital letter pairs (same list in stellanova.py and .h)
   const CASES = (() => {
     const all = Array.from("aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZàÀáÁâÂãÃäÄåÅæÆçÇèÈéÉêÊëËìÌíÍîÎïÏðÐñÑòÒóÓôÔõÕöÖøØùÙúÚûÛüÜýÝþÞÿŸāĀăĂąĄćĆĉĈċĊčČďĎđĐēĒĕĔėĖęĘěĚĝĜğĞġĠģĢĥĤħĦĩĨīĪĭĬįĮĳĲĵĴķĶĺĹļĻľĽŀĿłŁńŃņŅňŇŋŊōŌŏŎőŐœŒŕŔŗŖřŘśŚŝŜşŞšŠţŢťŤŧŦũŨūŪŭŬůŮűŰųŲŵŴŷŶźŹżŻžŽƀɃƃƂƅƄƈƇƌƋƒƑƕǶƙƘƚȽƞȠơƠƣƢƥƤƨƧƭƬưƯƴƳƶƵƹƸƽƼƿǷǆǄǉǇǌǊǎǍǐǏǒǑǔǓǖǕǘǗǚǙǜǛǝƎǟǞǡǠǣǢǥǤǧǦǩǨǫǪǭǬǯǮǳǱǵǴǹǸǻǺǽǼǿǾȁȀȃȂȅȄȇȆȉȈȋȊȍȌȏȎȑȐȓȒȕȔȗȖșȘțȚȝȜȟȞȣȢȥȤȧȦȩȨȫȪȭȬȯȮȱȰȳȲȼȻȿⱾɀⱿɂɁɇɆɉɈɋɊɍɌɏɎɐⱯɑⱭɒⱰɓƁɔƆɖƉɗƊəƏɛƐɜꞫɠƓɡꞬɣƔɥꞍɦꞪɨƗɩƖɪꞮɫⱢɬꞭɯƜɱⱮɲƝɵƟɽⱤʀƦʂꟅʃƩʇꞱʈƮʉɄʊƱʋƲʌɅʒƷʝꞲʞꞰͱͰͳͲͷͶͻϽͼϾͽϿάΆέΈήΉίΊαΑβΒγΓδΔεΕζΖηΗθΘιΙκΚλΛμΜνΝξΞοΟπΠρΡσΣτΤυΥφΦχΧψΨωΩϊΪϋΫόΌύΎώΏϗϏϙϘϛϚϝϜϟϞϡϠϣϢϥϤϧϦϩϨϫϪϭϬϯϮϲϹϳͿϸϷϻϺаАбБвВгГдДеЕжЖзЗиИйЙкКлЛмМнНоОпПрРсСтТуУфФхХцЦчЧшШщЩъЪыЫьЬэЭюЮяЯѐЀёЁђЂѓЃєЄѕЅіІїЇјЈљЉњЊћЋќЌѝЍўЎџЏѡѠѣѢѥѤѧѦѩѨѫѪѭѬѯѮѱѰѳѲѵѴѷѶѹѸѻѺѽѼѿѾҁҀҋҊҍҌҏҎґҐғҒҕҔҗҖҙҘқҚҝҜҟҞҡҠңҢҥҤҧҦҩҨҫҪҭҬүҮұҰҳҲҵҴҷҶҹҸһҺҽҼҿҾӂӁӄӃӆӅӈӇӊӉӌӋӎӍӏӀӑӐӓӒӕӔӗӖәӘӛӚӝӜӟӞӡӠӣӢӥӤӧӦөӨӫӪӭӬӯӮӱӰӳӲӵӴӷӶӹӸӻӺӽӼӿӾԁԀԃԂԅԄԇԆԉԈԋԊԍԌԏԎԑԐԓԒԕԔԗԖԙԘԛԚԝԜԟԞԡԠԣԢԥԤԧԦԩԨԫԪԭԬԯԮաԱբԲգԳդԴեԵզԶէԷըԸթԹժԺիԻլԼխԽծԾկԿհՀձՁղՂճՃմՄյՅնՆշՇոՈչՉպՊջՋռՌսՍվՎտՏրՐցՑւՒփՓքՔօՕֆՖაᲐბᲑგᲒდᲓეᲔვᲕზᲖთᲗიᲘკᲙლᲚმᲛნᲜოᲝპᲞჟᲟრᲠსᲡტᲢუᲣფᲤქᲥღᲦყᲧშᲨჩᲩცᲪძᲫწᲬჭᲭხᲮჯᲯჰᲰჱᲱჲᲲჳᲳჴᲴჵᲵჶᲶჷᲷჸᲸჹᲹჺᲺჽᲽჾᲾჿᲿᏸᏰᏹᏱᏺᏲᏻᏳᏼᏴᏽᏵᵹꝽᵽⱣᶎꟆḁḀḃḂḅḄḇḆḉḈḋḊḍḌḏḎḑḐḓḒḕḔḗḖḙḘḛḚḝḜḟḞḡḠḣḢḥḤḧḦḩḨḫḪḭḬḯḮḱḰḳḲḵḴḷḶḹḸḻḺḽḼḿḾṁṀṃṂṅṄṇṆṉṈṋṊṍṌṏṎṑṐṓṒṕṔṗṖṙṘṛṚṝṜṟṞṡṠṣṢṥṤṧṦṩṨṫṪṭṬṯṮṱṰṳṲṵṴṷṶṹṸṻṺṽṼṿṾẁẀẃẂẅẄẇẆẉẈẋẊẍẌẏẎẑẐẓẒẕẔạẠảẢấẤầẦẩẨẫẪậẬắẮằẰẳẲẵẴặẶẹẸẻẺẽẼếẾềỀểỂễỄệỆỉỈịỊọỌỏỎốỐồỒổỔỗỖộỘớỚờỜởỞỡỠợỢụỤủỦứỨừỪửỬữỮựỰỳỲỵỴỷỶỹỸỻỺỽỼỿỾἀἈἁἉἂἊἃἋἄἌἅἍἆἎἇἏἐἘἑἙἒἚἓἛἔἜἕἝἠἨἡἩἢἪἣἫἤἬἥἭἦἮἧἯἰἸἱἹἲἺἳἻἴἼἵἽἶἾἷἿὀὈὁὉὂὊὃὋὄὌὅὍὑὙὓὛὕὝὗὟὠὨὡὩὢὪὣὫὤὬὥὭὦὮὧὯὰᾺάΆὲῈέΈὴῊήΉὶῚίΊὸῸόΌὺῪύΎὼῺώΏᾰᾸᾱᾹῐῘῑῙῠῨῡῩῥῬⅎℲⅰⅠⅱⅡⅲⅢⅳⅣⅴⅤⅵⅥⅶⅦⅷⅧⅸⅨⅹⅩⅺⅪⅻⅫⅼⅬⅽⅭⅾⅮⅿⅯↄↃⓐⒶⓑⒷⓒⒸⓓⒹⓔⒺⓕⒻⓖⒼⓗⒽⓘⒾⓙⒿⓚⓀⓛⓁⓜⓂⓝⓃⓞⓄⓟⓅⓠⓆⓡⓇⓢⓈⓣⓉⓤⓊⓥⓋⓦⓌⓧⓍⓨⓎⓩⓏⰰⰀⰱⰁⰲⰂⰳⰃⰴⰄⰵⰅⰶⰆⰷⰇⰸⰈⰹⰉⰺⰊⰻⰋⰼⰌⰽⰍⰾⰎⰿⰏⱀⰐⱁⰑⱂⰒⱃⰓⱄⰔⱅⰕⱆⰖⱇⰗⱈⰘⱉⰙⱊⰚⱋⰛⱌⰜⱍⰝⱎⰞⱏⰟⱐⰠⱑⰡⱒⰢⱓⰣⱔⰤⱕⰥⱖⰦⱗⰧⱘⰨⱙⰩⱚⰪⱛⰫⱜⰬⱝⰭⱞⰮⱟⰯⱡⱠⱥȺⱦȾⱨⱧⱪⱩⱬⱫⱳⱲⱶⱵⲁⲀⲃⲂⲅⲄⲇⲆⲉⲈⲋⲊⲍⲌⲏⲎⲑⲐⲓⲒⲕⲔⲗⲖⲙⲘⲛⲚⲝⲜⲟⲞⲡⲠⲣⲢⲥⲤⲧⲦⲩⲨⲫⲪⲭⲬⲯⲮⲱⲰⲳⲲⲵⲴⲷⲶⲹⲸⲻⲺⲽⲼⲿⲾⳁⳀⳃⳂⳅⳄⳇⳆⳉⳈⳋⳊⳍⳌⳏⳎⳑⳐⳓⳒⳕⳔⳗⳖⳙⳘⳛⳚⳝⳜⳟⳞⳡⳠⳣⳢⳬⳫⳮⳭⳳⳲⴀႠⴁႡⴂႢⴃႣⴄႤⴅႥⴆႦⴇႧⴈႨⴉႩⴊႪⴋႫⴌႬⴍႭⴎႮⴏႯⴐႰⴑႱⴒႲⴓႳⴔႴⴕႵⴖႶⴗႷⴘႸⴙႹⴚႺⴛႻⴜႼⴝႽⴞႾⴟႿⴠჀⴡჁⴢჂⴣჃⴤჄⴥჅⴧჇⴭჍꙁꙀꙃꙂꙅꙄꙇꙆꙉꙈꙋꙊꙍꙌꙏꙎꙑꙐꙓꙒꙕꙔꙗꙖꙙꙘꙛꙚꙝꙜꙟꙞꙡꙠꙣꙢꙥꙤꙧꙦꙩꙨꙫꙪꙭꙬꚁꚀꚃꚂꚅꚄꚇꚆꚉꚈꚋꚊꚍꚌꚏꚎꚑꚐꚓꚒꚕꚔꚗꚖꚙꚘꚛꚚꜣꜢꜥꜤꜧꜦꜩꜨꜫꜪꜭꜬꜯꜮꜳꜲꜵꜴꜷꜶꜹꜸꜻꜺꜽꜼꜿꜾꝁꝀꝃꝂꝅꝄꝇꝆꝉꝈꝋꝊꝍꝌꝏꝎꝑꝐꝓꝒꝕꝔꝗꝖꝙꝘꝛꝚꝝꝜꝟꝞꝡꝠꝣꝢꝥꝤꝧꝦꝩꝨꝫꝪꝭꝬꝯꝮꝺꝹꝼꝻꝿꝾꞁꞀꞃꞂꞅꞄꞇꞆꞌꞋꞑꞐꞓꞒꞔꟄꞗꞖꞙꞘꞛꞚꞝꞜꞟꞞꞡꞠꞣꞢꞥꞤꞧꞦꞩꞨꞵꞴꞷꞶꞹꞸꞻꞺꞽꞼꞿꞾꟁꟀꟃꟂꟈꟇꟊꟉꟑꟐꟗꟖꟙꟘꟶꟵꭓꞳꭰᎠꭱᎡꭲᎢꭳᎣꭴᎤꭵᎥꭶᎦꭷᎧꭸᎨꭹᎩꭺᎪꭻᎫꭼᎬꭽᎭꭾᎮꭿᎯꮀᎰꮁᎱꮂᎲꮃᎳꮄᎴꮅᎵꮆᎶꮇᎷꮈᎸꮉᎹꮊᎺꮋᎻꮌᎼꮍᎽꮎᎾꮏᎿꮐᏀꮑᏁꮒᏂꮓᏃꮔᏄꮕᏅꮖᏆꮗᏇꮘᏈꮙᏉꮚᏊꮛᏋꮜᏌꮝᏍꮞᏎꮟᏏꮠᏐꮡᏑꮢᏒꮣᏓꮤᏔꮥᏕꮦᏖꮧᏗꮨᏘꮩᏙꮪᏚꮫᏛꮬᏜꮭᏝꮮᏞꮯᏟꮰᏠꮱᏡꮲᏢꮳᏣꮴᏤꮵᏥꮶᏦꮷᏧꮸᏨꮹᏩꮺᏪꮻᏫꮼᏬꮽᏭꮾᏮꮿᏯａＡｂＢｃＣｄＤｅＥｆＦｇＧｈＨｉＩｊＪｋＫｌＬｍＭｎＮｏＯｐＰｑＱｒＲｓＳｔＴｕＵｖＶｗＷｘＸｙＹｚＺ𐐨𐐀𐐩𐐁𐐪𐐂𐐫𐐃𐐬𐐄𐐭𐐅𐐮𐐆𐐯𐐇𐐰𐐈𐐱𐐉𐐲𐐊𐐳𐐋𐐴𐐌𐐵𐐍𐐶𐐎𐐷𐐏𐐸𐐐𐐹𐐑𐐺𐐒𐐻𐐓𐐼𐐔𐐽𐐕𐐾𐐖𐐿𐐗𐑀𐐘𐑁𐐙𐑂𐐚𐑃𐐛𐑄𐐜𐑅𐐝𐑆𐐞𐑇𐐟𐑈𐐠𐑉𐐡𐑊𐐢𐑋𐐣𐑌𐐤𐑍𐐥𐑎𐐦𐑏𐐧𐓘𐒰𐓙𐒱𐓚𐒲𐓛𐒳𐓜𐒴𐓝𐒵𐓞𐒶𐓟𐒷𐓠𐒸𐓡𐒹𐓢𐒺𐓣𐒻𐓤𐒼𐓥𐒽𐓦𐒾𐓧𐒿𐓨𐓀𐓩𐓁𐓪𐓂𐓫𐓃𐓬𐓄𐓭𐓅𐓮𐓆𐓯𐓇𐓰𐓈𐓱𐓉𐓲𐓊𐓳𐓋𐓴𐓌𐓵𐓍𐓶𐓎𐓷𐓏𐓸𐓐𐓹𐓑𐓺𐓒𐓻𐓓𐖗𐕰𐖘𐕱𐖙𐕲𐖚𐕳𐖛𐕴𐖜𐕵𐖝𐕶𐖞𐕷𐖟𐕸𐖠𐕹𐖡𐕺𐖣𐕼𐖤𐕽𐖥𐕾𐖦𐕿𐖧𐖀𐖨𐖁𐖩𐖂𐖪𐖃𐖫𐖄𐖬𐖅𐖭𐖆𐖮𐖇𐖯𐖈𐖰𐖉𐖱𐖊𐖳𐖌𐖴𐖍𐖵𐖎𐖶𐖏𐖷𐖐𐖸𐖑𐖹𐖒𐖻𐖔𐖼𐖕𐳀𐲀𐳁𐲁𐳂𐲂𐳃𐲃𐳄𐲄𐳅𐲅𐳆𐲆𐳇𐲇𐳈𐲈𐳉𐲉𐳊𐲊𐳋𐲋𐳌𐲌𐳍𐲍𐳎𐲎𐳏𐲏𐳐𐲐𐳑𐲑𐳒𐲒𐳓𐲓𐳔𐲔𐳕𐲕𐳖𐲖𐳗𐲗𐳘𐲘𐳙𐲙𐳚𐲚𐳛𐲛𐳜𐲜𐳝𐲝𐳞𐲞𐳟𐲟𐳠𐲠𐳡𐲡𐳢𐲢𐳣𐲣𐳤𐲤𐳥𐲥𐳦𐲦𐳧𐲧𐳨𐲨𐳩𐲩𐳪𐲪𐳫𐲫𐳬𐲬𐳭𐲭𐳮𐲮𐳯𐲯𐳰𐲰𐳱𐲱𐳲𐲲𑣀𑢠𑣁𑢡𑣂𑢢𑣃𑢣𑣄𑢤𑣅𑢥𑣆𑢦𑣇𑢧𑣈𑢨𑣉𑢩𑣊𑢪𑣋𑢫𑣌𑢬𑣍𑢭𑣎𑢮𑣏𑢯𑣐𑢰𑣑𑢱𑣒𑢲𑣓𑢳𑣔𑢴𑣕𑢵𑣖𑢶𑣗𑢷𑣘𑢸𑣙𑢹𑣚𑢺𑣛𑢻𑣜𑢼𑣝𑢽𑣞𑢾𑣟𑢿𖹠𖹀𖹡𖹁𖹢𖹂𖹣𖹃𖹤𖹄𖹥𖹅𖹦𖹆𖹧𖹇𖹨𖹈𖹩𖹉𖹪𖹊𖹫𖹋𖹬𖹌𖹭𖹍𖹮𖹎𖹯𖹏𖹰𖹐𖹱𖹑𖹲𖹒𖹳𖹓𖹴𖹔𖹵𖹕𖹶𖹖𖹷𖹗𖹸𖹘𖹹𖹙𖹺𖹚𖹻𖹛𖹼𖹜𖹽𖹝𖹾𖹞𖹿𖹟𞤢𞤀𞤣𞤁𞤤𞤂𞤥𞤃𞤦𞤄𞤧𞤅𞤨𞤆𞤩𞤇𞤪𞤈𞤫𞤉𞤬𞤊𞤭𞤋𞤮𞤌𞤯𞤍𞤰𞤎𞤱𞤏𞤲𞤐𞤳𞤑𞤴𞤒𞤵𞤓𞤶𞤔𞤷𞤕𞤸𞤖𞤹𞤗𞤺𞤘𞤻𞤙𞤼𞤚𞤽𞤛𞤾𞤜𞤿𞤝𞥀𞤞𞥁𞤟𞥂𞤠𞥃𞤡");
     const up = new Map(), down = new Map();
@@ -359,7 +357,7 @@
     async sorted_by_command(items, f, line) {  // 'sorted names by each n becomes ...'
       return stellanova.sorted_by_keys(items, await stellanova.changed_by(items, f, line));
     },
-    sorted_by_keys(items, keys) {  // in order of keys (numbers or text), ties kept in order (JavaScript's sort keeps them)
+    sorted_by_keys(items, keys) {  // stable sort by keys
       return items.map((x, k) => k).sort((a, b) => order(keys[a], keys[b])).map((k) => dup(items[k]));
     },
     async kept_by(items, f, line) {

@@ -1,4 +1,4 @@
-// The Unreal side of a Stellanova program: the eye (camera) that shows each frame, the flat drawing on top, and the game mode.
+// The Unreal side: the eye, flat drawing, the game mode.
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"

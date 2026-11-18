@@ -1,4 +1,4 @@
-"""Packs editor/vscode into stellanova.vsix, so VS Code can install it:  code --install-extension editor/stellanova.vsix"""
+"""Packs editor/vscode into stellanova.vsix."""
 import json
 import zipfile
 from pathlib import Path

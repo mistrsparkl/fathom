@@ -1,6 +1,4 @@
-"""Writes lessons/17-platformer.lesson from lessons/files/hop.stella and records.stella: the game is put together piece
-by piece, in the file's own order, so every zoom names the file's real line numbers. The game uses every part of the
-language the lessons before it teach."""
+"""Writes lessons/17-platformer.lesson from hop.stella."""
 from pathlib import Path
 
 HERE = Path(__file__).parent

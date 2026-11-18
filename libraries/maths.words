@@ -1,5 +1,4 @@
-note: Words for maths. Use them in a program with:  use: maths
-note: Angles are in degrees.
+note: Maths. Use: use: maths  Angles are in degrees.
 
 include: <cmath>
 

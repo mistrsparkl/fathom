@@ -1,7 +1,4 @@
-note: Words for reaching into JSON text (what web services send) with a path. Use them with:  use: json
-note: A path is names with dots between, and items in brackets, counted from 1: "weather.days[2].high".
-note: An empty path "" is the whole of it. Parts that are text come back as the text itself; anything else comes
-note: back as JSON text, which these words can read again.
+note: Reading JSON with a path like "days[2].high". Use: use: json
 
 code:
   namespace stellanova_json
@@ -337,7 +334,7 @@ javascript:
       }
       return out + '"';
     },
-    write(d) {  // shortcut: JavaScript puts names that are whole numbers first; the other ways keep the JSON's order
+    write(d) {  // shortcut: JavaScript puts number names first
       if (d === null) return "null";
       if (d === true || d === false) return d ? "true" : "false";
       if (typeof d === "number") return stellanova.text(d);

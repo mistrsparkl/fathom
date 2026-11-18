@@ -1,13 +1,4 @@
-"""Stellanova: a programming language written in plain English words.
-
-Run a program:         py -3 stellanova.py run <script.stella>      (or: stellanova <script.stella>)
-Build it as an .exe:   py -3 stellanova.py build <script.stella>    (needs LLVM: winget install LLVM.LLVM)
-Unreal parts:          py -3 stellanova.py <scripts folder> <output folder>
-
-How it works: this file reads a script once, checks it, and turns every piece into two things at the same time:
-a small Python function that does it (what 'run' uses) and the C++ that does it (what 'build' and Unreal use).
-Both come from the same reading, so a script means the same thing either way. LANGUAGE.md describes the language.
-"""
+"""Stellanova: a language in plain English words. Run: py -3 stellanova.py run game.stella  Build: py -3 stellanova.py build game.stella  See LANGUAGE.md."""
 import copy
 import json
 import difflib
@@ -42,7 +33,7 @@ class ScriptError(Exception):
 
 
 class RunError(Exception):
-    """Something that went wrong while a program ran (kind: a kind of problem of the program's own, or "")."""
+    """A problem while running."""
 
     def __init__(self, line, message, kind=""):
         super().__init__(message)
@@ -51,34 +42,33 @@ class RunError(Exception):
         self.kind = kind
 
 
-# ---------------------------------------------------------------- kinds of things
+# ---- kinds of things
 
 NUMBER, YESNO, PLACE, FLAT, TEXT = "number", "yes or no", "place", "flat", "text"
-# Kinds are strings: the five above, "list of <kind>", or "thing <name>" for a kind the script describes itself.
+# Kinds: the five above, "list of <kind>" or "thing <name>".
 CPP_TYPE = {NUMBER: "double", YESNO: "bool", PLACE: "FVector", FLAT: "FVector2D", TEXT: "std::string"}
 ZERO = {NUMBER: "0.0", YESNO: "false", PLACE: "FVector::ZeroVector", FLAT: "FVector2D::ZeroVector", TEXT: "std::string()"}
 BASIC_WORDS = {"number": NUMBER, "numbers": NUMBER, "yes or no": YESNO, "place": PLACE, "places": PLACE,
                "flat place": FLAT, "flat places": FLAT, "text": TEXT, "texts": TEXT, "text values": TEXT}
-UNREAL = False  # set by 'stellanova unreal': libraries/unreal/ words win, and the program starts from StellanovaMain()
-# Set by 'stellanova web': the script is read into JavaScript instead. Every piece's .cpp then holds JavaScript; most of it
-# is written the same way in both (calls, operators, if, while), and the places where they differ check JS.
+UNREAL = False  # set by 'stellanova unreal'
+# set by 'stellanova web': pieces hold JavaScript
 JS = False
 JS_RESERVED = set("""function let var yield await async in of typeof instanceof void delete new this class extends super import
 export default null undefined true false arguments eval with enum implements interface package private protected public
 static stellanova""".split())
 MAKING_CPP = False  # yes while a program is being made into C++ (build, unreal, translate)
 PLUGIN = False  # yes while a program is being made into a plugin for a game engine
-UNUSABLE = "\x00"  # a library word's C++ starts with this when this way of running can't use it; the message follows
+UNUSABLE = "\x00"  # marks C++ this way of running can't use
 ARGUMENTS = []  # the words typed after the script's name, for 'the words given'
-THINGS = {}  # name -> [(field words, kind)], for the script being read (a new dict for each script)
+THINGS = {}  # name -> [(field words, kind)]
 FIELDS = {}  # field words tuple -> {thing kind: (member, kind)}
-SECRET_PARTS = {}  # (thing kind, field words tuple) -> the kind that hid it: only its commands (and its kinds' commands) use it
+SECRET_PARTS = {}  # hidden fields: only their kind's commands use them
 OWNER_NOW = [None]  # the kind of thing the command being read is for
 
 KEYWORDS = set("""changed kept meanwhile invoke shatter trimmed begins ends touches exceeds falls echo cease gather banish inscribe conjure whisper wound return returning raise whether horizontal vertical depth try set to if otherwise stop note and or not is more less than at least most plus minus times divided by
 clamp between smaller larger of square root size flat direction angle from yes no move toward
 scrawl ask into repeat while with random for each in contains list empty new remove file write as""".split())
-# Words that shape a line, so no name may hold them. A name of two or more words may hold the other keywords.
+# Words no name may hold.
 STRUCTURE = set("""to and or is of in with as by from into plus minus times divided than not if otherwise set at between contains
 toward exceeds falls each for""".split())
 
@@ -97,12 +87,12 @@ TOKEN = r'"[^"]*"|\d+(?:\.\d+)?|[A-Za-z][A-Za-z\']*|[():,+\-*/]'
 
 
 OWNER_KINDS = {}  # the same, -> the kind of thing (machine code finds its parts with it)
-OWNER_PARAMS = set()  # the C++ names of the things commands are for ('to bounce, for a ball:' gets 'ball')
-# Commands for a kind of thing ('to bounce, for a ball:'): their C++ name -> the kind.
+OWNER_PARAMS = set()  # C++ names of the things commands are for
+# Commands for a kind: C++ name -> kind.
 OWNERS = {}
 PARENTS = {}  # kind of thing -> the kind it is a kind of ('a dog is a kind of pet')
-ABLE = {}  # 'a speaker is anything that can speak': 'speaker' -> [('speak',)], the commands every one of them has
-NAMES_NOW = [None]  # the Names of the script being read (fit() asks which kinds can do an ability's commands)
+ABLE = {}  # ability -> the commands each has
+NAMES_NOW = [None]  # the script being read
 
 # The parts of a place, written after it: 'existence of horizontal'.
 PLACE_PARTS = {("horizontal",): "X", ("vertical",): "Y", ("depth",): "Z"}
@@ -137,7 +127,7 @@ SIGNATURES = {}  # a command kind -> (input kinds, the kind it gives back or Non
 
 
 def command_kind(inputs, gives):
-    """The kind of a command that takes these inputs and gives this back: 'command(number;text)>number'."""
+    """A command's kind: 'command(number;text)>number'."""
     kind = "command(" + ";".join(inputs) + ")>" + (gives or "")
     SIGNATURES[kind] = (list(inputs), gives)
     return kind
@@ -148,7 +138,7 @@ def is_command(kind):
 
 
 def holds_command(kind):
-    """Is it a command, or a list or table with commands in it? (They can't be compared or saved.)"""
+    """Holds commands? (can't compare or save)"""
     if is_list(kind):
         return holds_command(element(kind))
     if is_table(kind):
@@ -186,7 +176,7 @@ def zero(kind):
 
 
 def js_class(kind):
-    """A kind of thing's JavaScript class: 'thing pet' -> Kind_Pet (a prefix, so it can't meet a browser's own names)."""
+    """A kind's JavaScript class name."""
     return "Kind_" + "".join(w.capitalize() for w in kind[6:].split())
 
 
@@ -205,22 +195,22 @@ def js_zero(kind):
 
 
 def is_deep(kind):
-    """Values that hold other values: they are copied when stored (C++ copies them by itself)."""
+    """Values copied when stored."""
     return kind in (PLACE, FLAT) or is_list(kind) or is_table(kind) or is_thing(kind)
 
 
 def js_copy(cpp, kind):
-    """In JavaScript a stored list, table, place or thing must be copied by hand, as C++ and Python do."""
+    """JavaScript must copy these by hand."""
     return f"stellanova::dup({strip_parens(cpp)})" if JS and is_deep(kind) else strip_parens(cpp)
 
 
 def js_set(target):
-    """The start of putting a value into target, in JavaScript: 'x = ', or a runtime call that the close bracket ends."""
+    """Start of putting a value into target, in JavaScript."""
     return getattr(target, "cpp_assign", None) or f"{strip_parens(target.cpp)} = "
 
 
 def js_dots(code):
-    """C++'s 'stellanova::text' is JavaScript's 'stellanova.text': turn every '::' outside text into '.'."""
+    """'::' to '.' outside text."""
     out, k, n = [], 0, len(code)
     while k < n:
         c = code[k]
@@ -286,7 +276,7 @@ def kind_name(kind):
 
 
 def plural_word(name):
-    """'pet' -> 'pets', 'body' -> 'bodies', 'box' -> 'boxes' (the last word of a name of several)"""
+    """'pet' -> 'pets'"""
     if re.search(r"[^aeiou]y$", name):
         return name[:-1] + "ies"
     if re.search(r"(s|x|z|ch|sh)$", name):
@@ -306,9 +296,9 @@ def plural(kind):
     return {NUMBER: "numbers", YESNO: "yes or no", PLACE: "places", FLAT: "flat places", TEXT: "text"}[kind]
 
 
-# ---------------------------------------------------------------- what running a program uses
+# ---- what running a program uses
 
-PART_NAMES = {}  # a kind's name -> (its parts as described, [(each part's inner name, kind)])
+PART_NAMES = {}  # kind -> (parts, [(inner name, kind)])
 
 
 class Thing:
@@ -338,7 +328,7 @@ class Thing:
 
 
 class Place:
-    """A place (x, y, z) or a flat place (x, y) while a program runs. Its parts are in .fields, like a Thing's."""
+    """A place while running."""
     __slots__ = ("fields",)
 
     def __init__(self, *parts):
@@ -405,7 +395,7 @@ def py_zero(kind, things):
 
 OTHERS = []  # commands running alongside the rest ('meanwhile ...'), as threads
 OTHERS_LOCK = threading.Lock()
-NAMED_LOCKS = {}  # 'holding the lock "total":' -> its lock (one command at a time holds each)
+NAMED_LOCKS = {}  # lock name -> its lock
 
 
 def named_lock(name):
@@ -414,7 +404,7 @@ def named_lock(name):
 
 
 def meanwhile(run, env):
-    """Starts run going on its own, with a copy of every name as it is now (as the C++ copies them)."""
+    """Starts run alongside, with copies of the names."""
     snapshot = {k: dup(v) for k, v in env.items()}
 
     def go():
@@ -434,7 +424,7 @@ def meanwhile(run, env):
 
 
 def wait_for_others():
-    """Waits until every command started with 'meanwhile' (except the one waiting) has finished."""
+    """Waits for every 'meanwhile' command."""
     me = threading.current_thread()
     while True:
         with OTHERS_LOCK:
@@ -472,16 +462,14 @@ def dup_thing(v):
 
 
 _new_thing = Thing.__new__
-PLAIN_KINDS = {}  # a kind's name -> its parts as described, when every part is a number, yes/no or text
+PLAIN_KINDS = {}  # kind -> parts, when all are plain
 PLAIN_ZEROS = {}  # such a kind's name -> a new one's parts
 
 
 def dup(v):
-    """Lists, tables, places and things are copied when they are stored, as they are in the C++.
-
-    Made by hand rather than with copy.deepcopy: it is called on every 'set', so it must be quick."""
+    """Copies lists, tables, places and things (fast, not deepcopy)."""
     t = type(v)
-    if t is Thing:  # (most often: py_copy leaves out numbers, yes/no and text it knows about)
+    if t is Thing:  # (numbers, yes/no and text aren't copied)
         new = _new_thing(Thing)
         new.name, new.spec = v.name, v.spec
         new.fields = v.fields.copy() if PLAIN_KINDS.get(v.name) is v.spec else             {k: x if type(x) in PLAIN else dup(x) for k, x in v.fields.items()}
@@ -507,7 +495,7 @@ DEEP = (list, dict, Thing, Place)  # values that hold other values, so copying t
 
 
 def part_text(v):
-    """A list or table inside another one is shown in brackets, so its items stay together."""
+    """A list inside a list is shown in brackets."""
     return f"({text(v)})" if isinstance(v, (list, dict)) and v else text(v)
 
 
@@ -608,7 +596,7 @@ BIT_LIMIT = 2 ** 53  # whole numbers this big (either way) are exact: bits work 
 
 
 def bits(op, a, b, line):
-    """'12 bitwise and 10', 'bitwise or', 'bitwise exclusive or', '1 shifted left by 4', 'shifted right by'"""
+    """bitwise words"""
     for x in (a, b):
         if x != math.floor(x) or abs(x) >= BIT_LIMIT:
             raise RunError(line, f"bits need whole numbers smaller than 9007199254740992, not {text(x)}.")
@@ -680,7 +668,7 @@ def write_file(path, s, line, mode="wb"):
         raise RunError(line, f'I couldn\'t {"write" if mode == "wb" else "add to"} the file "{path}".')
 
 
-# ---------------------------------------------------------------- saving and loading (as JSON)
+# ---- saving and loading (JSON)
 
 def saved_number(x, line):
     if not math.isfinite(x):
@@ -719,7 +707,7 @@ class NotSaved(Exception):
 
 
 def from_saved(d, kind, things):
-    """JSON data back into a value of this kind; a part a thing's file doesn't have stays empty."""
+    """JSON into a value of this kind."""
     if kind == NUMBER and isinstance(d, float):
         return d
     if kind == YESNO and isinstance(d, bool):
@@ -772,7 +760,7 @@ def no_constant(name):
 
 
 def load_text(data, kind, things, line):
-    """'load scores from the text reply': JSON text (from 'as saved text', a file or the web) back into a value."""
+    """'load ... from the text ...'"""
     try:
         return from_saved(json.loads(data, parse_int=float, parse_constant=no_constant), kind, things)
     except (NotSaved, ValueError, RecursionError):
@@ -793,7 +781,7 @@ def letters(s):
 
 ASCII_UP = str.maketrans("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 ASCII_DOWN = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
-# small and capital letters in every alphabet, in pairs (the same list is in stellanova.h and stellanova.js)
+# small and capital letter pairs (same list in stellanova.h and .js)
 CASE_PAIRS = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZàÀáÁâÂãÃäÄåÅæÆçÇèÈéÉêÊëËìÌíÍîÎïÏðÐñÑòÒóÓôÔõÕöÖøØùÙúÚûÛüÜýÝþÞÿŸāĀăĂąĄćĆĉĈċĊčČďĎđĐēĒĕĔėĖęĘěĚĝĜğĞġĠģĢĥĤħĦĩĨīĪĭĬįĮĳĲĵĴķĶĺĹļĻľĽŀĿłŁńŃņŅňŇŋŊōŌŏŎőŐœŒŕŔŗŖřŘśŚŝŜşŞšŠţŢťŤŧŦũŨūŪŭŬůŮűŰųŲŵŴŷŶźŹżŻžŽƀɃƃƂƅƄƈƇƌƋƒƑƕǶƙƘƚȽƞȠơƠƣƢƥƤƨƧƭƬưƯƴƳƶƵƹƸƽƼƿǷǆǄǉǇǌǊǎǍǐǏǒǑǔǓǖǕǘǗǚǙǜǛǝƎǟǞǡǠǣǢǥǤǧǦǩǨǫǪǭǬǯǮǳǱǵǴǹǸǻǺǽǼǿǾȁȀȃȂȅȄȇȆȉȈȋȊȍȌȏȎȑȐȓȒȕȔȗȖșȘțȚȝȜȟȞȣȢȥȤȧȦȩȨȫȪȭȬȯȮȱȰȳȲȼȻȿⱾɀⱿɂɁɇɆɉɈɋɊɍɌɏɎɐⱯɑⱭɒⱰɓƁɔƆɖƉɗƊəƏɛƐɜꞫɠƓɡꞬɣƔɥꞍɦꞪɨƗɩƖɪꞮɫⱢɬꞭɯƜɱⱮɲƝɵƟɽⱤʀƦʂꟅʃƩʇꞱʈƮʉɄʊƱʋƲʌɅʒƷʝꞲʞꞰͱͰͳͲͷͶͻϽͼϾͽϿάΆέΈήΉίΊαΑβΒγΓδΔεΕζΖηΗθΘιΙκΚλΛμΜνΝξΞοΟπΠρΡσΣτΤυΥφΦχΧψΨωΩϊΪϋΫόΌύΎώΏϗϏϙϘϛϚϝϜϟϞϡϠϣϢϥϤϧϦϩϨϫϪϭϬϯϮϲϹϳͿϸϷϻϺаАбБвВгГдДеЕжЖзЗиИйЙкКлЛмМнНоОпПрРсСтТуУфФхХцЦчЧшШщЩъЪыЫьЬэЭюЮяЯѐЀёЁђЂѓЃєЄѕЅіІїЇјЈљЉњЊћЋќЌѝЍўЎџЏѡѠѣѢѥѤѧѦѩѨѫѪѭѬѯѮѱѰѳѲѵѴѷѶѹѸѻѺѽѼѿѾҁҀҋҊҍҌҏҎґҐғҒҕҔҗҖҙҘқҚҝҜҟҞҡҠңҢҥҤҧҦҩҨҫҪҭҬүҮұҰҳҲҵҴҷҶҹҸһҺҽҼҿҾӂӁӄӃӆӅӈӇӊӉӌӋӎӍӏӀӑӐӓӒӕӔӗӖәӘӛӚӝӜӟӞӡӠӣӢӥӤӧӦөӨӫӪӭӬӯӮӱӰӳӲӵӴӷӶӹӸӻӺӽӼӿӾԁԀԃԂԅԄԇԆԉԈԋԊԍԌԏԎԑԐԓԒԕԔԗԖԙԘԛԚԝԜԟԞԡԠԣԢԥԤԧԦԩԨԫԪԭԬԯԮաԱբԲգԳդԴեԵզԶէԷըԸթԹժԺիԻլԼխԽծԾկԿհՀձՁղՂճՃմՄյՅնՆշՇոՈչՉպՊջՋռՌսՍվՎտՏրՐցՑւՒփՓքՔօՕֆՖაᲐბᲑგᲒდᲓეᲔვᲕზᲖთᲗიᲘკᲙლᲚმᲛნᲜოᲝპᲞჟᲟრᲠსᲡტᲢუᲣფᲤქᲥღᲦყᲧშᲨჩᲩცᲪძᲫწᲬჭᲭხᲮჯᲯჰᲰჱᲱჲᲲჳᲳჴᲴჵᲵჶᲶჷᲷჸᲸჹᲹჺᲺჽᲽჾᲾჿᲿᏸᏰᏹᏱᏺᏲᏻᏳᏼᏴᏽᏵᵹꝽᵽⱣᶎꟆḁḀḃḂḅḄḇḆḉḈḋḊḍḌḏḎḑḐḓḒḕḔḗḖḙḘḛḚḝḜḟḞḡḠḣḢḥḤḧḦḩḨḫḪḭḬḯḮḱḰḳḲḵḴḷḶḹḸḻḺḽḼḿḾṁṀṃṂṅṄṇṆṉṈṋṊṍṌṏṎṑṐṓṒṕṔṗṖṙṘṛṚṝṜṟṞṡṠṣṢṥṤṧṦṩṨṫṪṭṬṯṮṱṰṳṲṵṴṷṶṹṸṻṺṽṼṿṾẁẀẃẂẅẄẇẆẉẈẋẊẍẌẏẎẑẐẓẒẕẔạẠảẢấẤầẦẩẨẫẪậẬắẮằẰẳẲẵẴặẶẹẸẻẺẽẼếẾềỀểỂễỄệỆỉỈịỊọỌỏỎốỐồỒổỔỗỖộỘớỚờỜởỞỡỠợỢụỤủỦứỨừỪửỬữỮựỰỳỲỵỴỷỶỹỸỻỺỽỼỿỾἀἈἁἉἂἊἃἋἄἌἅἍἆἎἇἏἐἘἑἙἒἚἓἛἔἜἕἝἠἨἡἩἢἪἣἫἤἬἥἭἦἮἧἯἰἸἱἹἲἺἳἻἴἼἵἽἶἾἷἿὀὈὁὉὂὊὃὋὄὌὅὍὑὙὓὛὕὝὗὟὠὨὡὩὢὪὣὫὤὬὥὭὦὮὧὯὰᾺάΆὲῈέΈὴῊήΉὶῚίΊὸῸόΌὺῪύΎὼῺώΏᾰᾸᾱᾹῐῘῑῙῠῨῡῩῥῬⅎℲⅰⅠⅱⅡⅲⅢⅳⅣⅴⅤⅵⅥⅶⅦⅷⅧⅸⅨⅹⅩⅺⅪⅻⅫⅼⅬⅽⅭⅾⅮⅿⅯↄↃⓐⒶⓑⒷⓒⒸⓓⒹⓔⒺⓕⒻⓖⒼⓗⒽⓘⒾⓙⒿⓚⓀⓛⓁⓜⓂⓝⓃⓞⓄⓟⓅⓠⓆⓡⓇⓢⓈⓣⓉⓤⓊⓥⓋⓦⓌⓧⓍⓨⓎⓩⓏⰰⰀⰱⰁⰲⰂⰳⰃⰴⰄⰵⰅⰶⰆⰷⰇⰸⰈⰹⰉⰺⰊⰻⰋⰼⰌⰽⰍⰾⰎⰿⰏⱀⰐⱁⰑⱂⰒⱃⰓⱄⰔⱅⰕⱆⰖⱇⰗⱈⰘⱉⰙⱊⰚⱋⰛⱌⰜⱍⰝⱎⰞⱏⰟⱐⰠⱑⰡⱒⰢⱓⰣⱔⰤⱕⰥⱖⰦⱗⰧⱘⰨⱙⰩⱚⰪⱛⰫⱜⰬⱝⰭⱞⰮⱟⰯⱡⱠⱥȺⱦȾⱨⱧⱪⱩⱬⱫⱳⱲⱶⱵⲁⲀⲃⲂⲅⲄⲇⲆⲉⲈⲋⲊⲍⲌⲏⲎⲑⲐⲓⲒⲕⲔⲗⲖⲙⲘⲛⲚⲝⲜⲟⲞⲡⲠⲣⲢⲥⲤⲧⲦⲩⲨⲫⲪⲭⲬⲯⲮⲱⲰⲳⲲⲵⲴⲷⲶⲹⲸⲻⲺⲽⲼⲿⲾⳁⳀⳃⳂⳅⳄⳇⳆⳉⳈⳋⳊⳍⳌⳏⳎⳑⳐⳓⳒⳕⳔⳗⳖⳙⳘⳛⳚⳝⳜⳟⳞⳡⳠⳣⳢⳬⳫⳮⳭⳳⳲⴀႠⴁႡⴂႢⴃႣⴄႤⴅႥⴆႦⴇႧⴈႨⴉႩⴊႪⴋႫⴌႬⴍႭⴎႮⴏႯⴐႰⴑႱⴒႲⴓႳⴔႴⴕႵⴖႶⴗႷⴘႸⴙႹⴚႺⴛႻⴜႼⴝႽⴞႾⴟႿⴠჀⴡჁⴢჂⴣჃⴤჄⴥჅⴧჇⴭჍꙁꙀꙃꙂꙅꙄꙇꙆꙉꙈꙋꙊꙍꙌꙏꙎꙑꙐꙓꙒꙕꙔꙗꙖꙙꙘꙛꙚꙝꙜꙟꙞꙡꙠꙣꙢꙥꙤꙧꙦꙩꙨꙫꙪꙭꙬꚁꚀꚃꚂꚅꚄꚇꚆꚉꚈꚋꚊꚍꚌꚏꚎꚑꚐꚓꚒꚕꚔꚗꚖꚙꚘꚛꚚꜣꜢꜥꜤꜧꜦꜩꜨꜫꜪꜭꜬꜯꜮꜳꜲꜵꜴꜷꜶꜹꜸꜻꜺꜽꜼꜿꜾꝁꝀꝃꝂꝅꝄꝇꝆꝉꝈꝋꝊꝍꝌꝏꝎꝑꝐꝓꝒꝕꝔꝗꝖꝙꝘꝛꝚꝝꝜꝟꝞꝡꝠꝣꝢꝥꝤꝧꝦꝩꝨꝫꝪꝭꝬꝯꝮꝺꝹꝼꝻꝿꝾꞁꞀꞃꞂꞅꞄꞇꞆꞌꞋꞑꞐꞓꞒꞔꟄꞗꞖꞙꞘꞛꞚꞝꞜꞟꞞꞡꞠꞣꞢꞥꞤꞧꞦꞩꞨꞵꞴꞷꞶꞹꞸꞻꞺꞽꞼꞿꞾꟁꟀꟃꟂꟈꟇꟊꟉꟑꟐꟗꟖꟙꟘꟶꟵꭓꞳꭰᎠꭱᎡꭲᎢꭳᎣꭴᎤꭵᎥꭶᎦꭷᎧꭸᎨꭹᎩꭺᎪꭻᎫꭼᎬꭽᎭꭾᎮꭿᎯꮀᎰꮁᎱꮂᎲꮃᎳꮄᎴꮅᎵꮆᎶꮇᎷꮈᎸꮉᎹꮊᎺꮋᎻꮌᎼꮍᎽꮎᎾꮏᎿꮐᏀꮑᏁꮒᏂꮓᏃꮔᏄꮕᏅꮖᏆꮗᏇꮘᏈꮙᏉꮚᏊꮛᏋꮜᏌꮝᏍꮞᏎꮟᏏꮠᏐꮡᏑꮢᏒꮣᏓꮤᏔꮥᏕꮦᏖꮧᏗꮨᏘꮩᏙꮪᏚꮫᏛꮬᏜꮭᏝꮮᏞꮯᏟꮰᏠꮱᏡꮲᏢꮳᏣꮴᏤꮵᏥꮶᏦꮷᏧꮸᏨꮹᏩꮺᏪꮻᏫꮼᏬꮽᏭꮾᏮꮿᏯａＡｂＢｃＣｄＤｅＥｆＦｇＧｈＨｉＩｊＪｋＫｌＬｍＭｎＮｏＯｐＰｑＱｒＲｓＳｔＴｕＵｖＶｗＷｘＸｙＹｚＺ𐐨𐐀𐐩𐐁𐐪𐐂𐐫𐐃𐐬𐐄𐐭𐐅𐐮𐐆𐐯𐐇𐐰𐐈𐐱𐐉𐐲𐐊𐐳𐐋𐐴𐐌𐐵𐐍𐐶𐐎𐐷𐐏𐐸𐐐𐐹𐐑𐐺𐐒𐐻𐐓𐐼𐐔𐐽𐐕𐐾𐐖𐐿𐐗𐑀𐐘𐑁𐐙𐑂𐐚𐑃𐐛𐑄𐐜𐑅𐐝𐑆𐐞𐑇𐐟𐑈𐐠𐑉𐐡𐑊𐐢𐑋𐐣𐑌𐐤𐑍𐐥𐑎𐐦𐑏𐐧𐓘𐒰𐓙𐒱𐓚𐒲𐓛𐒳𐓜𐒴𐓝𐒵𐓞𐒶𐓟𐒷𐓠𐒸𐓡𐒹𐓢𐒺𐓣𐒻𐓤𐒼𐓥𐒽𐓦𐒾𐓧𐒿𐓨𐓀𐓩𐓁𐓪𐓂𐓫𐓃𐓬𐓄𐓭𐓅𐓮𐓆𐓯𐓇𐓰𐓈𐓱𐓉𐓲𐓊𐓳𐓋𐓴𐓌𐓵𐓍𐓶𐓎𐓷𐓏𐓸𐓐𐓹𐓑𐓺𐓒𐓻𐓓𐖗𐕰𐖘𐕱𐖙𐕲𐖚𐕳𐖛𐕴𐖜𐕵𐖝𐕶𐖞𐕷𐖟𐕸𐖠𐕹𐖡𐕺𐖣𐕼𐖤𐕽𐖥𐕾𐖦𐕿𐖧𐖀𐖨𐖁𐖩𐖂𐖪𐖃𐖫𐖄𐖬𐖅𐖭𐖆𐖮𐖇𐖯𐖈𐖰𐖉𐖱𐖊𐖳𐖌𐖴𐖍𐖵𐖎𐖶𐖏𐖷𐖐𐖸𐖑𐖹𐖒𐖻𐖔𐖼𐖕𐳀𐲀𐳁𐲁𐳂𐲂𐳃𐲃𐳄𐲄𐳅𐲅𐳆𐲆𐳇𐲇𐳈𐲈𐳉𐲉𐳊𐲊𐳋𐲋𐳌𐲌𐳍𐲍𐳎𐲎𐳏𐲏𐳐𐲐𐳑𐲑𐳒𐲒𐳓𐲓𐳔𐲔𐳕𐲕𐳖𐲖𐳗𐲗𐳘𐲘𐳙𐲙𐳚𐲚𐳛𐲛𐳜𐲜𐳝𐲝𐳞𐲞𐳟𐲟𐳠𐲠𐳡𐲡𐳢𐲢𐳣𐲣𐳤𐲤𐳥𐲥𐳦𐲦𐳧𐲧𐳨𐲨𐳩𐲩𐳪𐲪𐳫𐲫𐳬𐲬𐳭𐲭𐳮𐲮𐳯𐲯𐳰𐲰𐳱𐲱𐳲𐲲𑣀𑢠𑣁𑢡𑣂𑢢𑣃𑢣𑣄𑢤𑣅𑢥𑣆𑢦𑣇𑢧𑣈𑢨𑣉𑢩𑣊𑢪𑣋𑢫𑣌𑢬𑣍𑢭𑣎𑢮𑣏𑢯𑣐𑢰𑣑𑢱𑣒𑢲𑣓𑢳𑣔𑢴𑣕𑢵𑣖𑢶𑣗𑢷𑣘𑢸𑣙𑢹𑣚𑢺𑣛𑢻𑣜𑢼𑣝𑢽𑣞𑢾𑣟𑢿𖹠𖹀𖹡𖹁𖹢𖹂𖹣𖹃𖹤𖹄𖹥𖹅𖹦𖹆𖹧𖹇𖹨𖹈𖹩𖹉𖹪𖹊𖹫𖹋𖹬𖹌𖹭𖹍𖹮𖹎𖹯𖹏𖹰𖹐𖹱𖹑𖹲𖹒𖹳𖹓𖹴𖹔𖹵𖹕𖹶𖹖𖹷𖹗𖹸𖹘𖹹𖹙𖹺𖹚𖹻𖹛𖹼𖹜𖹽𖹝𖹾𖹞𖹿𖹟𞤢𞤀𞤣𞤁𞤤𞤂𞤥𞤃𞤦𞤄𞤧𞤅𞤨𞤆𞤩𞤇𞤪𞤈𞤫𞤉𞤬𞤊𞤭𞤋𞤮𞤌𞤯𞤍𞤰𞤎𞤱𞤏𞤲𞤐𞤳𞤑𞤴𞤒𞤵𞤓𞤶𞤔𞤷𞤕𞤸𞤖𞤹𞤗𞤺𞤘𞤻𞤙𞤼𞤚𞤽𞤛𞤾𞤜𞤿𞤝𞥀𞤞𞥁𞤟𞥂𞤠𞥃𞤡"
 CASE_UP = str.maketrans(CASE_PAIRS[0::2], CASE_PAIRS[1::2])
 CASE_DOWN = str.maketrans(CASE_PAIRS[1::2], CASE_PAIRS[0::2])
@@ -818,7 +806,7 @@ def items_from(items, first, last, line):
 
 
 def first_of(items, count, line, end=False):
-    """The first (or last) count items of a list or letters of text: all of them when there are fewer."""
+    """The first (or last) count items or letters."""
     if math.floor(count) != count or count < 0:
         raise RunError(line, f"I can't take {text(count)} of something: it must be a whole number, 0 or more.")
     n = int(count)
@@ -941,10 +929,8 @@ def looped(then):
     return with_ir(step, getattr(then, "ir", None))  # machine.loop makes 'break free' and 'move on' jumps
 
 
-# ---------------------------------------------------------------- direct runs as Python
-# Each command run directly becomes one Python function, written out as Python text: its lines and sums inline, with
-# real returns. A piece with no Python text of its own (pyf for a value, pyl for a line) is called as its run(env).
-PY_PARTS = []  # what the written Python calls: runs without Python text of their own, and commands
+# ---- direct runs: each command becomes one Python function
+PY_PARTS = []  # what the written Python calls
 FAST = not os.environ.get("STELLANOVA_NO_FAST")  # set it to run directly the old way (each piece a Python call)
 
 
@@ -963,7 +949,7 @@ def py_expr(v):
 
 
 def py_lines(run, tab):
-    """A line's Python: (its line number, or None for the line around it, and the text) for each Python line."""
+    """A line's Python lines."""
     x, out = run, None
     while out is None:
         if getattr(x, "pyl", None):
@@ -979,7 +965,7 @@ def py_lines(run, tab):
 
 
 def py_loop(head, then, tab):
-    """A loop's lines: 'stop the loop' and 'skip to the next one' inside a run of the old way still work."""
+    """A loop's lines (stop and skip still work)."""
     inner = py_lines(then.inner, tab + "        ")
     if not any("_F[" in t for _, t in inner):
         return [(None, tab + head)] + [(m, t[4:]) for m, t in inner]
@@ -987,7 +973,7 @@ def py_loop(head, then, tab):
         (None, tab + "    except _Leave:"), (None, tab + "        break"), (None, tab + "    except _Next:"), (None, tab + "        pass")]
 
 
-def py_copy(x, kind):  # Python text keeping x: lists, places and things are copied (not ones just made)
+def py_copy(x, kind):  # Python for x, copied unless just made
     return x if kind in (NUMBER, YESNO, TEXT) or x == "[]" or x.startswith(PY_FRESH) else f"_dup({x})"
 
 
@@ -1032,7 +1018,7 @@ def py_counting(x, last, by):
         x += by
 
 
-def py_each(items, simple):  # 'for each x in xs': a copy, so changing xs inside doesn't change the rounds
+def py_each(items, simple):  # loop over a copy
     return list(items) if simple else dup(items)
 
 
@@ -1041,7 +1027,7 @@ def py_reps(c):
 
 
 def py_fix(err, lines):
-    """A surprise inside written Python, as the old way says it (with the line it happened on)."""
+    """A surprise inside written Python."""
     tb = err.__traceback__
     n = lines[tb.tb_lineno - 1] if tb and 0 < tb.tb_lineno <= len(lines) else 0
     if isinstance(err, RunError):
@@ -1086,13 +1072,13 @@ def py_command(name, params, zeros, gives_zero, run):
 
 
 def not_here(line, what):
-    """For words that only mean something in C++ (Unreal, or a library word without a 'runs:' line)."""
+    """For words that only mean something in C++."""
     def run(env):
         raise RunError(line, f"{what} only works when the script is built into C++, not when it runs directly.")
     return run
 
 
-# ---------------------------------------------------------------- reading
+# ---- reading
 
 def tokenize(text, line):
     tokens = re.findall(TOKEN + r"|\S", text)
@@ -1104,8 +1090,7 @@ def tokenize(text, line):
     return [t.lower() if t[0].isalpha() else t for t in tokens]
 
 
-# Grammar is for people: 'the', 'a' and 'an' are checked where English needs them, then left out before the
-# line is read, so 'if the size of kept notifications falls below 60' is read as 'if size of kept notifications ...'.
+# 'the', 'a' and 'an' are checked, then left out before the line is read.
 ARTICLES = ("the", "a", "an")
 KEPT_PHRASES = [  # inner words that hold an article of their own
     ("stop", "the", "loop"), ("skip", "to", "the", "next"), ("wait", "for", "the", "others"), ("from", "the", "text"),
@@ -1120,7 +1105,7 @@ def read_words(text, line, names):
 
 
 def kept_span(tokens, i, names):
-    """How many words from tokens[i] belong to a phrase, name or command that holds an article itself (0 if none)."""
+    """How many words belong to a phrase holding an article."""
     for phrase in KEPT_PHRASES:
         if tuple(tokens[i:i + len(phrase)]) == phrase:
             return len(phrase)
@@ -1128,7 +1113,7 @@ def kept_span(tokens, i, names):
     for key in list(names.known) + library_phrases():
         if len(key) > best and tuple(tokens[i:i + len(key)]) == key and any(w in ARTICLES for w in key):
             best = len(key)
-    for key in names.commands:  # a command's own name is kept whole: 'total age of shelter' is the command 'total age of'
+    for key in names.commands:  # a command's name is kept whole
         said = tuple(spoken(key).split())
         if len(said) > best and tuple(tokens[i:i + len(said)]) == said:
             best = len(said)
@@ -1139,7 +1124,7 @@ LIBRARY_PHRASES = []
 
 
 def library_phrases():
-    """Every library word that holds an article ('open a world'), so it is kept even before its library is used."""
+    """Library words holding an article."""
     if not LIBRARY_PHRASES:
         for path in sorted((HERE / "libraries").glob("**/*.words")):
             for row in path.read_text(encoding="utf-8").splitlines():
@@ -1151,7 +1136,7 @@ def library_phrases():
 
 
 def needs_the(tokens, i, names):
-    """The part of something that must have 'the' before it here ('the size of x', 'the name of rex'), or None."""
+    """The part that must have 'the' before it, or None."""
     if tokens[i:i + 2] == ["size", "of"] and not names.match(tokens, i)[0] and not match_command(names, tokens[i:])[0]:
         return "size of"
     for n in range(min(6, len(tokens) - i - 1), 0, -1):
@@ -1167,8 +1152,8 @@ def drop_articles(tokens, names, line):
         span = kept_span(tokens, i, names)
         if span and tokens[i] in ARTICLES and (needs_the(tokens, i + 1, names) or any(
                 tuple(tokens[i + 1:i + 1 + n]) in FIELDS and tokens[i + 1 + n:i + 2 + n] == ["of"] for n in range(1, 7))):
-            span = 0  # 'the element of win' is the part 'element', not the library word 'the element ...'
-        if span:  # the longest known words win, as before: 'the page' is the library word even if 'page' is a name
+            span = 0  # a part named 'element', not the library word
+        if span:  # longest known words win
             out += tokens[i:i + span]
             i += span
             continue
@@ -1188,15 +1173,14 @@ def drop_articles(tokens, names, line):
         if part and (i == 0 or tokens[i - 1] != "the"):
             raise ScriptError(line, f"Write 'the {part}', not '{part}': grammar is needed here for people reading it "
                                     f"(the computer skips it).")
-        size = len(part.split()) - 1 if part else 1  # the whole part's name ('before x'), so 'x of' inside it isn't checked again
+        size = len(part.split()) - 1 if part else 1  # the whole part's name
         out += tokens[i:i + size]
         i += size
     return out
 
 
-# The language's words, and the words they replaced. A script line's words are turned into the
-# older inner words before it is read; the older words themselves are not allowed in scripts.
-OLD_WORDS = [  # (old words, how to say it now) - checked anywhere in a line, outside quote marks
+# The language's words, and the old words they replaced (not allowed in scripts).
+OLD_WORDS = [  # (old words, the new way to say it)
     (r"\bis more than\b", "exceeds"), (r"\bis less than\b", "falls below"),
     (r"\bthe problem\b", "the wound"), (r"\ban? new\b", "conjure a"),
     (r"\bopen a window\b", "open a world"), (r"\bthe window is open\b", "the world lives"),
@@ -1210,7 +1194,7 @@ OLD_STARTS = [  # (old first words, how to say it now) - checked at the start of
     (r"banish\b", "remove ... from"), (r"write\b", "inscribe ... into"), (r"give back\b", "return"),
     (r"shatter\b", "raise an error with"),
 ]
-NEW_WORDS = [  # (new words, the inner words they become) - anywhere outside quote marks
+NEW_WORDS = [  # (new words, inner words)
     (r"\bexceeds\b", "is more than"), (r"\bfalls below\b", "is less than"), (r"\bthe wound\b", "the problem"),
     (r"\bconjure (an?)\s+", "a new "), (r"\bwhether\s+", ""), (r"\ba quotation mark\b", "quote mark"),
     (r"\bthe item at\b(.+?)\bin\b", r"item\1of"), (r"\brounded to\b(.+?)\bdecimal places?\b", r"rounded to\1places"),
@@ -1233,9 +1217,7 @@ FILLED = re.compile(r"\[([A-Za-z][A-Za-z0-9' ]*)\]")  # words in square brackets
 
 
 def fill_in(text):
-    """'"Hello, [name]!"' becomes '("Hello, " plus (name) plus "!")': what the words in brackets hold, put into the text.
-    Brackets holding anything but words (like a pattern's [0-9]) are left as they are; doubled ones ('[[like this]]')
-    are shown as single brackets."""
+    """"[name]" in text becomes what name holds; [[x]] shows [x]."""
     def one(m):
         pieces = FILLED.split(m.group(0)[1:-1].replace("[[", "\x01").replace("]]", "\x02"))
         shown = [p.replace("\x01", "[").replace("\x02", "]") for p in pieces]
@@ -1251,9 +1233,7 @@ def fill_in(text):
 
 
 def surface(text, line, filled=False):
-    """A script line in the language's words, turned into the inner words (old words are a mistake).
-
-    'if done: cease' is two parts; each is turned on its own."""
+    """A line turned into the inner words."""
     if not filled:
         text = fill_in(text)
     head, colon, rest = split_colon(text)
@@ -1310,7 +1290,7 @@ def surface_part(text, line):
                 body = body[:k] + " to " + body[k + 6:]
             part = part[:lead] + body
         return part
-    # 'into' may sit after a quoted part, so turn the whole line, then put the quoted parts back unchanged
+    # turn the whole line, then put quoted parts back
     pieces = re.split(r'("[^"]*")', text)
     marks = [pieces[k] for k in range(1, len(pieces), 2)]
     joined = "".join(f"\x00{k}\x00" if i % 2 else piece for i, piece in enumerate(pieces) for k in [i // 2])
@@ -1329,11 +1309,9 @@ def split_colon(text):
 
 
 class Value:
-    """A piece of an expression: its C++, its kind, and run(env) which works it out.
+    """A piece of an expression: C++, kind, run(env), store(env, x)."""
 
-    store(env, x) changes it, for values that can be changed (a name, a part of a thing, an item of a list)."""
-
-    ir = None  # ir(f): writes this value's machine code into f and returns where it is (see machine.py)
+    ir = None  # ir(f): writes machine code into f (see machine.py)
     ir_store = None  # ir_store(f, x): puts x into it, for names
 
     def __init__(self, cpp, kind, run, store=None):
@@ -1344,7 +1322,7 @@ class Value:
         return self.store is not None
 
     @property
-    def pyf(self):  # its Python text, for direct runs (kept on run, which is what sums of values hold)
+    def pyf(self):  # its Python text, for direct runs
         return getattr(self.run, "pyf", None)
 
     @pyf.setter
@@ -1360,7 +1338,7 @@ def reversed_list(v):
 
 
 def with_ir(x, write):
-    """x (a Value or a statement's run), able to write its own machine code with write(f)."""
+    """x, able to write its machine code."""
     x.ir = write
     return x
 
@@ -1369,8 +1347,7 @@ HOLES = re.compile(r"\{([as])(\d+)\}|\{line\}")
 
 
 def builtin(template, kind, run, args, line=0):
-    """A value made by one of Stellanova's own C++ functions. template is its C++ with {a0}/{s0} for each input's C++
-    (s: without outer brackets) and {line}; the machine code calls the same function, from the prebuilt library."""
+    """A value made by one of Stellanova's C++ functions."""
     def fill(m):
         if not m.group(1):
             return str(line)
@@ -1415,7 +1392,7 @@ def number_ir(f, op, left, right):
 
 
 def key_text(v, line):
-    """A table's entry is named by text; a number names the entry with its written form (3 is the entry "3")."""
+    """A table entry is named by text (3 is "3")."""
     if v.kind == TEXT:
         return v
     if v.kind != NUMBER:
@@ -1440,7 +1417,7 @@ def pick_ir(f, test, a, b):
 
 
 def load_ir(target, source, fn, n):
-    """'load scores from file ...' in machine code: the library reads it into a new value shaped like the name's kind."""
+    """'load scores from file ...' in machine code."""
     if not target.ir_store:
         return None
 
@@ -1467,8 +1444,7 @@ def field_index(kind, member):
 
 
 def thing_part_ir(owner_ir, kind, member, part_kind, owner_own=None):
-    """A part of a thing: (get, put, own) machine-code writers. owner_ir(f) gives the thing itself (not a copy),
-    owner_own(f) the same, ready to be changed."""
+    """A part of a thing: get, put, own."""
     k = field_index(kind, member)
     owner_own = owner_own or owner_ir
 
@@ -1487,8 +1463,8 @@ def thing_part_ir(owner_ir, kind, member, part_kind, owner_own=None):
     return get, put, own
 
 
-WORLD_KINDS = {}  # 'the world remembers:' names: C++ name -> kind (for machine code's shared names)
-LIBRARY_HEADS = {}  # a library's name -> the C++ its words need above them (includes and code)
+WORLD_KINDS = {}  # shared names: C++ name -> kind
+LIBRARY_HEADS = {}  # library -> C++ it needs above its words
 LIBRARY_VALUES = {}  # a library word for a value: its words -> the library's name
 SETTING_NUMBERS = {}  # a setting's C++ name -> its number
 
@@ -1517,14 +1493,14 @@ class Command:
         self.cpp, self.kinds, self.gives = cpp, kinds, gives
         self.inputs = inputs  # library words: the input names their C++ uses as {name}
         self.runner = runner  # called with the inputs' values when running directly
-        self.versions = None  # a command for a kind of thing: {kind: Command} for it and the kinds of it
+        self.versions = None  # {kind: Command} for a kind and its kinds
 
 
 class Names:
-    """Every name a script can use: the class's words, settings, inputs and the script's own names."""
+    """Every name a script can use."""
 
     def __init__(self):
-        self.known = {}  # words tuple -> (cpp, kind, read_only, run or None for a name kept in env)
+        self.known = {}  # words -> (cpp, kind, read_only, run)
         self.commands = {}  # words tuple -> Command
         self.gives = None  # what the command being read gives back
         self.loops = 0  # how many loops the line being read is inside
@@ -1540,7 +1516,7 @@ class Names:
         return None, 0
 
     def unknown(self, tokens, i):
-        """The best guess at what an unknown name at tokens[i] was meant to be, as an error message."""
+        """A guess at what an unknown name meant."""
         for k in self.commands:
             if hidden_from_here(k) and tuple(tokens[i:i + len(k) - 1]) == k[:-1]:
                 return private_message(k)
@@ -1566,7 +1542,7 @@ class Names:
         cpp, kind, read_only, run = self.known[key]
         if cpp.startswith(UNUSABLE):
             raise ScriptError(0, cpp[len(UNUSABLE):])
-        if isinstance(run, tuple):  # (get, put): a shared name, or the thing a command is for, or one of its parts
+        if isinstance(run, tuple):  # (get, put)
             v = Value(cpp, kind, run[0], None if read_only else run[1])
             if cpp in WORLD_KINDS:
                 v.ir, v.ir_store = (lambda f: f.load(cpp, kind)), (lambda f, x: f.store(cpp, kind, x))
@@ -1623,7 +1599,7 @@ INLINE_COUNT = [0]  # commands written where they are used, numbered for their m
 
 
 class Expr:
-    """Reads one expression from a token list (recursive descent, lowest precedence first)."""
+    """Reads one expression (recursive descent)."""
 
     def __init__(self, tokens, names, line):
         self.t, self.i, self.names, self.line = tokens, 0, names, line
@@ -1653,8 +1629,7 @@ class Expr:
             self.bare = bare
 
     def operand(self):
-        """What follows 'of' or a command's name: 'as text', 'rounded to' and the like after it are left for the whole,
-        so 'item 2 of scores as text' is (item 2 of scores) as text."""
+        """What follows 'of' or a command's name."""
         self.bare = getattr(self, "bare", 0) + 1
         try:
             return self.unary()
@@ -1705,7 +1680,7 @@ class Expr:
         return False
 
     def circle(self, v):
-        """Where something is and how big it is, for 'touches': a thing's existence and radius, or a place and the radius in reach."""
+        """Where and how big, for 'touches'."""
         if is_thing(v.kind):
             for part in ("existence", "radius"):
                 if v.kind not in FIELDS.get((part,), {}):
@@ -1742,7 +1717,7 @@ class Expr:
                 return builtin(f"stellanova::{fn}({{a0}}, {{a1}})", YESNO, lambda env, test=test: test(a(env), b(env)), [v, r])
         for words, part, size in ((("touches", "a", "side"), "horizontal", "width"),
                                   (("touches", "the", "top", "or", "bottom"), "vertical", "height")):
-            if self.at(*words):  # 'existence touches a side': within radius of the world's edge (or past it)
+            if self.at(*words):  # within radius of the world's edge
                 self.i += len(words)
                 if v.kind not in (PLACE, FLAT):
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs a place, like 'existence {' '.join(words)}', not {kind_name(v.kind)}.")
@@ -1987,7 +1962,7 @@ class Expr:
             return with_ir(Value(f"stellanova::to_number({v.cpp}, {line})", NUMBER, lambda env: to_number(a(env), line)),
                            lambda f: f.op(f"call double @cn_to_number(ptr {machine.emit(f, v)}, i32 {line})"))
         for words in (("changed", "by"), ("kept", "by")):
-            if self.at(*words):  # 'scores changed by the command double', 'scores kept by the command is big'
+            if self.at(*words):  # 'changed by' and 'kept by'
                 self.i += 2
                 if not is_list(v.kind):
                     raise ScriptError(self.line, f"'{' '.join(words)}' needs a list, but this is {kind_name(v.kind)}.")
@@ -2063,7 +2038,7 @@ class Expr:
             return with_ir(out, lambda f, v=v, count=count, line=line:  # any kind of item, things too
                            f.call("ptr", "cn_repeated", ("ptr", machine.emit(f, v)), ("double", machine.emit(f, count)), ("i32", str(line)),
                                   checked=True))
-        if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"; '"food" padded to 12 letters' has spaces after it
+        if self.at("padded", "to"):  # '7 padded to 3 digits' is "007"
             self.i += 2
             if v.kind not in (NUMBER, TEXT):
                 raise ScriptError(self.line, f"'padded to' needs a number ('7 padded to 3 digits') or text ('\"food\" padded to 12 letters'), "
@@ -2085,9 +2060,7 @@ class Expr:
         return v
 
     def inline_command(self, given=None):
-        """'each x becomes x times 2': a command written where it is used, with its inputs before 'becomes' (joined
-        with 'and', each with its kind in brackets unless the place it goes says, like 'changed by') and its answer after.
-        It keeps copies of the names it uses, as they are when it is made."""
+        """'each x becomes x times 2'"""
         line = self.line
         self.take("each")
         try:
@@ -2172,7 +2145,7 @@ class Expr:
             raise ScriptError(line, "This line ends too early: something is missing.")
         if (tok == "the" and self.peek(1) not in (None, "command") and not self.names.match(self.t, self.i)[0]
                 and not match_command(self.names, self.t[self.i:])[0]):
-            self.i += 1  # 'the theme of prefs' reads as 'theme of prefs', unless a name starts with 'the'
+            self.i += 1  # 'the theme of prefs' is 'theme of prefs'
             try:
                 return self.primary()
             except ScriptError:
@@ -2235,7 +2208,7 @@ class Expr:
             if key in FIELDS and self.peek(n) == "of" and not (
                     key in self.names.known and (self.names.known[key][1] in FIELDS.get((self.peek(n + 1),), {})
                                                  or place_part(self.names.known[key][1], (self.peek(n + 1),)))):
-                # 'existence of x' is x of the name existence, when there is one, not the existence of x
+                # x of the name existence, if there is one
                 back = self.i
                 self.i += n + 1
                 owner = self.operand()
@@ -2322,7 +2295,7 @@ class Expr:
                 raise ScriptError(line, f"'keys of' needs a table, but this is {kind_name(table.kind)}.")
             get = table.run
             return builtin("stellanova::keys({a0})", "list of text", lambda env: sorted(get(env)), [table])
-        if self.at("each"):  # a command written where it is used: 'each x (a number) becomes x times 2'
+        if self.at("each"):  # a command written where it is used
             return self.inline_command()
         if self.at("the", "command"):  # a command kept as a value: 'set f to the command double'
             self.i += 2
@@ -2359,7 +2332,7 @@ class Expr:
                            lambda fn: machine.invoke(fn, machine.emit(fn, held), [(machine.emit(fn, a), a.kind) for a in args], ins, gives, line))
         key, n = self.names.match(self.t, self.i)
         command_key, command_n = match_command(self.names, self.t[self.i:])
-        if key and n >= command_n:  # the longer match wins: 'balls moved down' is a command even when 'balls' is a name
+        if key and n >= command_n:  # longer match wins
             self.i += n
             try:
                 return self.names.value(key)
@@ -2426,7 +2399,7 @@ class Expr:
                 self.take("and")
                 b = self.need(self.sum(), NUMBER, f"{word} of")
                 x, y = a.run, b.run
-                # as Python's min and max: the first, unless the second is smaller (or larger)
+                # like Python's min and max
                 return with_ir(Value(f"FMath::{fn}({a.cpp}, {b.cpp})", NUMBER, lambda env, f=f: f(x(env), y(env))),
                                lambda f, a=a, b=b, test="olt" if word == "smaller" else "ogt": pick_ir(f, test, a, b))
         if self.at("contents", "of", "file") or self.at("lines", "of", "file"):
@@ -2521,7 +2494,7 @@ class Expr:
             start = self.i
             self.i += 1
             v = self.operand()
-            if self.at("by", "each") and is_list(v.kind):  # 'sorted names by each n becomes the size of n': by what each works out to
+            if self.at("by", "each") and is_list(v.kind):  # sorted by what each works out to
                 self.i += 1
                 item = element(v.kind)
                 f = self.inline_command([item])
@@ -2529,7 +2502,7 @@ class Expr:
                 if gives not in (NUMBER, TEXT):
                     raise ScriptError(line, f"'sorted ... by each' needs to work out a number or text for each item, not {kind_name(gives)}.")
                 down = self.biggest_first()
-                if down:  # as for parts: back to front, sorted, back to front, so equal ones keep their order
+                if down:  # stable
                     v = reversed_list(v)
                 a, g = v.run, f.run
 
@@ -2556,7 +2529,7 @@ class Expr:
                         if kind not in (NUMBER, TEXT):
                             raise ScriptError(line, f"'sorted ... by' needs a part that is a number or text, but '{' '.join(key)}' is {kind_name(kind)}.")
                         down = self.biggest_first()
-                        if down:  # back to front, smallest first, back to front again: biggest first, and equal ones keep their order
+                        if down:  # biggest first, stable
                             v = reversed_list(v)
                         a = v.run
                         by = f"(t) => t.{member}" if JS else f"[](const auto& t) {{ return t.{member}; }}"
@@ -2684,7 +2657,7 @@ class Expr:
         raise ScriptError(line, self.names.unknown(self.t, self.i))
 
     def made(self):
-        """A new value: 'a list of numbers', 'an empty list of text', 'a list of (1, 2, 3)', 'a new pet'."""
+        """A new value: 'a list of numbers', 'a new pet'."""
         start = self.i
         for lead in (("a", "new"), ("an", "new"), ("new",)):
             if self.at(*lead) and not self.names.match(self.t, self.i)[0]:  # a name like 'new notification' wins
@@ -2755,7 +2728,7 @@ class Expr:
         return None
 
 
-# ---------------------------------------------------------------- words files and libraries
+# ---- words files and libraries
 
 def load_words(name, line):
     path = LOGIC / f"{name}.words"
@@ -2846,7 +2819,7 @@ def part_of(owner, key, line=0):
 
 
 def library_hint(tokens):
-    """If the words at the start of tokens belong to a library the script doesn't use, says which one."""
+    """Says which library the words belong to, if not used."""
     best = None  # the longest matching word wins: 'open a window' over 'open'
     for path in sorted((HERE / "libraries").glob("*.words")):
         for row in path.read_text(encoding="utf-8").splitlines():
@@ -2859,15 +2832,14 @@ def library_hint(tokens):
 
 
 def similar_words(tokens, names):
-    """' Words that start with 'etch': ...' when a line starts like known words but goes on differently."""
+    """Shows words starting the same way."""
     found = sorted({spoken(k) for k in names.commands if k[0] == tokens[0] and not hidden_from_here(k)})
     if not found:
         return ""
     return f" Words that start with '{tokens[0]}': " + ", ".join(found) + "."
 
 
-# C functions from a library (.dll, .so): the kinds a word's C line may use, as
-# (C type, Stellanova kind, ctypes type name, C++ for an input {x}, C++ for an answer {x})
+# C types a library word may use: (C type, kind, ctypes name, C++ in, C++ out)
 C_TYPES = {
     "int": ("int", NUMBER, "c_int", "(int)({x})", "(double)({x})"),
     "unsigned": ("unsigned", NUMBER, "c_uint", "(unsigned)({x})", "(double)({x})"),
@@ -3002,7 +2974,7 @@ def from_python(x, kind):
 
 
 def py_call(module, path, gives, *args):
-    """'use python "statistics":' words, when running directly: the package's function, given Stellanova's values."""
+    """'use python' words when running directly."""
     import importlib
     try:
         fn = importlib.import_module(module)
@@ -3022,7 +2994,7 @@ def py_call(module, path, gives, *args):
 
 
 def c_word(command, word, library, spec, where, line, out):
-    """'to beep, given pitch (a number) and length (a number), returning yes or no = c: bool Beep(unsigned, unsigned)'"""
+    """'to beep ... = c: bool Beep(unsigned, unsigned)'"""
     m = C_LINE.fullmatch(spec.strip())
     if not library:
         raise ScriptError(line, where + "say which library the C functions are in first, with a line like: c library: user32.dll")
@@ -3053,8 +3025,7 @@ def c_word(command, word, library, spec, where, line, out):
 
 
 def load_library(name, line, names, rows=None):
-    """Reads the words a 'use:' line asks for into names; returns the C++ the library needs at the top of the file.
-    rows: the library's lines, when they are in the program itself ('use the library "user32.dll":')."""
+    """Reads a 'use:' line's words; returns the C++ the library needs."""
     if rows is None:
         places = ([LOGIC / f"{name}.words"] + ([HERE / "libraries" / "unreal" / f"{name}.words"] if UNREAL else [])
                   + [HERE / "libraries" / f"{name}.words", got_folder() / f"{name}.words"])
@@ -3069,10 +3040,10 @@ def load_library(name, line, names, rows=None):
     out = [f"// From the library '{name}'"]
     space = {"math": math, "time": time, "os": os, "sys": sys, "subprocess": subprocess, "random": pyrandom,
              "text": text, "RunError": RunError, "ARGUMENTS": ARGUMENTS, "Place": Place, "py_call": py_call}
-    pending = None  # the word whose 'runs:' line may come next: (where, input names, set run)
-    web = None  # the word whose 'web:' line may come next: (where, input names, set its JavaScript)
+    pending = None  # the word a 'runs:' line may follow
+    web = None  # the word a 'web:' line may follow
     web_only = False  # 'web only': the library's words have no C++, only 'web:' lines
-    runs_only = False  # 'runs only': the library's words have no C++, only 'runs:' lines (Python)
+    runs_only = False  # 'runs only': Python lines, no C++
     k = 0
     while k < len(rows):
         raw = rows[k]
@@ -3205,7 +3176,7 @@ def load_library(name, line, names, rows=None):
     return out + [""]
 
 
-# ---------------------------------------------------------------- a whole script
+# ---- a whole script
 
 CLOSING = "and the universe said i love you"
 
@@ -3235,7 +3206,7 @@ def translate(path):
         MAKING_CPP = False
 
 
-FILES = []  # the script, then each script it uses ('use: shapes.stella'), in the order they were read
+FILES = []  # the script, then the scripts it uses
 PER_FILE = 100000  # a line number n in FILES[k] is kept as k * PER_FILE + n
 
 
@@ -3246,14 +3217,12 @@ def where(line):
 
 
 def run_where(line):
-    """How an error while running names its line: 'Line 3' in the program itself, 'shapes.stella line 3' in a used script."""
+    """'Line 3', or 'shapes.stella line 3'."""
     return f"Line {line}" if line < PER_FILE else where(line)
 
 
 def gather(path, from_line=None, seen=None):
-    """The lines of a script with every 'use: other.stella' line replaced by that script's lines.
-
-    Returns (lines, numbers): numbers[i] is the kept line number of lines[i]."""
+    """Lines with 'use: x.stella' lines put in. Returns (lines, numbers)."""
     seen = set() if seen is None else seen
     seen.add(path.resolve())
     k = len(FILES)
@@ -3285,16 +3254,14 @@ def gather(path, from_line=None, seen=None):
     return lines, numbers
 
 
-GENERIC_COPIES = set()  # the kinds written out from a kind for any kind ('stack of numbers'): their commands may differ
+GENERIC_COPIES = set()  # kinds made from 'for any kind' kinds
 GENERIC_HEAD = re.compile(r"an? ([a-z][a-z ]*?) of anything (?:has|is a kind of .+):", re.IGNORECASE)
 GENERIC_FOR = re.compile(r"to .+?, for an? ([a-z][a-z ]*?) of anything\b.*:", re.IGNORECASE)
 ANYTHING = re.compile(r"\banything\b(?! else)")
 
 
 def expand_generics(lines, numbers):
-    """Kinds for any kind: 'a stack of anything has:' (and commands 'to push, for a stack of anything, given x (anything):')
-    are written out again for each kind the program uses them with, so 'a stack of numbers' is a kind of its own, with
-    'anything' read as 'a number' (and 'of anything' as 'of numbers'). Each copy keeps the line numbers it came from."""
+    """Kinds for any kind: written out again for each kind used."""
     def block_end(i):
         j = i + 1
         while j < len(lines) and not is_closing(lines[j]):
@@ -3323,7 +3290,7 @@ def expand_generics(lines, numbers):
     use = re.compile(rf"\b({names})s? of ((?:[a-z]+ ?){{1,5}})", re.IGNORECASE)
 
     def kind_at(words):
-        """the longest start of words that is a kind (as 'of ...' says it: 'numbers', 'lists of pets'): (kind, how many words)"""
+        """longest kind at the start: (kind, words)"""
         global THINGS
         saved, THINGS = THINGS, {name: [] for name in described}
         try:
@@ -3343,7 +3310,7 @@ def expand_generics(lines, numbers):
     pending = [(x, n) for x, n in zip(kept, kept_numbers)]
 
     def rewrite(raw):
-        """uses of a generic kind, written the one way its copy is named ('stack of number' -> 'stack of numbers')"""
+        """'stack of number' -> 'stack of numbers'"""
         if raw.lstrip().lower().startswith("note:"):
             return raw
 
@@ -3391,9 +3358,7 @@ def expand_generics(lines, numbers):
 
 
 def read_script(path):
-    """Reads one .stella file. Returns (C++ text, Program or None), or raises ScriptError.
-
-    A program that uses a library's words without 'use:' gets that library by itself."""
+    """Reads one .stella file. Returns (C++ text, Program or None)."""
     auto = []
     while True:
         try:
@@ -3494,7 +3459,7 @@ def read_one(path, auto):
             i += 1
             continue
         m = re.fullmatch(r'use the library "([^"]+)":', text_, re.IGNORECASE)
-        if m:  # C functions from a library, one word for each: 'to beep, given ... = bool Beep(unsigned, unsigned)'
+        if m:  # C functions from a library, one word each
             rows = ["c library: " + m.group(1)]
             while i < len(lines) and lines[i][:1].isspace():
                 word = lines[i].strip()
@@ -3512,7 +3477,7 @@ def read_one(path, auto):
             libs += load_library(lib, n, names, rows)
             continue
         m = re.fullmatch(r'use python "([A-Za-z_][\w.]*)":', text_, re.IGNORECASE)
-        if m:  # a Python package's functions, one word for each: 'to middle of, given xs (a list of numbers), returning a number = median'
+        if m:  # Python package functions, one word each
             rows = ["runs only"]
             while i < len(lines) and lines[i][:1].isspace():
                 word = lines[i].strip()
@@ -3546,7 +3511,7 @@ def read_one(path, auto):
             libs += load_library(lib, n, names)
             continue
         able = re.fullmatch(r"an? ([a-z][a-z ]*?) is anything that can ([a-z][a-z ]*?)\.?", text_.lower())
-        if able:  # a shared ability: any kind of thing with its own version of each command fits
+        if able:  # a shared ability
             name = " ".join(able.group(1).split())
             if name in THINGS or name in BASIC_WORDS:
                 raise ScriptError(n, f"There is already a kind of thing called '{name}'.")
@@ -3629,7 +3594,7 @@ def read_one(path, auto):
             if cpp in OWNERS:
                 command.versions = {inputs[0][1]: command}
         made.append(command)
-    # A kind of pet does a pet's command the pet's way, unless it has its own version: the command is made again for it.
+    # A kind of pet does a pet's command the pet's way, unless it has its own.
     extra, written = [], list(made)
     for head, (text_, n, body), command in zip(heads, commands, made):
         words, cpp, inputs, gives = head
@@ -3682,7 +3647,7 @@ def read_one(path, auto):
         functions.append(f"{start}\n\tstellanova::begin({{{files}}}, count, given);\n\ttry\n\t{{\n\t\tStart();\n\t\tstellanova::wait_for_others();\n\t}}\n"
                          f"\tcatch (const stellanova::Problem& problem)\n\t{{\n\t\tstellanova::report(problem);\n\t\treturn 1;\n\t}}\n\treturn 0;\n}}\n")
     else:
-        # The class's header must declare each command, so they can call each other (C++ needs that).
+        # Commands declared first, so they can call each other.
         wanted = [f"//   {cpp_type(gives) if gives else 'void'} {cpp}({params(cpp, inputs)});"
                   for _, cpp, inputs, gives in heads]
         head = [f"// Generated from {path.name} by stellanova.py. Edit the .stella file, not this one.",
@@ -3692,11 +3657,11 @@ def read_one(path, auto):
     return "\n".join(head + ns + out + [""] + functions) + "\n", Program(names.commands) if program else None
 
 
-SHARED = {}  # the values of 'the world remembers:' names, while a program runs directly
+SHARED = {}  # shared names' values while running directly
 
 
 def remember(rows, names):
-    """'the world remembers:' lines: names every command shares. Returns the C++ (or JavaScript) that makes them."""
+    """'the world remembers:' names."""
     SHARED.clear()
     WORLD_KINDS.clear()
     out = []
@@ -3812,9 +3777,7 @@ INPUT_LINE = re.compile(r"((?:[a-z][a-z' ]*?))\s*\(([a-z ]+)\)")
 
 
 def listed_inputs(header, line, body):
-    """'to tell, use:' with the inputs on the indented lines under it -> the same command as 'to tell, given ...:'.
-
-    The inputs are the first lines, each 'name (kind)'; the first line that isn't one starts the instructions."""
+    """'to tell, use:' with inputs on the lines below."""
     m = re.fullmatch(r"(to .+?),\s*(?:use|using|utilize):", header.strip().lower())
     if not m:
         return header, line, body
@@ -3889,7 +3852,7 @@ def command_head(header, line):
     return words, "".join(w.capitalize() for w in words), inputs, gives
 
 
-USUAL = {}  # a command's C++ name -> {input number: the value it usually has, as written}
+USUAL = {}  # command -> {input: usual value}
 
 
 def is_kind_of(kind, other):
@@ -3910,8 +3873,7 @@ def can(kind, able):
 
 
 def fit(v, kind):
-    """v as the kind wanted: itself, a dog made into a pet (a copy with just a pet's parts), or a dog as a speaker (itself,
-    all its parts kept). None if it can't be."""
+    """v as the kind wanted, or None."""
     if v.kind == kind:
         return v
     if is_thing(v.kind) and is_thing(kind) and kind[6:] in ABLE and can(v.kind, kind[6:]):
@@ -3935,20 +3897,20 @@ def as_kind(thing, name, things):
 
 
 def nearest_version(versions, kind):
-    """The version of a command for this kind of thing, or for the closest kind it is a kind of."""
+    """The command version for this kind, or its nearest parent."""
     while kind not in versions and is_thing(kind) and kind[6:] in PARENTS:
         kind = "thing " + PARENTS[kind[6:]]
     return versions.get(kind)
 
 
 def params(cpp, inputs):
-    """The C++ inputs of a command; the thing a command is for is passed so the command can change it."""
+    """A command's C++ inputs."""
     return ", ".join((f"{cpp_type(k)}& " if i == 0 and cpp in OWNERS else param_type(k) + " ") + snake(w)
                      for i, (w, k) in enumerate(inputs))
 
 
 def machine_name(cpp, inputs):
-    """A command's name in machine code: a command for a kind of thing has one version per kind ('Bounce__ball')."""
+    """A command's machine-code name ('Bounce__ball')."""
     return f"{cpp}__{snake(inputs[0][1][6:].split())}" if cpp in OWNERS and inputs and is_thing(inputs[0][1]) else cpp
 
 
@@ -4009,7 +3971,7 @@ def function(head, line, body, names, info, command=None):
         if FAST and not (WATCHING or DEBUG is not None or PROFILE is not None or MAKING_CPP or JS):
             zeros = [(c, k) for c, k in declared.values() if c not in param_names]
             made.runner = py_command(name, param_names, zeros, lambda: py_zero(gives, things) if gives else None, run) or runner
-        # what machine.py needs to write this command (a command for a kind of thing can't be made into machine code yet)
+        # what machine.py needs for this command
         made.machine = (machine_name(name, inputs), [(snake(w), k) for w, k in inputs], gives, run)
     if JS:
         title = getattr(command, "js", name) if command else name
@@ -4020,8 +3982,7 @@ def function(head, line, body, names, info, command=None):
 
 
 def only_waiting_async(functions):
-    """Web commands are made async so they can wait (for a web page, a timer, the person). Async calls cost time,
-    so a command stays async only if it waits itself or calls one that does; the rest become plain functions."""
+    """Web commands are async only if they wait."""
     titles = {re.match(r"async function (\w+)\(", f).group(1): f for f in functions}
     call = re.compile(r"await (\w+)\(")
     waits = {name for name, f in titles.items() if "await" in call.sub(lambda m: "" if m.group(1) in titles else m.group(0), f)}
@@ -4038,10 +3999,10 @@ def only_waiting_async(functions):
     return [call.sub(plain, f if name in waits else f.replace("async function", "function", 1)) for name, f in titles.items()]
 
 
-# ---------------------------------------------------------------- lines inside a command
+# ---- lines inside a command
 
 def statements(body, names, declared, depth):
-    """Reads an indented block. body: list of (line number, raw text). Returns (C++ lines, run)."""
+    """Reads an indented block. Returns (C++ lines, run)."""
     out, runs = [], []
     rows = [(n, r) for n, r in body if r.strip()]
     indent = len(rows[0][1].expandtabs(4)) - len(rows[0][1].expandtabs(4).lstrip()) if rows else 0
@@ -4117,7 +4078,7 @@ def statements(body, names, declared, depth):
                 chain = [(cond, run)]
                 pick = choose(chain)
                 pick.line_n = n
-                # the whole choice is the if line's (its test too), so it stops and is timed even when the test is no
+                # the whole choice belongs to the if line
                 if DEBUG is not None:
                     pick = debugged(pick, n)
                 if PROFILE is not None:
@@ -4156,8 +4117,7 @@ def top_commas(text):
 
 
 def depending_rows(n, said, inner, indent):
-    """'depending on weather:' with lines like '"rain": ...' and 'anything else: ...', as the if / otherwise if lines it
-    means. The value is worked out once, into a name of its own."""
+    """'depending on' as if / otherwise if."""
     subject = said[len("depending on"):].rstrip()[:-1].strip()
     if not subject:
         raise ScriptError(n, "Say what to look at, like 'depending on weather:'.")
@@ -4193,9 +4153,7 @@ def depending_rows(n, said, inner, indent):
 
 
 def watch_rows(rows, indent):
-    """'whenever <something>:', 'every 2 seconds:' and 'every frame:' blocks, taken out of rows and put in a loop after
-    the other lines: it goes on until the world ends ('every frame:' is there) or the program ends.
-    'whenever' runs its lines each time its yes-or-no turns to yes; the frame is revealed after each round on its own."""
+    """'whenever' and 'every' blocks: a loop after the other lines."""
     def width(raw):
         return len(raw.expandtabs(4)) - len(raw.expandtabs(4).lstrip())
 
@@ -4255,8 +4213,7 @@ def watch_rows(rows, indent):
 
 
 def holding(n, which, inner, names, declared, depth):
-    """'holding the lock "total":' - only one command at a time runs the indented lines (or any others holding that
-    lock): the rest wait their turn. For names commands going alongside ('meanwhile') share."""
+    """'holding the lock': one command at a time."""
     if not inner:
         raise ScriptError(n, "Say what to do on the indented lines below the ':'.")
     for k, raw in inner:
@@ -4299,9 +4256,7 @@ WENT_WRONG = re.compile(r"if that went wrong(?: with an? ([a-z][a-z ]*))?:")
 
 
 def attempt(n, tried, handlers, names, declared, depth):
-    """try: ... if that went wrong with a fuel problem: ... if that went wrong: ...
-    Each handler takes its kind of problem (None: any); a problem no handler takes goes on, as if there were no try.
-    Inside a handler, 'the problem' is what went wrong, as text."""
+    """try: ... if that went wrong ..."""
     tab = "\t" * depth
     try_lines, try_run = statements(tried, names, declared, depth + 1)
     key = ("the", "problem")
@@ -4379,7 +4334,7 @@ def block(runs):
     return with_ir(run, write)
 
 
-WATCHING = False  # 'stellanova watch': each line is shown as it runs, with the names it changed
+WATCHING = False  # 'stellanova watch'
 SOURCE = {}  # a kept line number -> the line as it was written
 HIDDEN = ("depending_value", "whenever_was", "whenever_now", "every_next")  # names Stellanova makes for itself
 
@@ -4402,12 +4357,11 @@ def watch_line(n, after=""):
     print(f"\u25b8 {where_}: {SOURCE.get(n, '?')}{after}", flush=True)
 
 
-TESTED = threading.local()  # the line whose test was just shown ('if ...: -> yes'), so it isn't shown twice
+TESTED = threading.local()  # already shown
 
 
 def watched(run, n):
-    """run, showing its line before it runs and the names it changed after (a line with indented lines below leaves
-    the changes to them)."""
+    """'stellanova watch': show the line and changed names."""
     def go(env):
         if getattr(TESTED, "line", None) != n:
             watch_line(n)
@@ -4433,16 +4387,16 @@ def watched_test(cond, n):
     return go
 
 
-DEBUG = None  # 'stellanova debug': where to stop, and how it goes on from a stop (see debug_pause)
+DEBUG = None  # 'stellanova debug'
 DEBUG_HELP = ("Enter or step: run this line, stop at the next one.  over: run this line and any commands it calls.  "
               "out: run until this command gives back.  go: run until the next stop.  names: the names and what they hold.  "
               "look <name>: one name.  stop at <line> / forget <line>: add or remove a stop.  stops: the stops.  quit: end the program.")
 
 
 def debug_pause(env, n):
-    """Before line n: stops if it is a stop, or the last command (step, over, out) says so; then waits for commands."""
+    """Debug: stop before line n if asked."""
     d = DEBUG
-    envs = d["envs"]  # each running command has its own names, so they tell how deep the program is
+    envs = d["envs"]  # how deep the program is
     if any(e is env for e in envs):
         while envs[-1] is not env:
             envs.pop()
@@ -4509,7 +4463,7 @@ def debug_pause(env, n):
                 break
 
 
-PROFILE = None  # 'stellanova profile': line -> [times run, seconds with what it runs, its own seconds]
+PROFILE = None  # 'stellanova profile': line -> [runs, seconds, own seconds]
 PROFILE_INSIDE = threading.local()  # the seconds spent in the lines inside the line running now
 
 
@@ -4552,7 +4506,7 @@ def debugged(run, n):
 
 
 def guard(run, n):
-    """Turns a surprise inside Stellanova into a plain message with the line it happened on."""
+    """A surprise as a plain message with its line."""
     if WATCHING and not getattr(run, "watched", False):
         run = watched(run, n)
         run.watched = True
@@ -4578,7 +4532,7 @@ def guard(run, n):
 
 
 def statement(n, text_, inner, names, declared, depth):
-    """One line (with its indented lines). Returns (C++ lines, run, branch); branch is set for if/otherwise lines."""
+    """One line. Returns (C++ lines, run, branch)."""
     tab = "\t" * depth
     READING_FILE[0] = n // PER_FILE
     if text_.startswith("note:"):
@@ -4689,7 +4643,7 @@ def statement(n, text_, inner, names, declared, depth):
     if tokens == ["wait", "for", "the", "others"]:
         run = with_ir(lambda env: wait_for_others(), lambda f: f.put("call void @cn_wait_for_others()"))
         return [f"{tab}{'await ' if JS else ''}stellanova::wait_for_others();"], run, None
-    if tokens[0] == "meanwhile":  # 'meanwhile download with ...': the command goes on alongside the lines after this one
+    if tokens[0] == "meanwhile":  # 'meanwhile': runs alongside
         rest = tokens[1 + (tokens[1:2] == [","]):]
         key, size = match_command(names, rest)
         if rest[:1] == ["invoke"]:
@@ -4709,7 +4663,7 @@ def statement(n, text_, inner, names, declared, depth):
             cpp, run = call(key, expr_list(more, 0, names, n), names, n)
         else:
             raise ScriptError(n, "'meanwhile' starts a command going alongside the rest, like 'meanwhile count down with 10'." + library_hint(rest))
-        if JS:  # shortcut: it sees the names as they are when it runs, not a copy made when it started
+        if JS:  # shortcut: sees names as they are now, not a copy
             return [f"{tab}stellanova::meanwhile(async () => {{ {cpp}; }});"], lambda env: meanwhile(run, env), None
         piece = v if rest[:1] == ["invoke"] else run
         return ([f"{tab}stellanova::meanwhile([=]() {{ {cpp}; }});"],
@@ -4722,7 +4676,7 @@ def statement(n, text_, inner, names, declared, depth):
             raise ScriptError(n, f"I don't understand '{' '.join(e.t[e.i:])}' here.")
         get = v.run
         return [f"{tab}{strip_parens(v.cpp)};"], with_ir(lambda env: get(env) and None, lambda f: machine.emit(f, v) and None), None
-    if tokens[0] == "shatter":  # 'raise an error with "no fuel"': a problem of your own, caught by try: like any other
+    if tokens[0] == "shatter":  # 'raise an error with ...'
         v = expr_to_end(tokens, 2 if tokens[1:2] == ["with"] else 1, names, n)
         if v.kind != TEXT:
             raise ScriptError(n, f"'raise an error with' needs text saying what went wrong, not {kind_name(v.kind)}.")
@@ -5015,7 +4969,7 @@ def statement(n, text_, inner, names, declared, depth):
         names.add(words, cpp, v.kind)
         get = v.run
         if words == ["birth"] and ("existence",) not in names.known:
-            # birth is where something starts; existence is where it is now, and it starts at its birth
+            # birth: where it starts; existence: where it is
             declared[("existence",)] = ("existence", v.kind)
             names.add(["existence"], "existence", v.kind)
 
@@ -5084,7 +5038,7 @@ def for_each(n, head, body, names, declared, depth):
     words = tokens[2:cut] if cut else []
     if not words or bad_name(words) or any(not w[0].isalpha() for w in words):
         raise ScriptError(n, "'for each' looks like 'for each score in scores:' or 'for each n from 1 to 10:'.")
-    before = names.known.get(tuple(words))  # a name already set here: each item for the loop, then what it was again
+    before = names.known.get(tuple(words))  # loop name: restored after
     if before is not None and before[2]:
         raise ScriptError(n, f"'{' '.join(words)}' already means something here that can't change, so pick another name for each item.")
     cpp = snake(words) + f"_{n}"
@@ -5107,7 +5061,7 @@ def for_each(n, head, body, names, declared, depth):
         e.take("to")
         hi = e.need(e.sum(), NUMBER, "for each ... from")
         step = None
-        if e.at("by"):  # 'for each n from 0 to 100 by 5', 'from 10 to 1 by -1' (by 0: no rounds)
+        if e.at("by"):  # 'from 0 to 100 by 5' (by 0: no rounds)
             e.i += 1
             step = e.need(e.sum(), NUMBER, "for each ... by")
         if e.i != len(e.t):
@@ -5233,7 +5187,7 @@ def call(key, args, names, n):
             raise
     run.pyf = lambda: f"{py_part(command)}.runner({', '.join(py_expr(g) for g in gets)})"
     cpp = command.cpp
-    if command.inputs is None:  # one of the script's own commands: after it, look whether a problem happened in it
+    if command.inputs is None:  # after one of the script's commands, check for a problem
         def write(f, command=command, args=args):
             done = [machine.owned(f, a) if k == 0 and command.cpp in OWNERS else machine.emit(f, a) for k, a in enumerate(args)]
             if command.cpp not in OWNERS or not done:  # inputs are copies, except the thing a command for a kind changes
@@ -5270,8 +5224,7 @@ def call(key, args, names, n):
 
 
 def owner_command_value(c, line):
-    """'the command speak', for a command for a kind of thing: kept as a value, it works on a copy of the thing it is given
-    and gives the changed copy back (or, if it returns something, that)."""
+    """'the command speak' for a kind: works on a copy."""
     thing = c.kinds[0]
     gives = c.gives or thing
     kind = command_kind(c.kinds, gives)
@@ -5311,7 +5264,7 @@ def owner_command_value(c, line):
 
 
 def command_value(names, tokens, e, line):
-    """'the command double': the command itself, to keep in a name or a list, or give to another command."""
+    """'the command double'."""
     key, size = match_command(names, tokens[e.i:])
     if not key:
         raise ScriptError(line, "'the command' needs the name of a command after it, like 'the command double'." + library_hint(list(tokens[e.i:])))
@@ -5348,14 +5301,14 @@ def command_value(names, tokens, e, line):
 
 
 class Piece:
-    """A bit of machine code standing in for a Value or a statement (it has only .ir and .kind)."""
+    """Machine code standing in for a value."""
 
     def __init__(self, ir, kind=None):
         self.ir, self.kind = ir, kind
 
 
 def library_command_ir(f, c, line):
-    """'the command square root of' in machine code: a small function of the program's own that calls the library word."""
+    """'the command square root of' in machine code."""
     import hashlib
     template = c.cpp
     for k, in_name in enumerate(c.inputs):
@@ -5384,7 +5337,7 @@ def writable_list(tokens, names, n, what):
     return v
 
 
-READING_FILE = [0]  # which script the line being read is in (FILES), for its private commands
+READING_FILE = [0]  # which script this line is in
 
 
 def match_command(names, tokens):
@@ -5413,7 +5366,7 @@ def spoken(key):
 
 
 def ask(tokens, names, declared, n, tab):
-    """ask "question" into name (kind) -- shows the question and keeps what the person types."""
+    """ask "question" into name"""
     if not (len(tokens) >= 4 and tokens[1].startswith('"') and tokens[2] == "into"):
         raise ScriptError(n, "'ask' looks like: ask \"What's your name? \" into name (text)")
     rest = tokens[3:]
@@ -5491,10 +5444,10 @@ def strip_parens(cpp):
     return cpp
 
 
-# ---------------------------------------------------------------- running and building
+# ---- running and building
 
 def run_tests(program):
-    """'stellanova test': runs each command whose name starts with 'test' (and has no inputs), not genesis."""
+    """'stellanova test'"""
     tests = [(key, c) for key, c in program.commands.items() if key[0] == "test" and not c.kinds and c.inputs is None]
     if not tests:
         print("There are no tests: a test is a command like 'to test adding:' with 'check' lines in it.")
@@ -5513,7 +5466,7 @@ def run_tests(program):
     return 1 if failed else 0
 
 
-SOURCES = set()  # every script and .words file read since run_built began (start.py checks them before using a kept copy)
+SOURCES = set()  # files read since run_built began (start.py checks them)
 
 
 def source_text(path):
@@ -5524,8 +5477,7 @@ def source_text(path):
 
 
 def run_built(script):
-    """Runs the program as machine code: built the first time, then the kept copy runs. Its exit code,
-    or None when it can't be built (it then runs the old way, which says any mistake itself)."""
+    """Runs as machine code (built once, kept). Exit code, or None."""
     global LOGIC, MAKING_CPP
     import hashlib
     import start
@@ -5568,7 +5520,7 @@ def run_built(script):
                         pass
         else:
             os.utime(exe)  # (used again: kept longer)
-        # shortcut: a new file that a 'use:' would find before the one it found isn't noticed until the script changes.
+        # shortcut: a new file a 'use:' would find first isn't noticed until the script changes.
         note = {"exe": exe.name, "stamp": start.install_stamp(), "sources": [start.stamp(Path(p)) for p in sorted(SOURCES)]}
         start.note_of(script).write_text(json.dumps(note), encoding="utf-8")
     except (ScriptError, machine.Unsupported, RuntimeError, OSError, RecursionError):
@@ -5581,7 +5533,7 @@ def run_built(script):
 
 
 def run_program(script, tests=False):
-    """Runs a program directly (or its tests). Returns the exit code (0 when it finished, 1 when it stopped with an error)."""
+    """Runs directly. Exit code."""
     global LOGIC
     if not tests and DEBUG is None and PROFILE is None and not WATCHING and not os.environ.get("STELLANOVA_DIRECT"):
         code = run_built(script)  # as fast as C++: the same program, built
@@ -5600,7 +5552,7 @@ def run_program(script, tests=False):
         print(f"{script.name} is for a game engine (it has no 'genesis:'): make it into a plugin with 'stellanova plugin {script.name}'.")
         return 1
     result = {"code": 0}
-    # Text is UTF-8 everywhere, as in built programs (Windows would otherwise use its old code page when piped).
+    # UTF-8 everywhere.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8")
 
@@ -5629,15 +5581,15 @@ def run_program(script, tests=False):
     return result["code"]
 
 
-MACHINE_UNITS = {}  # the built-in and library words the program being built uses (see machine.wrap)
+MACHINE_UNITS = {}  # words the program uses (see machine.wrap)
 
 
 def machine_code(program, plugin=False):
-    """The whole program as LLVM code (raises machine.Unsupported for what can't be made into machine code yet)."""
+    """The program as LLVM code."""
     module = machine.Module()
     module.shared = dict(WORLD_KINDS)
     for key, base in program.commands.items():
-        if base.inputs is not None:  # a library word: only a problem if the program uses it (its call has no writer)
+        if base.inputs is not None:  # only a problem if used
             continue
         for command in (base.versions.values() if base.versions else [base]):  # a version for each kind of thing
             if getattr(command, "machine", None) is None:
@@ -5658,7 +5610,7 @@ def machine_code(program, plugin=False):
 
 
 def build(script, exe, plugin=False):
-    """Reads a program script and compiles it into exe (a plugin for a game engine, when plugin). Returns an error message, or None."""
+    """Builds an exe (or plugin). Returns an error, or None."""
     global LOGIC, MAKING_CPP
     LOGIC = script.parent
     MAKING_CPP = True
@@ -5679,7 +5631,7 @@ def build(script, exe, plugin=False):
 
 
 def wasm(script):
-    """Builds the program into WebAssembly (WASI): <name>.wasm, and <name>.mjs to run it with node. Returns an error message, or None."""
+    """Builds WebAssembly: .wasm and .mjs. Returns an error, or None."""
     native, machine.TARGET = machine.TARGET, "wasm"
     try:
         problem = build(script, script.with_suffix(".wasm"))
@@ -5692,8 +5644,7 @@ def wasm(script):
 
 
 def web(script, folder=None):
-    """Turns a program into JavaScript: <name>.js and stellanova.js (what every web program uses) in folder.
-    Returns an error message, or None. Run it with node, or load both into a page (stellanova.js first)."""
+    """Makes JavaScript: <name>.js and stellanova.js. Returns an error, or None."""
     global LOGIC, JS
     LOGIC, JS = script.parent, True
     try:
@@ -5716,7 +5667,7 @@ WORLD = Path.home() / "Documents" / "StellanovaWorld"  # the Unreal project 'ste
 
 
 def unreal(script, launch=True):
-    """Turns a program into the StellanovaWorld Unreal project, builds it, and starts it. Returns an error message, or None."""
+    """Makes and starts the Unreal project. Returns an error, or None."""
     global LOGIC, UNREAL, MAKING_CPP
     LOGIC, UNREAL, MAKING_CPP = script.parent, True, True
     try:
@@ -5762,7 +5713,7 @@ A line ending in ':' (like 'repeat 3 times:') takes the indented lines after it;
 
 
 def try_it(read=input, show=print):
-    """Lines typed one at a time, each done straight away (names are kept from line to line)."""
+    """Try-it mode."""
     global LOGIC, THINGS
     LOGIC = Path.cwd()
     THINGS = {}
@@ -5837,8 +5788,7 @@ def got_folder():
 
 
 def get_package(where):
-    """'stellanova get <address>': a library from the internet (or a file), kept so any program can 'use:' it.
-    The address is a .words file, a .zip holding .words files, or a GitHub project written user/project."""
+    """'stellanova get <address>': .words, .zip or user/project."""
     import io
     import urllib.request
     import zipfile
@@ -5881,7 +5831,7 @@ def get_package(where):
 
 
 def got_packages():
-    """'stellanova got': the libraries 'stellanova get' has kept, and where each came from."""
+    """'stellanova got'"""
     sources = got_folder() / "sources.txt"
     kept = dict(line.split("\t", 1) for line in sources.read_text(encoding="utf-8").splitlines() if "\t" in line) if sources.exists() else {}
     names = sorted(p.stem for p in got_folder().glob("*.words"))
@@ -5925,8 +5875,7 @@ USAGE = """Use:
 
 
 def tidy(text):
-    """A script with its spacing put right: two spaces for each step in, no spaces at line ends, a tab as 4 spaces,
-    one empty line between the top-level parts, and one new line at the end. Words and quotes are left as they are."""
+    """Fixes spacing: two spaces a step, no trailing spaces."""
     out, steps = [], [0]  # steps: the indents seen so far, the deepest last
     for raw in text.splitlines():
         line = raw.rstrip()
@@ -5951,7 +5900,7 @@ def tidy(text):
 def main(argv):
     global LOGIC, OUT
     args = argv[1:]
-    for stream in (sys.stdout, sys.stderr):  # each line shows straight away, even into a file or another program (as built ones do)
+    for stream in (sys.stdout, sys.stderr):  # each line shows straight away
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(line_buffering=True)
     if not args:
@@ -5969,7 +5918,7 @@ def main(argv):
         return got_packages()
     if len(args) == 2 and args[0] == "drop":
         return drop_package(args[1])
-    if len(args) >= 2 and args[0] == "debug":  # runs it directly, stopping at lines: 'stellanova debug game.stella 12 30'
+    if len(args) >= 2 and args[0] == "debug":  # 'stellanova debug game.stella 12 30'
         global DEBUG
         studia = args[1] == "--studia"
         rest = args[2:] if studia else args[1:]
@@ -6070,7 +6019,7 @@ def main(argv):
             return 1
         for extra in (".lib", ".exp"):
             made.with_suffix(extra).unlink(missing_ok=True)
-        # Godot loads the extensions listed here as it starts (one it first finds while running can make it crash).
+        # Godot loads these at start (finding one later can crash it).
         listed = project / ".godot" / "extension_list.cfg"
         listed.parent.mkdir(exist_ok=True)
         have = listed.read_text(encoding="utf-8").split() if listed.exists() else []
@@ -6110,7 +6059,7 @@ def main(argv):
         global PLUGIN
         PLUGIN = True
         problem = build(script, made, plugin=True)
-        for extra in (".lib", ".exp"):  # (what the linker makes for C++ programs using the .dll: an engine doesn't need them)
+        for extra in (".lib", ".exp"):  # (linker leftovers an engine doesn't need)
             if made.suffix == ".dll":
                 made.with_suffix(extra).unlink(missing_ok=True)
         if problem:
@@ -6141,7 +6090,7 @@ def main(argv):
                 profile_report()
             sys.stdout.flush()
             sys.stderr.flush()
-            # Exit straight away: a library's leftovers (like a closed window) must not be tidied up from the wrong thread.
+            # Exit straight away, so nothing is tidied from the wrong thread.
             os._exit(code)
         exe = script.with_suffix("" if machine.TARGET == "linux" else ".exe")
         problem = build(script, exe)

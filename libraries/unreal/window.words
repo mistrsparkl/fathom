@@ -1,6 +1,4 @@
-note: The window library's words, for programs running inside Unreal (stellanova unreal game.stella).
-note: The program runs on its own thread; 'reveal the frame' hands the frame to Unreal and waits until Unreal has shown it.
-note: 3D shapes become real Unreal meshes in a lit world; flat drawing goes on top of the picture.
+note: The window words inside Unreal (stellanova unreal game.stella).
 
 include: "StellanovaBridge.h"
 include: <chrono>
@@ -156,7 +154,7 @@ code:
   		return bridge().*part;
   	}
 
-  	// ---- 3D: across is horizontal, up is vertical, away is depth (1 = one metre in Unreal)
+  	// ---- 3D (1 = one metre)
   	inline void shape(int kind, const FVector& at, const FVector& size, const std::string& c, int line)
   	{
   		need_window(line);

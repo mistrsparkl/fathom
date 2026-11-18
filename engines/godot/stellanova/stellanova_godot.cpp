@@ -1,7 +1,4 @@
-// Godot's side of Stellanova: a GDExtension giving GDScript the class Stellanova, whose static methods load a program
-// made with 'stellanova plugin', call its commands, and hand its engine words to a Callable (stellanova_script.gd).
-// Every input and answer is a Variant, so Godot's own types never need to be laid out here.
-// 'stellanova godot <project>' builds this into stellanova_godot.dll with clang.
+// Godot's side of Stellanova: loads plugins, calls their commands, passes engine words to a Callable.
 #include "gdextension_interface.h"
 #include <cstring>
 #include <string>
@@ -89,7 +86,7 @@ namespace
 		destructor(GDEXTENSION_VARIANT_TYPE_STRING)(&str);
 	}
 
-	// The engine's answer to a word: engine.call(word, count, a, b, c, d, text) gives a number, a Vector3 or a String.
+	// Asks the engine about a word.
 	double ask(const char* word, const double* n, int count, const char* text, double* answers, char* answer_text, int room)
 	{
 		if (!have_engine)
@@ -169,7 +166,7 @@ namespace
 		return k >= 1 && k <= programs.size() && programs[k - 1].library ? &programs[k - 1] : nullptr;
 	}
 
-	// The methods. Each gets its inputs as Variants and puts its answer into r.
+	// The methods. Inputs and answers are Variants.
 	void open(const GDExtensionConstVariantPtr* a, GDExtensionVariantPtr r)  // open(path) -> the program's number, or 0
 	{
 		void* lib = open_library(text_of(a[0]));
@@ -226,7 +223,7 @@ namespace
 	}
 	void ptrcall_any(void* m, GDExtensionClassInstancePtr, const GDExtensionConstTypePtr* a, GDExtensionTypePtr r)
 	{
-		// (every input and the answer are Variants, so a pointer call holds Variants too; the answer is made fresh, then copied in)
+		// (a pointer call holds Variants too)
 		Variant made;
 		reinterpret_cast<Method>(m)(reinterpret_cast<const GDExtensionConstVariantPtr*>(a), &made);
 		variant_destroy(r);
