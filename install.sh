@@ -55,10 +55,14 @@ Path=$place/editor/studia
 Terminal=false
 Categories=Development;Education;
 EOF
+# WSL's Start menu only lists apps from /usr/share/applications
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    sudo cp "$HOME/.local/share/applications/stellanova-studia.desktop" /usr/share/applications/ || true
+fi
 
 echo
 echo "Stellanova is installed."
-echo "  Open Stellanova Studia from your apps, and press Learn to start the course."
+echo "  Open Stellanova Studia from your apps (on WSL: the Start menu, under Ubuntu), and press Learn to start the course."
 case ":$PATH:" in
     *":$bin:"*) echo "  Or in a terminal:  stellanova hello.stella" ;;
     *)
