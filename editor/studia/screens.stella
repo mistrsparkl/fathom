@@ -876,9 +876,11 @@ to on name key, given event (a number):
     if (ask the system with ("/api/exists?path=" plus web encoded name)) is not "true":
       set the text with (status box, "There is no folder called " plus name plus ".")
       cease
-    set folder to name
+    whisper: A file's path opens the folder it is in, and the file.
+    set folder to ask the system with ("/api/opening?path=" plus web encoded name)
     load the tree
     remember the settings
+    if folder is not name: open the sheet with name
   otherwise:
     if not (name contains "."): set name to name plus ".stella"
     set path to joined path with (folder, name)
@@ -1475,7 +1477,7 @@ genesis:
   if that went wrong:
     conjure a memory as remembered
   if the folder of remembered is not "" and (ask the system with ("/api/exists?path=" plus web encoded (the folder of remembered))) is "true":
-    set folder to the folder of remembered
+    set folder to ask the system with ("/api/opening?path=" plus web encoded (the folder of remembered))
   load the tree
   load the words
   for each path in the files of remembered:

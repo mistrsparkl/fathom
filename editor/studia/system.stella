@@ -208,6 +208,9 @@ to reply, given address (text), returning text:
     inscribe the web message into file path
     return "saved"
   if route is "/api/exists": return (file path exists or folder path exists) as saved text
+  if route is "/api/opening":
+    if folder path exists: return path
+    return folder holding path
   if route is "/api/make folder":
     make the folder path
     return "made"
