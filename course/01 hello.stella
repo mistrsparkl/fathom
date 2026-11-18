@@ -1,0 +1,18 @@
+whisper: Lesson 1: Hello
+whisper:
+whisper: Hi! Welcome to the course. Every lesson is a file like this one, so you can read it,
+whisper: change it, and run it as many times as you want. You can't break anything.
+whisper:
+whisper: Lines starting with "whisper:" are notes for people. The computer skips them.
+whisper:
+whisper: Press F5 (or the Run button up top) now. You should see Hello! appear at the bottom.
+whisper:
+whisper: Every program starts at "genesis:". The lines that belong to it are pushed in two spaces,
+whisper: and it finishes with "and the universe said i love you". Yes, really. You get used to it.
+whisper:
+whisper: Your turn: make it say your name on a second line. Copy the scrawl line and change the words.
+whisper: When you're happy with it, open "02 names" on the left.
+
+genesis:
+  scrawl "Hello!"
+and the universe said i love you

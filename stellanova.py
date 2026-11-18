@@ -4455,13 +4455,13 @@ def debug_pause(env, n):
     where_ = f"line {n}" if n < PER_FILE else where(n)
     names = names_shown(env)
     while True:
-        if d["studio"]:  # one marked line the studio reads (and doesn't show as printed)
+        if d["studia"]:  # one marked line the studia reads (and doesn't show as printed)
             print("@@debug " + json.dumps({"line": n, "where": where_, "source": SOURCE.get(n, ""), "depth": depth,
                                               "names": names, "stops": sorted(d["stops"])}), flush=True)
         else:
             print(f"■ {where_}: {SOURCE.get(n, '?')}", flush=True)
         while True:
-            if not d["studio"]:
+            if not d["studia"]:
                 print("(debug) ", end="", flush=True)
             said = sys.stdin.readline()
             if not said:
@@ -4486,7 +4486,7 @@ def debug_pause(env, n):
                 sys.stdout.flush()
                 os._exit(1)
             if what == "names":
-                if not d["studio"]:
+                if not d["studia"]:
                     print("\n".join(f"    {k}: {v}" for k, v in names.items()) or "    (no names yet)", flush=True)
             elif words[:1] == ["look"] and len(words) > 1:
                 wanted = " ".join(words[1:])
@@ -4499,13 +4499,13 @@ def debug_pause(env, n):
                     d["stops"].add(int(number))
                 else:
                     d["stops"].discard(int(number))
-                if d["studio"]:
+                if d["studia"]:
                     break  # show the stop again, with the stops as they are now
             elif what == "stops":
                 print("    stops: " + (", ".join(map(str, sorted(d["stops"]))) or "none"), flush=True)
             else:
                 print("    " + DEBUG_HELP, flush=True)
-            if d["studio"]:
+            if d["studia"]:
                 break
 
 
@@ -5971,13 +5971,13 @@ def main(argv):
         return drop_package(args[1])
     if len(args) >= 2 and args[0] == "debug":  # runs it directly, stopping at lines: 'stellanova debug game.stella 12 30'
         global DEBUG
-        studio = args[1] == "--studio"
-        rest = args[2:] if studio else args[1:]
+        studia = args[1] == "--studia"
+        rest = args[2:] if studia else args[1:]
         if not rest or not all(a.isdigit() for a in rest[1:]):
             print("Say the script, then the lines to stop at (if any): stellanova debug game.stella 12 30")
             return 2
-        DEBUG = {"stops": {int(a) for a in rest[1:]}, "mode": "step" if len(rest) == 1 else "go", "depth": 0, "envs": [], "studio": studio}
-        if not studio:
+        DEBUG = {"stops": {int(a) for a in rest[1:]}, "mode": "step" if len(rest) == 1 else "go", "depth": 0, "envs": [], "studia": studia}
+        if not studia:
             print(DEBUG_HELP)
         args = ["run", rest[0]]
     if len(args) == 2 and args[0] == "profile":  # runs it directly, then shows which lines took the time

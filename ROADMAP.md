@@ -31,7 +31,7 @@ platformer (`tutorial/lessons/files/hop.stella`) rewritten to use everything the
 - [x] The web build gets the words it lacks (database included): every library word works on the web (C libraries and Python packages can't)
 
 ## 4. Tools
-- [x] Debugger: stop at a line, step, look at names (studio): `stellanova debug`, and Debug in the studio
+- [x] Debugger: stop at a line, step, look at names (studia): `stellanova debug`, and Debug in the studia
 - [x] Profiler: which lines take the time (`stellanova profile`)
 - [x] WebAssembly output (`stellanova wasm`: WASI, run by node or wasmtime; the libraries that use Windows itself, and `meanwhile`, not yet)
 - [x] Linux: `stellanova build` run on Linux (WSL Ubuntu, clang) makes a Linux program; the language passes the built-vs-direct checks

@@ -1,0 +1,16 @@
+whisper: Lesson 5: Lists
+whisper:
+whisper: A list keeps a bunch of values in order. You can add to it, ask how big it is,
+whisper: and go through it with "for each". Counting starts at 1, not 0, the way people count.
+whisper:
+whisper: Your turn: add two more things to the shopping, then say the last one.
+whisper: (Hint: "item 3 of shopping" is the third. "the size of shopping" is how many there are.)
+
+genesis:
+  set shopping to a list of ("milk", "eggs")
+  add "bread" to shopping
+  scrawl "I need ", the size of shopping, " things: ", shopping
+  for each thing in shopping:
+    scrawl "- ", thing
+  if shopping contains "eggs": scrawl "Don't drop the eggs!"
+and the universe said i love you

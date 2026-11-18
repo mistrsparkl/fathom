@@ -1,0 +1,20 @@
+whisper: Lesson 3: Choosing
+whisper:
+whisper: "if" only does its pushed-in lines when the thing after it is true.
+whisper: "otherwise if" gets a go when the one above didn't happen, and "otherwise" catches the rest.
+whisper:
+whisper: "exceeds" means bigger than, and "falls below" means smaller than.
+whisper: You can also say "is", "is not", "is at least" and "is at most".
+whisper:
+whisper: Your turn: change the temperature and run it a few times. Try 31, then 5, then 20.
+whisper: Then add a check for exactly 0 that says "It's freezing!". Where does it have to go? Try it and see.
+
+genesis:
+  set temperature to 31
+  if temperature exceeds 30:
+    scrawl "It's hot."
+  otherwise if temperature falls below 10:
+    scrawl "It's cold."
+  otherwise:
+    scrawl "It's nice."
+and the universe said i love you

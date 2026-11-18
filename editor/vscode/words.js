@@ -10,7 +10,7 @@ function home(setting) {
   return places.find((p) => fs.existsSync(path.join(p, "stellanova.py"))) || null;
 }
 
-// Every library word, read from libraries/*.words the way the studio reads them.
+// Every library word, read from libraries/*.words the way the studia reads them.
 function libraryWords(folder) {
   const found = [];
   for (const name of fs.readdirSync(folder).filter((n) => n.endsWith(".words")).sort()) {

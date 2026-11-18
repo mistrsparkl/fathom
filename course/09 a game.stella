@@ -1,0 +1,26 @@
+whisper: Lesson 9: A game
+whisper:
+whisper: Time to open a window. This is a tiny game: move the orange ball with the arrow keys.
+whisper: Press F5 and have a go. Close the window when you're done.
+whisper:
+whisper: The loop goes round about 60 times a second. Each time it checks the keys, wipes the window
+whisper: ("consume the window"), draws the ball, then shows the new picture ("reveal the frame").
+whisper:
+whisper: Your turn. Pick one, or do all of them:
+whisper:   make the ball faster
+whisper:   change the colours
+whisper:   make space put the ball back in the middle
+
+genesis:
+  open a world with "Ball", 600, 400
+  set across to 300
+  set down to 200
+  as long as the world lives:
+    if key held "left": set across to across minus 5
+    if key held "right": set across to across plus 5
+    if key held "up": set down to down minus 5
+    if key held "down": set down to down plus 5
+    consume the window with "black"
+    etch a circle with across, down, 20, "orange"
+    reveal the frame
+and the universe said i love you

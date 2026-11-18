@@ -1,16 +1,16 @@
 # The Stellanova tutorial film
 
-A film that goes through every part of the language, in Stellanova Studio, with a spoken voice and captions, and ends
-by making a platform game (`lessons/files/hop.stella`). Each lesson is a script; the recorder plays it in the studio
+A film that goes through every part of the language, in Stellanova Studia, with a spoken voice and captions, and ends
+by making a platform game (`lessons/files/hop.stella`). Each lesson is a script; the recorder plays it in the studia
 (typing, running, zooming in) and films it.
 
-Needs: Node with the studio's Electron (`cd editor/studio && npm install`), ffmpeg, and `py -3 -m pip install edge-tts`
+Needs: Node with the studia's Electron (`cd editor/studia && npm install`), ffmpeg, and `py -3 -m pip install edge-tts`
 (the voice is Microsoft Edge's online voice `en-US-AndrewNeural`, so speaking new lines needs the internet; spoken lines
 are kept in `out/voice` and only new or changed ones are sent).
 
 ```
 py -3 check_lessons.py lessons/*.lesson          # try the lessons' programs without filming (-v shows each zoom's lines)
-cd ../editor/studio
+cd ../editor/studia
 npx electron ../../tutorial/recorder.js ../../tutorial/lessons/*.lesson    # films out/parts/<lesson>.mp4
 cd ../../tutorial
 py -3 join.py                                     # out/Stellanova Tutorial.mp4, a chapter per lesson
@@ -28,7 +28,7 @@ indented two spaces; a block starting with an empty line starts a new line first
 | Step | Does |
 |---|---|
 | `title: Lists` | The lesson's name (its chapter in the joined film). |
-| `files: a.stella, b.txt` | Copies these from `lessons/files` into the studio's folder first. |
+| `files: a.stella, b.txt` | Copies these from `lessons/files` into the studia's folder first. |
 | `say: ...` | Speaks it, with captions. The steps after it go on while it is spoken, but every step except `say`, `pause` and `until ...` waits for the voice to finish first. |
 | `wait`, `pause: 2` | Wait for the voice to finish, or a number of seconds. |
 | `card: kicker \| title \| words`, `uncard` | A title card over everything, and taking it away. |
@@ -41,4 +41,4 @@ indented two spaces; a block starting with an empty line starts a new line first
 | `run`, `watch`, `test`, `build`, `web`, `wasm`, `profile`, `debug` | Press that button and wait until it finishes, or (debugging) pauses (`run: and keep going` doesn't wait; anything else after the colon is a note). |
 | `stop at: 4`, `until paused` | Click beside a line's number to put a stop there (or take it away), and wait until the program pauses or ends. |
 | `answer: Sam`, `until finished`, `focus` | Type an answer for `ask`, wait for the program to finish, give the code back the keys. |
-| `game: hop.stella \| hop.keys \| Hop!` | Play the game (filmed ahead with those keys) in a window over the studio; the lesson goes on meanwhile, and `until game ends` waits for it. |
+| `game: hop.stella \| hop.keys \| Hop!` | Play the game (filmed ahead with those keys) in a window over the studia; the lesson goes on meanwhile, and `until game ends` waits for it. |

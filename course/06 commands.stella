@@ -1,0 +1,28 @@
+whisper: Lesson 6: Your own commands
+whisper:
+whisper: Once a program gets longer, you'll want to give parts of it names. That's what "to ..." is for.
+whisper: "given" says what it takes in (with the kind in brackets), and "returning" says what it hands back.
+whisper:
+whisper: At the bottom there's a test. A command whose name starts with "test" checks things,
+whisper: and F7 (Test) runs all of them. Right now the Mistakes tab says it doesn't know "triple". Fair enough.
+whisper:
+whisper: Your turn: write "triple" so the test passes. It's nearly the same as "double".
+whisper: Keep pressing F7 until you get a tick.
+
+to double, given x (a number), returning a number:
+  return x times 2
+and the universe said i love you
+
+to greet, given who (text):
+  scrawl "Hello, ", who, "!"
+and the universe said i love you
+
+genesis:
+  greet with "Ann"
+  scrawl "Double 21 is ", double with 21
+and the universe said i love you
+
+to test my commands:
+  check double with 4 is 8
+  check triple with 4 is 12
+and the universe said i love you

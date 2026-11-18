@@ -1,4 +1,4 @@
-// Stellanova Studio's shell: a window for the screens (screens.stella) and the system side (system.stella).
+// Stellanova Studia's shell: a window for the screens (screens.stella) and the system side (system.stella).
 // Both are written in Stellanova; this only remakes them when their .stella changed, starts the system side and shows the window.
 
 const { app, BrowserWindow } = require("electron");
@@ -53,22 +53,22 @@ async function start() {
   system = spawn(systemExe, [String(port), screens, home], { windowsHide: true, stdio: "ignore" });
   await answering(port);
   const win = new BrowserWindow({
-    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Stellanova Studio",
+    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Stellanova Studia",
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
-  // For checking it: STUDIO_PLAY is a script given the window (to press keys like a person), STUDIO_SHOT saves a picture after STUDIO_SHOT_WAIT ms and closes.
+  // For checking it: STUDIA_PLAY is a script given the window (to press keys like a person), STUDIA_SHOT saves a picture after STUDIA_SHOT_WAIT ms and closes.
   win.webContents.once("did-finish-load", () => {
-    if (process.env.STUDIO_PLAY) win.webContents.on("console-message", (e) => console.log(e.message));
-    if (process.env.STUDIO_PLAY) setTimeout(() => require(process.env.STUDIO_PLAY)(win), 1500);
-    if (process.env.STUDIO_SHOT)
+    if (process.env.STUDIA_PLAY) win.webContents.on("console-message", (e) => console.log(e.message));
+    if (process.env.STUDIA_PLAY) setTimeout(() => require(process.env.STUDIA_PLAY)(win), 1500);
+    if (process.env.STUDIA_SHOT)
       setTimeout(async () => {
         try {
-          fs.writeFileSync(process.env.STUDIO_SHOT, (await win.webContents.capturePage()).toPNG());
+          fs.writeFileSync(process.env.STUDIA_SHOT, (await win.webContents.capturePage()).toPNG());
         } finally {
           app.quit();
         }
-      }, Number(process.env.STUDIO_SHOT_WAIT || 4000));
+      }, Number(process.env.STUDIA_SHOT_WAIT || 4000));
   });
 }
 

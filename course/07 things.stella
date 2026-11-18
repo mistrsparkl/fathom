@@ -1,0 +1,21 @@
+whisper: Lesson 7: Your own kinds of things
+whisper:
+whisper: Sometimes a few values belong together. A pet has a name and an age, say.
+whisper: "a pet has:" describes that, and "conjure a pet" makes a new one.
+whisper: After that, "the name of rex" is rex's name. You can set it and read it like any other name.
+whisper:
+whisper: Your turn: give pets a sound too, set rex's sound to "woof", and add a line
+whisper: that says "Rex says woof".
+
+a pet has:
+  name (text)
+  age (a number)
+and the universe said i love you
+
+genesis:
+  conjure a pet as rex
+  set the name of rex to "Rex"
+  set the age of rex to 3
+  scrawl rex
+  scrawl the name of rex, " is ", the age of rex, " years old."
+and the universe said i love you

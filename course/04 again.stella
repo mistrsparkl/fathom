@@ -1,0 +1,16 @@
+whisper: Lesson 4: Doing things again
+whisper:
+whisper: Computers are great at boring jobs. "repeat 3 times:" does its lines three times.
+whisper: "for each n from 1 to 5:" does them once per number, and n is that number each time round.
+whisper:
+whisper: Press F6 (Watch) instead of F5 this time. It runs one line at a time and shows you
+whisper: what each name holds as it goes. Handy when something does what you didn't expect.
+whisper:
+whisper: Your turn: print the 9 times table, from 1 times 9 up to 12 times 9.
+
+genesis:
+  repeat 3 times:
+    scrawl "Hip hip hooray!"
+  for each n from 1 to 5:
+    scrawl n, " times 7 is ", n times 7
+and the universe said i love you

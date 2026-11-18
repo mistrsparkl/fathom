@@ -1,6 +1,6 @@
 {
-  "name": "stellanova-studio",
-  "productName": "Stellanova Studio",
+  "name": "stellanova-studia",
+  "productName": "Stellanova Studia",
   "version": "0.1.0",
   "description": "A place to write, check and run Stellanova programs.",
   "main": "main.js",

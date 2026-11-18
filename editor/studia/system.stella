@@ -1,4 +1,4 @@
-whisper: Stellanova Studio's system side: it reads and writes files, looks for mistakes and runs programs for the screens.
+whisper: Stellanova Studia's system side: it reads and writes files, looks for mistakes and runs programs for the screens.
 whisper: The shell starts it with three words: the port to answer on, the screens' folder, and Stellanova's own folder.
 
 use: server
@@ -123,7 +123,7 @@ to run, given how (text) and path (text) and stops (text), returning text:
     set program to start the program with (quoted with target, parent folder of path)
   otherwise if how is "debug":
     whisper: the stops are line numbers with spaces between, after the script
-    set program to start the program with (stellanova call with ("debug --studio", target) plus " " plus stops, parent folder of path)
+    set program to start the program with (stellanova call with ("debug --studia", target) plus " " plus stops, parent folder of path)
   otherwise:
     set program to start the program with (stellanova call with (how, target), parent folder of path)
   set started to yes
@@ -172,9 +172,28 @@ to library words, returning text:
   return found as saved text
 and the universe said i love you
 
+to course folder, returning text:
+  whisper: a copy of the course in Documents, so the lessons can be changed
+  set lessons to joined with (home, "course")
+  set mine to joined with (joined with (environment value of "USERPROFILE", "Documents"), "Stellanova course")
+  if not (folder mine exists): make the folder mine
+  for each name in files in the folder lessons:
+    if not (file (joined with (mine, name)) exists): copy the file with (joined with (lessons, name), joined with (mine, name))
+  return mine
+and the universe said i love you
+
 whisper: ---- answering the screens
 
 to answer, given address (text), returning text:
+  whisper: a request that goes wrong gets an error back; the side keeps going
+  try:
+    return reply with address
+  if that went wrong:
+    answer with the status 500
+    return the wound
+and the universe said i love you
+
+to reply, given address (text), returning text:
   set route to address
   set mark to the position of "?" in address
   if mark exceeds 0: set route to letters 1 to (mark minus 1) of address
@@ -200,8 +219,9 @@ to answer, given address (text), returning text:
     if started: stop the program program
     return "stopped"
   if route is "/api/words": return library words
+  if route is "/api/course": return course folder as saved text
   if route is "/api/settings":
-    set place to joined with (environment value of "APPDATA", "Stellanova Studio")
+    set place to joined with (environment value of "APPDATA", "Stellanova Studia")
     set settings file to joined with (place, "settings.json")
     if the web message is not "":
       if not (folder place exists): make the folder place
@@ -214,7 +234,7 @@ and the universe said i love you
 genesis:
   set given to the words given
   if the size of given falls below 3:
-    scrawl "Stellanova Studio's system side is started by the studio itself (it needs a port, the screens' folder and Stellanova's folder)."
+    scrawl "Stellanova Studia's system side is started by the studia itself (it needs a port, the screens' folder and Stellanova's folder)."
     cease
   set home to item 3 of given
   serve the web from the folder with (item 1 of given as number, item 2 of given, the command answer)

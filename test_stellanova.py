@@ -1119,7 +1119,7 @@ def program_checks():
     assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
                      "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
 
-    # stellanova debug: stops, stepping into, over and out of commands, names; and the studio's marked lines
+    # stellanova debug: stops, stepping into, over and out of commands, names; and the studia's marked lines
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "d.stella").write_text('to double, given x (a number), returning a number:\n  set y to x times 2\n  return y\n'
                                           'and the universe said i love you\n\ngenesis:\n  set total to 0\n  for each n from 1 to 3:\n'
@@ -1130,7 +1130,7 @@ def program_checks():
         assert stops == ["\u25a0 line 7: set total to 0", "\u25a0 line 8: for each n from 1 to 3:", "\u25a0 line 9: set total to total plus double with n",
                          "\u25a0 line 2: set y to x times 2", "    x: 1", "\u25a0 line 9: set total to total plus double with n",
                          "\u25a0 line 9: set total to total plus double with n", "12"], stops
-        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "debug", "--studio", "d.stella", "3"], input="go\nforget 3\ngo\n",
+        shown = subprocess.run([sys.executable, str(HERE / "stellanova.py"), "debug", "--studia", "d.stella", "3"], input="go\nforget 3\ngo\n",
                                capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
         marked = [json.loads(l[8:]) for l in shown.splitlines() if l.startswith("@@debug ")]
         assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked
@@ -1883,7 +1883,35 @@ def main():
     program_checks()
     built_run_checks()
     plugin_checks()
+    course_checks()
     print("stellanova.py self-check passed")
+
+
+def course_checks():
+    """The course's lessons: each is fine as it is (but lesson 6, which asks for triple), and the ones without a window run."""
+    import subprocess
+    said = {"01 hello": "Hello!\n", "02 names": "This is Sam.\nSam has 3 coins.\n", "03 choosing": "It's hot.\n",
+            "05 lists": "I need 3 things: milk, eggs, bread\n- milk\n- eggs\n- bread\nDon't drop the eggs!\n",
+            "07 things": "a pet (name: Rex, age: 3)\nRex is 3 years old.\n",
+            "08 mistakes": "Grounded: not enough fuel (only 3)\nScore: 0\n"}
+    go = lambda *a: subprocess.run([sys.executable, str(HERE / "stellanova.py"), *a], capture_output=True, text=True, encoding="utf-8")
+    lessons = sorted((HERE / "course").glob("*.stella"))
+    assert len(lessons) == 10, lessons
+    for lesson in lessons:
+        looked = go("check", str(lesson))
+        if lesson.stem == "06 commands":
+            assert "I don't know 'triple'" in looked.stdout, looked.stdout
+        else:
+            assert looked.returncode == 0, looked.stdout
+        if lesson.stem in said:
+            ran = go("run", str(lesson))
+            assert ran.stdout == said[lesson.stem], (lesson.stem, ran.stdout, ran.stderr)
+    with tempfile.TemporaryDirectory() as d:  # lesson 6, done
+        done = Path(d) / "six.stella"
+        done.write_text((HERE / "course" / "06 commands.stella").read_text(encoding="utf-8") +
+                        "\nto triple, given x (a number), returning a number:\n  return x times 3\n" + END, encoding="utf-8")
+        tested = go("test", str(done))
+        assert tested.returncode == 0 and "1 passed" in tested.stdout, tested.stdout
 
 
 def plugin_checks():

@@ -1,5 +1,5 @@
-// Films lessons: opens Stellanova Studio in a hidden window, plays a lesson script in it (speaking, typing, running,
-// zooming in), and writes out/parts/<lesson>.mp4 with the voice. Run from editor/studio with:
+// Films lessons: opens Stellanova Studia in a hidden window, plays a lesson script in it (speaking, typing, running,
+// zooming in), and writes out/parts/<lesson>.mp4 with the voice. Run from editor/studia with:
 //     npx electron ../../tutorial/recorder.js <lesson files...>
 // See README.md in this folder for the lesson script format.
 
@@ -12,7 +12,7 @@ const path = require("path");
 
 const here = __dirname;
 const home = path.resolve(here, "..");
-const studio = path.join(home, "editor", "studio");
+const studia = path.join(home, "editor", "studia");
 const out = path.join(here, "out");
 const workspace = path.join(out, "workspace");
 const WIDTH = 1920, HEIGHT = 1080, FPS = 30;
@@ -46,7 +46,7 @@ function readLesson(file) {
   return { title, files, steps, name: path.basename(file, ".lesson"), folder: path.dirname(file) };
 }
 
-// ---------------------------------------------------------------- the studio, its system side, and a little file server
+// ---------------------------------------------------------------- the studia, its system side, and a little file server
 
 function freePort() {
   return new Promise((resolve) => {
@@ -67,7 +67,7 @@ async function answering(port) {
       await wait(150);
     }
   }
-  throw new Error("the studio's system side didn't answer");
+  throw new Error("the studia's system side didn't answer");
 }
 
 function serveOut(port) {  // games' films, for the page to play
@@ -79,7 +79,7 @@ function serveOut(port) {  // games' films, for the page to play
   }).listen(port, "127.0.0.1");
 }
 
-// ---------------------------------------------------------------- what is laid over the studio: the camera, captions, cursor, cards
+// ---------------------------------------------------------------- what is laid over the studia: the camera, captions, cursor, cards
 
 const OVERLAY = String.raw`
 (() => {
@@ -311,8 +311,8 @@ async function film(lesson, filePort) {
   fs.mkdirSync(workspace, { recursive: true });
   for (const f of lesson.files) fs.copyFileSync(path.join(lesson.folder, "files", f), path.join(workspace, path.basename(f)));
   const appdata = path.join(out, "appdata");
-  fs.mkdirSync(path.join(appdata, "Stellanova Studio"), { recursive: true });
-  fs.writeFileSync(path.join(appdata, "Stellanova Studio", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
+  fs.mkdirSync(path.join(appdata, "Stellanova Studia"), { recursive: true });
+  fs.writeFileSync(path.join(appdata, "Stellanova Studia", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
 
   // the voice first: every line spoken ahead, so the film knows how long each takes
   const said = lesson.steps.filter((s) => s.what === "say").map((s) => s.value);
@@ -329,7 +329,7 @@ async function film(lesson, filePort) {
   }
 
   const port = await freePort();
-  const system = spawn(path.join(studio, "system.exe"), [String(port), path.join(studio, "ui"), home], {
+  const system = spawn(path.join(studia, "system.exe"), [String(port), path.join(studia, "ui"), home], {
     windowsHide: true, stdio: "ignore", env: { ...process.env, APPDATA: appdata } });
   await answering(port);
   const win = new BrowserWindow({ width: WIDTH, height: HEIGHT, show: false, useContentSize: true,
@@ -513,7 +513,7 @@ async function film(lesson, filePort) {
           const spot = JSON.parse(await js(`(() => { const n = [...document.querySelectorAll(".row .num")].find((e) => e.textContent === ${JSON.stringify(v)}); const r = n.getBoundingClientRect(); return JSON.stringify({ x: r.left + r.width - 22, y: r.top + r.height / 2 }); })()`));
           await js(`film.cursorTo(${spot.x}, ${spot.y})`);
           await wait(600);
-          // the click, sent inside the page onto whatever is at that point (the studio reads mousedown on the code)
+          // the click, sent inside the page onto whatever is at that point (the studia reads mousedown on the code)
           await js(`(() => { const c = document.getElementById("film-cursor"); c.classList.remove("click"); void c.offsetWidth; c.classList.add("click");
             const at = document.elementFromPoint(${spot.x}, ${spot.y});
             for (const type of ["mousedown", "mouseup"]) at.dispatchEvent(new MouseEvent(type, { clientX: ${spot.x}, clientY: ${spot.y}, button: 0, bubbles: true })); })()`);
@@ -609,9 +609,9 @@ app.disableHardwareAcceleration();
 app.on("window-all-closed", () => {});  // each lesson closes its window; keep going to the next
 app.whenReady().then(async () => {
   try {
-    execFileSync("py", ["-3", path.join(home, "stellanova.py"), "web", "screens.stella", "ui"], { cwd: studio, windowsHide: true });
-    if (!fs.existsSync(path.join(studio, "system.exe")))
-      execFileSync("py", ["-3", path.join(home, "stellanova.py"), "build", "system.stella"], { cwd: studio, windowsHide: true });
+    execFileSync("py", ["-3", path.join(home, "stellanova.py"), "web", "screens.stella", "ui"], { cwd: studia, windowsHide: true });
+    if (!fs.existsSync(path.join(studia, "system.exe")))
+      execFileSync("py", ["-3", path.join(home, "stellanova.py"), "build", "system.stella"], { cwd: studia, windowsHide: true });
     const filePort = await freePort();
     serveOut(filePort);
     const files = process.argv.slice(2).filter((a) => a.endsWith(".lesson"));

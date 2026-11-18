@@ -297,8 +297,8 @@ say("Running right, faster each frame. Jumping: up fast, slowing, and falling, a
 say("Over the spikes, under the bees, and every coin. The flag turns green, and blinks. We win, and the record is saved.")
 put("until game ends")
 say("And that's how a platform game works: speed changes the place, gravity changes the speed, one direction at a time, and a camera that the whole world is drawn around.")
-put("card: Thank you | That's Stellanova | Every word is in the list on the left of the studio, and in LANGUAGE.md. Now go and make something of your own.")
-say("That's every part of Stellanova. Every word is listed in the studio, and in the language guide. Now it's your turn: go and make something of your own.")
+put("card: Thank you | That's Stellanova | Every word is in the list on the left of the studia, and in LANGUAGE.md. Now go and make something of your own.")
+say("That's every part of Stellanova. Every word is listed in the studia, and in the language guide. Now it's your turn: go and make something of your own.")
 put("pause: 2")
 
 (HERE / "lessons" / "17-platformer.lesson").write_text("\n".join(out) + "\n", encoding="utf-8")

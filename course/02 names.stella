@@ -1,0 +1,16 @@
+whisper: Lesson 2: Remembering things
+whisper:
+whisper: "set ... to ..." puts a value away under a name, so you can use it later.
+whisper: Names can be more than one word, like "best score". That's on purpose.
+whisper:
+whisper: Inside quotes, a name in square brackets gets swapped for what it holds.
+whisper: Run this and look at the second line closely.
+whisper:
+whisper: Your turn: add a line that sets coins to coins plus 10, then say how many there are now.
+
+genesis:
+  set name to "Sam"
+  set coins to 3
+  scrawl "This is ", name, "."
+  scrawl "[name] has [coins] coins."
+and the universe said i love you

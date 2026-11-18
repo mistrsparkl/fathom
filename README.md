@@ -27,7 +27,7 @@ and the universe said i love you
 
 Start with **TUTORIAL.md**. **LANGUAGE.md** lists everything the language can do. The examples are in `examples/`, and the libraries (maths, time, window, sound, web, computer, folders, letters, patterns, server) are in `libraries/`.
 
-**Stellanova Studio** (`editor/studio`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studio`.
+**Stellanova Studia** (`editor/studia`) is a place to write programs, like Visual Studio Code but only for Stellanova, and it is written in Stellanova too: `screens.stella` is the editing box, tabs, files, words and output, and `system.stella` reads and writes files, looks for mistakes and runs programs. Start it with `npm install` once, then `npm start` in `editor/studia`.
 
 **Visual Studio Code**: `py -3 editor/make_vsix.py`, then `code --install-extension editor/stellanova.vsix`. It colours `.stella` files, shows mistakes while you type, completes words and explains a word when the mouse is on it. The setting `stellanova.home` is the folder with `stellanova.py`, if it has moved since the extension was made.
 

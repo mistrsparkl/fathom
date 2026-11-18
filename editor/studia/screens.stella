@@ -1,4 +1,4 @@
-whisper: Stellanova Studio's screens: the editing box, tabs, files, words, mistakes and running programs.
+whisper: Stellanova Studia's screens: the editing box, tabs, files, words, mistakes and running programs.
 whisper: Made into ui/screens.js with:  stellanova web screens.stella ui
 
 use: page
@@ -1278,7 +1278,7 @@ to paused at, given marked (text):
 and the universe said i love you
 
 to without debug lines, given words (text), returning text:
-  whisper: the marked lines a debugged program prints are stops for the studio, not output; a half line waits for the rest
+  whisper: the marked lines a debugged program prints are stops for the studia, not output; a half line waits for the rest
   set all to debug carry plus words
   set debug carry to ""
   if not (all contains "@@debug "): return all
@@ -1331,6 +1331,19 @@ to on answer key, given event (a number):
   set the value with (answer box, "")
   show output with (words plus new line, "typed")
   set ignored to tell the system with ("/api/type", words)
+and the universe said i love you
+
+to on learn press, given event (a number):
+  set place to ""
+  try:
+    load place from the text (ask the system with "/api/course")
+  if that went wrong:
+    set the text with (status box, "I couldn't find the course.")
+    cease
+  set folder to place
+  load the tree
+  open the sheet with joined path with (folder, "01 hello.stella")
+  remember the settings
 and the universe said i love you
 
 to on run press, given event (a number):
@@ -1437,6 +1450,7 @@ genesis:
   hook up with ("#word-search", "input", the command on word search)
   hook up with ("#show-output", "click", the command on output tab press)
   hook up with ("#show-mistakes", "click", the command on mistakes tab press)
+  hook up with ("#learn", "click", the command on learn press)
   hook up with ("#run", "click", the command on run press)
   hook up with ("#watch", "click", the command on watch press)
   hook up with ("#debug", "click", the command on debug press)
