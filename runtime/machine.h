@@ -21,6 +21,7 @@ struct V  // every value starts like this; numbers are only this
 	bool owned = false;  // text only one name holds (cn_append): it may grow in place
 	bool numbers = false;  // plain numbers kept in Full's nums
 	unsigned char shared = 0;  // how many more places hold it (255: many)
+	bool live = false;  // handed out (the collector looks at these only)
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 

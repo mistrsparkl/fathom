@@ -55,7 +55,6 @@ namespace gc
 		char* sp = nullptr;
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
 		std::vector<V*> young;  // made since its current line began
-		std::vector<V*> made;  // made while running, not yet in all
 		std::vector<V*> ready[4];  // freed values ready to use again
 		size_t since = 0;  // counted here first (an atomic add each time is slow)
 	};
@@ -63,7 +62,6 @@ namespace gc
 	static std::mutex stop_lock;  // the threads and their states
 	static std::condition_variable stop_cv;
 	static std::vector<Thread*> threads;
-	static std::vector<V*> all;
 	static std::vector<V*> spare[4];  // freed values: numbers, text, the rest, things
 	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : tag == 'k' ? 3 : 2; }
 	static std::vector<std::pair<const char*, size_t>> roots;
@@ -87,7 +85,6 @@ namespace gc
 			{
 				std::lock_guard<std::mutex> hold(stop_lock);
 				std::lock_guard<std::mutex> heap(lock);
-				all.insert(all.end(), t->made.begin(), t->made.end());  // what it made may still be held elsewhere
 				for (int k = 0; k < 4; ++k)
 					spare[k].insert(spare[k].end(), t->ready[k].begin(), t->ready[k].end());
 				threads.erase(std::find(threads.begin(), threads.end(), t));
@@ -190,11 +187,6 @@ namespace gc
 	}
 	static void mark_and_sweep()
 	{
-		for (Thread* x : threads)  // (every thread is stopped or parked)
-		{
-			all.insert(all.end(), x->made.begin(), x->made.end());
-			x->made.clear();
-		}
 		std::vector<V*> work;
 		auto reach = [&](V* c) {
 			if (c && !c->marked)
@@ -238,58 +230,68 @@ namespace gc
 				reach(x);
 		}
 		size_t kept = 0;
-		for (V* v : all)
-			if (v->marked)
+		for (const Block& b : blocks)  // every value handed out, block by block
+			for (const char* p = b.from; p < b.to; p += b.size)
 			{
-				v->marked = false;
-				all[kept++] = v;
+				V* v = reinterpret_cast<V*>(const_cast<char*>(p));
+				if (!v->live)
+				{
+					v->marked = false;  // (a freed value a look at the stack found)
+					continue;
+				}
+				if (v->marked)
+				{
+					v->marked = false;
+					++kept;
+					continue;
+				}
+				v->live = false;
+				if (is_small(v->tag))
+				{
+					spare[0].push_back(v);  // (from a block: never deleted)
+				}
+				else if (v->tag == 't')
+				{
+					std::string& s = static_cast<TextValue*>(v)->s;
+					if (s.capacity() > 4096)
+						std::string().swap(s);
+					s.clear();
+					v->d = 0;
+					spare[1].push_back(v);
+				}
+				else if (v->tag == 'k')
+				{
+					ThingValue* f = static_cast<ThingValue*>(v);
+					f->d = 0;
+					if (f->boxed.capacity() > 1024)
+						f->boxed.release();
+					f->boxed.clear();
+					if (f->nums.room > 4096)
+						f->nums.release();
+					f->nums.clear();
+					f->numbers = false;
+					f->table.clear();
+					f->kind = nullptr;
+					spare[3].push_back(v);
+				}
+				else
+				{
+					Full* f = full(v);  // (from a block too: kept to be used again, never deleted)
+					f->d = f->x = f->y = f->z = 0;
+					if (f->boxed.capacity() > 1024)
+						f->boxed.release();
+					f->boxed.clear();
+					if (f->nums.room > 4096)
+						f->nums.release();
+					f->nums.clear();
+					f->numbers = false;
+					f->table.clear();
+					f->kind = nullptr;
+					f->command = nullptr;
+					f->last = nullptr;
+					spare[2].push_back(v);
+				}
 			}
-			else if (is_small(v->tag))
-			{
-				spare[0].push_back(v);  // (from a block: never deleted)
-			}
-			else if (v->tag == 't')
-			{
-				std::string& s = static_cast<TextValue*>(v)->s;
-				if (s.capacity() > 4096)
-					std::string().swap(s);
-				s.clear();
-				v->d = 0;
-				spare[1].push_back(v);
-			}
-			else if (v->tag == 'k')
-			{
-				ThingValue* f = static_cast<ThingValue*>(v);
-				f->d = 0;
-				if (f->boxed.capacity() > 1024)
-					f->boxed.release();
-				f->boxed.clear();
-				if (f->nums.room > 4096)
-					f->nums.release();
-				f->nums.clear();
-				f->numbers = false;
-				f->table.clear();
-				f->kind = nullptr;
-				spare[3].push_back(v);
-			}
-			else
-			{
-				Full* f = full(v);  // (from a block too: kept to be used again, never deleted)
-				f->d = f->x = f->y = f->z = 0;
-				if (f->boxed.capacity() > 1024)
-					f->boxed.release();
-				f->boxed.clear();
-				if (f->nums.room > 4096)
-					f->nums.release();
-				f->nums.clear();
-				f->numbers = false;
-				f->table.clear();
-				f->kind = nullptr;
-				f->command = nullptr;
-				f->last = nullptr;
-				spare[2].push_back(v);
-			}
-		all.resize(kept);
 		made_since = 0;
 		limit = std::getenv("STELLANOVA_COLLECT_OFTEN") ? least : std::max(least, kept);
 	}
@@ -405,7 +407,7 @@ namespace gc
 			ready.pop_back();
 			v->tag = tag;
 			v->owned = v->shared = v->marked = false;  // (a freed value may have been marked by a look at the stack)
-			t->made.push_back(v);
+			v->live = true;
 			if (!stored_now)
 				t->young.push_back(v);
 			if (++t->since >= batch && (made_since += std::exchange(t->since, 0)) > limit)
@@ -424,7 +426,7 @@ namespace gc
 				v = new_value(size_of(tag));
 			v->tag = tag;
 			v->owned = v->shared = v->marked = false;
-			all.push_back(v);
+			v->live = true;
 			t->young.push_back(v);
 			++made_since;
 		}
