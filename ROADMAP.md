@@ -61,3 +61,11 @@ Speed
 ## Not done
 
 - [ ] macOS. It needs a Mac to test on.
+
+Big games (as well as small ones)
+- [ ] As fast as C++ when making many values: numbers and small things kept inside lists and other things, not each on its own
+- [ ] Control over memory where it matters: values a program frees itself, and blocks of things laid out side by side
+- [ ] Finding slow parts: a built program says where its time went
+- [ ] A debugger: stop at a line, look at names, go on line by line
+- [ ] Large programs: many files built quickly, only the changed ones again
+- [ ] Consoles. They need the makers' kits to build and test on.
