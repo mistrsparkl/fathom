@@ -8,10 +8,13 @@
 #include <string>
 #include <vector>
 
+#include <atomic>
 struct ThingKind
 {
 	std::string name;
 	std::vector<std::string> fields;
+	std::string types;  // 'n' for each number part (kept plain), 't' text, '-' anything else; set once, before typed
+	std::atomic<bool> typed{false};
 };
 
 struct V  // every value starts like this; numbers are only this
@@ -22,6 +25,7 @@ struct V  // every value starts like this; numbers are only this
 	bool numbers = false;  // plain numbers kept in Full's nums
 	unsigned char shared = 0;  // how many more places hold it (255: many)
 	bool live = false;  // handed out (the collector looks at these only)
+	unsigned short slots = 0;  // a thing's room for parts (fixed by where it was made)
 	double d = 0;  // a number, or 1 / 0 for yes / no
 };
 
@@ -179,7 +183,14 @@ inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Fu
 	return out;
 }
 struct TextValue : V { std::string s; };  // a text: its own small value (Full has no text)
-struct ThingValue : V { Nums nums; Items boxed; const ThingKind* kind = nullptr; Table table; };  // a thing: only Full's parts up to table
+struct ThingValue : V  // a thing: its kind, then a slot for each part
+{
+	const ThingKind* kind = nullptr;
+	Items* side = nullptr;  // every part boxed, for C++ that wants them so (numbers is false then)
+};
+union Part { double d; V* v; };  // a slot: a number part kept plain (numbers is true), or any other part
+inline ThingValue* thing_of(const V* v) { return static_cast<ThingValue*>(const_cast<V*>(v)); }
+inline Part* parts_of(const V* v) { return reinterpret_cast<Part*>(reinterpret_cast<char*>(const_cast<V*>(v)) + sizeof(ThingValue)); }
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
 inline Full* full(V* v) { return static_cast<Full*>(v); }  // only for a value that isn't a number or a yes/no
 inline std::string& text_of(V* v) { return static_cast<TextValue*>(v)->s; }  // a text value's words

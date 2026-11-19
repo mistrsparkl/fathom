@@ -284,6 +284,11 @@ def nums_at():
     return 16
 
 
+def parts_at():
+    """Where a thing's parts begin (machine.cpp checks)."""
+    return 16 + 2 * (4 if TARGET == "wasm" else 8)
+
+
 def boxed_at():
     """Where it keeps boxed (just after nums)."""
     return 64
@@ -502,11 +507,11 @@ class Fn:
 
     def thing_number(self, thing, k):
         """Number part k of a thing: read in place while its number parts are kept plain."""
-        flag, data, _, _, _ = self.nums_place(thing)
+        flag = self.op(f"getelementptr inbounds i8, ptr {thing}, i64 3")
         fast, slow, done = self.label("partfast"), self.label("partslow"), self.label("partread")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
         self.place(fast)
-        a = self.op(f"load double, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, i32 {k}')}")
+        a = self.op(f"load double, ptr {self.op(f'getelementptr inbounds i8, ptr {thing}, i64 {parts_at() + 8 * k}')}")
         self.jump(done)
         self.place(slow)
         b = self.op(f"call double @cn_part_number(ptr {thing}, i32 {k})")
@@ -516,11 +521,11 @@ class Fn:
 
     def put_thing_number(self, thing, k, d):
         """Sets number part k in place."""
-        flag, data, _, _, _ = self.nums_place(thing)
+        flag = self.op(f"getelementptr inbounds i8, ptr {thing}, i64 3")
         fast, slow, done = self.label("partput"), self.label("partplain"), self.label("partset")
         self.branch(self.op(f"icmp ne i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
         self.place(fast)
-        self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, i32 {k}')}")
+        self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds i8, ptr {thing}, i64 {parts_at() + 8 * k}')}")
         self.jump(done)
         self.place(slow)
         self.put(f"call void @cn_part_number_put(ptr {thing}, i32 {k}, double {d})")
@@ -719,7 +724,7 @@ class Fn:
         ok = self.op(f"and i1 {self.op(f'icmp ne i8 {flag(to)}, 0')}, {self.op(f'icmp ne i8 {flag(value)}, 0')}")
         self.branch(self.op(f"and i1 {ok}, {self.op(f'icmp eq i8 {shared}, 0')}"), fast, slow)
         self.place(fast)
-        data = lambda v: self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {v}, i64 {nums_at()}')}")
+        data = lambda v: self.op(f"getelementptr inbounds i8, ptr {v}, i64 {parts_at()}")
         a, b = data(value), data(to)
         for k in range(len(parts)):
             d = self.op(f"load double, ptr {self.op(f'getelementptr inbounds double, ptr {a}, i32 {k}')}")
