@@ -1471,18 +1471,21 @@ SETTING_NUMBERS = {}  # a setting's C++ name -> its number
 
 def join_ir(f, parts):
     """The parts' text, one after the other."""
-    out = None
+    out, on = None, ""  # on: out is a text only this line holds, so it grows in place
     for v in parts:
         if out is not None and v.kind == NUMBER:  # (one new text, not two)
-            out = f.op(f"call ptr @cn_join_number(ptr {out}, double {machine.emit(f, v)})")
+            out, on = f.op(f"call ptr @cn_join_number{on}(ptr {out}, double {machine.emit(f, v)})"), "_on"
             continue
         t = f.as_text(machine.emit(f, v), v.kind)
         made = f"  {t} = call ptr @cn_text_number(double "
         if out is not None and f.lines and f.lines[-1].startswith(made):  # '"w" plus (n as text)': one new text, not two
             number = f.lines.pop()[len(made):-1]
-            out = f.op(f"call ptr @cn_join_number(ptr {out}, double {number})")
+            out, on = f.op(f"call ptr @cn_join_number{on}(ptr {out}, double {number})"), "_on"
             continue
-        out = t if out is None else f.op(f"call ptr @cn_join(ptr {out}, ptr {t})")
+        if out is None:  # a join's own answer, just made ('a plus b plus c'): only this line holds it
+            out, on = t, "_on" if f.lines and f.lines[-1].startswith(f"  {t} = call ptr @cn_join") else ""
+            continue
+        out, on = f.op(f"call ptr @cn_join{on}(ptr {out}, ptr {t})"), "_on"
     return out
 
 

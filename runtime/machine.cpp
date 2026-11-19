@@ -200,7 +200,8 @@ namespace gc
 			if (c && !c->marked)
 			{
 				c->marked = true;
-				work.push_back(c);
+				if (!is_small(c->tag) && c->tag != 't')  // (numbers and text hold nothing to look at)
+					work.push_back(c);
 			}
 		};
 		auto look = [&](const char* from, const char* to) {  // any word here that is a value's address
@@ -231,8 +232,6 @@ namespace gc
 		{
 			V* v = work.back();
 			work.pop_back();
-			if (is_small(v->tag) || v->tag == 't')
-				continue;
 			for (V* x : full(v)->boxed)
 				reach(x);
 			for (const auto& [key, x] : full(v)->table)
@@ -1086,6 +1085,8 @@ extern "C"
 	V* cn_show(V* v) { return cn_make_text(show(v)); }
 	V* cn_join(V* a, V* b) { return cn_make_text(text_of(a) + text_of(b)); }
 	V* cn_join_number(V* a, double b) { return cn_make_text(text_of(a) + stellanova::text(b)); }
+	V* cn_join_on(V* a, V* b) { text_of(a) += text_of(b); return a; }  // a: made by the join just before, held by nothing else
+	V* cn_join_number_on(V* a, double b) { text_of(a) += stellanova::text(b); return a; }
 	void cn_share(V* v)  // a text name was read: what it holds may be held elsewhere now
 	{
 		if (v)
@@ -1543,6 +1544,24 @@ extern "C"
 		std::string name(able);
 		able_kinds[name.substr(0, name.find('\x01'))][full(shape)->kind->name] = shape;
 	}
+	struct TextKey { uint64_t first; size_t size; const std::string* s; V* v; };  // the first 8 bytes, high first: most comparisons never look at the text
+	static TextKey text_key(const std::string& s, V* v)
+	{
+		uint64_t first = 0;
+		for (size_t b = 0; b < 8; ++b)
+			first = first << 8 | (b < s.size() ? static_cast<unsigned char>(s[b]) : 0);
+		return {first, s.size(), &s, v};
+	}
+	static void sort_text_keys(std::vector<TextKey>& keys)  // stable; bytes of UTF-8 sort as Python's letters do
+	{
+		std::stable_sort(keys.begin(), keys.end(), [](const TextKey& a, const TextKey& b) {
+			if (a.first != b.first)
+				return a.first < b.first;
+			if (a.size <= 8 || b.size <= 8)  // (the same first bytes: the shorter one is first)
+				return a.size < b.size;
+			return a.s->compare(8, std::string::npos, *b.s, 8, std::string::npos) < 0;
+		});
+	}
 	V* cn_sorted_by(V* list, int k, int line)  // 'sorted pets by age', stable
 	{
 		V* out = copy_of(list);
@@ -1553,13 +1572,13 @@ extern "C"
 		const size_t at = static_cast<size_t>(k);
 		if (xs.size() && full(xs[0])->boxed[at] && full(xs[0])->boxed[at]->tag == 't')
 		{
-			std::vector<std::pair<const std::string*, V*>> keyed;
+			std::vector<TextKey> keyed;
 			keyed.reserve(xs.size());
 			for (V* x : xs)
-				keyed.emplace_back(&text_of(full(x)->boxed[at]), x);
-			std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return *a.first < *b.first; });
+				keyed.push_back(text_key(text_of(full(x)->boxed[at]), x));
+			sort_text_keys(keyed);
 			for (size_t i = 0; i < xs.size(); ++i)
-				xs[i] = keyed[i].second;
+				xs[i] = keyed[i].v;
 			return out;
 		}
 		std::vector<std::pair<double, V*>> keyed;  // each key read once, without boxing the things' number parts
@@ -1580,9 +1599,18 @@ extern "C"
 		for (size_t k = 0; k < order.size(); ++k)
 			order[k] = k;
 		std::vector<V*> ks(cn_items(keys).begin(), cn_items(keys).end());
-		std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-			return ks[a]->tag == 't' ? text_of(ks[a]) < text_of(ks[b]) : ks[a]->d < ks[b]->d;
-		});
+		if (!ks.empty() && ks[0]->tag == 't')
+		{
+			std::vector<TextKey> keyed;
+			keyed.reserve(ks.size());
+			for (size_t k = 0; k < ks.size(); ++k)
+				keyed.push_back(text_key(text_of(ks[k]), reinterpret_cast<V*>(k)));  // (v: the item's place)
+			sort_text_keys(keyed);
+			for (size_t k = 0; k < order.size(); ++k)
+				order[k] = reinterpret_cast<size_t>(keyed[k].v);
+		}
+		else
+			std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return ks[a]->d < ks[b]->d; });
 		V* out = cn_list_new();
 		for (size_t k : order)
 			cn_list_add(out, cn_items(list)[k]);
@@ -1598,13 +1626,18 @@ extern "C"
 			std::stable_sort(f->boxed.begin(), f->boxed.end(), [](const V* a, const V* b) { return a->d < b->d; });
 		return out;
 	}
-	V* cn_sorted_texts(V* list)  // 'sorted names' for a list of text (stable; bytes of UTF-8 sort as Python's letters do)
+	V* cn_sorted_texts(V* list)  // 'sorted names' for a list of text
 	{
 		V* out = copy_of(list);
 		static const std::string none;
-		auto words = [](const V* x) -> const std::string& { return x ? text_of(x) : none; };
 		Items& xs = cn_items(out);
-		std::stable_sort(xs.begin(), xs.end(), [&](const V* a, const V* b) { return words(a) < words(b); });
+		std::vector<TextKey> keys;
+		keys.reserve(xs.size());
+		for (V* x : xs)
+			keys.push_back(text_key(x ? text_of(x) : none, x));
+		sort_text_keys(keys);
+		for (size_t k = 0; k < xs.size(); ++k)
+			xs[k] = keys[k].v;
 		return out;
 	}
 	V* cn_join_texts(V* list, V* between)  // 'join names with ", "' for a list of text
