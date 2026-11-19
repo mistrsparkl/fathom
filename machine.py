@@ -548,6 +548,24 @@ class Fn:
         self.place(done)
         return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow} ]")
 
+    def list_item(self, lst, k):
+        """Item k (from 0) of a list that has it, for 'for each': in place when the list holds boxed items (not shared: the loop's name can't change it, and the list is shared while it goes round)."""
+        flag = self.op(f"getelementptr inbounds i8, ptr {lst}, i64 3")
+        fast, slow, done = self.label("itemfast"), self.label("itemslow"), self.label("itemgot")
+        self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
+        self.place(fast)
+        size = "i64" if TARGET == "wasm" else "i32"
+        first = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {boxed_at()}')}")
+        index = k if size == "i64" else self.op(f"trunc i64 {k} to i32")
+        a = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds ptr, ptr {first}, {size} {index}')}")
+        fast_end = self.here
+        self.jump(done)
+        self.place(slow)
+        b = self.op(f"call ptr @cn_list_item(ptr {lst}, i64 {k})")
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi ptr [ {a}, %{fast_end} ], [ {b}, %{slow} ]")
+
     def jump(self, label):
         self.put(f"br label %{label}")
         self.ended = True
@@ -979,8 +997,7 @@ def each_in(f, cpp, kind, seq, body):
         more, out = f.label("item"), f.label("noitem")
         f.branch(go, more, out)
         f.place(more)
-        got = f.list_number(items, now) if kind == NUMBER else \
-            f.unbox(f.op(f"call ptr @cn_list_item(ptr {items}, i64 {now})"), kind)
+        got = f.list_number(items, now) if kind == NUMBER else f.unbox(f.list_item(items, now), kind)
         f.put(f"store {ll_type(kind)} {got}, ptr {f.slot(cpp, kind)}")
         stored = f.label("itemkept")  # (reading the item may have made blocks of its own)
         f.place(stored)
