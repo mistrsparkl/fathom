@@ -196,6 +196,7 @@ declare ptr @cn_load(ptr, ptr, i32, ptr, i32)
 declare double @llvm.fabs.f64(double)
 declare void @cn_meanwhile(ptr, ptr, i64)
 declare void @cn_statement()
+declare ptr @cn_young_count()
 @cn_stopping = external global i8
 @cn_failed_flag = external thread_local global i8
 declare void @cn_root(ptr, i64)
@@ -809,12 +810,42 @@ class Fn:
             body[len(self.entry) + 1:len(self.entry) + 3] = [
                 "  %waiting = load atomic i8, ptr @cn_stopping monotonic, align 1", "  %wanted = icmp ne i8 %waiting, 0",
                 "  br i1 %wanted, label %wait, label %start", "wait:", "  call void @cn_statement()", "  br label %start", "start:"]
+        if TARGET != "wasm":
+            body = inline_statements(body)
         if TARGET == "wasm":  # see cn_enter in runtime/machine.cpp
             slots = [l.split(" = ")[0].strip() for l in self.entry if l.endswith("= alloca ptr")]
             body[1 + len(self.entry):1 + len(self.entry)] = ["  call void @cn_enter()"] + [f"  call void @cn_slot(ptr {s})" for s in slots]
             body = [f"  call void @cn_leave(ptr {l.split()[2] if l.startswith('  ret ptr ') else 'null'})\n{l}" if l.startswith("  ret ") else l
                     for l in body]
         self.module.functions.append(f"define {gives} @cn_user_{self.name}({params}) {{\n" + "\n".join(body) + "\n}\n")
+
+
+STATEMENT = "  call void @cn_statement()"
+
+
+def inline_statements(body):
+    """Each line's start without a call: the last line's values forgotten in place, and cn_statement only when a collector waits."""
+    if STATEMENT not in body:
+        return body
+    out, final, origin, n = [], {}, None, 0
+    for line in body:
+        if line.endswith(":") and not line.startswith(" "):
+            origin = line[:-1]
+            final[origin] = origin
+        elif line == STATEMENT and origin is not None:
+            n += 1
+            go, stop = f"line.go{n}", f"line.stop{n}"
+            out += ["  store i64 0, ptr %young.count", f"  %line.w{n} = load atomic i8, ptr @cn_stopping monotonic, align 1",
+                    f"  %line.c{n} = icmp ne i8 %line.w{n}, 0", f"  br i1 %line.c{n}, label %{stop}, label %{go}",
+                    f"{stop}:", STATEMENT, f"  br label %{go}", f"{go}:"]
+            final[origin] = go  # (a phi naming this block comes from here now)
+            continue
+        out.append(line)
+    moved = {k: v for k, v in final.items() if k != v}
+    pattern = re.compile(r"\[ ([^\[\]]+?), %([\w.]+) \]")
+    fix = lambda m: f"[ {m.group(1)}, %{moved.get(m.group(2), m.group(2))} ]"
+    out = [pattern.sub(fix, line) if " = phi " in line else line for line in out]
+    return out[:1] + ["  %young.count = call ptr @cn_young_count()"] + out[1:]
 
 
 def function(module, name, inputs, gives, body, owner=None):

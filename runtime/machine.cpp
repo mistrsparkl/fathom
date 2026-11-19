@@ -41,6 +41,25 @@ extern "C" std::atomic<bool> cn_stopping{false};  // a collector waits for every
 
 namespace gc
 {
+	struct Young  // values made since the line began (machine code empties it: count is where cn_young_count says)
+	{
+		V** data = nullptr;
+		size_t count = 0, room = 0;
+		void push_back(V* v)
+		{
+			if (count == room)
+			{
+				room = room ? room * 2 : 256;
+				data = static_cast<V**>(std::realloc(data, room * sizeof(V*)));
+			}
+			data[count++] = v;
+		}
+		void clear() { count = 0; }
+		void resize(size_t n) { count = std::min(count, n); }  // (smaller only)
+		size_t size() const { return count; }
+		V** begin() const { return data; }
+		V** end() const { return data + count; }
+	};
 	struct Thread
 	{
 		char* top = nullptr;  // where its stack starts (its highest address)
@@ -54,7 +73,7 @@ namespace gc
 #endif
 		char* sp = nullptr;
 		std::atomic<int> state{0};  // 0 running, 1 stopped at a safe point, 2 parked
-		std::vector<V*> young;  // made since its current line began
+		Young young;  // made since its current line began
 		std::vector<std::vector<V*>> ready;  // freed values ready to use again, by size (see size_of)
 		size_t since = 0;  // counted here first (an atomic add each time is slow)
 	};
@@ -458,6 +477,7 @@ namespace gc
 
 extern "C"
 {
+	size_t* cn_young_count() { return &gc::me()->young.count; }  // (machine code starts each line with a store of 0 here)
 	void cn_statement()  // a line begins: last line's values kept only if held
 	{
 		gc::Thread* t = gc::me();
