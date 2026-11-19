@@ -56,7 +56,7 @@ Things real programs needed (from writing `todo.stella`, `guestbook.stella` and 
 Speed
 - [x] Built lists of numbers hold plain numbers
 - [x] Number loops as fast as C++
-- [ ] Lists of text and of things (faster now, still going)
+- [x] Lists of text and of things (faster than Python; sorting 1M texts takes a fifth of the time)
 
 ## Not done
 
