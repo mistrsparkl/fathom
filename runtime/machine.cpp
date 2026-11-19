@@ -359,38 +359,41 @@ namespace gc
 	{
 		static V* block = nullptr;
 		static size_t left = 0;
+		static const size_t sizeof_block = 4096;
 		if (!left)
 		{
-			left = 4096;
+			left = sizeof_block;  // (handed out from the start)
 			block = new V[left];
 			add_block(block, left, sizeof(V));
 		}
-		return &block[--left];
+		return &block[sizeof_block - left--];
 	}
 
 	static V* text_value()
 	{
 		static TextValue* block = nullptr;
 		static size_t left = 0;
+		static const size_t sizeof_block = 2048;
 		if (!left)
 		{
-			left = 2048;
+			left = sizeof_block;  // (handed out from the start)
 			block = new TextValue[left];
 			add_block(block, left, sizeof(TextValue));
 		}
-		return &block[--left];
+		return &block[sizeof_block - left--];
 	}
 	static V* full_value()  // the same for other values (one allocation each is slow)
 	{
 		static Full* block = nullptr;
 		static size_t left = 0;
+		static const size_t sizeof_block = 1024;
 		if (!left)
 		{
-			left = 1024;
+			left = sizeof_block;  // (handed out from the start)
 			block = new Full[left];
 			add_block(block, left, sizeof(Full));
 		}
-		return &block[--left];
+		return &block[sizeof_block - left--];
 	}
 
 	static V* thing_value(size_t parts)  // just big enough: a million things is less new memory to fill
@@ -409,7 +412,7 @@ namespace gc
 				(new (m.block + k * size) ThingValue())->slots = static_cast<unsigned short>(parts);
 			add_block(m.block, m.left, size);
 		}
-		return reinterpret_cast<V*>(m.block + --m.left * size);
+		return reinterpret_cast<V*>(m.block + (std::max<size_t>(16, 65536 / size) - m.left--) * size);  // (from the start)
 	}
 
 	static V* new_value(int size) { return size == 0 ? small_value() : size == 1 ? text_value() : size == 2 ? full_value() : thing_value(static_cast<size_t>(size - 3)); }
@@ -439,8 +442,10 @@ namespace gc
 				size_t take = std::min<size_t>(from.size(), 256);
 				ready.assign(from.end() - take, from.end());
 				from.resize(from.size() - take);
+				const size_t had = ready.size();
 				while (ready.size() < 256)
 					ready.push_back(new_value(size));
+				std::reverse(ready.begin() + static_cast<long long>(had), ready.end());  // (taken from the back: new ones in order of address)
 			}
 			v = ready.back();
 			ready.pop_back();
@@ -1616,12 +1621,28 @@ extern "C"
 		ThingKind* kind = last_kind;
 		if (zeros && !kind->typed.load(std::memory_order_acquire))  // the kind's parts known now: its things kept plain from here on
 		{
+			V* empty = cn_zero_part(true);  // (made before the lock: making a value may wait for a collector)
 			std::lock_guard<std::mutex> hold(kinds_lock);
 			if (!kind->typed.load(std::memory_order_relaxed) && std::strlen(zeros) == kind->fields.size())
 			{
 				kind->types = zeros;
+				kind->start.resize(kind->fields.size());
+				for (size_t k = 0; k < kind->start.size(); ++k)
+					if (zeros[k] == 'n')
+						kind->start[k].d = 0;
+					else
+						kind->start[k].v = zeros[k] == 't' ? empty : nullptr;
 				kind->typed.store(true, std::memory_order_release);
 			}
+		}
+		if (zeros && kind->typed.load(std::memory_order_acquire))  // its parts ready made
+		{
+			const size_t n = kind->start.size();
+			V* v = gc::track('k', 3 + static_cast<int>(n));
+			std::memcpy(parts_of(v), kind->start.data(), n * sizeof(Part));
+			thing_of(v)->kind = kind;
+			v->numbers = true;
+			return v;
 		}
 		return new_thing(kind, kind->fields.size());
 	}
@@ -1629,6 +1650,8 @@ extern "C"
 	V* cn_thing_zeroed(const char* spec, const char* zeros)  // a new thing, its number and text parts a shared 0 and "" (zeros: n, t or - for each part)
 	{
 		V* v = thing_with(spec, zeros);
+		if (v->numbers)
+			return v;  // (its parts are already 0 and "")
 		V* empty = cn_zero_part(true);
 		V* zero = v->numbers ? nullptr : cn_zero_part(false);
 		for (size_t k = 0; zeros[k]; ++k)

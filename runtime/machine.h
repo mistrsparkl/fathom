@@ -9,11 +9,14 @@
 #include <vector>
 
 #include <atomic>
+struct V;
+union Part { double d; V* v; };  // a thing's slot: a number part kept plain (numbers is true), or any other part
 struct ThingKind
 {
 	std::string name;
 	std::vector<std::string> fields;
 	std::string types;  // 'n' for each number part (kept plain), 't' text, '-' anything else; set once, before typed
+	std::vector<Part> start;  // a new thing's parts: 0, "" or nothing (set with types)
 	std::atomic<bool> typed{false};
 };
 
@@ -188,7 +191,6 @@ struct ThingValue : V  // a thing: its kind, then a slot for each part
 	const ThingKind* kind = nullptr;
 	Items* side = nullptr;  // every part boxed, for C++ that wants them so (numbers is false then)
 };
-union Part { double d; V* v; };  // a slot: a number part kept plain (numbers is true), or any other part
 inline ThingValue* thing_of(const V* v) { return static_cast<ThingValue*>(const_cast<V*>(v)); }
 inline Part* parts_of(const V* v) { return reinterpret_cast<Part*>(reinterpret_cast<char*>(const_cast<V*>(v)) + sizeof(ThingValue)); }
 inline bool is_small(char tag) { return tag == 'n' || tag == 'y'; }
