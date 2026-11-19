@@ -198,6 +198,7 @@ declare void @cn_meanwhile(ptr, ptr, i64)
 declare void @cn_statement()
 declare ptr @cn_young_count()
 @cn_stopping = external global i8
+@cn_sink = internal global [8 x i8] zeroinitializer
 @cn_failed_flag = external thread_local global i8
 declare void @cn_root(ptr, i64)
 declare void @cn_wait_for_others()
@@ -288,6 +289,11 @@ def nums_at():
 def parts_at():
     """Where a thing's parts begin (machine.cpp checks)."""
     return 16 + 2 * (4 if TARGET == "wasm" else 8)
+
+
+def last_key_at():
+    """Where a table keeps the text it found an entry with last, and then where that entry's value is (machine.cpp checks)."""
+    return 136 if TARGET == "wasm" else 168
 
 
 def boxed_at():
@@ -566,6 +572,65 @@ class Fn:
         self.place(done)
         return self.op(f"phi ptr [ {a}, %{fast_end} ], [ {b}, %{slow} ]")
 
+    def found_last(self, table, key):
+        """Whether the table's last entry was found with this text (the same value, not grown since), and where its value is."""
+        word = 4 if TARGET == "wasm" else 8
+        at = lambda k: self.op(f"getelementptr inbounds i8, ptr {table}, i64 {k}")
+        some = self.op(f"icmp ne ptr {key}, null")
+        same = self.op(f"and i1 {some}, {self.op(f'icmp eq ptr {self.op(f'load ptr, ptr {at(last_key_at())}')}, {key}')}")
+        safe = self.op(f"select i1 {some}, ptr {key}, ptr @cn_sink")
+        owned = self.op(f"load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {safe}, i64 2')}")
+        hit = self.op(f"and i1 {same}, {self.op(f'icmp eq i8 {owned}, 0')}")
+        return hit, lambda: self.op(f"load ptr, ptr {at(last_key_at() + word)}")
+
+    def table_has(self, table, key):
+        """'counts contains w'."""
+        hit, _ = self.found_last(table, key)
+        look, done = self.label("haslook"), self.label("hasdone")
+        start = self.here
+        self.branch(hit, done, look)
+        self.place(look)
+        b = self.op(f"call i1 @cn_table_has(ptr {table}, ptr {key})")
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi i1 [ true, %{start} ], [ {b}, %{look} ]")
+
+    def table_entry(self, table, key, line):
+        """'entry w of counts' (a problem if there is none)."""
+        hit, slot = self.found_last(table, key)
+        fast, look, done = self.label("entfast"), self.label("entlook"), self.label("entdone")
+        self.branch(hit, fast, look)
+        self.place(fast)
+        a = self.op(f"load ptr, ptr {slot()}")
+        self.jump(done)
+        self.place(look)
+        b = self.call("ptr", "cn_entry", ("ptr", table), ("ptr", key), ("i32", line), checked=True)
+        look_end = self.here
+        self.jump(done)
+        self.place(done)
+        return self.op(f"phi ptr [ {a}, %{fast} ], [ {b}, %{look_end} ]")
+
+    def table_put_number(self, table, key, d):
+        """'set entry w of counts to n': in place when the entry's number is the table's own."""
+        hit, slot = self.found_last(table, key)
+        check, fast, slow, done = self.label("putcheck"), self.label("putfast"), self.label("putslow"), self.label("putdone")
+        self.branch(hit, check, slow)
+        self.place(check)
+        box = self.op(f"load ptr, ptr {slot()}")
+        some = self.op(f"icmp ne ptr {box}, null")
+        safe = self.op(f"select i1 {some}, ptr {box}, ptr @cn_sink")
+        tag = self.op(f"load i8, ptr {safe}")
+        owned = self.op(f"load i8, ptr {self.op(f'getelementptr inbounds i8, ptr {safe}, i64 2')}")
+        mine = self.op(f"and i1 {self.op(f'icmp eq i8 {tag}, 110')}, {self.op(f'icmp ne i8 {owned}, 0')}")  # (110: 'n')
+        self.branch(self.op(f"and i1 {some}, {mine}"), fast, slow)
+        self.place(fast)
+        self.put(f"store double {d}, ptr {self.op(f'getelementptr inbounds i8, ptr {box}, i64 8')}")
+        self.jump(done)
+        self.place(slow)
+        self.put(f"call void @cn_entry_put_number(ptr {table}, ptr {key}, double {d})")
+        self.jump(done)
+        self.place(done)
+
     def jump(self, label):
         self.put(f"br label %{label}")
         self.ended = True
@@ -716,8 +781,9 @@ class Fn:
 
     def load(self, cpp, kind):
         value = self.op(f"load {ll_type(kind)}, ptr {self.where(cpp, kind)}")
-        if kind == TEXT and cpp not in self.module.shared:  # (see cn_append)
-            self.put(f"call void @cn_share(ptr {value})")
+        if kind == TEXT and cpp not in self.module.shared:  # it may be held elsewhere now: not grown in place (see cn_append)
+            at = self.op(f"select i1 {self.op(f'icmp eq ptr {value}, null')}, ptr @cn_sink, ptr {value}")
+            self.put(f"store i8 0, ptr {self.op(f'getelementptr inbounds i8, ptr {at}, i64 2')}")  # (V's owned)
         return value
 
     def append(self, cpp, parts):

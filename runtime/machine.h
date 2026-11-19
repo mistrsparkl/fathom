@@ -174,6 +174,8 @@ struct Full : V  // every other value: text, lists, tables, places, things and c
 	double x = 0, y = 0, z = 0;  // a place
 	void* command = nullptr;  // a command kept in a list or a table: its machine code
 	std::pair<const std::string, V*>* last = nullptr;  // a table's entry found last (most lines use one entry twice or more)
+	const V* last_key = nullptr;  // the text it was found with (forgotten at each collection: that text may be freed); set only with last
+	V** last_slot = nullptr;  // &last->second (machine code reads it when it has last_key)
 };
 
 inline std::vector<const std::pair<const std::string, V*>*> sorted_keys(const Full* f)  // a table's entries, in order of name

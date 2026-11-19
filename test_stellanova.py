@@ -1342,6 +1342,9 @@ def program_checks():
     assert out.stdout == ', a, abcdefg, abcdefgh, abcdefghi, abcdefghij1, abcdefghij1, abcdefghij2, b, Ω\n', out.stdout
     out = both('a pet has:\n  name (text)\n  age (a number)\nand the universe said i love you\n\ngenesis:\n  set pets to a list of pets\n  for each n in a list of ("Rexington the 2nd", "Rexington the 1st", "Rexingto", "Bo"):\n    conjure a pet as p\n    set the name of p to n\n    set the age of p to the size of n\n    add p to pets\n  for each p in sorted pets by name: scrawl the name of p\n  scrawl sorted a list of ("xxxxxxxxB", "xxxxxxxxA", "y") by each w becomes w plus "!"\nand the universe said i love you\n')
     assert out.stdout == 'Bo\nRexingto\nRexington the 1st\nRexington the 2nd\nxxxxxxxxA, xxxxxxxxB, y\n', out.stdout
+    # the entry found last, read and changed again; a copied table changed on its own; a removed entry
+    out = both('genesis:\n  set t to a table of numbers\n  set entry "a" of t to 1\n  set k to "a"\n  if t contains k: set entry k of t to (entry k of t) plus 5\n  set u to t\n  set entry k of u to 100\n  scrawl entry k of t, " ", entry k of u, " ", t contains "b"\n  remove entry k from t\n  scrawl t contains k\nand the universe said i love you\n')
+    assert out.stdout == '6 100 no\nno\n', out.stdout
     # 'a plus b plus c' grows one new text; the names it reads stay as they were
     out = both('genesis:\n  set u to "x" plus 1 plus "y"\n  set v to u plus "z" plus u plus 2\n  set w to (u plus v) plus (v plus u)\n  set parts to a list of ("p", "q")\n  set d to (join parts with ",") plus "!" plus 3\n  scrawl u, " ", v, " ", w, " ", d, " ", parts\nand the universe said i love you\n')
     assert out.stdout == 'x1y x1yzx1y2 x1yx1yzx1y2x1yzx1y2x1y p,q!3 p, q\n', out.stdout

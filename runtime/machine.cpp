@@ -6,6 +6,11 @@
 #include <cstddef>
 static_assert(sizeof(ThingValue) == 16 + 2 * sizeof(void*) && sizeof(Part) == 8, "machine.py's parts_at needs changing");
 #ifdef __wasm__
+static_assert(offsetof(Full, last_key) == 136 && offsetof(Full, last_slot) == 140, "machine.py's last_key_at needs changing");
+#else
+static_assert(offsetof(Full, last_key) == 168 && offsetof(Full, last_slot) == 176, "machine.py's last_key_at needs changing");
+#endif
+#ifdef __wasm__
 static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 64, "machine.py's nums_at and boxed_at need changing");
 #else
 static_assert(offsetof(Full, nums) == 16 && offsetof(Full, boxed) == 64, "machine.py's nums_at and boxed_at need changing");
@@ -264,6 +269,7 @@ namespace gc
 				reach(x);
 			for (const auto& [key, x] : full(v)->table)
 				reach(x);
+			full(v)->last_key = nullptr;  // (that text may be freed now, and made again as another)
 		}
 		size_t kept = 0;
 		for (const Block& b : blocks)  // every value handed out, block by block
@@ -319,6 +325,7 @@ namespace gc
 					f->kind = nullptr;
 					f->command = nullptr;
 					f->last = nullptr;
+					f->last_key = nullptr;
 					spare[2].push_back(v);
 				}
 			}
@@ -780,6 +787,7 @@ static V* copy_of(const V* v)  // a copy that shares until changed
 	*to = *from;
 	out->marked = out->shared = false;
 	to->last = nullptr;
+	to->last_key = nullptr;
 	for (auto& x : to->boxed)
 		share(x);
 	for (auto& [key, x] : to->table)
@@ -947,7 +955,7 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 }
 
 // machine.py's add_number and list_number use these places.
-static_assert(offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's nums_place and count_holders need changing");
+static_assert(offsetof(V, owned) == 2 && offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's load, nums_place and count_holders need changing");
 static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == sizeof(void*) + 4, "machine.py's nums_place needs changing");
 
 // Items, boxed (plain number lists get boxed).
@@ -987,10 +995,19 @@ static std::pair<const std::string, V*>* entry_of(V* table, V* key)  // the entr
 {
 	Full* t = full(table);
 	const std::string& name = text_of(key);
-	if (t->last && t->last->first == name)
+	if (t->last && t->last_key == key && !key->owned)  // (owned text may have grown since)
 		return t->last;
+	if (t->last && t->last->first == name)
+	{
+		t->last_key = key;
+		return t->last;
+	}
 	auto it = t->table.find(name);
-	return it == t->table.end() ? nullptr : (t->last = &*it);
+	if (it == t->table.end())
+		return nullptr;
+	t->last_key = key;
+	t->last_slot = &it->second;
+	return t->last = &*it;
 }
 static size_t count_of(const V* list) { return full(list)->numbers ? full(list)->nums.size() : full(list)->boxed.size(); }
 
@@ -1515,7 +1532,7 @@ extern "C"
 	{
 		auto* e = entry_of(table, key);
 		if (!e)
-			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first;
+			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first, full(table)->last_key = key, full(table)->last_slot = &e->second;
 		V* old = e->second;
 		e->second = share(x);
 		release(old);
@@ -1524,7 +1541,7 @@ extern "C"
 	{
 		auto* e = entry_of(table, key);
 		if (!e)
-			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first;
+			e = full(table)->last = &*full(table)->table.try_emplace(text_of(key)).first, full(table)->last_key = key, full(table)->last_slot = &e->second;
 		if (e->second && e->second->tag == 'n' && e->second->owned)
 		{
 			e->second->d = d;
@@ -1552,6 +1569,7 @@ extern "C"
 	void cn_entry_remove(V* table, V* key, int line)
 	{
 		full(table)->last = nullptr;
+		full(table)->last_key = nullptr;
 		GUARDED(,
 			if (!full(table)->table.erase(text_of(key)))
 				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table to remove.");)
@@ -1976,7 +1994,11 @@ extern "C"
 			thing->numbers = false;
 		}
 		else
+		{
 			*full(thing) = *full(fresh_copy);
+			full(thing)->last = nullptr;  // (it pointed into the copy's table)
+			full(thing)->last_key = nullptr;
+		}
 		thing->marked = marked, thing->shared = shared;
 	}
 }
