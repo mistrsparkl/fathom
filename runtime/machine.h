@@ -169,7 +169,7 @@ struct Full : V  // every other value: text, lists, tables, places, things and c
 {
 	Nums nums;  // plain numbers, at a fixed place
 	Items boxed;  // items or parts, in order: use cn_items
-	const ThingKind* kind = nullptr;
+	const ThingKind* kind = nullptr;  // a list of things laid flat: their kind (each thing's parts side by side in nums)
 	Table table;  // (in no order: sorted_keys gives them in order)
 	double x = 0, y = 0, z = 0;  // a place
 	void* command = nullptr;  // a command kept in a list or a table: its machine code

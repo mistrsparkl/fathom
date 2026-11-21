@@ -128,6 +128,7 @@ declare double @cn_list_number(ptr, i64)
 declare double @cn_list_at_number(ptr, double, i32)
 declare ptr @cn_list_at(ptr, double, i32)
 declare ptr @cn_list_item(ptr, i64)
+declare ptr @cn_list_flat_item(ptr, i64, ptr)
 declare void @cn_list_put(ptr, double, ptr, i32)
 declare void @cn_list_put_number(ptr, double, double, i32)
 declare void @cn_list_remove_item(ptr, double, i32)
@@ -164,6 +165,7 @@ declare void @cn_entry_put_number(ptr, ptr, double)
 declare ptr @cn_sorted_numbers(ptr)
 declare ptr @cn_sorted_texts(ptr)
 declare ptr @cn_thing_zeroed(ptr, ptr)
+declare ptr @cn_thing_zeroed_into(ptr, ptr, ptr)
 declare ptr @cn_join_texts(ptr, ptr)
 declare ptr @cn_split(ptr, ptr, i32)
 declare void @cn_assign(ptr, ptr)
@@ -442,6 +444,19 @@ class Fn:
         at = k0 if size == "i64" else self.op(f"trunc i64 {k0} to i32")
         return self.op(f"getelementptr inbounds ptr, ptr {first}, {size} {at}"), fast, slow
 
+    def flat_place(self, lst, index, n, k):
+        """Number part k of item index of a list of things laid flat (n parts each), if there."""
+        _, data, count, _, size = self.nums_place(lst)
+        ranged, fast, slow = self.label("fwhole"), self.label("ffast"), self.label("fslow")
+        whole = self.op(f"fptosi double {index} to i64")
+        self.branch(self.op(f"fcmp oeq double {self.op(f'sitofp i64 {whole} to double')}, {index}"), ranged, slow)
+        self.place(ranged)
+        at = self.op(f"add i64 {self.op(f'mul i64 {self.op(f'sub i64 {whole}, 1')}, {n}')}, {k}")
+        n_all = self.op(f"zext i32 {self.op(f'load i32, ptr {count}')} to i64")
+        self.branch(self.op(f"icmp ult i64 {at}, {n_all}"), fast, slow)  # (a list not laid flat keeps none: always the slow way)
+        self.place(fast)
+        return self.op(f"getelementptr inbounds double, ptr {self.op(f'load ptr, ptr {data}')}, i64 {at}"), fast, slow
+
     def read_item(self, lst, index, line):
         """'item i of pets', in place when it can."""
         at, fast, slow = self.item_place(lst, index)
@@ -554,20 +569,24 @@ class Fn:
         self.place(done)
         return self.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow} ]")
 
-    def list_item(self, lst, k):
+    def list_item(self, lst, k, scratch=None):
         """Item k (from 0) of a list that has it, for 'for each': in place when the list holds boxed items (not shared: the loop's name can't change it, and the list is shared while it goes round)."""
         flag = self.op(f"getelementptr inbounds i8, ptr {lst}, i64 3")
-        fast, slow, done = self.label("itemfast"), self.label("itemslow"), self.label("itemgot")
-        self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), fast, slow)
-        self.place(fast)
+        fast, slow, done, held = self.label("itemfast"), self.label("itemslow"), self.label("itemgot"), self.label("itemheld")
+        self.branch(self.op(f"icmp eq i8 {self.op(f'load i8, ptr {flag}')}, 0"), held, slow)
+        self.place(held)
         size = "i64" if TARGET == "wasm" else "i32"
+        word = 4 if TARGET == "wasm" else 8
+        n = self.op(f"load i32, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {boxed_at() + word}')}")
+        self.branch(self.op(f"icmp ult i64 {k}, {self.op(f'zext i32 {n} to i64')}"), fast, slow)  # (a list laid flat has no boxed items)
+        self.place(fast)
         first = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds i8, ptr {lst}, i64 {boxed_at()}')}")
         index = k if size == "i64" else self.op(f"trunc i64 {k} to i32")
         a = self.op(f"load ptr, ptr {self.op(f'getelementptr inbounds ptr, ptr {first}, {size} {index}')}")
         fast_end = self.here
         self.jump(done)
         self.place(slow)
-        b = self.op(f"call ptr @cn_list_item(ptr {lst}, i64 {k})")
+        b = self.op(f"call ptr @cn_list_flat_item(ptr {lst}, i64 {k}, ptr {scratch})" if scratch else f"call ptr @cn_list_item(ptr {lst}, i64 {k})")
         self.jump(done)
         self.place(done)
         return self.op(f"phi ptr [ {a}, %{fast_end} ], [ {b}, %{slow} ]")
@@ -762,7 +781,7 @@ class Fn:
         made = f"  {value} = call ptr @"
         for line in reversed(self.lines[-8:]):
             if line.startswith(made):
-                return line[len(made):].startswith(("cn_thing(", "cn_thing_zeroed(", "cn_list_new(", "cn_dup("))
+                return line[len(made):].startswith(("cn_thing(", "cn_thing_zeroed(", "cn_thing_zeroed_into(", "cn_list_new(", "cn_dup("))
         return False
 
     def slot(self, cpp, kind):
@@ -840,6 +859,10 @@ class Fn:
         return self.op(f"phi ptr [ {have}, %{before} ], [ {have}, %{look} ], [ {made}, %{copy} ]")
 
     def store(self, cpp, kind, value):
+        made = f"  {value} = call ptr @cn_thing_zeroed("
+        if kind.startswith("thing ") and self.lines and self.lines[-1].startswith(made):  # (a new thing made in place of the one the name holds)
+            old = self.tmp()
+            self.lines[-1:] = [f"  {old} = load ptr, ptr {self.where(cpp, kind)}", self.lines[-1].replace("@cn_thing_zeroed(", f"@cn_thing_zeroed_into(ptr {old}, ")]
         if kind.startswith("thing ") and not self.fresh(value):  # (into the thing already there, when only this name holds it)
             self.assign_thing(self.where(cpp, kind), value, kind)
             return
@@ -1056,6 +1079,11 @@ def each_in(f, cpp, kind, seq, body):
     items = f.hold(f.op(f"call ptr @cn_dup(ptr {emit(f, seq)})"))
     size = f.op(f"call i64 @cn_count_whole(ptr {items})")
     k = counter(f, "i")
+    scratch = None
+    if kind.startswith("thing "):  # (a list laid flat fills this thing for each item)
+        scratch = f"%flat{f.label('')}"
+        f.entry.append(f"  {scratch} = alloca ptr")
+        f.entry.append(f"  store ptr null, ptr {scratch}")
 
     def test():
         now = f.op(f"load i64, ptr {k}")
@@ -1063,7 +1091,7 @@ def each_in(f, cpp, kind, seq, body):
         more, out = f.label("item"), f.label("noitem")
         f.branch(go, more, out)
         f.place(more)
-        got = f.list_number(items, now) if kind == NUMBER else f.unbox(f.list_item(items, now), kind)
+        got = f.list_number(items, now) if kind == NUMBER else f.unbox(f.list_item(items, now, scratch), kind)
         f.put(f"store {ll_type(kind)} {got}, ptr {f.slot(cpp, kind)}")
         stored = f.label("itemkept")  # (reading the item may have made blocks of its own)
         f.place(stored)

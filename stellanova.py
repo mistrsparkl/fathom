@@ -1463,6 +1463,26 @@ def thing_part_ir(owner_ir, kind, member, part_kind, owner_own=None):
     return get, put, own
 
 
+def flat_part_ir(item, k, line):
+    """'the x of item i of dots': read straight from the list when it is laid flat."""
+    seq, index = item.flat
+
+    def ir(f):
+        lst, at = machine.emit(f, seq), machine.emit(f, index)
+        place, fast, slow = f.flat_place(lst, at, len(machine.THINGS[item.kind]), k)
+        done = f.label("flatread")
+        a = f.op(f"load double, ptr {place}")
+        f.jump(done)
+        f.place(slow)
+        thing = f.unbox(f.read_item(lst, at, line), item.kind)
+        b = f.thing_number(f.something(thing, f.spec(item.kind), k, line), k)
+        slow_end = f.here
+        f.jump(done)
+        f.place(done)
+        return f.op(f"phi double [ {a}, %{fast} ], [ {b}, %{slow_end} ]")
+    return ir
+
+
 WORLD_KINDS = {}  # shared names: C++ name -> kind
 LIBRARY_HEADS = {}  # library -> C++ it needs above its words
 LIBRARY_VALUES = {}  # a library word for a value: its words -> the library's name
@@ -2243,6 +2263,7 @@ class Expr:
                       put if seq.writable else None)
             v.ir = lambda f: f.read_number_item(machine.emit(f, seq), machine.emit(f, index), line) if v.kind == NUMBER else \
                 f.unbox(f.read_item(machine.emit(f, seq), machine.emit(f, index), line), v.kind)
+            v.flat = (seq, index)  # (its number parts read straight from a list laid flat)
             if seq.writable and v.kind == NUMBER:  # in place, in the machine code itself
                 v.ir_store = lambda f, x: f.write_number_item(machine.owned(f, seq), machine.emit(f, index), x, line)
             elif seq.writable:
@@ -2805,6 +2826,8 @@ def part_of(owner, key, line=0):
         v.ir, v.ir_store, v.ir_own = thing_part_ir(
             lambda f: f.something(machine.emit(f, owner), f.spec(owner.kind), k, line), owner.kind, member, kind,
             lambda f: f.something(machine.owned(f, owner), f.spec(owner.kind), k, line))
+        if kind == NUMBER and getattr(owner, "flat", None):
+            v.ir = flat_part_ir(owner, k, line)
     if not owner.writable:
         v.ir_store = v.ir_own = None
     if key == ("birth",) and is_thing(owner.kind) and owner.kind in FIELDS.get(("existence",), {}) and owner.writable:

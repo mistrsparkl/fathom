@@ -438,6 +438,9 @@ def program_checks():
                ]))
     assert out.stdout == "Tom makes a sound\n3\nTom is 3\nTom makes a sound\n", repr(out.stdout)
 
+    # Lists of things laid flat: copies, loops in loops, kept loop items, in-place conjure.
+    both('a dot has:\n  x (a number)\n  label (text)\nand the universe said i love you\n\ngenesis:\n  set dots to a list of dots\n  set i to 1\n  as long as 4 exceeds i:\n    set d to conjure a dot\n    set the x of d to i\n    set the label of d to "p"\n    set the label of d to the label of d plus "q"\n    add d to dots\n    set i to i plus 1\n  scrawl d\n  set copy to dots\n  set the x of item 1 of copy to 50\n  scrawl the x of item 1 of dots, " ", the x of item 1 of copy\n  set keep to a list of dots\n  set best to item 1 of dots\n  for each p in dots:\n    for each b in dots:\n      if the x of b exceeds the x of p: add b to keep\n    if the x of p exceeds the x of best: set best to p\n  scrawl best\n  scrawl keep\n  set held to a list of dots\n  for each p in dots:\n    set one to p\n    add one to held\n  scrawl held\n  add 5 to the x of item 2 of dots\n  scrawl dots\n  scrawl the label of item 3 of dots, " ", the size of dots\n  set dots to reversed dots\n  remove item 1 from dots\n  scrawl dots\n  set dots to a list of dots\n  set d to conjure a dot\n  set other to d\n  set d to conjure a dot\n  set the x of d to 7\n  scrawl other, " ", d\n  add d to dots\n  add d to dots\n  set the x of d to 8\n  add d to dots\n  scrawl dots\n  scrawl the x of item 3 of dots, " ", the x of item 2 of dots\n  set saved to dots\n  set dots to sorted dots by x, biggest first\n  scrawl dots, " ", saved\n  for each p in dots:\n    set d to p\n  scrawl d\n' + END)
+
     # Markup: HTML's loose ways, and XML.
     out = both('use: markup.stella\n\ngenesis:\n'
                '  set page to "<!DOCTYPE html><html><body><!-- note --><p class=\'intro\'>Fish &amp; chips<br>today</p><ul><li><a href=" plus '

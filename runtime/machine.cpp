@@ -267,6 +267,15 @@ namespace gc
 			}
 			for (V* x : full(v)->boxed)
 				reach(x);
+			if (const ThingKind* kind = full(v)->kind)  // (a list laid flat)
+			{
+				const size_t n = kind->start.size();
+				const Part* p = reinterpret_cast<const Part*>(full(v)->nums.data);
+				for (size_t at = 0; at < full(v)->nums.count; at += n)
+					for (size_t k = 0; k < n; ++k)
+						if (kind->types[k] == 't')
+							reach(p[at + k].v);
+			}
 			for (const auto& [key, x] : full(v)->table)
 				reach(x);
 			full(v)->last_key = nullptr;  // (that text may be freed now, and made again as another)
@@ -777,7 +786,7 @@ static V* copy_of(const V* v)  // a copy that shares until changed
 	V* out = fresh(v->tag);
 	const Full* from = full(v);
 	Full* to = full(out);
-	if (v->tag == 'l' && !from->numbers)  // (only the parts these use: quicker than copying the whole value)
+	if (v->tag == 'l' && !from->numbers && !from->kind)  // (only the parts these use: quicker than copying the whole value)
 	{
 		to->boxed.resize(from->boxed.size());
 		for (size_t k = 0; k < from->boxed.size(); ++k)
@@ -958,10 +967,44 @@ static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
 static_assert(offsetof(V, owned) == 2 && offsetof(V, numbers) == 3 && offsetof(V, shared) == 4, "machine.py's load, nums_place and count_holders need changing");
 static_assert(offsetof(Nums, count) == sizeof(void*) && offsetof(Nums, room) == sizeof(void*) + 4, "machine.py's nums_place needs changing");
 
+// A list of things laid flat: only things of one kind with number and text parts, made in the usual way (parts plain).
+static bool layable(const V* item)
+{
+	if (!item || item->tag != 'k' || !item->numbers)
+		return false;
+	const ThingKind* kind = thing_of(item)->kind;
+	return kind->typed.load(std::memory_order_acquire) && item->slots == kind->start.size() && !kind->start.empty()
+		&& kind->types.find('-') == std::string::npos;
+}
+static void unflat(const V* list)  // each thing its own value again (anything but machine code's quick ways in)
+{
+	if (list->tag != 'l')
+		return;
+	Full* f = const_cast<Full*>(full(list));
+	const ThingKind* kind = f->kind;
+	if (!kind)
+		return;
+	const size_t n = kind->start.size();
+	Items things;
+	things.reserve(f->nums.count / n);
+	for (size_t at = 0; at < f->nums.count; at += n)
+	{
+		V* v = gc::track('k', 3 + static_cast<int>(n));  // (young until the line ends: kept; the list still holds the texts)
+		std::memcpy(parts_of(v), f->nums.data + at, n * sizeof(Part));
+		thing_of(v)->kind = kind;
+		v->numbers = true;
+		things.push_back(v);
+	}
+	f->boxed = std::move(things);
+	f->nums.clear();
+	f->kind = nullptr;
+}
+
 // Items, boxed (plain number lists get boxed).
 Items& cn_items(const V* v)
 {
 	Full* f = const_cast<Full*>(full(v));
+	unflat(v);
 	if (v->tag == 'k')  // a thing's parts go in boxes on the side (kept plain again by cn_part_number_put)
 	{
 		ThingValue* t = thing_of(v);
@@ -1009,7 +1052,11 @@ static std::pair<const std::string, V*>* entry_of(V* table, V* key)  // the entr
 	t->last_slot = &it->second;
 	return t->last = &*it;
 }
-static size_t count_of(const V* list) { return full(list)->numbers ? full(list)->nums.size() : full(list)->boxed.size(); }
+static size_t count_of(const V* list)
+{
+	const Full* f = full(list);
+	return f->numbers ? f->nums.size() : list->tag == 'l' && f->kind ? f->nums.size() / f->kind->start.size() : f->boxed.size();
+}
 
 // A list's item number: counted from 1, as people count.
 static size_t index_of(const V* list, double number, int line)
@@ -1018,6 +1065,7 @@ static size_t index_of(const V* list, double number, int line)
 	if (number != std::floor(number) || number < 1 || number > static_cast<double>(size))
 		stellanova::fail(line, "there is no item " + stellanova::text(number) + " in a list of " + stellanova::text(static_cast<double>(size))
 			+ " item" + (size == 1 ? "" : "s") + ". Items are counted from 1.");
+	unflat(list);
 	return static_cast<size_t>(number) - 1;
 }
 
@@ -1354,6 +1402,7 @@ extern "C"
 	void cn_list_add_number(V* list, double d)
 	{
 		Full* f = full(list);
+		unflat(list);
 		if (f->numbers || f->boxed.empty())
 		{
 			f->numbers = true;
@@ -1364,7 +1413,23 @@ extern "C"
 	}
 	void cn_list_add(V* list, V* item)
 	{
-		if (item && item->tag == 'n' && (full(list)->numbers || full(list)->boxed.empty()))
+		Full* f = full(list);
+		if (layable(item) && (f->kind == thing_of(item)->kind || (!f->kind && f->nums.empty() && f->boxed.empty())))
+		{
+			const ThingKind* kind = thing_of(item)->kind;  // its parts copied in (texts never change: nothing to count)
+			const size_t n = kind->start.size();
+			f->kind = kind;
+			f->numbers = false;
+			if (f->nums.count + n > f->nums.room)
+				f->nums.reserve(std::max<size_t>(f->nums.count + n, static_cast<size_t>(f->nums.room) * 2));
+			Part* to = reinterpret_cast<Part*>(f->nums.data + f->nums.count);
+			std::memcpy(to, parts_of(item), n * sizeof(Part));
+			for (size_t k = 0; k < n; ++k)
+				if (kind->types[k] == 't' && to[k].v)
+					to[k].v->owned = false;  // (the thing may still grow it in place)
+			f->nums.count += static_cast<uint32_t>(n);
+		}
+		else if (item && item->tag == 'n' && (full(list)->numbers || full(list)->boxed.empty()) && !f->kind)
 			cn_list_add_number(list, item->d);
 		else
 			cn_items(list).push_back(share(item));
@@ -1393,8 +1458,27 @@ extern "C"
 	}
 	V* cn_list_item(V* list, long long k)  // for 'for each': k is always there
 	{
+		unflat(list);
 		const Full* f = full(list);
 		return f->numbers ? cn_box_number(f->nums[static_cast<size_t>(k)]) : share(f->boxed[static_cast<size_t>(k)]);
+	}
+	V* cn_list_flat_item(V* list, long long k, V** scratch)  // for 'for each': a list laid flat fills one thing again and again, while nothing else holds it
+	{
+		const Full* f = full(list);
+		const ThingKind* kind = list->tag == 'l' ? f->kind : nullptr;
+		if (!kind)
+			return cn_list_item(list, k);
+		const size_t n = kind->start.size();
+		V* v = *scratch;
+		if (!v || v->shared)
+		{
+			v = gc::track('k', 3 + static_cast<int>(n));
+			thing_of(v)->kind = kind;
+			v->numbers = true;
+			*scratch = v;
+		}
+		std::memcpy(parts_of(v), f->nums.data + static_cast<size_t>(k) * n, n * sizeof(Part));
+		return v;
 	}
 	V* cn_own_item(V* list, double number, int line)  // item 'number' is about to be changed (the list keeps the copy)
 	{
@@ -1496,6 +1580,7 @@ extern "C"
 			if (count_of(list) == 0)
 				stellanova::fail(line, "the list is empty, so I can't pick a random item.");
 			size_t k = static_cast<size_t>(stellanova::random(1, static_cast<double>(count_of(list)), line)) - 1;
+			unflat(list);
 			return full(list)->numbers ? cn_box_number(full(list)->nums[k]) : full(list)->boxed[k];)
 	}
 	V* cn_list_last(V* list, int line)
@@ -1503,6 +1588,7 @@ extern "C"
 		GUARDED(cn_box_number(0),
 			if (count_of(list) == 0)
 				stellanova::fail(line, "the list is empty, so it has no last item.");
+			unflat(list);
 			return full(list)->numbers ? cn_box_number(full(list)->nums.back()) : full(list)->boxed.back();)
 	}
 	double cn_list_stat(int which, V* list, int line)  // 0 sum, 1 average, 2 biggest, 3 smallest
@@ -1679,6 +1765,23 @@ extern "C"
 				part_slot(v, k) = zero;
 		return v;
 	}
+	V* cn_thing_zeroed_into(V* old, const char* spec, const char* zeros)  // 'set d to conjure a dot': d's thing made new in place, when only d holds it
+	{
+		static thread_local const char* last_spec = nullptr;
+		static thread_local const ThingKind* last_kind = nullptr;
+		if (old && spec == last_spec && old->tag == 'k' && !old->shared && old->numbers && thing_of(old)->kind == last_kind)
+		{
+			std::memcpy(parts_of(old), last_kind->start.data(), last_kind->start.size() * sizeof(Part));
+			return old;
+		}
+		V* v = cn_thing_zeroed(spec, zeros);
+		const ThingKind* kind = thing_of(v)->kind;
+		const bool plain = v->numbers && kind->typed.load(std::memory_order_acquire) && v->slots == kind->start.size()
+			&& kind->types.find('-') == std::string::npos;
+		last_spec = plain ? spec : nullptr;
+		last_kind = plain ? kind : nullptr;
+		return v;
+	}
 	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
 	{
 		GUARDED(nullptr,
@@ -1832,6 +1935,7 @@ extern "C"
 	V* cn_reversed(V* list)  // a copy, back to front: any kind of item
 	{
 		V* out = copy_of(list);
+		unflat(out);
 		Full* f = full(out);
 		if (f->numbers)
 			std::reverse(f->nums.begin(), f->nums.end());
