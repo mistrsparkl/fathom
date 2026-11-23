@@ -1,7 +1,7 @@
 note: CSV spreadsheets. Use: use: spreadsheet  Each row is a list of text.
 
 code:
-  namespace stellanova_spreadsheet
+  namespace fathom_spreadsheet
   {
   	inline std::vector<std::vector<std::string>> rows_of(const std::string& s)
   	{
@@ -75,15 +75,15 @@ python:
       csv.writer(out, lineterminator="\n").writerows(rows)
       return out.getvalue()
 
-to rows of the spreadsheet, given text (text), returning a list of lists of text = stellanova_spreadsheet::rows_of({text})
+to rows of the spreadsheet, given text (text), returning a list of lists of text = fathom_spreadsheet::rows_of({text})
   runs: rows_of({text})
-  web: stellanova_spreadsheet::rows_of({text})
-to the spreadsheet of, given rows (a list of lists of text), returning text = stellanova_spreadsheet::text_of({rows})
+  web: fathom_spreadsheet::rows_of({text})
+to the spreadsheet of, given rows (a list of lists of text), returning text = fathom_spreadsheet::text_of({rows})
   runs: text_of({rows})
-  web: stellanova_spreadsheet::text_of({rows})
+  web: fathom_spreadsheet::text_of({rows})
 
 javascript:
-  const stellanova_spreadsheet = {
+  const fathom_spreadsheet = {
     rows_of(s) {
       const rows = [];
       let row = [], cell = "", quoted = false, any = false;

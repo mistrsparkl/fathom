@@ -1,10 +1,10 @@
 title: Places, asking, files and problems
 card: Chapter 8 | Places | Where things are
 say:
-  Games and drawings need to know where things are. In Stellanova, a place is a value too.
+  Games and drawings need to know where things are. In Fathom, a place is a value too.
 uncard
 
-new: places.stella
+new: places.fathom
 type:
   genesis:
     set home to 100 horizontal 50 vertical

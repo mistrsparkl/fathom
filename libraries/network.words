@@ -9,7 +9,7 @@ include: <random>
 link: ws2_32
 
 code:
-  namespace stellanova_network
+  namespace fathom_network
   {
   	struct Link
   	{
@@ -37,7 +37,7 @@ code:
   		std::lock_guard<std::mutex> hold(lock);
   		auto at = links.find((int)n);
   		if (at == links.end())
-  			stellanova::fail(line, "there is no open connection " + stellanova::text(n) + ".");
+  			fathom::fail(line, "there is no open connection " + fathom::text(n) + ".");
   		return at->second;
   	}
   	inline addrinfo* lookup(const std::string& host, double port, bool udp, int line)
@@ -47,7 +47,7 @@ code:
   		hints.ai_family = AF_INET;
   		hints.ai_socktype = udp ? SOCK_DGRAM : SOCK_STREAM;
   		if (getaddrinfo(host.c_str(), std::to_string((int)port).c_str(), &hints, &found) != 0 || !found)
-  			stellanova::fail(line, "I couldn't find the computer \"" + host + "\".");
+  			fathom::fail(line, "I couldn't find the computer \"" + host + "\".");
   		return found;
   	}
   	inline SOCKET open_tcp(const std::string& host, double port, int line)
@@ -60,7 +60,7 @@ code:
   		{
   			if (s != INVALID_SOCKET)
   				closesocket(s);
-  			stellanova::fail(line, "I couldn't connect to " + host + " on port " + stellanova::text(port) + ".");
+  			fathom::fail(line, "I couldn't connect to " + host + " on port " + fathom::text(port) + ".");
   		}
   		return s;
   	}
@@ -81,7 +81,7 @@ code:
   		at.sin_port = htons((u_short)port);
   		at.sin_addr.s_addr = htonl(INADDR_ANY);
   		if (s == INVALID_SOCKET || bind(s, (sockaddr*)&at, sizeof at) != 0 || listen(s, SOMAXCONN) != 0)
-  			stellanova::fail(line, "I couldn't listen on port " + stellanova::text(port) + " (another program may be using it).");
+  			fathom::fail(line, "I couldn't listen on port " + fathom::text(port) + " (another program may be using it).");
   		Link l;
   		l.s = s;
   		return add(l);
@@ -90,7 +90,7 @@ code:
   	{
   		SOCKET s = accept(get(listener, line).s, nullptr, nullptr);
   		if (s == INVALID_SOCKET)
-  			stellanova::fail(line, "I couldn't take a connection on " + stellanova::text(listener) + ".");
+  			fathom::fail(line, "I couldn't take a connection on " + fathom::text(listener) + ".");
   		Link l;
   		l.s = s;
   		return add(l);
@@ -102,7 +102,7 @@ code:
   		{
   			int sent = send(s, data.data() + done, (int)(data.size() - done), 0);
   			if (sent <= 0)
-  				stellanova::fail(line, "the connection is closed, so I couldn't send to it.");
+  				fathom::fail(line, "the connection is closed, so I couldn't send to it.");
   			done += (size_t)sent;
   		}
   	}
@@ -125,7 +125,7 @@ code:
   	{
   		while (l.kept.size() < n)
   			if (!fill(l))
-  				stellanova::fail(line, "the connection closed in the middle of a message.");
+  				fathom::fail(line, "the connection closed in the middle of a message.");
   		return take(l, n);
   	}
 
@@ -156,7 +156,7 @@ code:
   	inline double connect_websocket(const std::string& address, int line)
   	{
   		if (address.rfind("ws://", 0) != 0)
-  			stellanova::fail(line, "a WebSocket address starts with ws:// (like \"ws://localhost:8080/chat\"); wss:// isn't there yet.");
+  			fathom::fail(line, "a WebSocket address starts with ws:// (like \"ws://localhost:8080/chat\"); wss:// isn't there yet.");
   		std::string rest = address.substr(5), path = "/";
   		if (rest.find('/') != std::string::npos)
   			path = rest.substr(rest.find('/')), rest = rest.substr(0, rest.find('/'));
@@ -171,10 +171,10 @@ code:
   		              "Sec-WebSocket-Key: c3RlbGxhbm92YXdzIGtleQ==\r\nSec-WebSocket-Version: 13\r\n\r\n", line);
   		while (l.kept.find("\r\n\r\n") == std::string::npos)
   			if (!fill(l))
-  				stellanova::fail(line, "the WebSocket at " + address + " closed before saying hello.");
+  				fathom::fail(line, "the WebSocket at " + address + " closed before saying hello.");
   		std::string hello = take(l, l.kept.find("\r\n\r\n") + 4);
   		if (hello.find(" 101 ") == std::string::npos)  // shortcut: the server's Sec-WebSocket-Accept isn't checked
-  			stellanova::fail(line, "the address " + address + " didn't answer as a WebSocket.");
+  			fathom::fail(line, "the address " + address + " didn't answer as a WebSocket.");
   		return add(l);
   	}
   	inline std::string receive_frame(Link& l, int line)  // the next whole message; "" when the other side closes
@@ -249,7 +249,7 @@ code:
   		for (double x : bytes)
   		{
   			if (x < 0 || x > 255 || x != (double)(int)x)
-  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  				fathom::fail(line, "a byte is a whole number from 0 to 255, not " + fathom::text(x) + ".");
   			out += (char)(unsigned char)x;
   		}
   		return out;
@@ -266,7 +266,7 @@ code:
   		Link l = get(c, line);
   		if (l.web)
   		{
-  			try { send_frame(l, 8, "", line); } catch (const stellanova::Problem&) {}
+  			try { send_frame(l, 8, "", line); } catch (const fathom::Problem&) {}
   		}
   		closesocket(l.s);
   		std::lock_guard<std::mutex> hold(lock);
@@ -282,7 +282,7 @@ code:
   		at.sin_port = htons((u_short)port);
   		at.sin_addr.s_addr = htonl(INADDR_ANY);
   		if (s == INVALID_SOCKET || bind(s, (sockaddr*)&at, sizeof at) != 0)
-  			stellanova::fail(line, "I couldn't open the UDP port " + stellanova::text(port) + " (another program may be using it).");
+  			fathom::fail(line, "I couldn't open the UDP port " + fathom::text(port) + " (another program may be using it).");
   		Link l;
   		l.s = s;
   		l.udp = true;
@@ -295,7 +295,7 @@ code:
   		int sent = sendto(s, message.data(), (int)message.size(), 0, found->ai_addr, (int)found->ai_addrlen);
   		freeaddrinfo(found);
   		if (sent < 0)
-  			stellanova::fail(line, "I couldn't send to " + host + ".");
+  			fathom::fail(line, "I couldn't send to " + host + ".");
   	}
   	inline std::string receive_udp(double c, int line)
   	{
@@ -467,63 +467,63 @@ python:
   def net_receive_udp(c):
       return _get(c).s.recvfrom(65536)[0].decode("utf-8", "replace")
 
-to connect to, given host (text) and port (a number), returning a number = stellanova_network::connect_to({host}, {port}, {line})
+to connect to, given host (text) and port (a number), returning a number = fathom_network::connect_to({host}, {port}, {line})
   runs: net_connect({host}, {port})
-  web: await stellanova_network.connect({host}, {port}, {line})
-to listen on port, given port (a number), returning a number = stellanova_network::listen_on({port}, {line})
+  web: await fathom_network.connect({host}, {port}, {line})
+to listen on port, given port (a number), returning a number = fathom_network::listen_on({port}, {line})
   runs: net_listen({port})
-  web: await stellanova_network.listen({port}, {line})
-to accept a connection on, given listener (a number), returning a number = stellanova_network::accept_on({listener}, {line})
+  web: await fathom_network.listen({port}, {line})
+to accept a connection on, given listener (a number), returning a number = fathom_network::accept_on({listener}, {line})
   runs: net_accept({listener})
-  web: await stellanova_network.accept({listener}, {line})
-to send on, given connection (a number) and message (text) = stellanova_network::send_text({connection}, {message}, {line})
+  web: await fathom_network.accept({listener}, {line})
+to send on, given connection (a number) and message (text) = fathom_network::send_text({connection}, {message}, {line})
   runs: net_send({connection}, {message})
-  web: await stellanova_network.send({connection}, {message}, {line})
-to send a line on, given connection (a number) and message (text) = stellanova_network::send_text({connection}, {message} + "\n", {line})
+  web: await fathom_network.send({connection}, {message}, {line})
+to send a line on, given connection (a number) and message (text) = fathom_network::send_text({connection}, {message} + "\n", {line})
   runs: net_send({connection}, {message} + "\n")
-  web: await stellanova_network.send({connection}, {message} + "\n", {line})
-to send bytes on, given connection (a number) and bytes (a list of numbers) = stellanova_network::send_text({connection}, stellanova_network::from_bytes({bytes}, {line}), {line})
+  web: await fathom_network.send({connection}, {message} + "\n", {line})
+to send bytes on, given connection (a number) and bytes (a list of numbers) = fathom_network::send_text({connection}, fathom_network::from_bytes({bytes}, {line}), {line})
   runs: net_send({connection}, net_bytes({bytes}))
-  web: await stellanova_network.send({connection}, stellanova_network.bytes({bytes}, {line}), {line})
-to receive from, given connection (a number), returning text = stellanova_network::receive({connection}, {line})
+  web: await fathom_network.send({connection}, fathom_network.bytes({bytes}, {line}), {line})
+to receive from, given connection (a number), returning text = fathom_network::receive({connection}, {line})
   runs: net_receive({connection})
-  web: await stellanova_network.receive({connection}, {line})
-to receive bytes from, given connection (a number), returning a list of numbers = stellanova_network::to_bytes(stellanova_network::receive({connection}, {line}))
+  web: await fathom_network.receive({connection}, {line})
+to receive bytes from, given connection (a number), returning a list of numbers = fathom_network::to_bytes(fathom_network::receive({connection}, {line}))
   runs: [float(b) for b in net_receive_raw({connection})]
-  web: Array.from(await stellanova_network.receiveRaw({connection}, {line}))
-to receive a line from, given connection (a number), returning text = stellanova_network::receive_line({connection}, {line})
+  web: Array.from(await fathom_network.receiveRaw({connection}, {line}))
+to receive a line from, given connection (a number), returning text = fathom_network::receive_line({connection}, {line})
   runs: net_receive_line({connection})
-  web: await stellanova_network.receiveLine({connection}, {line})
-to close the connection, given connection (a number) = stellanova_network::close({connection}, {line})
+  web: await fathom_network.receiveLine({connection}, {line})
+to close the connection, given connection (a number) = fathom_network::close({connection}, {line})
   runs: net_close({connection})
-  web: stellanova_network.close({connection}, {line})
-to connect a websocket to, given address (text), returning a number = stellanova_network::connect_websocket({address}, {line})
+  web: fathom_network.close({connection}, {line})
+to connect a websocket to, given address (text), returning a number = fathom_network::connect_websocket({address}, {line})
   runs: net_websocket({address})
-  web: await stellanova_network.websocket({address}, {line})
-to open the udp port, given port (a number), returning a number = stellanova_network::open_udp({port}, {line})
+  web: await fathom_network.websocket({address}, {line})
+to open the udp port, given port (a number), returning a number = fathom_network::open_udp({port}, {line})
   runs: net_udp({port})
-  web: await stellanova_network.udp({port}, {line})
-to send udp, given connection (a number) and host (text) and port (a number) and message (text) = stellanova_network::send_udp({connection}, {host}, {port}, {message}, {line})
+  web: await fathom_network.udp({port}, {line})
+to send udp, given connection (a number) and host (text) and port (a number) and message (text) = fathom_network::send_udp({connection}, {host}, {port}, {message}, {line})
   runs: net_send_udp({connection}, {host}, {port}, {message})
-  web: await stellanova_network.sendUdp({connection}, {host}, {port}, {message}, {line})
-to receive udp from, given connection (a number), returning text = stellanova_network::receive_udp({connection}, {line})
+  web: await fathom_network.sendUdp({connection}, {host}, {port}, {message}, {line})
+to receive udp from, given connection (a number), returning text = fathom_network::receive_udp({connection}, {line})
   runs: net_receive_udp({connection})
-  web: await stellanova_network.receiveUdp({connection}, {line})
+  web: await fathom_network.receiveUdp({connection}, {line})
 
 javascript:
-  const stellanova_network = {
+  const fathom_network = {
     links: new Map(),
     next: 0,
     add(l) { l.waiting = []; this.links.set(++this.next, l); return this.next; },
     get(n, line) {
       const l = this.links.get(n);
-      if (!l) stellanova.fail(line, "there is no open connection " + stellanova.text(n) + ".");
+      if (!l) fathom.fail(line, "there is no open connection " + fathom.text(n) + ".");
       return l;
     },
     wake(l) { for (const f of l.waiting.splice(0)) f(); },
     async until(l, ready) { while (!ready() && !l.closed) await new Promise((r) => l.waiting.push(r)); },
     node(name, line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can only use WebSockets (the rest works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page can only use WebSockets (the rest works with node).");
       return require(name);
     },
     tcp(socket) {
@@ -538,7 +538,7 @@ javascript:
       return new Promise((resolve, reject) => {
         const socket = net.connect({ host, port });
         socket.once("connect", () => resolve(this.add(this.tcp(socket))));
-        socket.once("error", (e) => reject(new stellanova.Problem(line, e.code === "ENOTFOUND" ? `I couldn't find the computer "${host}".` : `I couldn't connect to ${host} on port ${stellanova.text(port)}.`)));
+        socket.once("error", (e) => reject(new fathom.Problem(line, e.code === "ENOTFOUND" ? `I couldn't find the computer "${host}".` : `I couldn't connect to ${host} on port ${fathom.text(port)}.`)));
       });
     },
     listen(port, line) {
@@ -546,26 +546,26 @@ javascript:
       return new Promise((resolve, reject) => {
         const l = { kind: "listen", pending: [], closed: false };
         l.server = net.createServer((s) => { l.pending.push(s); this.wake(l); });
-        l.server.once("error", () => reject(new stellanova.Problem(line, `I couldn't listen on port ${stellanova.text(port)} (another program may be using it).`)));
+        l.server.once("error", () => reject(new fathom.Problem(line, `I couldn't listen on port ${fathom.text(port)} (another program may be using it).`)));
         l.server.listen(port, () => resolve(this.add(l)));
       });
     },
     async accept(n, line) {
       const l = this.get(n, line);
-      if (l.kind !== "listen") stellanova.fail(line, `I couldn't take a connection on ${stellanova.text(n)}.`);
+      if (l.kind !== "listen") fathom.fail(line, `I couldn't take a connection on ${fathom.text(n)}.`);
       await this.until(l, () => l.pending.length);
-      if (!l.pending.length) stellanova.fail(line, `I couldn't take a connection on ${stellanova.text(n)}.`);
+      if (!l.pending.length) fathom.fail(line, `I couldn't take a connection on ${fathom.text(n)}.`);
       return this.add(this.tcp(l.pending.shift()));
     },
     bytes(numbers, line) {
-      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `a byte is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
+      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) fathom.fail(line, `a byte is a whole number from 0 to 255, not ${fathom.text(x)}.`);
       return Buffer.from(numbers);
     },
     async send(n, message, line) {
       const l = this.get(n, line);
-      if (l.closed || l.kind === "listen" || l.kind === "udp") stellanova.fail(line, "the connection is closed, so I couldn't send to it.");
+      if (l.closed || l.kind === "listen" || l.kind === "udp") fathom.fail(line, "the connection is closed, so I couldn't send to it.");
       if (l.kind === "ws") return l.socket.send(message);
-      await new Promise((resolve, reject) => l.socket.write(message, (e) => (e ? reject(new stellanova.Problem(line, "the connection is closed, so I couldn't send to it.")) : resolve())));
+      await new Promise((resolve, reject) => l.socket.write(message, (e) => (e ? reject(new fathom.Problem(line, "the connection is closed, so I couldn't send to it.")) : resolve())));
     },
     take(l, n) { const out = l.kept.subarray(0, n); l.kept = l.kept.subarray(n); return out; },
     async receiveRaw(n, line) {
@@ -599,14 +599,14 @@ javascript:
       this.links.delete(n);
     },
     websocket(address, line) {
-      if (!address.startsWith("ws://") && !address.startsWith("wss://")) stellanova.fail(line, 'a WebSocket address starts with ws:// (like "ws://localhost:8080/chat").');
+      if (!address.startsWith("ws://") && !address.startsWith("wss://")) fathom.fail(line, 'a WebSocket address starts with ws:// (like "ws://localhost:8080/chat").');
       return new Promise((resolve, reject) => {
         const socket = new WebSocket(address);
         const l = { kind: "ws", socket, kept: [], closed: false };
         socket.onmessage = (e) => { l.kept.push(typeof e.data === "string" ? e.data : ""); this.wake(l); };
         socket.onclose = () => { l.closed = true; this.wake(l); };
         socket.onopen = () => resolve(this.add(l));
-        socket.onerror = () => { if (socket.readyState !== 1) reject(new stellanova.Problem(line, "I couldn't connect to the WebSocket at " + address + ".")); };
+        socket.onerror = () => { if (socket.readyState !== 1) reject(new fathom.Problem(line, "I couldn't connect to the WebSocket at " + address + ".")); };
       });
     },
     udp(port, line) {
@@ -614,7 +614,7 @@ javascript:
       return new Promise((resolve, reject) => {
         const l = { kind: "udp", socket: dgram.createSocket("udp4"), kept: [], closed: false };
         l.socket.on("message", (m) => { l.kept.push(m.toString("utf8")); this.wake(l); });
-        l.socket.once("error", () => reject(new stellanova.Problem(line, `I couldn't open the UDP port ${stellanova.text(port)} (another program may be using it).`)));
+        l.socket.once("error", () => reject(new fathom.Problem(line, `I couldn't open the UDP port ${fathom.text(port)} (another program may be using it).`)));
         l.socket.bind(port, () => resolve(this.add(l)));
       });
     },
@@ -622,7 +622,7 @@ javascript:
       const l = this.get(n, line);
       return new Promise((resolve, reject) =>
         l.socket.send(Buffer.from(message, "utf8"), port, host, (e) =>
-          e ? reject(new stellanova.Problem(line, e.code === "ENOTFOUND" ? `I couldn't find the computer "${host}".` : `I couldn't send to ${host}.`)) : resolve()));
+          e ? reject(new fathom.Problem(line, e.code === "ENOTFOUND" ? `I couldn't find the computer "${host}".` : `I couldn't send to ${host}.`)) : resolve()));
     },
     async receiveUdp(n, line) {
       const l = this.get(n, line);

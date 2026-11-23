@@ -1,4 +1,4 @@
-"""Plays words.stella in Unity, then in a built game. Run: py -3 engines/unity/check/check.py"""
+"""Plays words.fathom in Unity, then in a built game. Run: py -3 engines/unity/check/check.py"""
 import shutil
 import subprocess
 import sys
@@ -14,11 +14,11 @@ editors = sorted(Path(r"C:\Program Files\Unity\Hub\Editor").glob("*/Editor/Unity
 if not editors:
     sys.exit("Unity isn't installed: get it with Unity Hub.")
 unity = str(editors[-1])
-project = Path(tempfile.mkdtemp(prefix="stellanova_unity_")) / "Check"
+project = Path(tempfile.mkdtemp(prefix="fathom_unity_")) / "Check"
 log = project.parent / "unity.log"
 run = lambda *a: subprocess.run([unity, "-batchmode", "-nographics", *a, "-logFile", str(log)], timeout=1800).returncode
 assert run("-createProject", str(project), "-quit") == 0, log.read_text(errors="replace")[-3000:]
-subprocess.run([sys.executable, str(HOME / "stellanova.py"), "unity", str(project)], check=True)
+subprocess.run([sys.executable, str(HOME / "fathom.py"), "unity", str(project)], check=True)
 shutil.copy(check.PROGRAM, project / "Assets")
 shutil.copy(HERE / "CheckReport.cs", project / "Assets")
 (project / "Assets" / "Editor").mkdir()

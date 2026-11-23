@@ -67,7 +67,7 @@ struct Few  // numbers or values, laid out for machine code
 	~Few() { if (data != few) std::free(data); }
 	static void too_many()
 	{
-		std::fputs("Stellanova: a list can't hold more than 2147483647 items.\n", stderr);
+		std::fputs("Fathom: a list can't hold more than 2147483647 items.\n", stderr);
 		std::abort();
 	}
 	void reserve(size_t n)
@@ -203,8 +203,8 @@ inline const Full* full(const V* v) { return static_cast<const Full*>(v); }
 
 V* cn_make_text(std::string s);
 Items& cn_items(const V* v);  // items, boxed
-namespace stellanova { struct Problem; }
-void cn_set_problem(const stellanova::Problem& p);
+namespace fathom { struct Problem; }
+void cn_set_problem(const fathom::Problem& p);
 
 extern "C"
 {
@@ -226,7 +226,7 @@ struct CnParked  // around a library word that may wait
 };
 
 // ---- turning machine values into C++ values for library words, and back
-#ifdef STELLANOVA_CONVERSIONS
+#ifdef FATHOM_CONVERSIONS
 template <typename T> struct cn_is_vector : std::false_type {};
 template <typename T> struct cn_is_vector<std::vector<T>> : std::true_type { using item = T; };
 template <typename T> struct cn_is_table : std::false_type {};

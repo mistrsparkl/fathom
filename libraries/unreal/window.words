@@ -1,12 +1,12 @@
-note: The window words inside Unreal (stellanova unreal game.stella).
+note: The window words inside Unreal (fathom unreal game.fathom).
 
-include: "StellanovaBridge.h"
+include: "FathomBridge.h"
 include: <chrono>
 
 code:
-  namespace stellanova_window
+  namespace fathom_window
   {
-  	using stellanova_unreal::bridge;
+  	using fathom_unreal::bridge;
   	inline double eye[5] = {0, 1.5, -6, 0, 0};  // across, up, away, turn, tilt
   	inline int text_size = 16;
   	inline double frame_time_now = 1.0 / 60;
@@ -16,7 +16,7 @@ code:
   	inline void need_window(int line)
   	{
   		if (!bridge().opened)
-  			stellanova::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
+  			fathom::fail(line, "there is no window yet. Open one first, like: open a world with \"My game\", 800, 600");
   	}
   	inline FLinearColor colour(const std::string& name, int line)
   	{
@@ -25,7 +25,7 @@ code:
   			{"blue", FColor(50, 90, 230)}, {"yellow", FColor(245, 210, 40)}, {"orange", FColor(245, 140, 30)},
   			{"purple", FColor(140, 60, 200)}, {"pink", FColor(240, 120, 180)}, {"brown", FColor(130, 80, 40)},
   			{"grey", FColor(128, 128, 128)}, {"gray", FColor(128, 128, 128)}};
-  		std::string low = stellanova::lower(name);
+  		std::string low = fathom::lower(name);
   		for (const auto& [key, value] : named)
   			if (low == key)
   				return FLinearColor::FromSRGBColor(value);
@@ -34,27 +34,27 @@ code:
   			unsigned long v = std::stoul(low.substr(1), nullptr, 16);
   			return FLinearColor::FromSRGBColor(FColor((v >> 16) & 255, (v >> 8) & 255, v & 255));
   		}
-  		stellanova::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
+  		fathom::fail(line, "I don't know the colour \"" + name + "\". Use a name like \"red\" or a code like \"#ff8800\".");
   	}
   	inline std::string key_name(const std::string& name, int line)
   	{
-  		std::string k = stellanova::lower(name);
+  		std::string k = fathom::lower(name);
   		static const char* special[] = {"left", "right", "up", "down", "space", "enter", "escape", "shift", "control", "tab", "backspace"};
   		if (k.size() == 1 && ((k[0] >= 'a' && k[0] <= 'z') || (k[0] >= '0' && k[0] <= '9')))
   			return k;
   		for (const char* s : special)
   			if (k == s)
   				return k;
-  		stellanova::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
+  		fathom::fail(line, "I don't know the key \"" + name + "\". Keys are letters, digits, left, right, up, down, space, enter, escape, shift, control, tab and backspace.");
   	}
   	inline void open(const std::string& title, double w, double h, int line)
   	{
   		auto& b = bridge();
   		std::lock_guard<std::mutex> hold(b.lock);
   		if (b.opened)
-  			stellanova::fail(line, "a window is already open.");
+  			fathom::fail(line, "a window is already open.");
   		if (w < 1 || h < 1 || w > 10000 || h > 10000)
-  			stellanova::fail(line, "a window must be from 1 to 10000 dots wide and high.");
+  			fathom::fail(line, "a window must be from 1 to 10000 dots wide and high.");
   		b.title = title;
   		b.width = (int)std::lround(w);
   		b.height = (int)std::lround(h);
@@ -63,7 +63,7 @@ code:
   		b.opened = true;
   		b.open_asked = true;
   	}
-  	inline void flat(stellanova_unreal::Flat f, int line)
+  	inline void flat(fathom_unreal::Flat f, int line)
   	{
   		need_window(line);
   		std::lock_guard<std::mutex> hold(bridge().lock);
@@ -96,12 +96,12 @@ code:
   	inline void set_text_size(double size, int line)
   	{
   		if (!(size >= 1 && size <= 500))
-  			stellanova::fail(line, "text can be from 1 to 500 dots high, not " + stellanova::text(size) + ".");
+  			fathom::fail(line, "text can be from 1 to 500 dots high, not " + fathom::text(size) + ".");
   		text_size = (int)std::lround(size);
   	}
   	inline void no_pictures(int line)
   	{
-  		stellanova::fail(line, "pictures don't work in Unreal yet.");
+  		fathom::fail(line, "pictures don't work in Unreal yet.");
   	}
   	inline void show(int line)
   	{
@@ -113,7 +113,7 @@ code:
   		for (int k = 0; k < 5; ++k)
   			b.building.eye[k] = eye[k];
   		b.ready = std::move(b.building);
-  		b.building = stellanova_unreal::Frame{};
+  		b.building = fathom_unreal::Frame{};
   		b.building.sky = b.ready.sky;
   		b.fresh = true;
   		b.changed.notify_all();
@@ -148,7 +148,7 @@ code:
   		std::lock_guard<std::mutex> hold(bridge().lock);
   		return bridge().opened && bridge().lives;
   	}
-  	inline double read(double stellanova_unreal::Bridge::*part)
+  	inline double read(double fathom_unreal::Bridge::*part)
   	{
   		std::lock_guard<std::mutex> hold(bridge().lock);
   		return bridge().*part;
@@ -177,21 +177,21 @@ code:
   		double y2 = dy * std::cos(a) - z1 * std::sin(a), z2 = dy * std::sin(a) + z1 * std::cos(a);
   		if (z2 < 0.05)
   			return FVector2D(std::nan(""), std::nan(""));
-  		double w = read(&stellanova_unreal::Bridge::width_now), h = read(&stellanova_unreal::Bridge::height_now);
+  		double w = read(&fathom_unreal::Bridge::width_now), h = read(&fathom_unreal::Bridge::height_now);
   		double f = (h / 2.0) / std::tan(30.0 * pi3 / 180.0);
   		return FVector2D(w / 2.0 + x1 * f / z2, h / 2.0 - y2 * f / z2);
   	}
   	inline void block(const FVector& middle, double w, double h, double d, const std::string& c, int line)
   	{
   		if (!(w > 0 && h > 0 && d > 0))
-  			stellanova::fail(line, "a block's width, height and depth must all be more than 0.");
+  			fathom::fail(line, "a block's width, height and depth must all be more than 0.");
   		shape(0, middle, FVector(w, h, d), c, line);
   	}
   	inline void cube(const FVector& middle, double size, const std::string& c, int line) { block(middle, size, size, size, c, line); }
   	inline void ball(const FVector& middle, double radius, const std::string& c, int line)
   	{
   		if (!(radius > 0))
-  			stellanova::fail(line, "a ball's radius must be more than 0.");
+  			fathom::fail(line, "a ball's radius must be more than 0.");
   		shape(1, middle, FVector(radius, radius, radius), c, line);
   	}
   	inline void ground(const std::string& a, const std::string& b, int line)
@@ -205,35 +205,35 @@ code:
   	}
   }
 
-to open a world, given title (text) and width (a number) and height (a number) = stellanova_window::open({title}, {width}, {height}, {line})
-to consume the window, given colour (text) = stellanova_window::clear({colour}, {line})
-to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = stellanova_window::box({x}, {y}, {width}, {height}, {colour}, {line})
-to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = stellanova_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
-to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = stellanova_window::circle({x}, {y}, {radius}, {colour}, {line})
-to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = stellanova_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
-to etch words, given words (text) and x (a number) and y (a number) and colour (text) = stellanova_window::write({words}, {x}, {y}, {colour}, {line})
-to set the text size to, given size (a number) = stellanova_window::set_text_size({size}, {line})
-to reveal the frame = stellanova_window::show({line})
-to etch the picture, given file (text) and x (a number) and y (a number) = ((void)({file}), (void)({x}), (void)({y}), stellanova_window::no_pictures({line}))
-to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = ((void)({file}), (void)({x}), (void)({y}), (void)({size}), (void)({angle}), stellanova_window::no_pictures({line}))
-to width of picture, given file (text), giving back a number = ((void)({file}), stellanova_window::no_pictures({line}), 0.0)
-to height of picture, given file (text), giving back a number = ((void)({file}), stellanova_window::no_pictures({line}), 0.0)
-to end the world = stellanova_window::close()
-to key held, given key (text), giving back yes or no = stellanova_window::held({key}, {line})
-the world lives = stellanova_window::lives(), yes or no, read only
-width of the world = stellanova_window::read(&stellanova_unreal::Bridge::width_now), number, read only
-height of the world = stellanova_window::read(&stellanova_unreal::Bridge::height_now), number, read only
-mouse x = stellanova_window::read(&stellanova_unreal::Bridge::mouse_x), number, read only
-mouse y = stellanova_window::read(&stellanova_unreal::Bridge::mouse_y), number, read only
-to key pressed, given key (text), giving back yes or no = stellanova_window::pressed({key}, {line})
-mouse clicked = (stellanova_window::read(&stellanova_unreal::Bridge::clicked_now) != 0), yes or no, read only
-frame time = stellanova_window::frame_time_now, number, read only
-mouse held = (stellanova_window::read(&stellanova_unreal::Bridge::mouse_down) != 0), yes or no, read only
-to place the eye at, given where (a place) = stellanova_window::place_eye({where})
-to aim the eye, given turn (a number) and tilt (a number) = stellanova_window::aim_eye({turn}, {tilt})
-to screen place of, given where (a place), giving back a flat place = stellanova_window::screen_place({where}, {line})
-to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = stellanova_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
-to etch a cube, given middle (a place) and size (a number) and colour (text) = stellanova_window::cube({middle}, {size}, {colour}, {line})
-to etch a ball, given middle (a place) and radius (a number) and colour (text) = stellanova_window::ball({middle}, {radius}, {colour}, {line})
-to etch the ground, given colour (text) and other colour (text) = stellanova_window::ground({colour}, {other colour}, {line})
+to open a world, given title (text) and width (a number) and height (a number) = fathom_window::open({title}, {width}, {height}, {line})
+to consume the window, given colour (text) = fathom_window::clear({colour}, {line})
+to etch a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text) = fathom_window::box({x}, {y}, {width}, {height}, {colour}, {line})
+to etch a square, given x (a number) and y (a number) and radius (a number) and colour (text) = fathom_window::box(({x}) - ({radius}), ({y}) - ({radius}), 2 * ({radius}), 2 * ({radius}), {colour}, {line})
+to etch a circle, given x (a number) and y (a number) and radius (a number) and colour (text) = fathom_window::circle({x}, {y}, {radius}, {colour}, {line})
+to etch a line, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) = fathom_window::line_between({x}, {y}, {to x}, {to y}, {colour}, {line})
+to etch words, given words (text) and x (a number) and y (a number) and colour (text) = fathom_window::write({words}, {x}, {y}, {colour}, {line})
+to set the text size to, given size (a number) = fathom_window::set_text_size({size}, {line})
+to reveal the frame = fathom_window::show({line})
+to etch the picture, given file (text) and x (a number) and y (a number) = ((void)({file}), (void)({x}), (void)({y}), fathom_window::no_pictures({line}))
+to etch the picture turned, given file (text) and x (a number) and y (a number) and size (a number) and angle (a number) = ((void)({file}), (void)({x}), (void)({y}), (void)({size}), (void)({angle}), fathom_window::no_pictures({line}))
+to width of picture, given file (text), giving back a number = ((void)({file}), fathom_window::no_pictures({line}), 0.0)
+to height of picture, given file (text), giving back a number = ((void)({file}), fathom_window::no_pictures({line}), 0.0)
+to end the world = fathom_window::close()
+to key held, given key (text), giving back yes or no = fathom_window::held({key}, {line})
+the world lives = fathom_window::lives(), yes or no, read only
+width of the world = fathom_window::read(&fathom_unreal::Bridge::width_now), number, read only
+height of the world = fathom_window::read(&fathom_unreal::Bridge::height_now), number, read only
+mouse x = fathom_window::read(&fathom_unreal::Bridge::mouse_x), number, read only
+mouse y = fathom_window::read(&fathom_unreal::Bridge::mouse_y), number, read only
+to key pressed, given key (text), giving back yes or no = fathom_window::pressed({key}, {line})
+mouse clicked = (fathom_window::read(&fathom_unreal::Bridge::clicked_now) != 0), yes or no, read only
+frame time = fathom_window::frame_time_now, number, read only
+mouse held = (fathom_window::read(&fathom_unreal::Bridge::mouse_down) != 0), yes or no, read only
+to place the eye at, given where (a place) = fathom_window::place_eye({where})
+to aim the eye, given turn (a number) and tilt (a number) = fathom_window::aim_eye({turn}, {tilt})
+to screen place of, given where (a place), giving back a flat place = fathom_window::screen_place({where}, {line})
+to etch a block, given middle (a place) and width (a number) and height (a number) and depth (a number) and colour (text) = fathom_window::block({middle}, {width}, {height}, {depth}, {colour}, {line})
+to etch a cube, given middle (a place) and size (a number) and colour (text) = fathom_window::cube({middle}, {size}, {colour}, {line})
+to etch a ball, given middle (a place) and radius (a number) and colour (text) = fathom_window::ball({middle}, {radius}, {colour}, {line})
+to etch the ground, given colour (text) and other colour (text) = fathom_window::ground({colour}, {other colour}, {line})
 the graphics card draws = true, yes or no, read only

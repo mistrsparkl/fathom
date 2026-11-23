@@ -42,8 +42,8 @@ int main(int count, char** given)
 	void* plugin = OPEN(count > 1 ? given[1] : "game.dll");
 	if (!plugin)
 		return std::printf("can't load the plugin\n"), 1;
-	auto start = reinterpret_cast<Start>(FIND(plugin, "stellanova_start"));
-	auto call = reinterpret_cast<Call>(FIND(plugin, "stellanova_call"));
+	auto start = reinterpret_cast<Start>(FIND(plugin, "fathom_start"));
+	auto call = reinterpret_cast<Call>(FIND(plugin, "fathom_call"));
 	std::printf("start %d\n", start(show, word));
 	std::printf("begin %d\n", call("begin", 5, nullptr, 0, nullptr));
 	double seconds = 0.5, other = 7, answer = 0;

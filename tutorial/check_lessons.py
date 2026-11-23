@@ -54,7 +54,7 @@ class Editor:
 
 
 def run(how, file, answers):
-    py = ["py", "-3", str(HOME / "stellanova.py")]
+    py = ["py", "-3", str(HOME / "fathom.py")]
     call = py + ([file.name] if how == "run" else [how, file.name])
     said = subprocess.run(call, cwd=WORK, input="\n".join(answers) + "\n", capture_output=True, text=True, encoding="utf-8", timeout=300)
     return said.returncode, (said.stdout + said.stderr).rstrip()

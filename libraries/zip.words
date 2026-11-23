@@ -6,7 +6,7 @@ include: <algorithm>
 include: <cstdint>
 
 code:
-  namespace stellanova_zip
+  namespace fathom_zip
   {
   	namespace fs = std::filesystem;
   	using Bytes = std::vector<uint8_t>;
@@ -251,7 +251,7 @@ code:
   	{
   		std::ifstream f(path(name), std::ios::binary);
   		if (!f)
-  			stellanova::fail(line, missing);
+  			fathom::fail(line, missing);
   		return Bytes(std::istreambuf_iterator<char>(f), {});
   	}
   	inline void put16(Bytes& b, uint32_t v) { b.push_back(uint8_t(v)); b.push_back(uint8_t(v >> 8)); }
@@ -275,12 +275,12 @@ code:
   	inline void pack(const std::vector<std::string>& files, const std::string& zip, int line)
   	{
   		if (files.empty())
-  			stellanova::fail(line, "say which files to pack into \"" + zip + "\".");
+  			fathom::fail(line, "say which files to pack into \"" + zip + "\".");
   		std::vector<fs::path> all;
   		for (const std::string& f : files)
   		{
   			if (!fs::exists(path(f)))
-  				stellanova::fail(line, "there is no file or folder called \"" + f + "\".");
+  				fathom::fail(line, "there is no file or folder called \"" + f + "\".");
   			walk(path(f), all);
   		}
   		Bytes out, central;
@@ -311,7 +311,7 @@ code:
   		put32(out, uint32_t(central.size())), put32(out, dir), put16(out, 0);
   		std::ofstream f(path(zip), std::ios::binary);
   		if (!f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size())))
-  			stellanova::fail(line, "I couldn't pack \"" + zip + "\".");
+  			fathom::fail(line, "I couldn't pack \"" + zip + "\".");
   	}
 
   	struct Entry { std::string name; uint32_t method, size, local; };
@@ -322,16 +322,16 @@ code:
   			--e;
   		std::string cant = "\"" + zip + "\" isn't a zip file I can read.";
   		if (d.size() < 22 || get32(d, e) != 0x06054b50)
-  			stellanova::fail(line, cant);
+  			fathom::fail(line, cant);
   		std::vector<Entry> out;
   		size_t at = get32(d, e + 16);
   		for (uint32_t k = 0, n = get16(d, e + 10); k < n; ++k)
   		{
   			if (at + 46 > d.size() || get32(d, at) != 0x02014b50)
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   			uint32_t length = get16(d, at + 28);
   			if (at + 46 + length > d.size())
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   			out.push_back({std::string(d.begin() + at + 46, d.begin() + at + 46 + length), get16(d, at + 10), get32(d, at + 20), get32(d, at + 42)});
   			at += 46 + length + get16(d, at + 30) + get16(d, at + 32);
   		}
@@ -340,7 +340,7 @@ code:
   	inline std::vector<std::string> inside(const std::string& zip, int line)
   	{
   		if (!fs::exists(path(zip)))
-  			stellanova::fail(line, "there is no zip file called \"" + zip + "\".");
+  			fathom::fail(line, "there is no zip file called \"" + zip + "\".");
   		Bytes d = read_all(zip, line, "there is no zip file called \"" + zip + "\".");
   		std::vector<std::string> out;
   		for (const Entry& x : entries(d, zip, line))
@@ -352,7 +352,7 @@ code:
   	{
   		for (const std::string& name : inside(zip, line))
   			if (name.find("..") != std::string::npos || name[0] == '/' || name[0] == '\\' || name.find(':') != std::string::npos)
-  				stellanova::fail(line, "\"" + zip + "\" has a file that would land outside the folder (" + name + "), so I won't unpack it.");
+  				fathom::fail(line, "\"" + zip + "\" has a file that would land outside the folder (" + name + "), so I won't unpack it.");
   		Bytes d = read_all(zip, line, "there is no zip file called \"" + zip + "\".");
   		std::string cant = "I couldn't unpack \"" + zip + "\".";
   		fs::create_directories(path(folder));
@@ -361,10 +361,10 @@ code:
   			fs::path to = path(folder) / path(x.name);
   			if (!x.name.empty() && x.name.back() == '/') { fs::create_directories(to); continue; }
   			if (size_t(x.local) + 30 > d.size())
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   			size_t start = x.local + 30 + get16(d, x.local + 26) + get16(d, x.local + 28);
   			if (start + x.size > d.size())
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   			Bytes data;
   			if (x.method == 0)
   				data.assign(d.begin() + start, d.begin() + start + x.size);
@@ -372,15 +372,15 @@ code:
   			{
   				Inflate z{d.data() + start, x.size};
   				if (!z.run())
-  					stellanova::fail(line, cant);
+  					fathom::fail(line, cant);
   				data = std::move(z.out);
   			}
   			else
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   			fs::create_directories(to.parent_path());
   			std::ofstream f(to, std::ios::binary);
   			if (!f.write(reinterpret_cast<const char*>(data.data()), std::streamsize(data.size())))
-  				stellanova::fail(line, cant);
+  				fathom::fail(line, cant);
   		}
   	}
   }
@@ -425,20 +425,20 @@ python:
       with _zipfile.ZipFile(zip_) as z:
           z.extractall(folder)
 
-to pack the zip, given files (a list of text) and zip (text) = stellanova_zip::pack({files}, {zip}, {line})
+to pack the zip, given files (a list of text) and zip (text) = fathom_zip::pack({files}, {zip}, {line})
   runs: zip_pack({files}, {zip})
-  web: stellanova_zip.pack({files}, {zip}, {line})
-to the files in the zip, given zip (text), returning a list of text = stellanova_zip::inside({zip}, {line})
+  web: fathom_zip.pack({files}, {zip}, {line})
+to the files in the zip, given zip (text), returning a list of text = fathom_zip::inside({zip}, {line})
   runs: zip_inside({zip})
-  web: stellanova_zip.inside({zip}, {line})
-to unpack the zip, given zip (text) and folder (text) = stellanova_zip::unpack({zip}, {folder}, {line})
+  web: fathom_zip.inside({zip}, {line})
+to unpack the zip, given zip (text) and folder (text) = fathom_zip::unpack({zip}, {folder}, {line})
   runs: zip_unpack({zip}, {folder})
-  web: stellanova_zip.unpack({zip}, {folder}, {line})
+  web: fathom_zip.unpack({zip}, {folder}, {line})
 
 javascript:
-  const stellanova_zip = {
+  const fathom_zip = {
     node(line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can't read or write zip files yet (it works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page can't read or write zip files yet (it works with node).");
       return { fs: require("fs"), zlib: require("zlib"), path: require("path") };
     },
     crc(b) {
@@ -449,14 +449,14 @@ javascript:
     },
     pack(files, zip, line) {
       const { fs, zlib, path } = this.node(line);
-      if (!files.length) stellanova.fail(line, `say which files to pack into "${zip}".`);
+      if (!files.length) fathom.fail(line, `say which files to pack into "${zip}".`);
       const all = [];
       const walk = (f) => {
         if (fs.statSync(f).isDirectory()) for (const n of fs.readdirSync(f).sort()) walk(path.join(f, n));
         else all.push(f);
       };
       for (const f of files) {
-        if (!fs.existsSync(f)) stellanova.fail(line, `there is no file or folder called "${f}".`);
+        if (!fs.existsSync(f)) fathom.fail(line, `there is no file or folder called "${f}".`);
         walk(f);
       }
       const locals = [], centrals = [];
@@ -476,15 +476,15 @@ javascript:
       }
       const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
       end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(all.length, 8); end.writeUInt16LE(all.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
-      try { fs.writeFileSync(zip, Buffer.concat([...locals, dir, end])); } catch { stellanova.fail(line, `I couldn't pack "${zip}".`); }
+      try { fs.writeFileSync(zip, Buffer.concat([...locals, dir, end])); } catch { fathom.fail(line, `I couldn't pack "${zip}".`); }
     },
     entries(zip, line) {
       const { fs } = this.node(line);
-      if (!fs.existsSync(zip)) stellanova.fail(line, `there is no zip file called "${zip}".`);
+      if (!fs.existsSync(zip)) fathom.fail(line, `there is no zip file called "${zip}".`);
       const d = fs.readFileSync(zip);
       let e = d.length - 22;
       while (e >= 0 && d.readUInt32LE(e) !== 0x06054b50) e--;
-      if (e < 0) stellanova.fail(line, `"${zip}" isn't a zip file I can read.`);
+      if (e < 0) fathom.fail(line, `"${zip}" isn't a zip file I can read.`);
       const out = [];
       let at = d.readUInt32LE(e + 16);
       for (let k = 0; k < d.readUInt16LE(e + 10); k++) {
@@ -497,7 +497,7 @@ javascript:
     inside(zip, line) { return this.entries(zip, line).out.map((x) => x.name).filter((n) => !n.endsWith("/")); },
     unpack(zip, folder, line) {
       const { fs, zlib, path } = this.node(line), { d, out } = this.entries(zip, line);
-      for (const x of out) if (x.name.includes("..") || /^[\\/]/.test(x.name) || x.name.includes(":")) stellanova.fail(line, `"${zip}" has a file that would land outside the folder (${x.name}), so I won't unpack it.`);
+      for (const x of out) if (x.name.includes("..") || /^[\\/]/.test(x.name) || x.name.includes(":")) fathom.fail(line, `"${zip}" has a file that would land outside the folder (${x.name}), so I won't unpack it.`);
       for (const x of out) {
         const to = path.join(folder, x.name);
         if (x.name.endsWith("/")) { fs.mkdirSync(to, { recursive: true }); continue; }

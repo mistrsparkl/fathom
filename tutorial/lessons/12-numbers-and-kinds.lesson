@@ -4,7 +4,7 @@ say:
   Numbers can do more than add and multiply. Here are powers, the bits inside whole numbers, and numbers too big for any computer's own numbers.
 uncard
 
-new: numbers.stella
+new: numbers.fathom
 type fast:
   use: big numbers
 
@@ -46,7 +46,7 @@ say:
   Such a kind can be described once, with anything standing in for what it holds.
 uncard
 
-new: stacks.stella
+new: stacks.fathom
 type fast:
   a stack of anything has:
     items (a list of anything)
@@ -81,7 +81,7 @@ spot: lines 14-16
 say:
   Then a stack of numbers is a kind of its own: the description written out again with anything as a number.
 spot: lines 17-18
-say: And a stack of text is another. Push and top work on both, and Stellanova still checks you only put numbers on the stack of numbers.
+say: And a stack of text is another. Push and top work on both, and Fathom still checks you only put numbers on the stack of numbers.
 spot: off
 zoom: out
 run
@@ -93,7 +93,7 @@ card: Chapter 12 | Commands for a kind, kept | Doing it later
 say:
   In chapter six, a command could be kept as a value. Commands for a kind of thing can be kept the same way.
 uncard
-new: grow.stella
+new: grow.fathom
 type fast:
   a pet has:
     name (text)

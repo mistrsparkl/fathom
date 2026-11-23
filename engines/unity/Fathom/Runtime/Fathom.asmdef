@@ -1,0 +1,5 @@
+{
+    "name": "Fathom",
+    "references": ["Unity.InputSystem"],
+    "autoReferenced": true
+}

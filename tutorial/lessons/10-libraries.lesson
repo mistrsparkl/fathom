@@ -5,7 +5,7 @@ say:
   A library loads by itself as soon as a program uses one of its words. Writing use, and its name, at the top says so out loud.
 uncard
 
-new: libraries.stella
+new: libraries.fathom
 type fast:
   use: maths
   use: time

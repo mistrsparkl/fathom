@@ -8,7 +8,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Paths.h"
-#include "StellanovaComponent.h"
+#include "FathomComponent.h"
 #include "TimerManager.h"
 #include "Modules/ModuleManager.h"
 
@@ -20,10 +20,10 @@ struct FKeeper : FOutputDevice
 	FString Said;
 	virtual void Serialize(const TCHAR* Text, ELogVerbosity::Type Verbosity, const FName& Category) override
 	{
-		if (Category != TEXT("LogStellanova"))
+		if (Category != TEXT("LogFathom"))
 			return;
 		FString Line = Text;
-		if (Verbosity == ELogVerbosity::Error && Line.RemoveFromStart(TEXT("Stellanova: ")))
+		if (Verbosity == ELogVerbosity::Error && Line.RemoveFromStart(TEXT("Fathom: ")))
 			Said += TEXT("SAID problem: ") + Line + TEXT("\n");
 		else if (Verbosity == ELogVerbosity::Error)
 			Said += TEXT("BAD ") + Line + TEXT("\n");
@@ -46,7 +46,7 @@ static AStaticMeshActor* Shape(UWorld* World, const TCHAR* Mesh, const TCHAR* Na
 #endif
 	if (Program)
 	{
-		UStellanovaComponent* Script = NewObject<UStellanovaComponent>(Made);
+		UFathomComponent* Script = NewObject<UFathomComponent>(Made);
 		Script->Program = TEXT("words");
 		Script->RegisterComponent();
 	}

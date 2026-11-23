@@ -1,9 +1,9 @@
-"""Writes lessons/17-platformer.lesson from hop.stella."""
+"""Writes lessons/17-platformer.lesson from hop.fathom."""
 from pathlib import Path
 
 HERE = Path(__file__).parent
-game = (HERE / "lessons" / "files" / "hop.stella").read_text(encoding="utf-8").rstrip("\n").split("\n")
-records = (HERE / "lessons" / "files" / "records.stella").read_text(encoding="utf-8").rstrip("\n").split("\n")
+game = (HERE / "lessons" / "files" / "hop.fathom").read_text(encoding="utf-8").rstrip("\n").split("\n")
+records = (HERE / "lessons" / "files" / "records.fathom").read_text(encoding="utf-8").rstrip("\n").split("\n")
 END = "and the universe said i love you"
 
 
@@ -70,7 +70,7 @@ def span(a_text, b_text, start=1, lines=None):
 
 
 put("title: Making a platform game")
-put("files: records.stella")
+put("files: records.fathom")
 put("card: Chapter 17 | Making a game | Hop! A platform game that uses everything")
 say("Now let's put it all together, and make a real game: a platform game called Hop.",
     "A little blue block runs and jumps across floating platforms, picks up every coin, dodges spikes and bees, and reaches the flag at the end.",
@@ -79,8 +79,8 @@ put("uncard")
 
 # ---- the records script
 R = records
-put("open: records.stella")
-say("The game keeps its best time in a second script, records dot stella. It was written earlier. Let's read it first.")
+put("open: records.fathom")
+say("The game keeps its best time in a second script, records dot fathom. It was written earlier. Let's read it first.")
 rem = where("the world remembers:", 1, R)
 zoom(1, ends(rem, R),
      span("use: encryption", "use: folders", 1, R), "It uses seven libraries: encryption, hashing, json, big numbers, patterns, zip, time, and folders.",
@@ -110,7 +110,7 @@ put("zoom: output")
 say("The test passes. Now, the game.")
 put("wait")
 put("zoom: out")
-put("new: hop.stella")
+put("new: hop.fathom")
 
 # ---- the kinds of things
 kinds_end = ends(where("a trail of anything has:"))
@@ -119,7 +119,7 @@ plat = where("a platform has:")
 coin = where("a coin has:")
 zoom(1, ends(coin),
      (1, 2), "The top of the game says what it is, in whispers.",
-     span("use: window", "use: records.stella"), "Use window, for the window to draw in. Maths, for sine. And use records dot stella brings in the other script.",
+     span("use: window", "use: records.fathom"), "Use window, for the window to draw in. Maths, for sine. And use records dot fathom brings in the other script.",
      (plat, plat + 5), "A platform is a box: where its top left corner is, x across and y down, and how wide and high it is. Every floor, ledge and pillar in the level is one of these.",
      (coin, coin + 2), "A coin has a birth, which is where it floats, and so it has an existence too.")
 sp = where("a spike has:")
@@ -290,13 +290,13 @@ say("Both scripts' tests pass.")
 put("wait")
 put("zoom: out")
 say("That's the whole game. It's built into a program of its own, so it runs fast. Let's play it.")
-put("game: hop.stella | hop.keys | Hop!")
+put("game: hop.fathom | hop.keys | Hop!")
 say("Running right, faster each frame. Jumping: up fast, slowing, and falling, as gravity adds point six every frame.")
 say("Over the spikes, under the bees, and every coin. The flag turns green, and blinks. We win, and the record is saved.")
 put("until game ends")
 say("And that's how a platform game works: speed changes the place, gravity changes the speed, one direction at a time, and a camera that the whole world is drawn around.")
-put("card: Thank you | That's Stellanova | Every word is in the list on the left of the studia, and in LANGUAGE.md. Now go and make something of your own.")
-say("That's every part of Stellanova. Every word is listed in the studia, and in the language guide. Now it's your turn: go and make something of your own.")
+put("card: Thank you | That's Fathom | Every word is in the list on the left of the studia, and in LANGUAGE.md. Now go and make something of your own.")
+say("That's every part of Fathom. Every word is listed in the studia, and in the language guide. Now it's your turn: go and make something of your own.")
 put("pause: 2")
 
 (HERE / "lessons" / "17-platformer.lesson").write_text("\n".join(out) + "\n", encoding="utf-8")

@@ -15,8 +15,8 @@ KEPT = HERE / "out" / "voice"
 
 
 def spoken(text):
-    """How the voice reads Stellanova's words."""
-    return text.replace("stellanova.py", "stellanova dot p y").replace(".stella", " dot stella").replace(".exe", " dot e x e")
+    """How the voice reads Fathom's words."""
+    return text.replace("fathom.py", "fathom dot p y").replace(".fathom", " dot fathom").replace(".exe", " dot e x e")
 
 
 async def speak(text, mp3, timing):

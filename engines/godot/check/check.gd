@@ -20,8 +20,8 @@ func _object(called: String, node: Node3D, at: Vector3, shape: Shape3D, program:
 		outline.shape = shape
 		node.add_child(outline)
 	if program:
-		var script := StellanovaScript.new()
-		script.program = "res://words.stella"
+		var script := FathomScript.new()
+		script.program = "res://words.fathom"
 		node.add_child(script)
 	return node
 

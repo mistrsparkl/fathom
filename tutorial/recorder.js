@@ -308,8 +308,8 @@ async function film(lesson, filePort) {
   fs.mkdirSync(workspace, { recursive: true });
   for (const f of lesson.files) fs.copyFileSync(path.join(lesson.folder, "files", f), path.join(workspace, path.basename(f)));
   const appdata = path.join(out, "appdata");
-  fs.mkdirSync(path.join(appdata, "Stellanova Studia"), { recursive: true });
-  fs.writeFileSync(path.join(appdata, "Stellanova Studia", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
+  fs.mkdirSync(path.join(appdata, "Fathom Studia"), { recursive: true });
+  fs.writeFileSync(path.join(appdata, "Fathom Studia", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
 
   // the voice first, so timings are known
   const said = lesson.steps.filter((s) => s.what === "say").map((s) => s.value);
@@ -579,18 +579,18 @@ async function film(lesson, filePort) {
 async function filmGame(lesson, file, keysFile) {
   const games = path.join(out, "games");
   fs.mkdirSync(games, { recursive: true });
-  const name = path.basename(file, ".stella");
+  const name = path.basename(file, ".fathom");
   const source = path.join(lesson.folder, "files", file);
   const folder = path.join(games, name);
   fs.mkdirSync(folder, { recursive: true });
   // the game and its scripts, with no old saves
-  for (const f of fs.readdirSync(path.dirname(source)).filter((f) => f.endsWith(".stella"))) fs.copyFileSync(path.join(path.dirname(source), f), path.join(folder, f));
+  for (const f of fs.readdirSync(path.dirname(source)).filter((f) => f.endsWith(".fathom"))) fs.copyFileSync(path.join(path.dirname(source), f), path.join(folder, f));
   for (const f of fs.readdirSync(folder).filter((f) => f.endsWith(".save") || f.endsWith(".zip"))) fs.rmSync(path.join(folder, f));
   const exe = path.join(folder, name + ".exe");
-  py(path.join(home, "stellanova.py"), "build", path.join(folder, path.basename(file)));
+  py(path.join(home, "fathom.py"), "build", path.join(folder, path.basename(file)));
   const raw = path.join(folder, "frames.raw");
   execFileSync(exe, [], { cwd: folder, windowsHide: true, timeout: 600000,
-    env: { ...process.env, STELLANOVA_DEMO_FRAMES: raw, STELLANOVA_DEMO_KEYS: path.join(lesson.folder, "files", keysFile) } });
+    env: { ...process.env, FATHOM_DEMO_FRAMES: raw, FATHOM_DEMO_KEYS: path.join(lesson.folder, "files", keysFile) } });
   const size = fs.readFileSync(source, "utf8").match(/open a world with "[^"]*", (\d+), (\d+)/);
   const [width, height] = [parseInt(size[1], 10), parseInt(size[2], 10)];
   const film = `games/${name}.mp4`;
@@ -606,9 +606,9 @@ app.disableHardwareAcceleration();
 app.on("window-all-closed", () => {});  // each lesson closes its window; keep going to the next
 app.whenReady().then(async () => {
   try {
-    execFileSync("py", ["-3", path.join(home, "stellanova.py"), "web", "screens.stella", "ui"], { cwd: studia, windowsHide: true });
+    execFileSync("py", ["-3", path.join(home, "fathom.py"), "web", "screens.fathom", "ui"], { cwd: studia, windowsHide: true });
     if (!fs.existsSync(path.join(studia, "system.exe")))
-      execFileSync("py", ["-3", path.join(home, "stellanova.py"), "build", "system.stella"], { cwd: studia, windowsHide: true });
+      execFileSync("py", ["-3", path.join(home, "fathom.py"), "build", "system.fathom"], { cwd: studia, windowsHide: true });
     const filePort = await freePort();
     serveOut(filePort);
     const files = process.argv.slice(2).filter((a) => a.endsWith(".lesson"));

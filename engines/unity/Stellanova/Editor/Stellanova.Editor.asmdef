@@ -1,5 +1,0 @@
-{
-    "name": "Stellanova.Editor",
-    "references": ["Stellanova"],
-    "includePlatforms": ["Editor"]
-}

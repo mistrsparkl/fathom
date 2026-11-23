@@ -1,7 +1,7 @@
 {
-  "name": "stellanova",
-  "displayName": "Stellanova",
-  "description": "Colours, indenting, shortcuts, mistakes shown while typing, word completion and help on hover for the Stellanova language (.stella files).",
+  "name": "fathom",
+  "displayName": "Fathom",
+  "description": "Colours, indenting, shortcuts, mistakes shown while typing, word completion and help on hover for the Fathom language (.fathom files).",
   "version": "0.4.0",
   "publisher": "speda",
   "engines": {
@@ -14,49 +14,49 @@
   "contributes": {
     "languages": [
       {
-        "id": "stellanova",
+        "id": "fathom",
         "aliases": [
-          "Stellanova"
+          "Fathom"
         ],
         "extensions": [
-          ".stella"
+          ".fathom"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "stellanova",
-        "scopeName": "source.stellanova",
-        "path": "./syntaxes/stellanova.tmLanguage.json"
+        "language": "fathom",
+        "scopeName": "source.fathom",
+        "path": "./syntaxes/fathom.tmLanguage.json"
       }
     ],
     "snippets": [
       {
-        "language": "stellanova",
+        "language": "fathom",
         "path": "./snippets.json"
       }
     ],
     "configurationDefaults": {
-      "[stellanova]": {
+      "[fathom]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true,
         "editor.detectIndentation": false
       }
     },
     "configuration": {
-      "title": "Stellanova",
+      "title": "Fathom",
       "properties": {
-        "stellanova.home": {
+        "fathom.home": {
           "type": "string",
           "default": "",
-          "description": "The folder holding stellanova.py. Empty: the folder on PATH that has it."
+          "description": "The folder holding fathom.py. Empty: the folder on PATH that has it."
         }
       }
     }
   },
   "main": "./extension.js",
   "activationEvents": [
-    "onLanguage:stellanova"
+    "onLanguage:fathom"
   ]
 }

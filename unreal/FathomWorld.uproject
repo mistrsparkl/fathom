@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Games",
+  "Description": "Fathom programs, running in Unreal",
+  "Modules": [
+    {
+      "Name": "FathomWorld",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

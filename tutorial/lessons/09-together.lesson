@@ -4,8 +4,8 @@ say:
   A name set inside a command belongs to that command, and disappears when it ends.
   Names that every command shares go in a block called: the world remembers.
 uncard
-files: scores.stella
-open: scores.stella
+files: scores.fathom
+open: scores.fathom
 zoom: lines 1-10
 spot: line 1
 say: This script was written earlier. The first line is a whisper: a note for people. The computer ignores it.
@@ -22,9 +22,9 @@ zoom: out
 card: Chapter 9 | Several scripts | One program, made of many files
 say: A bigger program is easier to keep in several scripts. Let's make a game that uses this one.
 uncard
-new: game.stella
+new: game.fathom
 type:
-  use: scores.stella
+  use: scores.fathom
 
   the world remembers:
     games played (a number)
@@ -44,7 +44,7 @@ type:
 zoom: lines 1-5
 spot: line 1
 say:
-  Use scores dot stella brings in that script's commands, kinds, and shared names. It's looked for next to this one.
+  Use scores dot fathom brings in that script's commands, kinds, and shared names. It's looked for next to this one.
   Its genesis is left out, so each script can still be run and tried by itself.
 spot: lines 3-5
 say: This script remembers its own shared name too: how many games were played.
@@ -97,7 +97,7 @@ zoom: out
 card: Chapter 9 | Two things at once | Meanwhile
 say: Last in this chapter: doing two things at the same time.
 uncard
-new: both.stella
+new: both.fathom
 type:
   to count, given who (text) and gap (a number):
     for each n from 1 to 3:

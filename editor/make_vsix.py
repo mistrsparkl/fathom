@@ -1,4 +1,4 @@
-"""Packs editor/vscode into stellanova.vsix."""
+"""Packs editor/vscode into fathom.vsix."""
 import json
 import zipfile
 from pathlib import Path
@@ -29,12 +29,12 @@ types = """<?xml version="1.0" encoding="utf-8"?>
   <Default Extension=".vsixmanifest" ContentType="text/xml"/>
 </Types>
 """
-out = HERE / "stellanova.vsix"
+out = HERE / "fathom.vsix"
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("[Content_Types].xml", types)
     z.writestr("extension.vsixmanifest", manifest)
     for f in sorted(SRC.rglob("*")):
         if f.is_file():
             z.write(f, "extension/" + f.relative_to(SRC).as_posix())
-    z.writestr("extension/home.txt", str(HERE.parent.resolve()))  # where stellanova.py is, when PATH and the setting don't say
+    z.writestr("extension/home.txt", str(HERE.parent.resolve()))  # where fathom.py is, when PATH and the setting don't say
 print(f"Made {out}")

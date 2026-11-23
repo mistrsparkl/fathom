@@ -1,0 +1,1489 @@
+whisper: Studia's screens. Build: fathom web screens.fathom ui
+
+use: page
+use: web
+use: maths
+use: letters
+
+a spot has:
+  name (text)
+  path (text)
+  folder (yes or no)
+  inside (a list of spots)
+and the universe said i love you
+
+a run state has:
+  printed (text)
+  problems (text)
+  running (yes or no)
+  code (a number)
+and the universe said i love you
+
+a library word has:
+  library (text)
+  phrase (text)
+  given (text)
+  gives (text)
+and the universe said i love you
+
+a snapshot has:
+  changed row (a number)
+  old lines (a list of text)
+  new lines (a list of text)
+  back row (a number)
+  back column (a number)
+  forth row (a number)
+  forth column (a number)
+and the universe said i love you
+
+a sheet has:
+  path (text)
+  body (a list of text)
+  caret row (a number)
+  caret column (a number)
+  anchor row (a number)
+  anchor column (a number)
+  windows endings (yes or no)
+  back (a list of snapshots)
+  ahead (a list of snapshots)
+  warned (yes or no)
+  edit count (a number)
+  saved count (a number)
+and the universe said i love you
+
+a memory has:
+  folder (text)
+  files (a list of text)
+and the universe said i love you
+
+the world remembers:
+  home (text)
+  folder (text)
+  tree (a list of spots)
+  opened (a list of text)
+  sheets (a list of sheets)
+  current (a number)
+  body (a list of text)
+  row (a number)
+  column (a number)
+  mark row (a number)
+  mark column (a number)
+  goal column (a number)
+  back (a list of snapshots)
+  ahead (a list of snapshots)
+  edits (a number)
+  widest (a number)
+  typing run (yes or no)
+  dragging (yes or no)
+  glyph width (a number)
+  painted (a table of text)
+  classes (a table of text)
+  labels (a list of text)
+  notes (a list of text)
+  picks (a list of numbers)
+  suggesting (yes or no)
+  chosen (a number)
+  prefix size (a number)
+  mistake rows (a list of numbers)
+  mistake notes (a list of text)
+  calm (a number)
+  needs look (yes or no)
+  looking (yes or no)
+  running (yes or no)
+  polling (yes or no)
+  after build (yes or no)
+  halted on purpose (yes or no)
+  asking (text)
+  code box (a number)
+  rows box (a number)
+  marks box (a number)
+  caret box (a number)
+  catcher (a number)
+  suggest box (a number)
+  tabs box (a number)
+  files box (a number)
+  words box (a number)
+  output box (a number)
+  mistakes box (a number)
+  answer box (a number)
+  status box (a number)
+  where box (a number)
+  mistake box (a number)
+  stop rows (a list of numbers)
+  paused row (a number)
+  debugging (yes or no)
+  paused (yes or no)
+  debug carry (text)
+and the universe said i love you
+
+a debug stop has:
+  line (a number)
+  where (text)
+  source (text)
+  names (a table of text)
+  stops (a list of numbers)
+and the universe said i love you
+
+whisper: ---- helpers
+
+to joined path, given base (text) and name (text), returning text:
+  if base ends with "\" or base ends with "/": return base plus name
+  if base begins with "/": return base plus "/" plus name
+  return base plus "\" plus name
+and the universe said i love you
+
+to short name of, given path (text), returning text:
+  set cut to 0
+  for each n from 1 to the size of path:
+    if letter n of path is one of ("\", "/"): set cut to n
+  return letters (cut plus 1) to (the size of path) of path
+and the universe said i love you
+
+to spaces, given count (a number), returning text:
+  set made to ""
+  repeat count times:
+    set made to made plus " "
+  return made
+and the universe said i love you
+
+to leading spaces of, given line (text), returning a number:
+  set count to 0
+  for each n from 1 to the size of line:
+    if letter n of line is not " ": return count
+    set count to count plus 1
+  return count
+and the universe said i love you
+
+to is word letter, given c (text), returning yes or no:
+  return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'0123456789" contains c and c is not ""
+and the universe said i love you
+
+to whole text, returning text:
+  return join body with new line
+and the universe said i love you
+
+to ask the system, given route (text), returning text:
+  return web page route
+and the universe said i love you
+
+to tell the system, given route (text) and message (text), returning text:
+  return send to the web page with (route, message)
+and the universe said i love you
+
+whisper: ---- colouring a line
+
+to learn the classes:
+  for each w in ("if otherwise repeat times for each in from by try return returning given usually whenever every depending cease break free move on went wrong meanwhile anything else") split by " ":
+    set entry w of classes to "c-flow"
+  for each w in ("scrawl set to ask into add remove inscribe save load conjure as invoke etch consume reveal raise an error with the command") split by " ":
+    if not (classes contains w): set entry w of classes to "c-action"
+  for each w in ("yes no nothing birth existence horizontal vertical depth wound") split by " ":
+    set entry w of classes to "c-constant"
+  for each w in ("number text list table place kind thing") split by " ":
+    set entry w of classes to "c-kind"
+and the universe said i love you
+
+to span, given look (text) and words (text), returning text:
+  if words is "": return ""
+  return "<span class=" plus a quotation mark plus look plus a quotation mark plus ">" plus safe markup of words plus "</span>"
+and the universe said i love you
+
+to coloured words, given line (text), returning text:
+  set made to ""
+  set n to 1
+  set count to the size of line
+  as long as n is at most count:
+    set c to letter n of line
+    if c is a quotation mark:
+      set finish to n plus 1
+      as long as finish is at most count and letter finish of line is not a quotation mark:
+        set finish to finish plus 1
+      set made to made plus span with ("c-string", letters n to (smaller of finish and count) of line)
+      set n to finish plus 1
+    otherwise if "0123456789" contains c:
+      set finish to n
+      as long as finish is at most count and "0123456789." contains letter finish of line:
+        set finish to finish plus 1
+      set made to made plus span with ("c-number", letters n to (finish minus 1) of line)
+      set n to finish
+    otherwise if is word letter with c:
+      set finish to n
+      as long as finish is at most count and is word letter with (letter finish of line):
+        set finish to finish plus 1
+      set w to letters n to (finish minus 1) of line
+      if classes contains w:
+        set made to made plus span with (entry w of classes, w)
+      otherwise:
+        set made to made plus safe markup of w
+      set n to finish
+    otherwise:
+      set made to made plus safe markup of c
+      set n to n plus 1
+  return made
+and the universe said i love you
+
+to coloured, given line (text), returning text:
+  if painted contains line: return entry line of painted
+  set t to trimmed line
+  set made to ""
+  if t begins with "whisper:" or t begins with "note:":
+    set made to span with ("c-comment", line)
+  otherwise if line is "and the universe said i love you":
+    set made to span with ("c-closing", line)
+  otherwise if line is one of ("genesis:", "the world remembers:") or line begins with "use:":
+    set made to span with ("c-heading", line)
+  otherwise if line begins with "to " and line ends with ":":
+    set cut to the size of line
+    for each n from (the size of line) to 4 by -1:
+      if letter n of line is ",": set cut to n
+    set made to span with ("c-heading", "to ") plus span with ("c-command", letters 4 to (cut minus 1) of line) plus coloured words with (letters cut to (the size of line) of line)
+  otherwise if (line begins with "a " or line begins with "an ") and (line ends with " has:" or line contains " is a kind of "):
+    set made to span with ("c-kind", line)
+  otherwise:
+    set made to coloured words with line
+  if the size of painted exceeds 5000: set painted to a table of text
+  set entry line of painted to made
+  return made
+and the universe said i love you
+
+whisper: ---- the selection
+
+to selecting, returning yes or no:
+  return mark row is not row or mark column is not column
+and the universe said i love you
+
+to mark comes first, returning yes or no:
+  return mark row falls below row or (mark row is row and mark column falls below column)
+and the universe said i love you
+
+to start row, returning a number:
+  if mark comes first: return mark row
+  return row
+and the universe said i love you
+
+to start column, returning a number:
+  if mark comes first: return mark column
+  return column
+and the universe said i love you
+
+to end row, returning a number:
+  if mark comes first: return row
+  return mark row
+and the universe said i love you
+
+to end column, returning a number:
+  if mark comes first: return column
+  return mark column
+and the universe said i love you
+
+to chosen words, returning text:
+  if not selecting: return ""
+  set opening to start row
+  set closing to end row
+  if opening is closing: return letters (start column) to (end column minus 1) of item opening of body
+  set made to letters (start column) to (the size of item opening of body) of item opening of body
+  for each r from (opening plus 1) to (closing minus 1):
+    set made to made plus new line plus item r of body
+  return made plus new line plus letters 1 to (end column minus 1) of item closing of body
+and the universe said i love you
+
+to drop the mark:
+  set mark row to row
+  set mark column to column
+and the universe said i love you
+
+whisper: ---- changing the text (all through 'put words')
+
+to swap lines, given top row (a number) and taking (a number) and putting (a list of text):
+  whisper: the lines from top row on (taking of them) become putting
+  set made to items 1 to (top row minus 1) of body
+  for each line in putting:
+    add line to made
+  for each r from (top row plus taking) to (the size of body):
+    add item r of body to made
+  set body to made
+and the universe said i love you
+
+to put words, given what (text):
+  set fresh to replace (the letter with code 9) with "  " in (replace (the letter with code 13) with "" in what)
+  set single to the size of fresh is 1 and fresh is not " " and not selecting
+  set was row to row
+  set was column to column
+  set opening to start row
+  set closing to end row
+  set before to letters 1 to (start column minus 1) of item opening of body
+  set behind to letters (end column) to (the size of item closing of body) of item closing of body
+  set pieces to fresh split by new line
+  set fitted to a list of text
+  for each k from 1 to the size of pieces:
+    set piece to item k of pieces
+    if k is 1: set piece to before plus piece
+    if k is the size of pieces:
+      set row to opening plus k minus 1
+      set column to (the size of piece) plus 1
+      set piece to piece plus behind
+    add piece to fitted
+  whisper: undo keeps only changed lines; typing on one line is one step
+  set merged to no
+  if single and typing run and opening is closing and the size of back exceeds 0:
+    set last one to the size of back
+    if the changed row of item last one of back is opening and the size of the new lines of item last one of back is 1:
+      set the new lines of item last one of back to fitted
+      set the forth row of item last one of back to row
+      set the forth column of item last one of back to column
+      set merged to yes
+  if not merged:
+    conjure a snapshot as moment
+    set the changed row of moment to opening
+    set the old lines of moment to items opening to closing of body
+    set the new lines of moment to fitted
+    set the back row of moment to was row
+    set the back column of moment to was column
+    set the forth row of moment to row
+    set the forth column of moment to column
+    add moment to back
+    if the size of back exceeds 1000: remove item 1 from back
+  set ahead to a list of snapshots
+  set typing run to single
+  swap lines with (opening, closing minus opening plus 1, fitted)
+  drop the mark
+  set goal column to column
+  something changed
+and the universe said i love you
+
+to something changed:
+  set calm to 0
+  set needs look to yes
+  set edits to edits plus 1
+  measure the widest
+  show
+and the universe said i love you
+
+to measure the widest:
+  set widest to 0
+  for each line in body:
+    if the size of line exceeds widest: set widest to the size of line
+  set the style with (rows box, "width", ((64 plus (widest plus 6) times glyph width) as text) plus "px")
+  set the style with (rows box, "height", (((the size of body) times 20) as text) plus "px")
+and the universe said i love you
+
+to step, given moment (a snapshot) and undoing (yes or no):
+  if undoing:
+    swap lines with (the changed row of moment, the size of the new lines of moment, the old lines of moment)
+    set row to the back row of moment
+    set column to the back column of moment
+  otherwise:
+    swap lines with (the changed row of moment, the size of the old lines of moment, the new lines of moment)
+    set row to the forth row of moment
+    set column to the forth column of moment
+  set row to clamp row between 1 and (the size of body)
+  set column to clamp column between 1 and ((the size of item row of body) plus 1)
+  drop the mark
+  set goal column to column
+  set typing run to no
+  something changed
+and the universe said i love you
+
+to undo:
+  if the size of back is 0: cease
+  set moment to last item of back
+  remove item (the size of back) from back
+  add moment to ahead
+  step with (moment, yes)
+and the universe said i love you
+
+to redo:
+  if the size of ahead is 0: cease
+  set moment to last item of ahead
+  remove item (the size of ahead) from ahead
+  add moment to back
+  step with (moment, no)
+and the universe said i love you
+
+whisper: ---- moving the caret
+
+to go to, given r (a number) and c (a number) and keeping (yes or no):
+  set row to clamp r between 1 and (the size of body)
+  set column to clamp c between 1 and ((the size of item row of body) plus 1)
+  if not keeping: drop the mark
+  set typing run to no
+  show
+and the universe said i love you
+
+to go up or down, given count (a number) and keeping (yes or no):
+  set goal to goal column
+  go to with (row plus count, goal, keeping)
+  set goal column to goal
+and the universe said i love you
+
+to go across, given count (a number) and keeping (yes or no):
+  if selecting and not keeping:
+    if count falls below 0: go to with (start row, start column, no)
+    otherwise: go to with (end row, end column, no)
+  otherwise if count falls below 0 and column is 1 and row exceeds 1:
+    go to with (row minus 1, (the size of item (row minus 1) of body) plus 1, keeping)
+  otherwise if count exceeds 0 and column exceeds the size of item row of body and row falls below the size of body:
+    go to with (row plus 1, 1, keeping)
+  otherwise:
+    go to with (row, column plus count, keeping)
+  set goal column to column
+and the universe said i love you
+
+to word edge, given forward (yes or no), returning a number:
+  set line to item row of body
+  set c to column
+  if forward:
+    as long as c is at most the size of line and not is word letter with (letter c of line):
+      set c to c plus 1
+    as long as c is at most the size of line and is word letter with (letter c of line):
+      set c to c plus 1
+    return c
+  as long as c exceeds 1 and not is word letter with (letter (c minus 1) of line):
+    set c to c minus 1
+  as long as c exceeds 1 and is word letter with (letter (c minus 1) of line):
+    set c to c minus 1
+  return c
+and the universe said i love you
+
+to select the word here:
+  set line to item row of body
+  set opening to column
+  as long as opening exceeds 1 and is word letter with (letter (opening minus 1) of line):
+    set opening to opening minus 1
+  set closing to column
+  as long as closing is at most the size of line and is word letter with (letter closing of line):
+    set closing to closing plus 1
+  set mark row to row
+  set mark column to opening
+  set column to closing
+  show
+and the universe said i love you
+
+whisper: ---- drawing the box
+
+to show:
+  if current is 0: cease
+  set left to 64 plus (column minus 1) times glyph width
+  set top to (row minus 1) times 20
+  set the style with (caret box, "left", (left as text) plus "px")
+  set the style with (caret box, "top", (top as text) plus "px")
+  set the style with (catcher, "left", (left as text) plus "px")
+  set the style with (catcher, "top", (top as text) plus "px")
+  show the marks
+  if selecting:
+    set the value with (catcher, chosen words)
+    select all in the element catcher
+  otherwise:
+    set the value with (catcher, "")
+  scroll into view caret box
+  paint the rows
+  set the text with (where box, "Line " plus row plus ", Column " plus column)
+  set the text with (mistake box, "")
+  for each k from 1 to the size of mistake rows:
+    if item k of mistake rows is row: set the text with (mistake box, item k of mistake notes)
+  show the tabs
+and the universe said i love you
+
+to paint the rows:
+  whisper: only rows in sight are drawn
+  if current is 0: cease
+  set scrolled to scrolled down in the element code box
+  set shown start to larger of 1 and ((round down (scrolled divided by 20)) minus 4)
+  set shown end to smaller of (the size of body) and (shown start plus (round down ((the height of code box) divided by 20)) plus 9)
+  set made to ""
+  for each r from shown start to shown end:
+    set look to "row"
+    if r is row: set look to look plus " here"
+    if mistake rows contains r: set look to look plus " bad"
+    if stop rows contains r: set look to look plus " stop"
+    if paused and r is paused row: set look to look plus " paused"
+    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus "><span class=" plus a quotation mark plus "num" plus a quotation mark plus ">" plus r plus "</span><span class=" plus a quotation mark plus "txt" plus a quotation mark plus ">" plus coloured with (item r of body) plus "</span></div>"
+  set the markup with (rows box, "<div class=" plus a quotation mark plus "shown" plus a quotation mark plus " style=" plus a quotation mark plus "top:" plus ((shown start minus 1) times 20) plus "px" plus a quotation mark plus ">" plus made plus "</div>")
+and the universe said i love you
+
+to on scroll, given event (a number):
+  paint the rows
+and the universe said i love you
+
+to show the marks:
+  set made to ""
+  if selecting:
+    for each r from start row to end row:
+      set opening to 1
+      if r is start row: set opening to start column
+      set closing to (the size of item r of body) plus 2
+      if r is end row: set closing to end column
+      if closing exceeds opening:
+        set made to made plus "<div class=" plus a quotation mark plus "mark" plus a quotation mark plus " style=" plus a quotation mark plus "left:" plus (64 plus (opening minus 1) times glyph width) plus "px;top:" plus ((r minus 1) times 20) plus "px;width:" plus ((closing minus opening) times glyph width) plus "px" plus a quotation mark plus "></div>"
+  set the markup with (marks box, made)
+and the universe said i love you
+
+to spot of the pointer, given event (a number):
+  set x to (the pointer x coordinate of event) minus (the left edge of rows box) minus 64
+  set y to (the pointer y coordinate of event) minus (the top edge of rows box)
+  set row to clamp ((round down (y divided by 20)) plus 1) between 1 and (the size of body)
+  set column to clamp ((round (x divided by glyph width)) plus 1) between 1 and ((the size of item row of body) plus 1)
+  set goal column to column
+  set typing run to no
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- keys
+
+to on key, given event (a number):
+  set key to key of the event event
+  set control to control held in the event event
+  set shift to shift held in the event event
+  whisper: held back so commands on the page run in turn
+  set handled to key is one of ("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", "Backspace", "Delete", "Enter", "Tab", "Escape", "F5", "F6", "F7", "F8", "F9", "F10", "F11")
+  if control and not (key is one of ("c", "x", "v", "C", "X", "V", "Control")): set handled to yes
+  if handled: hold back the event event
+  if suggesting and key is one of ("ArrowUp", "ArrowDown", "Enter", "Tab", "Escape"):
+    if key is "ArrowUp": set chosen to larger of 1 and (chosen minus 1)
+    if key is "ArrowDown": set chosen to smaller of (the size of picks) and (chosen plus 1)
+    if key is "Escape": hide the suggestions
+    if key is "Enter" or key is "Tab": take the pick
+    otherwise: show the picks
+    cease
+  if control and key is one of ("z", "Z"):
+    if shift: redo
+    otherwise: undo
+  otherwise if control and key is one of ("y", "Y"): redo
+  otherwise if control and key is one of ("a", "A"):
+    set mark row to 1
+    set mark column to 1
+    set row to the size of body
+    set column to (the size of last item of body) plus 1
+    show
+  otherwise if control and key is one of ("s", "S"): save the sheet
+  otherwise if control and key is " ": suggest with yes
+  otherwise if control and key is "Home": go to with (1, 1, shift)
+  otherwise if control and key is "End": go to with (the size of body, (the size of last item of body) plus 1, shift)
+  otherwise if control and key is "ArrowLeft": go to with (row, word edge with no, shift)
+  otherwise if control and key is "ArrowRight": go to with (row, word edge with yes, shift)
+  otherwise if key is "ArrowLeft": go across with (-1, shift)
+  otherwise if key is "ArrowRight": go across with (1, shift)
+  otherwise if key is "ArrowUp": go up or down with (-1, shift)
+  otherwise if key is "ArrowDown": go up or down with (1, shift)
+  otherwise if key is "PageUp": go up or down with (-(round down ((the height of code box) divided by 20)), shift)
+  otherwise if key is "PageDown": go up or down with (round down ((the height of code box) divided by 20), shift)
+  otherwise if key is "Home":
+    set indent to (leading spaces of item row of body) plus 1
+    if column is indent: go to with (row, 1, shift)
+    otherwise: go to with (row, indent, shift)
+  otherwise if key is "End": go to with (row, (the size of item row of body) plus 1, shift)
+  otherwise if key is "Backspace":
+    if not selecting:
+      if column exceeds 1:
+        set mark column to column minus 1
+        set line to item row of body
+        if trimmed (letters 1 to (column minus 1) of line) is "" and column exceeds 2: set mark column to column minus 2
+      otherwise if row exceeds 1:
+        set mark row to row minus 1
+        set mark column to (the size of item mark row of body) plus 1
+    put words with ""
+  otherwise if key is "Delete":
+    if not selecting:
+      if column is at most the size of item row of body:
+        set mark column to column plus 1
+      otherwise if row falls below the size of body:
+        set mark row to row plus 1
+        set mark column to 1
+    put words with ""
+  otherwise if key is "Enter":
+    set line to item row of body
+    set indent to leading spaces of line
+    if trimmed (letters 1 to (column minus 1) of line) ends with ":": set indent to indent plus 2
+    put words with (new line plus spaces with indent)
+  otherwise if key is "Tab":
+    if shift:
+      set line to item row of body
+      if line begins with "  ":
+        set keep to column
+        set mark column to 1
+        set column to 3
+        put words with ""
+        go to with (row, keep minus 2, no)
+    otherwise:
+      put words with "  "
+  otherwise if key is "Escape": go to with (row, column, no)
+  otherwise if paused and key is one of ("F5", "F10", "F11"):
+    if key is "F5" and not shift: debug say with "go"
+    otherwise if key is "F10": debug say with "over"
+    otherwise if key is "F11" and shift: debug say with "out"
+    otherwise if key is "F11": debug say with "step"
+  otherwise if key is "F9":
+    start running with "debug"
+  otherwise if key is one of ("F5", "F6", "F7", "F8"):
+    if shift and key is "F5": stop running
+    otherwise if key is "F5": start running with "run"
+    otherwise if key is "F6": start running with "watch"
+    otherwise if key is "F7": start running with "test"
+    otherwise: start running with "build"
+and the universe said i love you
+
+to on typing, given event (a number):
+  set got to value of the element catcher
+  if selecting and got is chosen words: cease
+  put words with got
+  if the size of got is 1 and is word letter with got: suggest with no
+  otherwise: hide the suggestions
+and the universe said i love you
+
+to on press, given event (a number):
+  if current is 0: cease
+  if the nearest matching element with (the target of event, "#suggest") is not 0: cease
+  hold back the event event
+  if (the pointer x coordinate of event) minus (the left edge of rows box) falls below 56:
+    set y to (the pointer y coordinate of event) minus (the top edge of rows box)
+    toggle the stop with (clamp ((round down (y divided by 20)) plus 1) between 1 and (the size of body))
+    cease
+  focus on the element catcher
+  set keep row to mark row
+  set keep column to mark column
+  spot of the pointer with event
+  if shift held in the event event:
+    set mark row to keep row
+    set mark column to keep column
+  otherwise:
+    drop the mark
+  set dragging to yes
+  hide the suggestions
+  show
+and the universe said i love you
+
+to on pointer move, given event (a number):
+  if not dragging: cease
+  set keep row to mark row
+  set keep column to mark column
+  spot of the pointer with event
+  set mark row to keep row
+  set mark column to keep column
+  show
+and the universe said i love you
+
+to on let go, given event (a number):
+  set dragging to no
+and the universe said i love you
+
+to on double press, given event (a number):
+  if current is 0: cease
+  select the word here
+and the universe said i love you
+
+to on wake, given event (a number):
+  apply the appearance with (code box, "awake")
+and the universe said i love you
+
+to on sleep, given event (a number):
+  remove the appearance with (code box, "awake")
+  hide the suggestions
+and the universe said i love you
+
+whisper: ---- suggestions
+
+to the word before the caret, returning text:
+  set line to item row of body
+  set opening to column
+  as long as opening exceeds 1 and is word letter with (letter (opening minus 1) of line):
+    set opening to opening minus 1
+  return letters opening to (column minus 1) of line
+and the universe said i love you
+
+to the line before the caret, returning text:
+  return trimmed (letters 1 to (column minus 1) of item row of body)
+and the universe said i love you
+
+to suggest, given asked (yes or no):
+  set w to lower case of (the word before the caret)
+  set line to lower case of (the line before the caret)
+  if not asked and the size of w falls below 2:
+    hide the suggestions
+    cease
+  set picks to a list of numbers
+  for each k from 1 to the size of labels:
+    set label to lower case of item k of labels
+    if the size of picks falls below 12:
+      if (line is not "" and label begins with line) or (w is not "" and label begins with w) or (w is "" and line is ""):
+        if label is not w: add k to picks
+  if the size of picks is 0:
+    hide the suggestions
+    cease
+  set prefix size to the size of w
+  if line is not "" and label begins with line: set prefix size to the size of w
+  set chosen to 1
+  set the style with (suggest box, "left", ((64 plus (column minus 1) times glyph width) as text) plus "px")
+  set the style with (suggest box, "top", ((row times 20 plus 2) as text) plus "px")
+  drop the attribute with (suggest box, "hidden")
+  set suggesting to yes
+  show the picks
+and the universe said i love you
+
+to show the picks:
+  set made to ""
+  for each k from 1 to the size of picks:
+    set look to "pick"
+    if k is chosen: set look to look plus " chosen"
+    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus " data-n=" plus a quotation mark plus k plus a quotation mark plus "><span>" plus safe markup of item (item k of picks) of labels plus "</span><small>" plus safe markup of item (item k of picks) of notes plus "</small></div>"
+  set the markup with (suggest box, made)
+and the universe said i love you
+
+to hide the suggestions:
+  set the attribute with (suggest box, "hidden", "")
+  set suggesting to no
+  set picks to a list of numbers
+and the universe said i love you
+
+to insertion of, given label (text), returning text:
+  set cut to position of "…" in label
+  if cut is 0: return label
+  return trimmed (letters 1 to (cut minus 1) of label) plus " "
+and the universe said i love you
+
+to take the pick:
+  if the size of picks is 0: cease
+  set label to item (item chosen of picks) of labels
+  hide the suggestions
+  set line to item row of body
+  set lower line to lower case of (letters 1 to (column minus 1) of line)
+  set start to column minus prefix size
+  set before to the line before the caret
+  if before is not "" and lower case of label begins with lower case of before:
+    set start to column minus the size of before
+  set mark row to row
+  set mark column to start
+  put words with (insertion of label)
+  focus on the element catcher
+and the universe said i love you
+
+to on pick press, given event (a number):
+  hold back the event event
+  set pick to the nearest matching element with (the target of event, ".pick")
+  if pick is 0: cease
+  set chosen to (the attribute value with (pick, "data-n")) as a number
+  take the pick
+and the universe said i love you
+
+whisper: ---- the words panel
+
+to load the words:
+  set labels to a list of text
+  set notes to a list of text
+  for each line in lines of (ask the system with "words.txt"):
+    if line contains "|":
+      set parts to line split by "|"
+      add item 1 of parts to labels
+      add item 2 of parts to notes
+  set found to a list of library words
+  try:
+    load found from the text (ask the system with "/api/words")
+  if that went wrong:
+    set found to a list of library words
+  for each word in found:
+    add the phrase of word to labels
+    set about to "from the " plus the library of word plus " library"
+    if the given of word is not "": set about to about plus ", " plus the given of word
+    if the gives of word is not "": set about to about plus ", gives " plus the gives of word
+    add about to notes
+  show the words
+and the universe said i love you
+
+to show the words:
+  set wanted to lower case of trimmed (value of the element (the element "#word-search"))
+  set made to ""
+  for each k from 1 to the size of labels:
+    if wanted is "" or lower case of item k of labels contains wanted or lower case of item k of notes contains wanted:
+      set made to made plus "<div class=" plus a quotation mark plus "word" plus a quotation mark plus " data-n=" plus a quotation mark plus k plus a quotation mark plus "><b>" plus safe markup of item k of labels plus "</b><span>" plus safe markup of item k of notes plus "</span></div>"
+  set the markup with (words box, made)
+and the universe said i love you
+
+to on word search, given event (a number):
+  show the words
+and the universe said i love you
+
+to on word press, given event (a number):
+  set word to the nearest matching element with (the target of event, ".word")
+  if word is 0 or current is 0: cease
+  put words with (insertion of item ((the attribute value with (word, "data-n")) as a number) of labels)
+  focus on the element catcher
+and the universe said i love you
+
+whisper: ---------------------------------------------------------------- files
+
+to load the tree:
+  set tree to a list of spots
+  try:
+    load tree from the text (ask the system with ("/api/tree?path=" plus web encoded folder))
+  if that went wrong:
+    set tree to a list of spots
+  set the text with (the element "#folder-name", short name of folder)
+  set the attribute with (the element "#folder-name", "title", folder)
+  show the files
+and the universe said i love you
+
+to spot markup, given spots (a list of spots) and depth (a number), returning text:
+  set made to ""
+  set open path to ""
+  if current is not 0: set open path to the path of item current of sheets
+  for each one in spots:
+    set look to "file"
+    if the folder of one: set look to look plus " folder"
+    if the folder of one and opened contains the path of one: set look to look plus " open"
+    if the path of one is open path: set look to look plus " active"
+    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus " data-path=" plus a quotation mark plus safe markup of the path of one plus a quotation mark plus " style=" plus a quotation mark plus "padding-left:" plus (10 plus depth times 14) plus "px" plus a quotation mark plus ">" plus safe markup of the name of one plus "</div>"
+    if the folder of one and opened contains the path of one:
+      set made to made plus spot markup with (the inside of one, depth plus 1)
+  return made
+and the universe said i love you
+
+to show the files:
+  set the markup with (files box, spot markup with (tree, 0))
+and the universe said i love you
+
+to on file press, given event (a number):
+  set one to the nearest matching element with (the target of event, ".file")
+  if one is 0: cease
+  set path to the attribute value with (one, "data-path")
+  if the element has the appearance with (one, "folder"):
+    if opened contains path:
+      remove item (position of path in opened) from opened
+    otherwise:
+      add path to opened
+    show the files
+  otherwise:
+    open the sheet with path
+and the universe said i love you
+
+to request a name, given hint (text) and purpose (text):
+  set old to the element within with (files box, ".file-input")
+  if old is not 0: remove the element old
+  set box to the element made from ("<input class=" plus a quotation mark plus "file-input" plus a quotation mark plus " spellcheck=" plus a quotation mark plus "false" plus a quotation mark plus ">")
+  set the attribute with (box, "placeholder", hint)
+  insert as the first child with (box, files box)
+  focus on the element box
+  set asking to purpose
+  listen for an event with (box, "keydown", the command on name key)
+and the universe said i love you
+
+to on name key, given event (a number):
+  set key to key of the event event
+  set box to the target of event
+  if key is "Escape": remove the element box
+  if key is not "Enter": cease
+  set name to trimmed (value of the element box)
+  remove the element box
+  if name is "": cease
+  if asking is "open":
+    if (ask the system with ("/api/exists?path=" plus web encoded name)) is not "true":
+      set the text with (status box, "There is no folder called " plus name plus ".")
+      cease
+    whisper: A file's path opens the folder it is in, and the file.
+    set folder to ask the system with ("/api/opening?path=" plus web encoded name)
+    load the tree
+    remember the settings
+    if folder is not name: open the sheet with name
+  otherwise:
+    if not (name contains "."): set name to name plus ".fathom"
+    set path to joined path with (folder, name)
+    if (ask the system with ("/api/exists?path=" plus web encoded path)) is "true":
+      set the text with (status box, name plus " is already there.")
+      open the sheet with path
+      cease
+    set ignored to tell the system with ("/api/write?path=" plus web encoded path, "genesis:" plus new line plus "  scrawl " plus a quotation mark plus "Hello!" plus a quotation mark plus new line plus "and the universe said i love you" plus new line)
+    load the tree
+    open the sheet with path
+and the universe said i love you
+
+to on new file press, given event (a number):
+  request a name with ("Name of the new program", "new")
+and the universe said i love you
+
+to on open folder press, given event (a number):
+  request a name with ("Folder to open, like C:\Users\me\Games", "open")
+and the universe said i love you
+
+whisper: ---- open files and tabs
+
+to keep the sheet:
+  if current is 0: cease
+  set the body of item current of sheets to body
+  set the caret row of item current of sheets to row
+  set the caret column of item current of sheets to column
+  set the anchor row of item current of sheets to mark row
+  set the anchor column of item current of sheets to mark column
+  set the back of item current of sheets to back
+  set the ahead of item current of sheets to ahead
+  set the edit count of item current of sheets to edits
+and the universe said i love you
+
+to bring up the sheet, given n (a number):
+  keep the sheet
+  set current to n
+  hide the suggestions
+  set mistake rows to a list of numbers
+  set mistake notes to a list of text
+  set the markup with (mistakes box, "")
+  if n is 0:
+    set the markup with (rows box, "")
+    set the markup with (marks box, "")
+    drop the attribute with (the element "#welcome", "hidden")
+    set the text with (where box, "")
+    set the text with (mistake box, "")
+    show the tabs
+    show the files
+    cease
+  set the attribute with (the element "#welcome", "hidden", "")
+  set one to item n of sheets
+  set body to the body of one
+  set row to the caret row of one
+  set column to the caret column of one
+  set mark row to the anchor row of one
+  set mark column to the anchor column of one
+  set back to the back of one
+  set ahead to the ahead of one
+  set edits to the edit count of one
+  measure the widest
+  set goal column to column
+  set typing run to no
+  set needs look to yes
+  set calm to 3
+  show
+  show the files
+  focus on the element catcher
+and the universe said i love you
+
+to open the sheet, given path (text):
+  for each k from 1 to the size of sheets:
+    if the path of item k of sheets is path:
+      bring up the sheet with k
+      cease
+  set words to ""
+  try:
+    set words to ask the system with ("/api/read?path=" plus web encoded path)
+  if that went wrong:
+    set the text with (status box, "I couldn't open " plus path plus ".")
+    cease
+  set ending to the letter with code 13 plus new line
+  conjure a sheet as one
+  set the windows endings of one to words contains ending
+  set words to replace (the letter with code 13) with "" in words
+  set the path of one to path
+  set the body of one to words split by new line
+  set the caret row of one to 1
+  set the caret column of one to 1
+  set the anchor row of one to 1
+  set the anchor column of one to 1
+  add one to sheets
+  bring up the sheet with (the size of sheets)
+  remember the settings
+and the universe said i love you
+
+to sheet changed, given n (a number), returning yes or no:
+  if n is current: return edits is not the saved count of item n of sheets
+  return the edit count of item n of sheets is not the saved count of item n of sheets
+and the universe said i love you
+
+to show the tabs:
+  set made to ""
+  for each k from 1 to the size of sheets:
+    set look to "tab"
+    if k is current: set look to look plus " active"
+    if sheet changed with k: set look to look plus " changed"
+    set made to made plus "<div class=" plus a quotation mark plus look plus a quotation mark plus " data-n=" plus a quotation mark plus k plus a quotation mark plus " title=" plus a quotation mark plus safe markup of the path of item k of sheets plus a quotation mark plus "><span class=" plus a quotation mark plus "tab-name" plus a quotation mark plus ">" plus safe markup of short name of (the path of item k of sheets) plus "</span><span class=" plus a quotation mark plus "shut" plus a quotation mark plus " title=" plus a quotation mark plus "Close" plus a quotation mark plus ">×</span></div>"
+  set the markup with (tabs box, made)
+and the universe said i love you
+
+to on tab press, given event (a number):
+  set tab to the nearest matching element with (the target of event, ".tab")
+  if tab is 0: cease
+  set n to (the attribute value with (tab, "data-n")) as a number
+  if the nearest matching element with (the target of event, ".shut") is not 0:
+    close the sheet with n
+  otherwise:
+    bring up the sheet with n
+and the universe said i love you
+
+to close the sheet, given n (a number):
+  keep the sheet
+  if sheet changed with n and not the warned of item n of sheets:
+    set the warned of item n of sheets to yes
+    set the text with (status box, short name of (the path of item n of sheets) plus " has changes that aren't saved. Press Ctrl+S to save them, or close it again to throw them away.")
+    cease
+  set keep to current
+  set current to 0
+  remove item n from sheets
+  if keep is n: set keep to smaller of n and (the size of sheets)
+  otherwise if keep exceeds n: set keep to keep minus 1
+  bring up the sheet with keep
+  remember the settings
+and the universe said i love you
+
+to save the sheet:
+  if current is 0: cease
+  set words to whole text
+  if the windows endings of item current of sheets: set words to join body with (the letter with code 13 plus new line)
+  try:
+    set ignored to tell the system with ("/api/write?path=" plus web encoded (the path of item current of sheets), words)
+  if that went wrong:
+    set the text with (status box, "I couldn't save " plus the path of item current of sheets plus ".")
+    cease
+  set the saved count of item current of sheets to edits
+  set the warned of item current of sheets to no
+  set the text with (status box, "Saved " plus short name of (the path of item current of sheets))
+  show the tabs
+and the universe said i love you
+
+whisper: ---- settings
+
+to remember the settings:
+  conjure a memory as remembered
+  set the folder of remembered to folder
+  for each one in sheets:
+    add the path of one to the files of remembered
+  try:
+    set ignored to tell the system with ("/api/settings", remembered as saved text)
+  if that went wrong:
+    set ignored to ""
+and the universe said i love you
+
+whisper: ---- mistakes, checked when typing stops
+
+to look for mistakes:
+  if current is 0 or looking: cease
+  set path to the path of item current of sheets
+  if not (path ends with ".fathom"):
+    set needs look to no
+    cease
+  set needs look to no
+  set looking to yes
+  set words to whole text
+  set said to ""
+  try:
+    set said to tell the system with ("/api/check?path=" plus web encoded path, words)
+  if that went wrong:
+    set said to ""
+  set looking to no
+  if current is 0 or the path of item current of sheets is not path: cease
+  set mistake rows to a list of numbers
+  set mistake notes to a list of text
+  set made to ""
+  for each line in lines of said:
+    set mark to position of " line " in line
+    if mark exceeds 0 and line contains ": ":
+      set rest to letters (mark plus 6) to (the size of line) of line
+      set cut to position of ":" in rest
+      if cut exceeds 1:
+        set number words to letters 1 to (cut minus 1) of rest
+        set about to trimmed (letters (cut plus 1) to (the size of rest) of rest)
+        set found row to 0
+        try:
+          set found row to number words as a number
+        if that went wrong:
+          set found row to 0
+        if found row exceeds 0:
+          add found row to mistake rows
+          add about to mistake notes
+          set made to made plus "<div class=" plus a quotation mark plus "err goes" plus a quotation mark plus " data-line=" plus a quotation mark plus found row plus a quotation mark plus ">Line " plus found row plus ": " plus safe markup of about plus "</div>"
+  if made is "": set made to "<div class=" plus a quotation mark plus "note" plus a quotation mark plus ">No mistakes found.</div>"
+  set the markup with (mistakes box, made)
+  set the text with (the element "#show-mistakes", "Mistakes")
+  if the size of mistake rows exceeds 0: set the text with (the element "#show-mistakes", "Mistakes (" plus (the size of mistake rows) plus ")")
+  show
+and the universe said i love you
+
+to on line press, given event (a number):
+  set one to the nearest matching element with (the target of event, ".goes")
+  if one is 0 or current is 0: cease
+  go to with ((the attribute value with (one, "data-line")) as a number, 1, no)
+  focus on the element catcher
+and the universe said i love you
+
+to show the pane, given which (text):
+  set out to which is "output"
+  toggle the appearance with (the element "#show-output", "active", out)
+  toggle the appearance with (the element "#show-mistakes", "active", not out)
+  if out:
+    drop the attribute with (output box, "hidden")
+    set the attribute with (mistakes box, "hidden", "")
+  otherwise:
+    drop the attribute with (mistakes box, "hidden")
+    set the attribute with (output box, "hidden", "")
+and the universe said i love you
+
+to on output tab press, given event (a number):
+  show the pane with "output"
+and the universe said i love you
+
+to on mistakes tab press, given event (a number):
+  show the pane with "mistakes"
+and the universe said i love you
+
+whisper: ---- running programs
+
+to show output, given words (text) and look (text):
+  if words is "": cease
+  set made to ""
+  for each line in words split by new line:
+    set mark to position of "line " in lower case of line
+    set found row to 0
+    if mark exceeds 0:
+      set digits to ""
+      set n to mark plus 5
+      as long as n is at most the size of line and "0123456789" contains letter n of line:
+        set digits to digits plus letter n of line
+        set n to n plus 1
+      if digits is not "": set found row to digits as a number
+    if made is not "": set made to made plus new line
+    if found row exceeds 0 and look is "err":
+      set made to made plus "<span class=" plus a quotation mark plus "err goes" plus a quotation mark plus " data-line=" plus a quotation mark plus found row plus a quotation mark plus ">" plus safe markup of line plus "</span>"
+    otherwise:
+      set made to made plus "<span class=" plus a quotation mark plus look plus a quotation mark plus ">" plus safe markup of line plus "</span>"
+  insert as a child with (the element made from ("<span>" plus made plus "</span>"), output box)
+  scroll to the end output box
+and the universe said i love you
+
+to start running, given how (text):
+  if current is 0: cease
+  if sheet changed with current: save the sheet
+  set path to the path of item current of sheets
+  if not (path ends with ".fathom"):
+    set the text with (status box, "Only .fathom programs can be run.")
+    cease
+  set after build to how is "build"
+  show the pane with "output"
+  set the markup with (output box, "")
+  show output with ("Running " plus short name of path plus " (" plus how plus ")" plus new line, "note")
+  set halted on purpose to no
+  set debugging to how is "debug"
+  set paused to no
+  set debug carry to ""
+  enable the stepping with no
+  run it with (how, path)
+and the universe said i love you
+
+to run it, given how (text) and path (text):
+  try:
+    set ignored to ask the system with ("/api/run?how=" plus how plus "&path=" plus web encoded path plus "&stops=" plus web encoded stops as words)
+  if that went wrong:
+    show output with ("I couldn't start it: " plus the wound, "err")
+    cease
+  set running to yes
+  enable the element with (the element "#stop", yes)
+  enable the element with (answer box, yes)
+  set the text with (status box, "Running")
+  focus on the element answer box
+and the universe said i love you
+
+to poll the program:
+  if polling: cease
+  set polling to yes
+  conjure a run state as state
+  try:
+    load state from the text (ask the system with "/api/poll")
+  if that went wrong:
+    set polling to no
+    cease
+  set polling to no
+  show output with (without debug lines with (the printed of state), "")
+  show output with (the problems of state, "err")
+  if the running of state: cease
+  set running to no
+  set debugging to no
+  set paused to no
+  enable the stepping with no
+  paint the rows
+  enable the element with (the element "#stop", no)
+  enable the element with (answer box, no)
+  if after build and the code of state is 0:
+    set after build to no
+    set path to the path of item current of sheets
+    show output with (new line plus "Running the built program" plus new line, "note")
+    run it with ("exe", path)
+    cease
+  set after build to no
+  if halted on purpose:
+    set halted on purpose to no
+    set the text with (status box, "Stopped")
+  otherwise if the code of state is 0:
+    show output with (new line plus "Finished.", "note")
+    set the text with (status box, "Finished")
+  otherwise:
+    show output with (new line plus "Ended with a problem.", "err")
+    set the text with (status box, "Ended with a problem")
+  if current is not 0: focus on the element catcher
+and the universe said i love you
+
+to stop running:
+  if not running: cease
+  set halted on purpose to yes
+  set ignored to ask the system with "/api/stop"
+  set after build to no
+  show output with (new line plus "Stopped.", "note")
+and the universe said i love you
+
+to toggle the stop, given r (a number):
+  set others to a list of numbers
+  for each s in stop rows:
+    if s is not r: add s to others
+  if the size of others is the size of stop rows:
+    add r to others
+    if debugging: debug say with ("stop at " plus r)
+  otherwise if debugging:
+    debug say with ("forget " plus r)
+  set stop rows to others
+  paint the rows
+and the universe said i love you
+
+to stops as words, returning text:
+  set made to ""
+  for each s in stop rows:
+    if made is not "": set made to made plus " "
+    set made to made plus s
+  return made
+and the universe said i love you
+
+to debug say, given words (text):
+  whisper: a command for the paused program, typed into it as a line
+  if not paused: cease
+  set ignored to tell the system with ("/api/type", words)
+  if words begins with "stop at" or words begins with "forget": cease
+  set paused to no
+  enable the stepping with no
+  set the text with (status box, "Running")
+  paint the rows
+and the universe said i love you
+
+to enable the stepping, given on (yes or no):
+  for each name in a list of ("#step", "#over", "#out", "#go"):
+    enable the element with (the element name, on)
+and the universe said i love you
+
+to paused at, given marked (text):
+  conjure a debug stop as halt
+  try:
+    load halt from the text marked
+  if that went wrong:
+    cease
+  set paused to yes
+  set paused row to the line of halt
+  set stop rows to the stops of halt
+  enable the stepping with yes
+  set the text with (status box, "Paused at " plus the where of halt)
+  set shown to "■ " plus the where of halt plus ": " plus the source of halt
+  for each name in the keys of the names of halt:
+    set shown to shown plus new line plus "    " plus name plus ": " plus (entry name of the names of halt)
+  show output with (shown plus new line, "note")
+  if the line of halt falls below 100000 and current is not 0:
+    set row to the line of halt
+    set column to (leading spaces of item row of body) plus 1
+    drop the mark
+    show
+and the universe said i love you
+
+to without debug lines, given words (text), returning text:
+  whisper: marked lines are debug stops, not output
+  set all to debug carry plus words
+  set debug carry to ""
+  if not (all contains "@@debug "): return all
+  set left over to ""
+  set pieces to all split by new line
+  for each k from 1 to the size of pieces:
+    set piece to item k of pieces
+    if piece begins with "@@debug ":
+      if k is the size of pieces and not (all ends with new line):
+        set debug carry to piece
+      otherwise:
+        paused at with (letters 9 to (the size of piece) of piece)
+    otherwise:
+      set left over to left over plus piece
+      if k falls below the size of pieces: set left over to left over plus new line
+  return left over
+and the universe said i love you
+
+to on step press, given event (a number):
+  debug say with "step"
+and the universe said i love you
+
+to on over press, given event (a number):
+  debug say with "over"
+and the universe said i love you
+
+to on out press, given event (a number):
+  debug say with "out"
+and the universe said i love you
+
+to on go press, given event (a number):
+  debug say with "go"
+and the universe said i love you
+
+to on wasm press, given event (a number):
+  start running with "wasm"
+and the universe said i love you
+
+to on profile press, given event (a number):
+  start running with "profile"
+and the universe said i love you
+
+to on debug press, given event (a number):
+  start running with "debug"
+and the universe said i love you
+
+to on answer key, given event (a number):
+  if key of the event event is not "Enter": cease
+  set words to value of the element answer box
+  set the value with (answer box, "")
+  show output with (words plus new line, "typed")
+  set ignored to tell the system with ("/api/type", words)
+and the universe said i love you
+
+to on learn press, given event (a number):
+  set place to ""
+  try:
+    load place from the text (ask the system with "/api/course")
+  if that went wrong:
+    set the text with (status box, "I couldn't find the course.")
+    cease
+  set folder to place
+  load the tree
+  open the sheet with joined path with (folder, "01 hello.fathom")
+  remember the settings
+and the universe said i love you
+
+to on run press, given event (a number):
+  start running with "run"
+and the universe said i love you
+
+to on watch press, given event (a number):
+  start running with "watch"
+and the universe said i love you
+
+to on test press, given event (a number):
+  start running with "test"
+and the universe said i love you
+
+to on build press, given event (a number):
+  start running with "build"
+and the universe said i love you
+
+to on web press, given event (a number):
+  start running with "web"
+and the universe said i love you
+
+to on stop press, given event (a number):
+  stop running
+and the universe said i love you
+
+to on clear press, given event (a number):
+  set the markup with (output box, "")
+and the universe said i love you
+
+to on window key, given event (a number):
+  set key to key of the event event
+  if the focused element is catcher: cease
+  if paused and key is one of ("F5", "F10", "F11"):
+    hold back the event event
+    if key is "F5" and not shift held in the event event: debug say with "go"
+    otherwise if key is "F10": debug say with "over"
+    otherwise if key is "F11" and shift held in the event event: debug say with "out"
+    otherwise if key is "F11": debug say with "step"
+  otherwise if key is "F9":
+    hold back the event event
+    start running with "debug"
+  otherwise if key is one of ("F5", "F6", "F7", "F8"):
+    hold back the event event
+    if shift held in the event event and key is "F5": stop running
+    otherwise if key is "F5": start running with "run"
+    otherwise if key is "F6": start running with "watch"
+    otherwise if key is "F7": start running with "test"
+    otherwise: start running with "build"
+  if control held in the event event and key is one of ("s", "S"):
+    hold back the event event
+    save the sheet
+and the universe said i love you
+
+whisper: ---- the beat: mistakes and output
+
+to tick:
+  set calm to calm plus 1
+  if needs look and calm is at least 3: look for mistakes
+  if running: poll the program
+and the universe said i love you
+
+whisper: ---- starting up
+
+to hook up, given selector (text) and happening (text) and then (a command given a number):
+  listen for an event with (the element selector, happening, then)
+and the universe said i love you
+
+genesis:
+  set code box to the element "#code"
+  set rows box to the element "#rows"
+  set marks box to the element "#marks"
+  set caret box to the element "#caret"
+  set catcher to the element "#catcher"
+  set suggest box to the element "#suggest"
+  set tabs box to the element "#tabs"
+  set files box to the element "#files"
+  set words box to the element "#words"
+  set output box to the element "#output"
+  set mistakes box to the element "#mistakes"
+  set answer box to the element "#answer"
+  set status box to the element "#status"
+  set where box to the element "#where"
+  set mistake box to the element "#mistake-line"
+  set glyph width to (the width of (the element "#measure")) divided by 100
+  learn the classes
+  listen for an event with (catcher, "keydown", the command on key)
+  listen for an event with (catcher, "input", the command on typing)
+  listen for an event with (catcher, "focus", the command on wake)
+  listen for an event with (catcher, "blur", the command on sleep)
+  listen for an event with (code box, "mousedown", the command on press)
+  listen for an event with (code box, "dblclick", the command on double press)
+  listen for an event with (code box, "scroll", the command on scroll)
+  listen for an event with (the whole window, "mousemove", the command on pointer move)
+  listen for an event with (the whole window, "mouseup", the command on let go)
+  listen for an event with (the whole window, "keydown", the command on window key)
+  listen for an event with (suggest box, "mousedown", the command on pick press)
+  listen for an event with (tabs box, "click", the command on tab press)
+  listen for an event with (files box, "click", the command on file press)
+  listen for an event with (words box, "click", the command on word press)
+  listen for an event with (output box, "click", the command on line press)
+  listen for an event with (mistakes box, "click", the command on line press)
+  listen for an event with (answer box, "keydown", the command on answer key)
+  hook up with ("#word-search", "input", the command on word search)
+  hook up with ("#show-output", "click", the command on output tab press)
+  hook up with ("#show-mistakes", "click", the command on mistakes tab press)
+  hook up with ("#learn", "click", the command on learn press)
+  hook up with ("#run", "click", the command on run press)
+  hook up with ("#watch", "click", the command on watch press)
+  hook up with ("#debug", "click", the command on debug press)
+  hook up with ("#profile", "click", the command on profile press)
+  hook up with ("#wasm", "click", the command on wasm press)
+  hook up with ("#step", "click", the command on step press)
+  hook up with ("#over", "click", the command on over press)
+  hook up with ("#out", "click", the command on out press)
+  hook up with ("#go", "click", the command on go press)
+  hook up with ("#test", "click", the command on test press)
+  hook up with ("#build", "click", the command on build press)
+  hook up with ("#web", "click", the command on web press)
+  hook up with ("#stop", "click", the command on stop press)
+  hook up with ("#clear", "click", the command on clear press)
+  hook up with ("#new-file", "click", the command on new file press)
+  hook up with ("#open-folder", "click", the command on open folder press)
+  load home from the text (ask the system with "/api/home")
+  set folder to joined path with (home, "examples")
+  conjure a memory as remembered
+  try:
+    load remembered from the text (ask the system with "/api/settings")
+  if that went wrong:
+    conjure a memory as remembered
+  if the folder of remembered is not "" and (ask the system with ("/api/exists?path=" plus web encoded (the folder of remembered))) is "true":
+    set folder to ask the system with ("/api/opening?path=" plus web encoded (the folder of remembered))
+  load the tree
+  load the words
+  for each path in the files of remembered:
+    try:
+      open the sheet with path
+    if that went wrong:
+      set ignored to ""
+  every with (0.25, the command tick)
+and the universe said i love you

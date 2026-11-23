@@ -4,7 +4,7 @@ say:
   Real programs sort things, line them up in columns, and grow into several scripts. Here are the words for that.
 uncard
 
-new: spending.stella
+new: spending.fathom
 type fast:
   a cost has:
     kind (text)
@@ -47,7 +47,7 @@ card: Chapter 16 | Text | Every alphabet
 say:
   Text words count letters, not bytes, so accents, other alphabets and emoji all work the way they look.
 uncard
-new: letters.stella
+new: letters.fathom
 type fast:
   genesis:
     set word to "straße Ωμέγα 😀"
@@ -66,7 +66,7 @@ card: Chapter 16 | Several scripts | Keeping a command to its own script
 say:
   As a program grows into several scripts, two of them may want a helper with the same name. A command written privately is kept to its own script.
 uncard
-new: money.stella
+new: money.fathom
 type fast:
   to tidy, privately, given amount (a number), returning text:
     return "$" plus (amount rounded to 2 decimal places)
@@ -76,9 +76,9 @@ type fast:
     return "costs " plus tidy with amount
   and the universe said i love you
 save
-new: shop.stella
+new: shop.fathom
 type fast:
-  use: money.stella
+  use: money.fathom
 
   to tidy, given name (text), returning text:
     return trimmed name
@@ -90,7 +90,7 @@ type fast:
 run
 zoom: #output
 say:
-  Money's tidy is written privately, so only money dot stella can use it, and the shop can have a tidy of its own. Without privately, Stellanova would say there are two commands called tidy, and where each one is.
+  Money's tidy is written privately, so only money dot fathom can use it, and the shop can have a tidy of its own. Without privately, Fathom would say there are two commands called tidy, and where each one is.
 wait
 zoom: out
 
@@ -98,7 +98,7 @@ card: Chapter 16 | Files | Is it there?
 say:
   Asking whether a file or a folder is there reads the same way for both.
 uncard
-new: saves.stella
+new: saves.fathom
 type fast:
   genesis:
     if folder "saves" exists:
@@ -120,7 +120,7 @@ card: Chapter 16 | Kinds | Parts only a kind's own commands can touch
 say:
   A part written hidden can only be used by the commands for that kind of thing. Everywhere else, it is a mistake to reach in and change it.
 uncard
-new: bank.stella
+new: bank.fathom
 type fast:
   an account has:
     balance (a number, hidden)
@@ -156,7 +156,7 @@ card: Chapter 16 | The web | A server that says how it was asked
 say:
   A web server's answer command can see how it was asked, with the web way, and say a page isn't there with a status.
 uncard
-new: tiny server.stella
+new: tiny server.fathom
 type fast:
   use: server
   use: web

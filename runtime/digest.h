@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace stellanova_digest
+namespace fathom_digest
 {
 	using Bytes = std::vector<uint8_t>;
 

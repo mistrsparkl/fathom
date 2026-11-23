@@ -1,11 +1,11 @@
-// Runs the extension with a fake VS Code. Use: node check_extension.js script.stella
+// Runs the extension with a fake VS Code. Use: node check_extension.js script.fathom
 const Module = require("module");
 const fs = require("fs");
 const file = require("path").resolve(process.argv[2]);
 const text = fs.readFileSync(file, "utf8");
 const lines = text.split(/\r?\n/);
 const doc = {
-  languageId: "stellanova", uri: { scheme: "file", fsPath: file, toString: () => file }, lineCount: lines.length,
+  languageId: "fathom", uri: { scheme: "file", fsPath: file, toString: () => file }, lineCount: lines.length,
   getText: () => text, lineAt: (n) => ({ text: lines[n], range: { line: n } }),
 };
 const shown = [], providers = {};

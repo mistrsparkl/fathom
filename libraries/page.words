@@ -1,277 +1,277 @@
-note: Web pages. Use: use: page  Build: stellanova web script.stella  Elements are numbers.
+note: Web pages. Use: use: page  Build: fathom web script.fathom  Elements are numbers.
 
 web only
 
 note: ---- finding elements
 the whole window = 0, number, read only
-  web: stellanova_page::number(window)
+  web: fathom_page::number(window)
 the page = 0, number, read only
-  web: stellanova_page::number(document.documentElement)
+  web: fathom_page::number(document.documentElement)
 the page body = 0, number, read only
-  web: stellanova_page::number(document.body)
+  web: fathom_page::number(document.body)
 the focused element = 0, number, read only
-  web: stellanova_page::number(document.activeElement)
+  web: fathom_page::number(document.activeElement)
 to the element, given selector (text), returning a number
-  web: stellanova_page::number(document.querySelector({selector}))
+  web: fathom_page::number(document.querySelector({selector}))
 to elements matching, given selector (text), returning a list of numbers
-  web: stellanova_page::numbers(document.querySelectorAll({selector}))
+  web: fathom_page::numbers(document.querySelectorAll({selector}))
 to the element within, given element (a number) and selector (text), returning a number
-  web: stellanova_page::number(stellanova_page::get({element}, {line}).querySelector({selector}))
+  web: fathom_page::number(fathom_page::get({element}, {line}).querySelector({selector}))
 to elements within, given element (a number) and selector (text), returning a list of numbers
-  web: stellanova_page::numbers(stellanova_page::get({element}, {line}).querySelectorAll({selector}))
+  web: fathom_page::numbers(fathom_page::get({element}, {line}).querySelectorAll({selector}))
 to the nearest matching element, given element (a number) and selector (text), returning a number
-  web: stellanova_page::number(stellanova_page::get({element}, {line}).closest?.({selector}))
+  web: fathom_page::number(fathom_page::get({element}, {line}).closest?.({selector}))
 to parent of the element, given element (a number), returning a number
-  web: stellanova_page::number(stellanova_page::get({element}, {line}).parentElement)
+  web: fathom_page::number(fathom_page::get({element}, {line}).parentElement)
 to the element at, given x (a number) and y (a number), returning a number
-  web: stellanova_page::number(document.elementFromPoint({x}, {y}))
+  web: fathom_page::number(document.elementFromPoint({x}, {y}))
 to the element made from, given markup (text), returning a number
-  web: stellanova_page::made({markup}, {line})
+  web: fathom_page::made({markup}, {line})
 
 note: ---- placing them
 to insert as a child, given element (a number) and parent (a number)
-  web: stellanova_page::get({parent}, {line}).append(stellanova_page::get({element}, {line}))
+  web: fathom_page::get({parent}, {line}).append(fathom_page::get({element}, {line}))
 to insert as the first child, given element (a number) and parent (a number)
-  web: stellanova_page::get({parent}, {line}).prepend(stellanova_page::get({element}, {line}))
+  web: fathom_page::get({parent}, {line}).prepend(fathom_page::get({element}, {line}))
 to insert before, given element (a number) and other (a number)
-  web: stellanova_page::get({other}, {line}).before(stellanova_page::get({element}, {line}))
+  web: fathom_page::get({other}, {line}).before(fathom_page::get({element}, {line}))
 to remove the element, given element (a number)
-  web: stellanova_page::get({element}, {line}).remove()
+  web: fathom_page::get({element}, {line}).remove()
 to empty the element, given element (a number)
-  web: stellanova_page::get({element}, {line}).replaceChildren()
+  web: fathom_page::get({element}, {line}).replaceChildren()
 
 note: ---- what they hold
 to set the text, given element (a number) and words (text)
-  web: (stellanova_page::get({element}, {line}).textContent = {words})
+  web: (fathom_page::get({element}, {line}).textContent = {words})
 to set the markup, given element (a number) and markup (text)
-  web: (stellanova_page::get({element}, {line}).innerHTML = {markup})
+  web: (fathom_page::get({element}, {line}).innerHTML = {markup})
 to words in the element, given element (a number), returning text
-  web: stellanova_page::get({element}, {line}).textContent
+  web: fathom_page::get({element}, {line}).textContent
 to safe markup of, given words (text), returning text
-  web: stellanova_page::safe({words})
+  web: fathom_page::safe({words})
 to value of the element, given element (a number), returning text
-  web: String(stellanova_page::get({element}, {line}).value ?? "")
+  web: String(fathom_page::get({element}, {line}).value ?? "")
 to set the value, given element (a number) and value (text)
-  web: (stellanova_page::get({element}, {line}).value = {value})
+  web: (fathom_page::get({element}, {line}).value = {value})
 to the element is ticked, given element (a number), returning yes or no
-  web: !!stellanova_page::get({element}, {line}).checked
+  web: !!fathom_page::get({element}, {line}).checked
 to tick the element, given element (a number) and on (yes or no)
-  web: (stellanova_page::get({element}, {line}).checked = {on})
+  web: (fathom_page::get({element}, {line}).checked = {on})
 to enable the element, given element (a number) and on (yes or no)
-  web: (stellanova_page::get({element}, {line}).disabled = !{on})
+  web: (fathom_page::get({element}, {line}).disabled = !{on})
 to focus on the element, given element (a number)
-  web: stellanova_page::get({element}, {line}).focus()
+  web: fathom_page::get({element}, {line}).focus()
 to select all in the element, given element (a number)
-  web: stellanova_page::get({element}, {line}).select?.()
+  web: fathom_page::get({element}, {line}).select?.()
 the selected words = 0, text, read only
   web: String(getSelection() || "")
 
 note: ---- attributes, looks (CSS classes) and styles
 to set the attribute, given element (a number) and name (text) and value (text)
-  web: stellanova_page::get({element}, {line}).setAttribute({name}, {value})
+  web: fathom_page::get({element}, {line}).setAttribute({name}, {value})
 to drop the attribute, given element (a number) and name (text)
-  web: stellanova_page::get({element}, {line}).removeAttribute({name})
+  web: fathom_page::get({element}, {line}).removeAttribute({name})
 to the attribute value, given element (a number) and name (text), returning text
-  web: (stellanova_page::get({element}, {line}).getAttribute({name}) ?? "")
+  web: (fathom_page::get({element}, {line}).getAttribute({name}) ?? "")
 to apply the appearance, given element (a number) and look (text)
-  web: stellanova_page::get({element}, {line}).classList.add(...stellanova_page::looks({look}))
+  web: fathom_page::get({element}, {line}).classList.add(...fathom_page::looks({look}))
 to remove the appearance, given element (a number) and look (text)
-  web: stellanova_page::get({element}, {line}).classList.remove(...stellanova_page::looks({look}))
+  web: fathom_page::get({element}, {line}).classList.remove(...fathom_page::looks({look}))
 to toggle the appearance, given element (a number) and look (text) and on (yes or no)
-  web: stellanova_page::get({element}, {line}).classList.toggle({look}, {on})
+  web: fathom_page::get({element}, {line}).classList.toggle({look}, {on})
 to the element has the appearance, given element (a number) and look (text), returning yes or no
-  web: stellanova_page::get({element}, {line}).classList.contains({look})
+  web: fathom_page::get({element}, {line}).classList.contains({look})
 to set the style, given element (a number) and property (text) and value (text)
-  web: stellanova_page::get({element}, {line}).style.setProperty({property}, {value})
+  web: fathom_page::get({element}, {line}).style.setProperty({property}, {value})
 to the style value, given element (a number) and property (text), returning text
-  web: getComputedStyle(stellanova_page::get({element}, {line})).getPropertyValue({property}).trim()
+  web: getComputedStyle(fathom_page::get({element}, {line})).getPropertyValue({property}).trim()
 
 note: ---- where they are and how big
 to the left edge of, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).getBoundingClientRect().left
+  web: fathom_page::get({element}, {line}).getBoundingClientRect().left
 to the top edge of, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).getBoundingClientRect().top
+  web: fathom_page::get({element}, {line}).getBoundingClientRect().top
 to the width of, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).getBoundingClientRect().width
+  web: fathom_page::get({element}, {line}).getBoundingClientRect().width
 to the height of, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).getBoundingClientRect().height
+  web: fathom_page::get({element}, {line}).getBoundingClientRect().height
 width of the window = 0, number, read only
   web: innerWidth
 height of the window = 0, number, read only
   web: innerHeight
 to scroll into view, given element (a number)
-  web: stellanova_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
+  web: fathom_page::get({element}, {line}).scrollIntoView({ block: "nearest" })
 to scroll to the end, given element (a number)
-  web: stellanova_page::end({element}, {line})
+  web: fathom_page::end({element}, {line})
 to scrolled down in the element, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).scrollTop
+  web: fathom_page::get({element}, {line}).scrollTop
 to scrolled across in the element, given element (a number), returning a number
-  web: stellanova_page::get({element}, {line}).scrollLeft
+  web: fathom_page::get({element}, {line}).scrollLeft
 
 note: ---- answering the person
 to listen for an event, given element (a number) and happening (text) and then (a command given a number)
-  web: stellanova_page::whenever({element}, {happening}, {then}, {line})
+  web: fathom_page::whenever({element}, {happening}, {then}, {line})
 to the pointer x coordinate of, given event (a number), returning a number
-  web: (stellanova_page::event({event}, {line}).clientX ?? 0)
+  web: (fathom_page::event({event}, {line}).clientX ?? 0)
 to the pointer y coordinate of, given event (a number), returning a number
-  web: (stellanova_page::event({event}, {line}).clientY ?? 0)
+  web: (fathom_page::event({event}, {line}).clientY ?? 0)
 to key of the event, given event (a number), returning text
-  web: (stellanova_page::event({event}, {line}).key ?? "")
+  web: (fathom_page::event({event}, {line}).key ?? "")
 to button of the event, given event (a number), returning a number
-  web: (stellanova_page::event({event}, {line}).button ?? 0)
+  web: (fathom_page::event({event}, {line}).button ?? 0)
 to wheel of the event, given event (a number), returning a number
-  web: (stellanova_page::event({event}, {line}).deltaY ?? 0)
+  web: (fathom_page::event({event}, {line}).deltaY ?? 0)
 to the target of, given event (a number), returning a number
-  web: stellanova_page::number(stellanova_page::event({event}, {line}).target)
+  web: fathom_page::number(fathom_page::event({event}, {line}).target)
 to control held in the event, given event (a number), returning yes or no
-  web: stellanova_page::held({event}, "ctrlKey", {line})
+  web: fathom_page::held({event}, "ctrlKey", {line})
 to shift held in the event, given event (a number), returning yes or no
-  web: stellanova_page::held({event}, "shiftKey", {line})
+  web: fathom_page::held({event}, "shiftKey", {line})
 to alt held in the event, given event (a number), returning yes or no
-  web: stellanova_page::held({event}, "altKey", {line})
+  web: fathom_page::held({event}, "altKey", {line})
 to hold back the event, given event (a number)
-  web: stellanova_page::event({event}, {line}).preventDefault()
+  web: fathom_page::event({event}, {line}).preventDefault()
 to stop spreading, given event (a number)
-  web: stellanova_page::event({event}, {line}).stopPropagation()
+  web: fathom_page::event({event}, {line}).stopPropagation()
 to capture the pointer, given element (a number) and event (a number)
-  web: stellanova_page::capture({element}, {event}, {line})
+  web: fathom_page::capture({element}, {event}, {line})
 
 note: ---- later, and every frame
 to after, given seconds (a number) and then (a command)
-  web: stellanova_page::after({seconds}, {then}, {line})
+  web: fathom_page::after({seconds}, {then}, {line})
 to every, given seconds (a number) and then (a command)
-  web: stellanova_page::every({seconds}, {then}, {line})
+  web: fathom_page::every({seconds}, {then}, {line})
 to wait for the next frame
   web: (await new Promise((done) => requestAnimationFrame(done)))
 
 note: ---- moving smoothly
 to animate, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
-  web: stellanova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
+  web: fathom_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line})
 to animate and wait, given element (a number) and property (text) and from (text) and to (text) and seconds (a number) and easing (text)
-  web: (await stellanova_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
+  web: (await fathom_page::animate({element}, {property}, {from}, {to}, {seconds}, {easing}, {line}).finished.catch(() => {}))
 
 note: ---- drawing on a canvas
 to start drawing on, given element (a number) and sharpness (a number)
-  web: stellanova_page::draw_on({element}, {sharpness}, {line})
+  web: fathom_page::draw_on({element}, {sharpness}, {line})
 drawing width = 0, number, read only
-  web: stellanova_page::pen().width
+  web: fathom_page::pen().width
 drawing height = 0, number, read only
-  web: stellanova_page::pen().height
+  web: fathom_page::pen().height
 to clear the drawing
-  web: stellanova_page::pen().clear()
+  web: fathom_page::pen().clear()
 to begin a shape
-  web: stellanova_page::pen().begin()
+  web: fathom_page::pen().begin()
 to shape point, given x (a number) and y (a number)
-  web: stellanova_page::pen().point({x}, {y})
+  web: fathom_page::pen().point({x}, {y})
 to fill the shape, given colour (text)
-  web: stellanova_page::pen().fill({colour})
+  web: fathom_page::pen().fill({colour})
 to fill the shape fading, given top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
-  web: stellanova_page::pen().fade({top colour}, {bottom colour}, {top}, {bottom})
+  web: fathom_page::pen().fade({top colour}, {bottom colour}, {top}, {bottom})
 to trace the shape, given colour (text) and width (a number)
-  web: stellanova_page::pen().trace({colour}, {width})
+  web: fathom_page::pen().trace({colour}, {width})
 to fill a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
-  web: stellanova_page::pen().dot({x}, {y}, {radius}, {colour})
+  web: fathom_page::pen().dot({x}, {y}, {radius}, {colour})
 to fill a box, given x (a number) and y (a number) and width (a number) and height (a number) and colour (text)
-  web: stellanova_page::pen().box({x}, {y}, {width}, {height}, {colour})
+  web: fathom_page::pen().box({x}, {y}, {width}, {height}, {colour})
 to fill the drawing fading, given top colour (text) and bottom colour (text)
-  web: stellanova_page::pen().all_fade({top colour}, {bottom colour})
+  web: fathom_page::pen().all_fade({top colour}, {bottom colour})
 to fill the drawing glowing, given x (a number) and y (a number) and radius (a number) and inner colour (text) and outer colour (text)
-  web: stellanova_page::pen().glow({x}, {y}, {radius}, {inner colour}, {outer colour})
+  web: fathom_page::pen().glow({x}, {y}, {radius}, {inner colour}, {outer colour})
 
 note: ---- sound and video elements
 to play the media, given element (a number)
-  web: (await stellanova_page::get({element}, {line}).play().catch(() => {}))
+  web: (await fathom_page::get({element}, {line}).play().catch(() => {}))
 to pause the media, given element (a number)
-  web: stellanova_page::get({element}, {line}).pause()
+  web: fathom_page::get({element}, {line}).pause()
 to the media is playing, given element (a number), returning yes or no
-  web: !stellanova_page::get({element}, {line}).paused
+  web: !fathom_page::get({element}, {line}).paused
 to media time of, given element (a number), returning a number
-  web: (stellanova_page::get({element}, {line}).currentTime || 0)
+  web: (fathom_page::get({element}, {line}).currentTime || 0)
 to media length of, given element (a number), returning a number
-  web: (stellanova_page::get({element}, {line}).duration || 0)
+  web: (fathom_page::get({element}, {line}).duration || 0)
 to set the media time, given element (a number) and seconds (a number)
-  web: (stellanova_page::get({element}, {line}).currentTime = {seconds})
+  web: (fathom_page::get({element}, {line}).currentTime = {seconds})
 to set the media loudness, given element (a number) and level (a number)
-  web: (stellanova_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
+  web: (fathom_page::get({element}, {line}).volume = Math.min(1, Math.max(0, {level})))
 to local copy of, given address (text), returning text
-  web: (await stellanova_page::copy({address}, {line}))
+  web: (await fathom_page::copy({address}, {line}))
 to loudness bands of, given element (a number) and bands (a number), returning a list of numbers
-  web: stellanova_page::bands({element}, {bands}, {line})
+  web: fathom_page::bands({element}, {bands}, {line})
 
 javascript:
   // element numbers (held weakly)
-  const stellanova_page = {
+  const fathom_page = {
     known: new Map(),
     numbered: new WeakMap(),
     next: 1,
     number(el) {
       if (!el) return 0;
-      let n = stellanova_page.numbered.get(el);
+      let n = fathom_page.numbered.get(el);
       if (!n) {
-        n = stellanova_page.next++;
-        stellanova_page.numbered.set(el, n);
-        stellanova_page.known.set(n, new WeakRef(el));
+        n = fathom_page.next++;
+        fathom_page.numbered.set(el, n);
+        fathom_page.known.set(n, new WeakRef(el));
       }
       return n;
     },
-    numbers: (list) => [...list].map(stellanova_page.number),
+    numbers: (list) => [...list].map(fathom_page.number),
     get(n, line) {
-      const el = n ? stellanova_page.known.get(n)?.deref() : null;
-      if (!el) stellanova.fail(line, n ? `element ${n} isn't on the page any more.` : "there is no element there (it is 0).");
+      const el = n ? fathom_page.known.get(n)?.deref() : null;
+      if (!el) fathom.fail(line, n ? `element ${n} isn't on the page any more.` : "there is no element there (it is 0).");
       return el;
     },
     made(markup, line) {
       const t = document.createElement("template");
       t.innerHTML = markup.trim();
-      if (!t.content.firstElementChild) stellanova.fail(line, "the markup doesn't make an element.");
-      return stellanova_page.number(t.content.firstElementChild);
+      if (!t.content.firstElementChild) fathom.fail(line, "the markup doesn't make an element.");
+      return fathom_page.number(t.content.firstElementChild);
     },
     safe: (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]),
     looks: (s) => s.split(/\s+/).filter(Boolean),
     end(n, line) {
-      const el = stellanova_page.get(n, line);
+      const el = fathom_page.get(n, line);
       el.scrollTop = el.scrollHeight;
     },
     // each event gets a number
     events: new Map(),
     next_event: 1,
     event(n, line) {
-      const e = stellanova_page.events.get(n);
-      if (!e) stellanova.fail(line, `there is no event ${n} (an event is only kept for a little while).`);
+      const e = fathom_page.events.get(n);
+      if (!e) fathom.fail(line, `there is no event ${n} (an event is only kept for a little while).`);
       return e;
     },
-    held: (n, key, line) => !!stellanova_page.event(n, line)[key] || (key === "ctrlKey" && !!stellanova_page.event(n, line).metaKey),
+    held: (n, key, line) => !!fathom_page.event(n, line)[key] || (key === "ctrlKey" && !!fathom_page.event(n, line).metaKey),
     run(then, args) {
       Promise.resolve()
         .then(() => then(...args))
-        .catch((e) => stellanova.report(e));
+        .catch((e) => fathom.report(e));
     },
     whenever(n, happening, then, line) {
-      if (!then) stellanova.fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
-      stellanova_page.get(n, line).addEventListener(happening, (e) => {
-        const k = stellanova_page.next_event++;
-        stellanova_page.events.set(k, e);
-        stellanova_page.events.delete(k - 500);
-        stellanova_page.run(then, [k]);
+      if (!then) fathom.fail(line, "there is no command in it yet: set it to one first, like 'set f to the command double'.");
+      fathom_page.get(n, line).addEventListener(happening, (e) => {
+        const k = fathom_page.next_event++;
+        fathom_page.events.set(k, e);
+        fathom_page.events.delete(k - 500);
+        fathom_page.run(then, [k]);
       });
     },
     capture(n, e, line) {
-      const ev = stellanova_page.event(e, line);
+      const ev = fathom_page.event(e, line);
       try {
-        if (ev.pointerId !== undefined) stellanova_page.get(n, line).setPointerCapture(ev.pointerId);
+        if (ev.pointerId !== undefined) fathom_page.get(n, line).setPointerCapture(ev.pointerId);
       } catch {} // a pointer that is already up (or a made-up one) can't be held
     },
-    after: (seconds, then, line) => setTimeout(() => stellanova_page.run(then, []), Math.max(0, seconds) * 1000),
-    every: (seconds, then, line) => setInterval(() => stellanova_page.run(then, []), Math.max(0.001, seconds) * 1000),
+    after: (seconds, then, line) => setTimeout(() => fathom_page.run(then, []), Math.max(0, seconds) * 1000),
+    every: (seconds, then, line) => setInterval(() => fathom_page.run(then, []), Math.max(0.001, seconds) * 1000),
     animate(n, property, from, to, seconds, easing, line) {
       const name = property.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      return stellanova_page.get(n, line).animate([{ [name]: from }, { [name]: to }], { duration: seconds * 1000, easing });
+      return fathom_page.get(n, line).animate([{ [name]: from }, { [name]: to }], { duration: seconds * 1000, easing });
     },
     // a canvas, drawn on in dots, sharp on every screen
     canvas: null,
     draw_on(n, sharpness, line) {
-      const el = stellanova_page.get(n, line);
-      if (!el.getContext) stellanova.fail(line, "only a canvas element can be drawn on.");
+      const el = fathom_page.get(n, line);
+      if (!el.getContext) fathom.fail(line, "only a canvas element can be drawn on.");
       const ratio = (devicePixelRatio || 1) * Math.min(1, Math.max(0.1, sharpness)), w = el.clientWidth, h = el.clientHeight;
       if (el.width !== Math.round(w * ratio) || el.height !== Math.round(h * ratio)) {
         el.width = Math.round(w * ratio);
@@ -280,7 +280,7 @@ javascript:
       const c = el.getContext("2d");
       c.setTransform(ratio, 0, 0, ratio, 0, 0);
       let first = true;
-      stellanova_page.canvas = {
+      fathom_page.canvas = {
         width: w, height: h,
         clear: () => c.clearRect(0, 0, w, h),
         begin: () => { c.beginPath(); first = true; },
@@ -313,39 +313,39 @@ javascript:
       };
     },
     pen() {
-      if (!stellanova_page.canvas) stellanova.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
-      return stellanova_page.canvas;
+      if (!fathom_page.canvas) fathom.fail(0, "say which canvas to draw on first, with 'start drawing on'.");
+      return fathom_page.canvas;
     },
     // a whole file, so a song can be moved about in
     copies: new Map(),
     async copy(address, line) {
-      if (stellanova_page.copies.has(address)) return stellanova_page.copies.get(address);
+      if (fathom_page.copies.has(address)) return fathom_page.copies.get(address);
       let reply;
       try {
         reply = await fetch(address);
       } catch {}
-      if (!reply || !reply.ok) stellanova.fail(line, `I couldn't get "${address}".`);
+      if (!reply || !reply.ok) fathom.fail(line, `I couldn't get "${address}".`);
       const made = URL.createObjectURL(await reply.blob());
-      if (stellanova_page.copies.size > 8) {
-        const [oldest, url] = stellanova_page.copies.entries().next().value;
+      if (fathom_page.copies.size > 8) {
+        const [oldest, url] = fathom_page.copies.entries().next().value;
         URL.revokeObjectURL(url);
-        stellanova_page.copies.delete(oldest);
+        fathom_page.copies.delete(oldest);
       }
-      stellanova_page.copies.set(address, made);
+      fathom_page.copies.set(address, made);
       return made;
     },
     // how loud each band of pitches is in a playing sound, from 0 to 1
     hearing: new WeakMap(),
     bands(n, count, line) {
-      const el = stellanova_page.get(n, line);
-      let ear = stellanova_page.hearing.get(el);
+      const el = fathom_page.get(n, line);
+      let ear = fathom_page.hearing.get(el);
       if (!ear) {
         const context = new AudioContext(), source = context.createMediaElementSource(el), analyser = context.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
         analyser.connect(context.destination);
         ear = { context, analyser, data: new Uint8Array(analyser.frequencyBinCount) };
-        stellanova_page.hearing.set(el, ear);
+        fathom_page.hearing.set(el, ear);
       }
       if (ear.context.state === "suspended") ear.context.resume();
       ear.analyser.getByteFrequencyData(ear.data);

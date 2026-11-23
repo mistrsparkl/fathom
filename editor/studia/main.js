@@ -9,7 +9,7 @@ const path = require("path");
 
 const here = __dirname;
 const home = path.resolve(here, "..", "..");
-const compiler = path.join(home, "stellanova.py");
+const compiler = path.join(home, "fathom.py");
 const screens = path.join(here, "ui");
 const windows = process.platform === "win32";
 const systemExe = path.join(here, windows ? "system.exe" : "system");
@@ -30,8 +30,8 @@ function remake() {
       if (!fs.existsSync(made)) throw e;
     }
   };
-  make(path.join(screens, "screens.js"), path.join(here, "screens.stella"), "web", "screens.stella", "ui");
-  make(systemExe, path.join(here, "system.stella"), "build", "system.stella");
+  make(path.join(screens, "screens.js"), path.join(here, "screens.fathom"), "web", "screens.fathom", "ui");
+  make(systemExe, path.join(here, "system.fathom"), "build", "system.fathom");
 }
 
 function freePort() {
@@ -62,7 +62,7 @@ async function start() {
   system = spawn(systemExe, [String(port), screens, home, python.join(" ")], { windowsHide: true, stdio: "ignore" });
   await answering(port);
   const win = new BrowserWindow({
-    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Stellanova Studia",
+    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Fathom Studia",
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },
   });
   win.loadURL(`http://127.0.0.1:${port}/`);

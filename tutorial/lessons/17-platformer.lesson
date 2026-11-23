@@ -1,14 +1,14 @@
 title: Making a platform game
-files: records.stella
+files: records.fathom
 card: Chapter 17 | Making a game | Hop! A platform game that uses everything
 say:
   Now let's put it all together, and make a real game: a platform game called Hop.
   A little blue block runs and jumps across floating platforms, picks up every coin, dodges spikes and bees, and reaches the flag at the end.
   It uses every part of the language we've seen. We'll write it piece by piece, and look closely at how each piece works.
 uncard
-open: records.stella
+open: records.fathom
 say:
-  The game keeps its best time in a second script, records dot stella. It was written earlier. Let's read it first.
+  The game keeps its best time in a second script, records dot fathom. It was written earlier. Let's read it first.
 line: 16
 zoom: lines 1-16
 spot: lines 3-10
@@ -67,14 +67,14 @@ say:
   The test passes. Now, the game.
 wait
 zoom: out
-new: hop.stella
+new: hop.fathom
 paste:
   whisper: Hop! A small platformer. Left and right run, space jumps.
   whisper: Pick up every coin, keep away from the spikes and the bees, then touch the flag at the far end.
 
   use: window
   use: maths
-  use: records.stella
+  use: records.fathom
 
   a platform has:
     x (a number)
@@ -114,7 +114,7 @@ say:
   The top of the game says what it is, in whispers.
 spot: lines 4-6
 say:
-  Use window, for the window to draw in. Maths, for sine. And use records dot stella brings in the other script.
+  Use window, for the window to draw in. Maths, for sine. And use records dot fathom brings in the other script.
 spot: lines 8-13
 say:
   A platform is a box: where its top left corner is, x across and y down, and how wide and high it is. Every floor, ledge and pillar in the level is one of these.
@@ -821,7 +821,7 @@ wait
 zoom: out
 say:
   That's the whole game. It's built into a program of its own, so it runs fast. Let's play it.
-game: hop.stella | hop.keys | Hop!
+game: hop.fathom | hop.keys | Hop!
 say:
   Running right, faster each frame. Jumping: up fast, slowing, and falling, as gravity adds point six every frame.
 say:
@@ -829,7 +829,7 @@ say:
 until game ends
 say:
   And that's how a platform game works: speed changes the place, gravity changes the speed, one direction at a time, and a camera that the whole world is drawn around.
-card: Thank you | That's Stellanova | Every word is in the list on the left of the studia, and in LANGUAGE.md. Now go and make something of your own.
+card: Thank you | That's Fathom | Every word is in the list on the left of the studia, and in LANGUAGE.md. Now go and make something of your own.
 say:
-  That's every part of Stellanova. Every word is listed in the studia, and in the language guide. Now it's your turn: go and make something of your own.
+  That's every part of Fathom. Every word is listed in the studia, and in the language guide. Now it's your turn: go and make something of your own.
 pause: 2

@@ -1,4 +1,4 @@
-"""Makes dist/stellanova-linux.tar.gz for install.sh. Runs inside Linux (make_release.py starts it in WSL)."""
+"""Makes dist/fathom-linux.tar.gz for install.sh. Runs inside Linux (make_release.py starts it in WSL)."""
 import io
 import os
 import json
@@ -22,10 +22,10 @@ with tempfile.TemporaryDirectory() as d:
     archive = subprocess.run(["git", "archive", "HEAD"], cwd=HOME, capture_output=True, check=True).stdout
     tarfile.open(fileobj=io.BytesIO(archive)).extractall(src, filter="tar")
     studia = src / "editor" / "studia"
-    subprocess.run([sys.executable, str(src / "stellanova.py"), "web", "screens.stella", "ui"], cwd=studia, check=True)
-    subprocess.run([sys.executable, str(src / "stellanova.py"), "build", "system.stella"], cwd=studia, check=True)
-    later = time.time() + 60  # (newer than their .stella files, so Studia doesn't rebuild them)
-    for f in (studia / "system", studia / "ui" / "screens.js", studia / "ui" / "stellanova.js"):
+    subprocess.run([sys.executable, str(src / "fathom.py"), "web", "screens.fathom", "ui"], cwd=studia, check=True)
+    subprocess.run([sys.executable, str(src / "fathom.py"), "build", "system.fathom"], cwd=studia, check=True)
+    later = time.time() + 60  # (newer than their .fathom files, so Studia doesn't rebuild them)
+    for f in (studia / "system", studia / "ui" / "screens.js", studia / "ui" / "fathom.js"):
         os.utime(f, (later, later))
     for skip in ("tutorial", "unreal", "blog"):
         shutil.rmtree(src / skip, ignore_errors=True)
@@ -42,10 +42,10 @@ with tempfile.TemporaryDirectory() as d:
                 (window / info.filename).chmod(mode & 0o777)
     shutil.copy(HOME / "installer" / "uninstall.sh", src / "uninstall.sh")
     (src / "uninstall.sh").chmod(0o755)
-    (src / "stellanova").chmod(0o755)
+    (src / "fathom").chmod(0o755)
     (src / "VERSION").write_text(VERSION)
 
-    out = HOME / "dist" / "stellanova-linux.tar.gz"
+    out = HOME / "dist" / "fathom-linux.tar.gz"
     out.parent.mkdir(exist_ok=True)
     with tarfile.open(out, "w:gz") as t:
         for f in sorted(src.iterdir()):

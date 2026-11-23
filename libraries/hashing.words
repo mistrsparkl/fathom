@@ -3,15 +3,15 @@ note: Hashes of text or bytes. Use: use: hashing
 include: "digest.h"
 
 code:
-  namespace stellanova_hashing
+  namespace fathom_hashing
   {
   	inline std::string hash(const std::string& kind, const std::string& data, const std::string* key, int line)
   	{
   		if (kind != "sha256" && kind != "sha512" && kind != "sha1" && kind != "md5")
-  			stellanova::fail(line, "there is no kind of hash called \"" + kind + "\". Kinds: sha256, sha512, sha1, md5.");
+  			fathom::fail(line, "there is no kind of hash called \"" + kind + "\". Kinds: sha256, sha512, sha1, md5.");
   		auto bytes = [](const std::string& s) { return reinterpret_cast<const uint8_t*>(s.data()); };
-  		std::vector<uint8_t> out = key ? stellanova_digest::hmac(kind, bytes(*key), key->size(), bytes(data), data.size())
-  									   : stellanova_digest::digest(kind, bytes(data), data.size());
+  		std::vector<uint8_t> out = key ? fathom_digest::hmac(kind, bytes(*key), key->size(), bytes(data), data.size())
+  									   : fathom_digest::digest(kind, bytes(data), data.size());
   		static const char* digits = "0123456789abcdef";
   		std::string hex;
   		for (unsigned char c : out)
@@ -24,7 +24,7 @@ code:
   		for (double x : numbers)
   		{
   			if (x < 0 || x > 255 || x != (double)(int)x)
-  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  				fathom::fail(line, "a byte is a whole number from 0 to 255, not " + fathom::text(x) + ".");
   			out += (char)(unsigned char)x;
   		}
   		return out;
@@ -44,29 +44,29 @@ python:
               raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
       return bytes(int(x) for x in numbers)
 
-to the hash of, given kind (text) and words (text), returning text = stellanova_hashing::hash({kind}, {words}, nullptr, {line})
+to the hash of, given kind (text) and words (text), returning text = fathom_hashing::hash({kind}, {words}, nullptr, {line})
   runs: _hashlib.new(_kind({kind}), {words}.encode("utf-8")).hexdigest()
-  web: await stellanova_hashing.hash({kind}, new TextEncoder().encode({words}), null, {line})
-to the hash of the bytes, given kind (text) and bytes (a list of numbers), returning text = stellanova_hashing::hash({kind}, stellanova_hashing::bytes({bytes}, {line}), nullptr, {line})
+  web: await fathom_hashing.hash({kind}, new TextEncoder().encode({words}), null, {line})
+to the hash of the bytes, given kind (text) and bytes (a list of numbers), returning text = fathom_hashing::hash({kind}, fathom_hashing::bytes({bytes}, {line}), nullptr, {line})
   runs: _hashlib.new(_kind({kind}), _bytes({bytes})).hexdigest()
-  web: await stellanova_hashing.hash({kind}, stellanova_hashing.bytes({bytes}, {line}), null, {line})
-to the signature of, given kind (text) and key (text) and words (text), returning text = [&] { std::string k = {key}; return stellanova_hashing::hash({kind}, {words}, &k, {line}); }()
+  web: await fathom_hashing.hash({kind}, fathom_hashing.bytes({bytes}, {line}), null, {line})
+to the signature of, given kind (text) and key (text) and words (text), returning text = [&] { std::string k = {key}; return fathom_hashing::hash({kind}, {words}, &k, {line}); }()
   runs: _hmac.new({key}.encode("utf-8"), {words}.encode("utf-8"), _kind({kind})).hexdigest()
-  web: await stellanova_hashing.hash({kind}, new TextEncoder().encode({words}), new TextEncoder().encode({key}), {line})
+  web: await fathom_hashing.hash({kind}, new TextEncoder().encode({words}), new TextEncoder().encode({key}), {line})
 
 javascript:
-  const stellanova_hashing = {
+  const fathom_hashing = {
     bytes(numbers, line) {
-      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `a byte is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
+      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) fathom.fail(line, `a byte is a whole number from 0 to 255, not ${fathom.text(x)}.`);
       return Uint8Array.from(numbers);
     },
     async hash(kind, data, key, line) {
-      if (!["sha256", "sha512", "sha1", "md5"].includes(kind)) stellanova.fail(line, `there is no kind of hash called "${kind}". Kinds: sha256, sha512, sha1, md5.`);
+      if (!["sha256", "sha512", "sha1", "md5"].includes(kind)) fathom.fail(line, `there is no kind of hash called "${kind}". Kinds: sha256, sha512, sha1, md5.`);
       if (typeof require === "function") {
         const crypto = require("crypto");
         return (key ? crypto.createHmac(kind, key) : crypto.createHash(kind)).update(data).digest("hex");
       }
-      if (kind === "md5") stellanova.fail(line, "a web page can't make md5 hashes; use sha256.");
+      if (kind === "md5") fathom.fail(line, "a web page can't make md5 hashes; use sha256.");
       const name = { sha256: "SHA-256", sha512: "SHA-512", sha1: "SHA-1" }[kind];
       const out = key
         ? await crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: name }, false, ["sign"]), data)

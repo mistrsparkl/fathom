@@ -1,12 +1,12 @@
 note: Numbers behind letters. Use: use: letters
 
 code:
-  namespace stellanova_letters
+  namespace fathom_letters
   {
   	inline double code_of(const std::string& s, int line)
   	{
   		if (s.empty())
-  			stellanova::fail(line, "'code of the letter' needs a letter, but the text is empty.");
+  			fathom::fail(line, "'code of the letter' needs a letter, but the text is empty.");
   		unsigned char c = (unsigned char)s[0];
   		int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
   		unsigned code = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
@@ -17,7 +17,7 @@ code:
   	inline std::string letter_with(double number, int line)
   	{
   		if (number < 0 || number > 0x10FFFF || number != (double)(long long)number || (number >= 0xD800 && number <= 0xDFFF))
-  			stellanova::fail(line, "there is no letter with the code " + stellanova::text(number) + ".");
+  			fathom::fail(line, "there is no letter with the code " + fathom::text(number) + ".");
   		unsigned c = (unsigned)number;
   		std::string out;
   		if (c < 0x80)
@@ -43,7 +43,7 @@ code:
   		for (double x : bytes)
   		{
   			if (x < 0 || x > 255 || x != (double)(int)x)
-  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  				fathom::fail(line, "a byte is a whole number from 0 to 255, not " + fathom::text(x) + ".");
   			out += (char)(unsigned char)x;
   		}
   		return out;
@@ -65,32 +65,32 @@ python:
               raise RunError(0, "a byte is a whole number from 0 to 255, not " + text(x) + ".")
       return bytes(int(x) for x in numbers).decode("utf-8", "replace")
 
-to code of the letter, given letter (text), returning a number = stellanova_letters::code_of({letter}, {line})
+to code of the letter, given letter (text), returning a number = fathom_letters::code_of({letter}, {line})
   runs: code_of({letter})
-  web: stellanova_letters::code_of({letter}, {line})
-to the letter with code, given code (a number), returning text = stellanova_letters::letter_with({code}, {line})
+  web: fathom_letters::code_of({letter}, {line})
+to the letter with code, given code (a number), returning text = fathom_letters::letter_with({code}, {line})
   runs: letter_with({code})
-  web: stellanova_letters::letter_with({code}, {line})
-to the bytes of the text, given words (text), returning a list of numbers = stellanova_letters::bytes_of({words})
+  web: fathom_letters::letter_with({code}, {line})
+to the bytes of the text, given words (text), returning a list of numbers = fathom_letters::bytes_of({words})
   runs: [float(b) for b in {words}.encode("utf-8")]
   web: Array.from(new TextEncoder().encode({words}))
-to the text of the bytes, given bytes (a list of numbers), returning text = stellanova_letters::text_of({bytes}, {line})
+to the text of the bytes, given bytes (a list of numbers), returning text = fathom_letters::text_of({bytes}, {line})
   runs: text_of({bytes})
-  web: stellanova_letters.text_of({bytes}, {line})
+  web: fathom_letters.text_of({bytes}, {line})
 
 javascript:
-  const stellanova_letters = {
+  const fathom_letters = {
     code_of(s, line) {
-      if (!s) stellanova.fail(line, "'code of the letter' needs a letter, but the text is empty.");
+      if (!s) fathom.fail(line, "'code of the letter' needs a letter, but the text is empty.");
       return s.codePointAt(0);
     },
     letter_with(n, line) {
       if (n < 0 || n > 0x10FFFF || n !== Math.trunc(n) || (n >= 0xD800 && n <= 0xDFFF))
-        stellanova.fail(line, "there is no letter with the code " + stellanova.text(n) + ".");
+        fathom.fail(line, "there is no letter with the code " + fathom.text(n) + ".");
       return String.fromCodePoint(n);
     },
     text_of(bytes, line) {
-      for (const x of bytes) if (x < 0 || x > 255 || x !== Math.trunc(x)) stellanova.fail(line, "a byte is a whole number from 0 to 255, not " + stellanova.text(x) + ".");
+      for (const x of bytes) if (x < 0 || x > 255 || x !== Math.trunc(x)) fathom.fail(line, "a byte is a whole number from 0 to 255, not " + fathom.text(x) + ".");
       return new TextDecoder().decode(new Uint8Array(bytes));
     },
   };

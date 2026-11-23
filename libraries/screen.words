@@ -65,8 +65,8 @@ python:
       root = tkinter.Tk()
       root.title(title)
       root.configure(bg="#000000")
-      size = os.environ.get("STELLANOVA_SCREEN_SIZE", "")
-      hidden = os.environ.get("STELLANOVA_SCREEN_HIDDEN", "") == "1"
+      size = os.environ.get("FATHOM_SCREEN_SIZE", "")
+      hidden = os.environ.get("FATHOM_SCREEN_HIDDEN", "") == "1"
       if size:
           w, h = (int(v) for v in size.lower().split("x"))
           root.overrideredirect(True)
@@ -87,7 +87,7 @@ python:
           dpi = ctypes.windll.user32.GetDpiForSystem()
       except Exception:
           dpi = 96
-      k = float(os.environ.get("STELLANOVA_SCREEN_SCALE", "0") or 0) or max(1.0, dpi / 96)
+      k = float(os.environ.get("FATHOM_SCREEN_SCALE", "0") or 0) or max(1.0, dpi / 96)
       SCREEN.update(open=True, root=root, frame=frame, w=w, h=h, k=k, hidden=hidden, lives=True, asked_close=False,
                     mx=0.0, my=0.0, held=set(), down=set(), up=set(), double=False, wheel=0.0, keys=[], typed="",
                     ctrl=False, shift=False, alt=False, last=time.perf_counter(), dt=1 / 60, began=time.perf_counter(),
@@ -153,7 +153,7 @@ python:
       if not hidden:
           root.focus_force()
       SCREEN["hwnd"] = frame.winfo_id()
-      play = os.environ.get("STELLANOVA_SCREEN_PLAY", "")
+      play = os.environ.get("FATHOM_SCREEN_PLAY", "")
       if play:
           with open(play, encoding="utf-8") as f:
               SCREEN["play"] = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
@@ -816,181 +816,181 @@ python:
 
 to open the screen, given title (text)
   runs: open_screen({title})
-  web: stellanova_screen.open({title}, {line})
+  web: fathom_screen.open({title}, {line})
 to close the screen
   runs: close_screen()
-  web: stellanova_screen.close()
+  web: fathom_screen.close()
 the screen lives = 0, yes or no, read only
   runs: SCREEN.get("lives", False)
-  web: stellanova_screen.lives
+  web: fathom_screen.lives
 the screen was asked to close = 0, yes or no, read only
   runs: SCREEN.get("asked_close", False)
-  web: stellanova_screen.askedClose
+  web: fathom_screen.askedClose
 to stop asking to close
   runs: SCREEN.update(asked_close=False)
-  web: (stellanova_screen.askedClose = false)
+  web: (fathom_screen.askedClose = false)
 screen width = 0, number, read only
   runs: SCREEN["w"] / SCREEN["k"] if SCREEN["open"] else 0
-  web: (stellanova_screen.isOpen ? stellanova_screen.w / stellanova_screen.k : 0)
+  web: (fathom_screen.isOpen ? fathom_screen.w / fathom_screen.k : 0)
 screen height = 0, number, read only
   runs: SCREEN["h"] / SCREEN["k"] if SCREEN["open"] else 0
-  web: (stellanova_screen.isOpen ? stellanova_screen.h / stellanova_screen.k : 0)
+  web: (fathom_screen.isOpen ? fathom_screen.h / fathom_screen.k : 0)
 screen sharpness = 0, number, read only
   runs: SCREEN.get("k", 1)
-  web: stellanova_screen.k
+  web: fathom_screen.k
 to show the screen
   runs: show()
-  web: await stellanova_screen.show({line})
+  web: await fathom_screen.show({line})
 frame seconds = 0, number, read only
   runs: SCREEN.get("dt", 1 / 60)
-  web: stellanova_screen.dt
+  web: fathom_screen.dt
 to save the screen picture to, given file (text)
   runs: save_picture({file})
-  web: stellanova_screen.save({file}, {line})
+  web: fathom_screen.save({file}, {line})
 note: ---- drawing
 to clear the drawing with, given colour (text)
   runs: clear({colour})
-  web: stellanova_screen.clear({colour}, {line})
+  web: fathom_screen.clear({colour}, {line})
 to etch a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text)
   runs: rounded_box({x}, {y}, {width}, {height}, {radius}, {colour})
-  web: stellanova_screen.roundedBox({x}, {y}, {width}, {height}, {radius}, {colour}, {line})
+  web: fathom_screen.roundedBox({x}, {y}, {width}, {height}, {radius}, {colour}, {line})
 to outline a rounded box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and colour (text) and thickness (a number)
   runs: outline_box({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness})
-  web: stellanova_screen.outlineBox({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness}, {line})
+  web: fathom_screen.outlineBox({x}, {y}, {width}, {height}, {radius}, {colour}, {thickness}, {line})
 to etch a fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and top colour (text) and bottom colour (text)
   runs: fading_box({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, False)
-  web: stellanova_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, false, {line})
+  web: fathom_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {top colour}, {bottom colour}, false, {line})
 to etch a sideways fading box, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and left colour (text) and right colour (text)
   runs: fading_box({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, True)
-  web: stellanova_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, true, {line})
+  web: fathom_screen.fadingBox({x}, {y}, {width}, {height}, {radius}, {left colour}, {right colour}, true, {line})
 to etch a glow, given x (a number) and y (a number) and radius (a number) and colour (text)
   runs: glow({x}, {y}, {radius}, {colour})
-  web: stellanova_screen.glow({x}, {y}, {radius}, {colour}, {line})
+  web: fathom_screen.glow({x}, {y}, {radius}, {colour}, {line})
 to etch a dot, given x (a number) and y (a number) and radius (a number) and colour (text)
   runs: dot({x}, {y}, {radius}, {colour})
-  web: stellanova_screen.dot({x}, {y}, {radius}, {colour}, {line})
+  web: fathom_screen.dot({x}, {y}, {radius}, {colour}, {line})
 to etch a stroke, given x (a number) and y (a number) and to x (a number) and to y (a number) and colour (text) and thickness (a number)
   runs: stroke({x}, {y}, {to x}, {to y}, {colour}, {thickness})
-  web: stellanova_screen.trace([{x}, {y}, {to x}, {to y}], {colour}, {thickness}, {line})
+  web: fathom_screen.trace([{x}, {y}, {to x}, {to y}], {colour}, {thickness}, {line})
 to etch a shape, given points (a list of numbers) and colour (text)
   runs: shape({points}, {colour})
-  web: stellanova_screen.shape({points}, {colour}, {line})
+  web: fathom_screen.shape({points}, {colour}, {line})
 to etch a fading shape, given points (a list of numbers) and top colour (text) and bottom colour (text) and top (a number) and bottom (a number)
   runs: fading_shape({points}, {top colour}, {bottom colour}, {top}, {bottom})
-  web: stellanova_screen.fadingShape({points}, {top colour}, {bottom colour}, {top}, {bottom}, {line})
+  web: fathom_screen.fadingShape({points}, {top colour}, {bottom colour}, {top}, {bottom}, {line})
 to trace a shape, given points (a list of numbers) and colour (text) and thickness (a number)
   runs: trace({points}, {colour}, {thickness})
-  web: stellanova_screen.trace({points}, {colour}, {thickness}, {line})
+  web: fathom_screen.trace({points}, {colour}, {thickness}, {line})
 to etch text, given words (text) and x (a number) and y (a number) and size (a number) and style (text) and colour (text)
   runs: text({words}, {x}, {y}, {size}, {style}, {colour})
-  web: stellanova_screen.text({words}, {x}, {y}, {size}, {style}, {colour}, {line})
+  web: fathom_screen.text({words}, {x}, {y}, {size}, {style}, {colour}, {line})
 to width of text, given words (text) and size (a number) and style (text), returning a number
   runs: text_width({words}, {size}, {style})
-  web: stellanova_screen.textWidth({words}, {size}, {style})
+  web: fathom_screen.textWidth({words}, {size}, {style})
 to use the font, given style (text) and file (text)
   runs: use_font({style}, {file})
-  web: await stellanova_screen.useFont({style}, {file}, {line})
+  web: await fathom_screen.useFont({style}, {file}, {line})
 to etch a picture, given file (text) and x (a number) and y (a number) and width (a number) and height (a number) and opacity (a number)
   runs: draw_picture({file}, {x}, {y}, {width}, {height}, {opacity})
-  web: await stellanova_screen.drawPicture({file}, {x}, {y}, {width}, {height}, {opacity}, {line})
+  web: await fathom_screen.drawPicture({file}, {x}, {y}, {width}, {height}, {opacity}, {line})
 to picture width of, given file (text), returning a number
   runs: picture_size({file}, 0)
-  web: (await stellanova_screen.picture({file}, {line})).width / stellanova_screen.k
+  web: (await fathom_screen.picture({file}, {line})).width / fathom_screen.k
 to picture height of, given file (text), returning a number
   runs: picture_size({file}, 1)
-  web: (await stellanova_screen.picture({file}, {line})).height / stellanova_screen.k
+  web: (await fathom_screen.picture({file}, {line})).height / fathom_screen.k
 to etch an icon, given markup (text) and x (a number) and y (a number) and size (a number) and colour (text)
   runs: icon({markup}, {x}, {y}, {size}, {colour})
-  web: await stellanova_screen.icon({markup}, {x}, {y}, {size}, {colour}, {line})
+  web: await fathom_screen.icon({markup}, {x}, {y}, {size}, {colour}, {line})
 to etch frosted glass, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and tint (text)
   runs: frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint})
-  web: stellanova_screen.frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint}, {line})
+  web: fathom_screen.frosted({x}, {y}, {width}, {height}, {radius}, {blur}, {tint}, {line})
 to etch a shadow, given x (a number) and y (a number) and width (a number) and height (a number) and radius (a number) and blur (a number) and colour (text)
   runs: shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour})
-  web: stellanova_screen.shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour}, {line})
+  web: fathom_screen.shadow({x}, {y}, {width}, {height}, {radius}, {blur}, {colour}, {line})
 to colour of hue, given hue (a number) and saturation (a number) and lightness (a number) and opacity (a number), returning text
   runs: hue_colour({hue}, {saturation}, {lightness}, {opacity})
-  web: stellanova_screen.hue({hue}, {saturation}, {lightness}, {opacity})
+  web: fathom_screen.hue({hue}, {saturation}, {lightness}, {opacity})
 note: ---- layers and clips
 to begin the layer, given name (text) and width (a number) and height (a number)
   runs: begin_layer({name}, {width}, {height})
-  web: stellanova_screen.beginLayer({name}, {width}, {height}, {line})
+  web: fathom_screen.beginLayer({name}, {width}, {height}, {line})
 to end the layer
   runs: end_layer()
-  web: stellanova_screen.endLayer({line})
+  web: fathom_screen.endLayer({line})
 to etch the layer, given name (text) and x (a number) and y (a number) and opacity (a number) and size (a number)
   runs: put_layer({name}, {x}, {y}, {opacity}, {size})
-  web: stellanova_screen.putLayer({name}, {x}, {y}, {opacity}, {size}, {line})
+  web: fathom_screen.putLayer({name}, {x}, {y}, {opacity}, {size}, {line})
 to forget the layer, given name (text)
   runs: forget_layer({name})
-  web: stellanova_screen.layers.delete({name})
+  web: fathom_screen.layers.delete({name})
 to begin clipping, given x (a number) and y (a number) and width (a number) and height (a number)
   runs: begin_clip({x}, {y}, {width}, {height})
-  web: stellanova_screen.beginClip({x}, {y}, {width}, {height}, {line})
+  web: fathom_screen.beginClip({x}, {y}, {width}, {height}, {line})
 to end clipping
   runs: end_clip()
-  web: stellanova_screen.endClip({line})
+  web: fathom_screen.endClip({line})
 note: ---- what the person does (each frame)
 pointer x = 0, number, read only
   runs: SCREEN.get("mx", 0)
-  web: stellanova_screen.mx
+  web: fathom_screen.mx
 pointer y = 0, number, read only
   runs: SCREEN.get("my", 0)
-  web: stellanova_screen.my
+  web: fathom_screen.my
 the pointer went down = 0, yes or no, read only
   runs: "left" in SCREEN.get("down", ())
-  web: stellanova_screen.down.has("left")
+  web: fathom_screen.down.has("left")
 the pointer went up = 0, yes or no, read only
   runs: "left" in SCREEN.get("up", ())
-  web: stellanova_screen.up.has("left")
+  web: fathom_screen.up.has("left")
 the pointer is held = 0, yes or no, read only
   runs: "left" in SCREEN.get("held", ())
-  web: stellanova_screen.held.has("left")
+  web: fathom_screen.held.has("left")
 the right button went down = 0, yes or no, read only
   runs: "right" in SCREEN.get("down", ())
-  web: stellanova_screen.down.has("right")
+  web: fathom_screen.down.has("right")
 the pointer double clicked = 0, yes or no, read only
   runs: SCREEN.get("double", False)
-  web: stellanova_screen.double
+  web: fathom_screen.double
 the wheel turned = 0, number, read only
   runs: SCREEN.get("wheel", 0.0)
-  web: stellanova_screen.wheel
+  web: fathom_screen.wheel
 the keys pressed = 0, a list of text, read only
   runs: list(SCREEN.get("keys", []))
-  web: [...stellanova_screen.keys]
+  web: [...fathom_screen.keys]
 to the key went down, given key (text), returning yes or no
   runs: key_went({key})
-  web: stellanova_screen.keys.includes({key})
+  web: fathom_screen.keys.includes({key})
 the typed letters = 0, text, read only
   runs: SCREEN.get("typed", "")
-  web: stellanova_screen.typed
+  web: fathom_screen.typed
 control is held = 0, yes or no, read only
   runs: SCREEN.get("ctrl", False)
-  web: stellanova_screen.ctrl
+  web: fathom_screen.ctrl
 shift is held = 0, yes or no, read only
   runs: SCREEN.get("shift", False)
-  web: stellanova_screen.shift
+  web: fathom_screen.shift
 alt is held = 0, yes or no, read only
   runs: SCREEN.get("alt", False)
-  web: stellanova_screen.alt
+  web: fathom_screen.alt
 to set the pointer look to, given look (text)
   runs: set_cursor({look})
-  web: stellanova_screen.setCursor({look}, {line})
+  web: fathom_screen.setCursor({look}, {line})
 the clipboard text = 0, text, read only
   runs: clipboard_text()
-  web: (await stellanova_screen.clipboard())
+  web: (await fathom_screen.clipboard())
 to copy to the clipboard, given words (text)
   runs: copy_text({words})
-  web: stellanova_screen.copy({words}, {line})
+  web: fathom_screen.copy({words}, {line})
 
 javascript:
-  const stellanova_screen = {
+  const fathom_screen = {
     // On the web the screen is a canvas over the page.
     page: typeof document !== "undefined",
     isOpen: false, lives: false, askedClose: false, w: 0, h: 0, k: 1, dt: 1 / 60, last: 0,
     mx: 0, my: 0, held: new Set(), down: new Set(), up: new Set(), double: false, wheel: 0, keys: [], typed: "",
     ctrl: false, shift: false, alt: false, play: null, playAt: 0, targets: [], layers: new Map(),
-    need(line) { if (!this.isOpen) stellanova.fail(line, "open the screen first, with 'open the screen with \"My app\"'."); },
+    need(line) { if (!this.isOpen) fathom.fail(line, "open the screen first, with 'open the screen with \"My app\"'."); },
     now() { return typeof performance !== "undefined" ? performance.now() / 1000 : Date.now() / 1000; },
     colours: new Map(),
     colour(c, line) {
@@ -1002,7 +1002,7 @@ javascript:
       if (h.length === 3 || h.length === 4) h = [...h].map((ch) => ch + ch).join("");
       if (h.length === 6) h += "ff";
       if (h.length !== 8 || !/^[0-9a-f]{8}$/.test(h))
-        stellanova.fail(line, `'${c}' isn't a colour I know. Write colours like "#0fb5ae", or "#0fb5ae80" to see through them.`);
+        fathom.fail(line, `'${c}' isn't a colour I know. Write colours like "#0fb5ae", or "#0fb5ae80" to see through them.`);
       const v = [0, 2, 4, 6].map((i) => parseInt(h.slice(i, i + 2), 16));
       v.css = `rgba(${v[0]},${v[1]},${v[2]},${v[3] / 255})`;
       this.colours.set(c, v);
@@ -1051,10 +1051,10 @@ javascript:
         addEventListener("keyup", (e) => { this.ctrl = e.ctrlKey, this.shift = e.shiftKey, this.alt = e.altKey; });
         c.focus();
       } else {
-        const size = (process.env.STELLANOVA_SCREEN_SIZE || "1600x900").toLowerCase().split("x").map(Number);
-        this.k = Number(process.env.STELLANOVA_SCREEN_SCALE) || 1;
+        const size = (process.env.FATHOM_SCREEN_SIZE || "1600x900").toLowerCase().split("x").map(Number);
+        this.k = Number(process.env.FATHOM_SCREEN_SCALE) || 1;
         [this.w, this.h] = size;
-        const play = process.env.STELLANOVA_SCREEN_PLAY;
+        const play = process.env.FATHOM_SCREEN_PLAY;
         if (play) {
           this.play = require("fs").readFileSync(play, "utf8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
           this.playAt = this.now();
@@ -1100,7 +1100,7 @@ javascript:
     },
     async show(line) {
       this.need(line);
-      if (this.targets.length > 1) stellanova.fail(line, "a layer or a clip is still open: finish it ('end the layer' or 'end clipping') before showing the screen.");
+      if (this.targets.length > 1) fathom.fail(line, "a layer or a clip is still open: finish it ('end the layer' or 'end clipping') before showing the screen.");
       this.down = new Set(), this.up = new Set(), this.double = false, this.wheel = 0, this.keys = [], this.typed = "";
       if (this.play) this.playSteps();
       if (this.page) await new Promise((r) => requestAnimationFrame(() => r()));
@@ -1204,7 +1204,7 @@ javascript:
       });
     },
     points(t, pts, line) {
-      if (pts.length % 2) stellanova.fail(line, "the points of a shape come in pairs: x, y, x, y...");
+      if (pts.length % 2) fathom.fail(line, "the points of a shape come in pairs: x, y, x, y...");
       const out = [];
       for (let i = 0; i < pts.length; i += 2) out.push(this.px(t, pts[i], pts[i + 1]));
       return out;
@@ -1253,12 +1253,12 @@ javascript:
     },
     async useFont(style, file, line) {
       if (!this.page) return;
-      const name = "stellanova " + style;
+      const name = "fathom " + style;
       try {
         const face = new FontFace(name, `url("${encodeURI(file)}")`);
         document.fonts.add(await face.load());
       } catch {
-        stellanova.fail(line, `I couldn't read the font '${file}'.`);
+        fathom.fail(line, `I couldn't read the font '${file}'.`);
       }
       this.fonts[style] = name;
     },
@@ -1295,7 +1295,7 @@ javascript:
           else got = { width: 0, height: 0 };  // shortcut: node only reads the sizes of .png and .gif pictures
         } catch {}
       }
-      if (!got) stellanova.fail(line, `I couldn't open the picture "${file}".`);
+      if (!got) fathom.fail(line, `I couldn't open the picture "${file}".`);
       this.pictures.set(file, got);
       return got;
     },
@@ -1366,13 +1366,13 @@ javascript:
     },
     endLayer(line) {
       this.need(line);
-      if (this.targets.length < 2 || this.target().name === undefined) stellanova.fail(line, "there is no layer to end: start one with 'begin the layer'.");
+      if (this.targets.length < 2 || this.target().name === undefined) fathom.fail(line, "there is no layer to end: start one with 'begin the layer'.");
       const t = this.targets.pop();
       this.layers.set(t.name, t.c);
     },
     putLayer(name, x, y, opacity, grow, line) {
       this.need(line);
-      if (!this.layers.has(name)) stellanova.fail(line, `there is no layer called "${name}" yet.`);
+      if (!this.layers.has(name)) fathom.fail(line, `there is no layer called "${name}" yet.`);
       const im = this.layers.get(name);
       this.paint(line, (g, t) => {
         const [X, Y] = this.px(t, x, y);
@@ -1387,7 +1387,7 @@ javascript:
     },
     endClip(line) {
       this.need(line);
-      if (this.targets.length < 2 || !this.target().clip) stellanova.fail(line, "there is no clip to end: start one with 'begin clipping'.");
+      if (this.targets.length < 2 || !this.target().clip) fathom.fail(line, "there is no clip to end: start one with 'begin clipping'.");
       const t = this.targets.pop();
       this.paint(line, (g) => g.drawImage(t.c, t.px, t.py));
     },

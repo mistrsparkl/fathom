@@ -19,7 +19,7 @@ include: <thread>
 link: shell32
 
 code:
-  namespace stellanova_computer
+  namespace fathom_computer
   {
   	inline std::string environment(const std::string& name)
   	{
@@ -87,25 +87,25 @@ python:
       else:
           os.startfile(thing)
 
-to beep, given pitch (a number) and seconds (a number) = stellanova_computer::beep({pitch}, {seconds})
+to beep, given pitch (a number) and seconds (a number) = fathom_computer::beep({pitch}, {seconds})
   runs: beep({pitch}, {seconds})
-  web: await stellanova_computer.beep({pitch}, {seconds})
-to run the command, given command (text), returning a number = stellanova_computer::run_command({command})
+  web: await fathom_computer.beep({pitch}, {seconds})
+to run the command, given command (text), returning a number = fathom_computer::run_command({command})
   runs: run_command({command})
-  web: stellanova_computer.run({command}, {line})
-to open, given thing (text) = stellanova_computer::open_thing({thing})
+  web: fathom_computer.run({command}, {line})
+to open, given thing (text) = fathom_computer::open_thing({thing})
   runs: open_thing({thing})
-  web: stellanova_computer.open({thing})
+  web: fathom_computer.open({thing})
 
-user name = stellanova_computer::user_name(), text, read only
+user name = fathom_computer::user_name(), text, read only
   runs: os.environ.get("USERNAME") or os.environ.get("USER", "")
-  web: stellanova_computer::environment("USERNAME")
+  web: fathom_computer::environment("USERNAME")
 
 include: <cstdio>
 include: <filesystem>
 
 code:
-  namespace stellanova_computer
+  namespace fathom_computer
   {
   	inline std::string output_of(const std::string& command, int line)
   	{
@@ -116,7 +116,7 @@ code:
   		FILE* pipe = popen(command.c_str(), "r");
   #endif
   		if (!pipe)
-  			stellanova::fail(line, "I couldn't run the command \"" + command + "\".");
+  			fathom::fail(line, "I couldn't run the command \"" + command + "\".");
   		std::string all;
   		char chunk[4096];
   		for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, pipe)) > 0;)
@@ -150,21 +150,21 @@ python:
       sys.stderr.flush()
       os._exit(int(code))
 
-the words given = stellanova::arguments, a list of text, read only
+the words given = fathom::arguments, a list of text, read only
   runs: list(ARGUMENTS)
-  web: stellanova_computer::words_given()
+  web: fathom_computer::words_given()
 current folder = std::filesystem::current_path().string(), text, read only
   runs: os.getcwd()
-  web: stellanova_computer::folder()
-to output of the command, given command (text), returning text = stellanova_computer::output_of({command}, {line})
+  web: fathom_computer::folder()
+to output of the command, given command (text), returning text = fathom_computer::output_of({command}, {line})
   runs: output_of({command})
-  web: stellanova_computer.outputOf({command}, {line})
-to environment value of, given name (text), returning text = stellanova_computer::environment({name})
+  web: fathom_computer.outputOf({command}, {line})
+to environment value of, given name (text), returning text = fathom_computer::environment({name})
   runs: os.environ.get({name}, "")
-  web: stellanova_computer::environment({name})
-to end the program, given code (a number) = stellanova_computer::end_program({code})
+  web: fathom_computer::environment({name})
+to end the program, given code (a number) = fathom_computer::end_program({code})
   runs: end_program({code})
-  web: stellanova::leave({code})
+  web: fathom::leave({code})
 
 note: ---- programs running alongside
 
@@ -175,7 +175,7 @@ include: <thread>
 
 code:
   #ifndef _WIN32
-  namespace stellanova_computer
+  namespace fathom_computer
   {
   	struct Running
   	{
@@ -193,7 +193,7 @@ code:
   		std::lock_guard<std::mutex> hold(programs_lock());
   		auto it = programs().find((int)id);
   		if (it == programs().end())
-  			stellanova::fail(line, "there is no program " + stellanova::text(id) + " (start one with 'start the program').");
+  			fathom::fail(line, "there is no program " + fathom::text(id) + " (start one with 'start the program').");
   		return it->second;
   	}
   	inline void read_into(int from, std::shared_ptr<Running> r, bool errors)
@@ -215,7 +215,7 @@ code:
   		signal(SIGPIPE, SIG_IGN);  // typing into a program that ended mustn't end this one
   		int out[2], err[2], in[2];
   		if (pipe2(out, O_CLOEXEC) || pipe2(err, O_CLOEXEC) || pipe2(in, O_CLOEXEC))
-  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  			fathom::fail(line, "I couldn't start the program \"" + command + "\".");
   		posix_spawn_file_actions_t acts;
   		posix_spawn_file_actions_init(&acts);
   		posix_spawn_file_actions_adddup2(&acts, out[1], 1);
@@ -239,7 +239,7 @@ code:
   		{
   			for (int fd : {out[0], err[0], in[1]})
   				close(fd);
-  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  			fathom::fail(line, "I couldn't start the program \"" + command + "\".");
   		}
   		r->typing = in[1];
   		std::thread(read_into, out[0], r, false).detach();
@@ -294,7 +294,7 @@ code:
   	}
   }
   #else
-  namespace stellanova_computer
+  namespace fathom_computer
   {
   	struct Running
   	{
@@ -310,7 +310,7 @@ code:
   		std::lock_guard<std::mutex> hold(programs_lock());
   		auto it = programs().find((int)id);
   		if (it == programs().end())
-  			stellanova::fail(line, "there is no program " + stellanova::text(id) + " (start one with 'start the program').");
+  			fathom::fail(line, "there is no program " + fathom::text(id) + " (start one with 'start the program').");
   		return it->second;
   	}
   	inline void read_into(HANDLE from, std::shared_ptr<Running> r, bool errors)
@@ -333,7 +333,7 @@ code:
   		SECURITY_ATTRIBUTES shared{sizeof shared, nullptr, TRUE};
   		HANDLE out_read, out_write, err_read, err_write, in_read, in_write;
   		if (!CreatePipe(&out_read, &out_write, &shared, 0) || !CreatePipe(&err_read, &err_write, &shared, 0) || !CreatePipe(&in_read, &in_write, &shared, 0))
-  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  			fathom::fail(line, "I couldn't start the program \"" + command + "\".");
   		for (HANDLE own : {out_read, err_read, in_write})  // the program gets only its own ends
   			SetHandleInformation(own, HANDLE_FLAG_INHERIT, 0);
   		STARTUPINFOA start{};
@@ -358,7 +358,7 @@ code:
   		{
   			for (HANDLE h : {out_read, err_read, in_write, r->job})
   				CloseHandle(h);
-  			stellanova::fail(line, "I couldn't start the program \"" + command + "\".");
+  			fathom::fail(line, "I couldn't start the program \"" + command + "\".");
   		}
   		AssignProcessToJobObject(r->job, made.hProcess);
   		ResumeThread(made.hThread);
@@ -461,36 +461,36 @@ python:
           return
       subprocess.call(["taskkill", "/T", "/F", "/PID", str(p.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-to start the program, given command (text) and folder (text), returning a number = stellanova_computer::start_program({command}, {folder}, {line})
+to start the program, given command (text) and folder (text), returning a number = fathom_computer::start_program({command}, {folder}, {line})
   runs: start_program({command}, {folder})
-  web: stellanova_computer.start({command}, {folder}, {line})
-to latest output of the program, given program (a number), returning text = stellanova_computer::new_output({program}, false, {line})
+  web: fathom_computer.start({command}, {folder}, {line})
+to latest output of the program, given program (a number), returning text = fathom_computer::new_output({program}, false, {line})
   runs: new_output({program}, "out")
-  web: stellanova_computer.latest({program}, "out", {line})
-to latest errors of the program, given program (a number), returning text = stellanova_computer::new_output({program}, true, {line})
+  web: fathom_computer.latest({program}, "out", {line})
+to latest errors of the program, given program (a number), returning text = fathom_computer::new_output({program}, true, {line})
   runs: new_output({program}, "err")
-  web: stellanova_computer.latest({program}, "err", {line})
-to type into the program, given program (a number) and words (text) = stellanova_computer::type_into({program}, {words}, {line})
+  web: fathom_computer.latest({program}, "err", {line})
+to type into the program, given program (a number) and words (text) = fathom_computer::type_into({program}, {words}, {line})
   runs: type_into({program}, {words})
-  web: stellanova_computer.typeInto({program}, {words}, {line})
-to the program is running, given program (a number), returning yes or no = stellanova_computer::is_running({program}, {line})
+  web: fathom_computer.typeInto({program}, {words}, {line})
+to the program is running, given program (a number), returning yes or no = fathom_computer::is_running({program}, {line})
   runs: program_running({program})
-  web: await stellanova_computer.isRunning({program}, {line})
-to exit code of the program, given program (a number), returning a number = stellanova_computer::exit_code({program}, {line})
+  web: await fathom_computer.isRunning({program}, {line})
+to exit code of the program, given program (a number), returning a number = fathom_computer::exit_code({program}, {line})
   runs: exit_code({program})
-  web: stellanova_computer.exitCode({program}, {line})
-to stop the program, given program (a number) = stellanova_computer::stop_program({program}, {line})
+  web: fathom_computer.exitCode({program}, {line})
+to stop the program, given program (a number) = fathom_computer::stop_program({program}, {line})
   runs: stop_program({program})
-  web: stellanova_computer.stop({program}, {line})
+  web: fathom_computer.stop({program}, {line})
 
 javascript:
-  const stellanova_computer = {
+  const fathom_computer = {
     node: typeof process !== "undefined" && !!(process.versions && process.versions.node),
-    environment: (name) => (stellanova_computer.node ? process.env[name] || "" : ""),
-    words_given: () => (stellanova_computer.node ? process.argv.slice(2) : []),
-    folder: () => (stellanova_computer.node ? process.cwd() : ""),
+    environment: (name) => (fathom_computer.node ? process.env[name] || "" : ""),
+    words_given: () => (fathom_computer.node ? process.argv.slice(2) : []),
+    folder: () => (fathom_computer.node ? process.cwd() : ""),
     need(line) {
-      if (!this.node) stellanova.fail(line, "a web page can't run programs on the computer (this works with node).");
+      if (!this.node) fathom.fail(line, "a web page can't run programs on the computer (this works with node).");
       return require("child_process");
     },
     async beep(pitch, seconds) {
@@ -522,7 +522,7 @@ javascript:
       try {
         p = cp.spawn(command, { cwd: folder || undefined, shell: true, windowsHide: true });
       } catch {
-        stellanova.fail(line, `I couldn't start the program "${command}".`);
+        fathom.fail(line, `I couldn't start the program "${command}".`);
       }
       const r = { p, out: [], err: [], open: 2, code: null };
       p.stdout.on("data", (d) => r.out.push(d));
@@ -537,7 +537,7 @@ javascript:
     },
     get(n, line) {
       const r = this.running[n - 1];
-      if (!r) stellanova.fail(line, `there is no program ${stellanova.text(n)} (start one with 'start the program').`);
+      if (!r) fathom.fail(line, `there is no program ${fathom.text(n)} (start one with 'start the program').`);
       return r;
     },
     latest(n, key, line) {

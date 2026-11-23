@@ -1,4 +1,4 @@
-note: Words for game engines. Use: use: engine  Build: stellanova plugin game.stella
+note: Words for game engines. Use: use: engine  Build: fathom plugin game.fathom
 
 code:
   extern "C"
@@ -6,12 +6,12 @@ code:
   	extern double (*cn_engine)(const char* word, const double* numbers, int count, const char* text, double* answers, char* answer_text, int room);
   	extern double cn_me;
   }
-  namespace stellanova_engine
+  namespace fathom_engine
   {
   	inline double (*need(int line))(const char*, const double*, int, const char*, double*, char*, int)
   	{
   		if (!cn_engine)
-  			stellanova::fail(line, "the engine words only work inside a game engine: make the program with 'stellanova plugin', then add it to Unity, Unreal or Godot.");
+  			fathom::fail(line, "the engine words only work inside a game engine: make the program with 'fathom plugin', then add it to Unity, Unreal or Godot.");
   		return cn_engine;
   	}
   	inline double ask(const char* word, std::initializer_list<double> numbers, const std::string& text, int line)
@@ -41,35 +41,35 @@ code:
   	inline double object(double n, int line)  // an object that must be there
   	{
   		if (n == 0)
-  			stellanova::fail(line, "this is 0, which means there is nothing there.");
+  			fathom::fail(line, "this is 0, which means there is nothing there.");
   		return n;
   	}
   }
 
 me = cn_me, number, read only
 
-to place of, given object (a number), returning a place = stellanova_engine::ask_place("place", {stellanova_engine::object({object}, {line})}, {line})
+to place of, given object (a number), returning a place = fathom_engine::ask_place("place", {fathom_engine::object({object}, {line})}, {line})
 
-to put the object, given object (a number) and where (a place) = stellanova_engine::ask_at("put", stellanova_engine::object({object}, {line}), {where}, {line})
+to put the object, given object (a number) and where (a place) = fathom_engine::ask_at("put", fathom_engine::object({object}, {line}), {where}, {line})
 
-to move the object, given object (a number) and by (a place) = stellanova_engine::ask_at("move", stellanova_engine::object({object}, {line}), {by}, {line})
+to move the object, given object (a number) and by (a place) = fathom_engine::ask_at("move", fathom_engine::object({object}, {line}), {by}, {line})
 
-to turn of, given object (a number), returning a number = stellanova_engine::ask("turn", {stellanova_engine::object({object}, {line})}, "", {line})
+to turn of, given object (a number), returning a number = fathom_engine::ask("turn", {fathom_engine::object({object}, {line})}, "", {line})
 
-to turn the object, given object (a number) and degrees (a number) = stellanova_engine::ask("turn by", {stellanova_engine::object({object}, {line}), {degrees}}, "", {line})
+to turn the object, given object (a number) and degrees (a number) = fathom_engine::ask("turn by", {fathom_engine::object({object}, {line}), {degrees}}, "", {line})
 
-to the object named, given name (text), returning a number = stellanova_engine::ask("named", {}, {name}, {line})
+to the object named, given name (text), returning a number = fathom_engine::ask("named", {}, {name}, {line})
 
-to object name of, given object (a number), returning text = stellanova_engine::ask_text("name", {stellanova_engine::object({object}, {line})}, {line})
+to object name of, given object (a number), returning text = fathom_engine::ask_text("name", {fathom_engine::object({object}, {line})}, {line})
 
-to copy the object, given object (a number) and where (a place), returning a number = stellanova_engine::ask_at("copy", stellanova_engine::object({object}, {line}), {where}, {line})
+to copy the object, given object (a number) and where (a place), returning a number = fathom_engine::ask_at("copy", fathom_engine::object({object}, {line}), {where}, {line})
 
-to remove the object, given object (a number) = stellanova_engine::ask("remove", {stellanova_engine::object({object}, {line})}, "", {line})
+to remove the object, given object (a number) = fathom_engine::ask("remove", {fathom_engine::object({object}, {line})}, "", {line})
 
-to colour the object, given object (a number) and colour (text) = stellanova_engine::ask("colour", {stellanova_engine::object({object}, {line})}, {colour}, {line})
+to colour the object, given object (a number) and colour (text) = fathom_engine::ask("colour", {fathom_engine::object({object}, {line})}, {colour}, {line})
 
-to key held, given key (text), returning yes or no = (stellanova_engine::ask("key held", {}, {key}, {line}) != 0)
+to key held, given key (text), returning yes or no = (fathom_engine::ask("key held", {}, {key}, {line}) != 0)
 
-to key pressed, given key (text), returning yes or no = (stellanova_engine::ask("key pressed", {}, {key}, {line}) != 0)
+to key pressed, given key (text), returning yes or no = (fathom_engine::ask("key pressed", {}, {key}, {line}) != 0)
 
-frame time = stellanova_engine::ask("frame time", {}, "", 0), number, read only
+frame time = fathom_engine::ask("frame time", {}, "", 0), number, read only

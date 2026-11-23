@@ -2,10 +2,10 @@ title: Your own kinds of things
 card: Chapter 7 | Your own kinds of things | Describing things with parts
 say:
   Numbers, text and lists go a long way. But programs are usually about things: pets, players, coins, enemies.
-  Stellanova lets you describe a new kind of thing, and the parts it has.
+  Fathom lets you describe a new kind of thing, and the parts it has.
 uncard
 
-new: pets.stella
+new: pets.fathom
 type:
   a pet has:
     name (text)

@@ -1,17 +1,17 @@
 note: Reading JSON with a path like "days[2].high". Use: use: json
 
 code:
-  namespace stellanova_json
+  namespace fathom_json
   {
-  	using Data = stellanova::SavedData;
+  	using Data = fathom::SavedData;
   	inline Data read(const std::string& json, int line)
   	{
-  		stellanova::SavedReader reader{json};
+  		fathom::SavedReader reader{json};
   		Data d;
   		bool ok = reader.value(d);
   		reader.space();
   		if (!ok || reader.i != json.size())
-  			stellanova::fail(line, "that isn't JSON text.");
+  			fathom::fail(line, "that isn't JSON text.");
   		return d;
   	}
   	inline void quoted(std::string& out, const std::string& s)
@@ -34,7 +34,7 @@ code:
   		switch (d.type)
   		{
   		case Data::Nothing: out += "null"; break;
-  		case Data::Number: out += stellanova::text(d.number); break;
+  		case Data::Number: out += fathom::text(d.number); break;
   		case Data::YesNo: out += d.yes ? "true" : "false"; break;
   		case Data::Text: quoted(out, d.words); break;
   		case Data::List:
@@ -66,7 +66,7 @@ code:
   			else if (c == ']')
   			{
   				if (now.size() < 2 || now[0] != '[' || now.find_first_not_of("0123456789", 1) != std::string::npos)
-  					stellanova::fail(line, "in the path \"" + path + "\", brackets hold an item's number, like [2].");
+  					fathom::fail(line, "in the path \"" + path + "\", brackets hold an item's number, like [2].");
   				out.push_back(now), now.clear();
   			}
   			else
@@ -75,7 +75,7 @@ code:
   		if (!now.empty())
   		{
   			if (now[0] == '[')
-  				stellanova::fail(line, "in the path \"" + path + "\", a bracket isn't closed.");
+  				fathom::fail(line, "in the path \"" + path + "\", a bracket isn't closed.");
   			out.push_back(now);
   		}
   		return out;
@@ -111,7 +111,7 @@ code:
   	{
   		Data* at = find(d, path, line);
   		if (!at)
-  			stellanova::fail(line, "there is nothing at \"" + path + "\" in the JSON.");
+  			fathom::fail(line, "there is nothing at \"" + path + "\" in the JSON.");
   		return *at;
   	}
   	inline std::string shown(const Data& d)
@@ -128,7 +128,7 @@ code:
   		Data d = read(json, line);
   		Data& x = need(d, path, line);
   		if (x.type != Data::Number)
-  			stellanova::fail(line, "the JSON at \"" + path + "\" isn't a number.");
+  			fathom::fail(line, "the JSON at \"" + path + "\" isn't a number.");
   		return x.number;
   	}
   	inline std::vector<std::string> list_at(const std::string& json, const std::string& path, int line)
@@ -136,7 +136,7 @@ code:
   		Data d = read(json, line);
   		Data& x = need(d, path, line);
   		if (x.type != Data::List)
-  			stellanova::fail(line, "the JSON at \"" + path + "\" isn't a list.");
+  			fathom::fail(line, "the JSON at \"" + path + "\" isn't a list.");
   		std::vector<std::string> out;
   		for (const Data& item : x.items)
   			out.push_back(shown(item));
@@ -147,7 +147,7 @@ code:
   		Data d = read(json, line);
   		Data& x = need(d, path, line);
   		if (x.type != Data::Table)
-  			stellanova::fail(line, "the JSON at \"" + path + "\" has no names in it.");
+  			fathom::fail(line, "the JSON at \"" + path + "\" has no names in it.");
   		std::vector<std::string> out;
   		for (const auto& part : x.parts)
   			if (std::find(out.begin(), out.end(), part.first) == out.end())
@@ -171,7 +171,7 @@ code:
   			{
   				size_t k = (size_t)std::stoull(last.substr(1));
   				if (p.type != Data::List || k < 1 || k > p.items.size() + 1)
-  					stellanova::fail(line, "there is no item " + last.substr(1) + " to change at \"" + path + "\".");
+  					fathom::fail(line, "there is no item " + last.substr(1) + " to change at \"" + path + "\".");
   				if (k == p.items.size() + 1)
   					p.items.push_back(v);
   				else
@@ -180,7 +180,7 @@ code:
   			else
   			{
   				if (p.type != Data::Table)
-  					stellanova::fail(line, "the JSON at \"" + parent + "\" has no names in it, so it can't have \"" + last + "\".");
+  					fathom::fail(line, "the JSON at \"" + parent + "\" has no names in it, so it can't have \"" + last + "\".");
   				bool done = false;
   				for (auto& part : p.parts)
   					if (part.first == last)
@@ -299,32 +299,32 @@ python:
           p[last] = v
       return _write(d)
 
-to the json at, given json (text) and path (text), returning text = stellanova_json::at({json}, {path}, {line})
+to the json at, given json (text) and path (text), returning text = fathom_json::at({json}, {path}, {line})
   runs: json_at({json}, {path})
-  web: stellanova_json.at({json}, {path}, {line})
-to the json number at, given json (text) and path (text), returning a number = stellanova_json::number_at({json}, {path}, {line})
+  web: fathom_json.at({json}, {path}, {line})
+to the json number at, given json (text) and path (text), returning a number = fathom_json::number_at({json}, {path}, {line})
   runs: json_number_at({json}, {path})
-  web: stellanova_json.numberAt({json}, {path}, {line})
-to the json list at, given json (text) and path (text), returning a list of text = stellanova_json::list_at({json}, {path}, {line})
+  web: fathom_json.numberAt({json}, {path}, {line})
+to the json list at, given json (text) and path (text), returning a list of text = fathom_json::list_at({json}, {path}, {line})
   runs: json_list_at({json}, {path})
-  web: stellanova_json.listAt({json}, {path}, {line})
-to the json names at, given json (text) and path (text), returning a list of text = stellanova_json::keys_at({json}, {path}, {line})
+  web: fathom_json.listAt({json}, {path}, {line})
+to the json names at, given json (text) and path (text), returning a list of text = fathom_json::keys_at({json}, {path}, {line})
   runs: json_keys_at({json}, {path})
-  web: stellanova_json.keysAt({json}, {path}, {line})
-to there is json at, given json (text) and path (text), returning yes or no = stellanova_json::there({json}, {path}, {line})
+  web: fathom_json.keysAt({json}, {path}, {line})
+to there is json at, given json (text) and path (text), returning yes or no = fathom_json::there({json}, {path}, {line})
   runs: json_there({json}, {path})
-  web: stellanova_json.there({json}, {path}, {line})
-to the json changed at, given json (text) and path (text) and value (text), returning text = stellanova_json::changed({json}, {path}, {value}, {line})
+  web: fathom_json.there({json}, {path}, {line})
+to the json changed at, given json (text) and path (text) and value (text), returning text = fathom_json::changed({json}, {path}, {value}, {line})
   runs: json_changed({json}, {path}, {value})
-  web: stellanova_json.changed({json}, {path}, {value}, {line})
-to as json text, given words (text), returning text = stellanova_json::as_json({words})
+  web: fathom_json.changed({json}, {path}, {value}, {line})
+to as json text, given words (text), returning text = fathom_json::as_json({words})
   runs: _quoted({words})
-  web: stellanova_json.quoted({words})
+  web: fathom_json.quoted({words})
 
 javascript:
-  const stellanova_json = {
+  const fathom_json = {
     read(s, line) {
-      try { return JSON.parse(s); } catch { stellanova.fail(line, "that isn't JSON text."); }
+      try { return JSON.parse(s); } catch { fathom.fail(line, "that isn't JSON text."); }
     },
     quoted(s) {
       let out = '"';
@@ -337,7 +337,7 @@ javascript:
     write(d) {  // shortcut: JavaScript puts number names first
       if (d === null) return "null";
       if (d === true || d === false) return d ? "true" : "false";
-      if (typeof d === "number") return stellanova.text(d);
+      if (typeof d === "number") return fathom.text(d);
       if (typeof d === "string") return this.quoted(d);
       if (Array.isArray(d)) return "[" + d.map((x) => this.write(x)).join(",") + "]";
       return "{" + Object.keys(d).map((k) => this.quoted(k) + ":" + this.write(d[k])).join(",") + "}";
@@ -348,12 +348,12 @@ javascript:
       for (const ch of path) {
         if (ch === "." || ch === "[") { if (now) out.push(now); now = ch === "[" ? "[" : ""; }
         else if (ch === "]") {
-          if (!/^\[\d+$/.test(now)) stellanova.fail(line, `in the path "${path}", brackets hold an item's number, like [2].`);
+          if (!/^\[\d+$/.test(now)) fathom.fail(line, `in the path "${path}", brackets hold an item's number, like [2].`);
           out.push(now); now = "";
         } else now += ch;
       }
       if (now) {
-        if (now[0] === "[") stellanova.fail(line, `in the path "${path}", a bracket isn't closed.`);
+        if (now[0] === "[") fathom.fail(line, `in the path "${path}", a bracket isn't closed.`);
         out.push(now);
       }
       return out;
@@ -374,24 +374,24 @@ javascript:
     },
     need(d, path, line) {
       const x = this.find(d, path, line);
-      if (x === this.MISSING) stellanova.fail(line, `there is nothing at "${path}" in the JSON.`);
+      if (x === this.MISSING) fathom.fail(line, `there is nothing at "${path}" in the JSON.`);
       return x;
     },
     shown(x) { return typeof x === "string" ? x : this.write(x); },
     at(s, path, line) { return this.shown(this.need(this.read(s, line), path, line)); },
     numberAt(s, path, line) {
       const x = this.need(this.read(s, line), path, line);
-      if (typeof x !== "number") stellanova.fail(line, `the JSON at "${path}" isn't a number.`);
+      if (typeof x !== "number") fathom.fail(line, `the JSON at "${path}" isn't a number.`);
       return x;
     },
     listAt(s, path, line) {
       const x = this.need(this.read(s, line), path, line);
-      if (!Array.isArray(x)) stellanova.fail(line, `the JSON at "${path}" isn't a list.`);
+      if (!Array.isArray(x)) fathom.fail(line, `the JSON at "${path}" isn't a list.`);
       return x.map((v) => this.shown(v));
     },
     keysAt(s, path, line) {
       const x = this.need(this.read(s, line), path, line);
-      if (x === null || typeof x !== "object" || Array.isArray(x)) stellanova.fail(line, `the JSON at "${path}" has no names in it.`);
+      if (x === null || typeof x !== "object" || Array.isArray(x)) fathom.fail(line, `the JSON at "${path}" has no names in it.`);
       return Object.keys(x);
     },
     there(s, path, line) { return this.find(this.read(s, line), path, line) !== this.MISSING; },
@@ -402,10 +402,10 @@ javascript:
       const p = this.need(d, parent, line);
       if (last[0] === "[") {
         const k = Number(last.slice(1));
-        if (!Array.isArray(p) || k < 1 || k > p.length + 1) stellanova.fail(line, `there is no item ${last.slice(1)} to change at "${path}".`);
+        if (!Array.isArray(p) || k < 1 || k > p.length + 1) fathom.fail(line, `there is no item ${last.slice(1)} to change at "${path}".`);
         p[k - 1] = v;
       } else {
-        if (p === null || typeof p !== "object" || Array.isArray(p)) stellanova.fail(line, `the JSON at "${parent}" has no names in it, so it can't have "${last}".`);
+        if (p === null || typeof p !== "object" || Array.isArray(p)) fathom.fail(line, `the JSON at "${parent}" has no names in it, so it can't have "${last}".`);
         p[last] = v;
       }
       return this.write(d);

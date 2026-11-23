@@ -1,0 +1,5 @@
+{
+    "name": "Fathom.Editor",
+    "references": ["Fathom"],
+    "includePlatforms": ["Editor"]
+}

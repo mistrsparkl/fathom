@@ -5,7 +5,7 @@ include: <ctime>
 include: <thread>
 
 code:
-  namespace stellanova_time
+  namespace fathom_time
   {
   	inline void local(std::tm& parts, std::time_t now)  // the clock's parts here (Windows and WebAssembly say it differently)
   	{
@@ -35,32 +35,32 @@ python:
 
 to wait, given seconds (a number) = std::this_thread::sleep_for(std::chrono::duration<double>({seconds}))
   runs: time.sleep(max(0.0, {seconds}))
-  web: (await stellanova_time::wait({seconds}))
+  web: (await fathom_time::wait({seconds}))
 
-seconds since the start = stellanova_time::since_start(), number, read only
+seconds since the start = fathom_time::since_start(), number, read only
   runs: time.monotonic() - started
-  web: stellanova_time::since_start()
-the current hour = stellanova_time::part_of_today(0), number, read only
+  web: fathom_time::since_start()
+the current hour = fathom_time::part_of_today(0), number, read only
   runs: part_of_today(0)
   web: new Date().getHours()
-the current minute = stellanova_time::part_of_today(1), number, read only
+the current minute = fathom_time::part_of_today(1), number, read only
   runs: part_of_today(1)
   web: new Date().getMinutes()
-the current second = stellanova_time::part_of_today(2), number, read only
+the current second = fathom_time::part_of_today(2), number, read only
   runs: part_of_today(2)
   web: new Date().getSeconds()
-the day of the month = stellanova_time::part_of_today(3), number, read only
+the day of the month = fathom_time::part_of_today(3), number, read only
   runs: part_of_today(3)
   web: new Date().getDate()
-the current month = stellanova_time::part_of_today(4), number, read only
+the current month = fathom_time::part_of_today(4), number, read only
   runs: part_of_today(4)
   web: (new Date().getMonth() + 1)
-the current year = stellanova_time::part_of_today(5), number, read only
+the current year = fathom_time::part_of_today(5), number, read only
   runs: part_of_today(5)
   web: new Date().getFullYear()
 
 code:
-  namespace stellanova_time
+  namespace fathom_time
   {
   	inline std::string stamp(const char* shape)
   	{
@@ -81,24 +81,24 @@ code:
   	}
   }
 
-today = stellanova_time::stamp("%Y-%m-%d"), text, read only
+today = fathom_time::stamp("%Y-%m-%d"), text, read only
   runs: time.strftime("%Y-%m-%d")
-  web: stellanova_time::stamp(true)
-the time now = stellanova_time::stamp("%H:%M:%S"), text, read only
+  web: fathom_time::stamp(true)
+the time now = fathom_time::stamp("%H:%M:%S"), text, read only
   runs: time.strftime("%H:%M:%S")
-  web: stellanova_time::stamp(false)
-the day of the week = stellanova_time::weekday(), text, read only
+  web: fathom_time::stamp(false)
+the day of the week = fathom_time::weekday(), text, read only
   runs: ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[time.localtime().tm_wday]
-  web: stellanova_time::weekday()
+  web: fathom_time::weekday()
 seconds since 1970 = (double)std::time(nullptr), number, read only
   runs: float(int(time.time()))
   web: Math.floor(Date.now() / 1000)
 
 javascript:
-  const stellanova_time = {
+  const fathom_time = {
     started: Date.now(),
     wait: (seconds) => new Promise((done) => setTimeout(done, Math.max(0, seconds) * 1000)),
-    since_start: () => (Date.now() - stellanova_time.started) / 1000,
+    since_start: () => (Date.now() - fathom_time.started) / 1000,
     stamp(day) {
       const d = new Date(), two = (n) => String(n).padStart(2, "0");
       return day ? `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}` : `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
@@ -108,7 +108,7 @@ javascript:
 
 note: Dates are text like 2026-11-13, so they sort as they are.
 code:
-  namespace stellanova_time
+  namespace fathom_time
   {
   	// days since 1970-01-01
   	inline long long day_number(const std::string& date, int line)
@@ -117,7 +117,7 @@ code:
   		char extra = 0;
   		if (date.size() != 10 || std::sscanf(date.c_str(), "%4d-%2d-%2d%c", &y, &m, &d, &extra) != 3 || m < 1 || m > 12 || d < 1
   			|| d > (m == 2 ? 28 + ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0) : 30 + ((m + (m > 7)) % 2)))
-  			stellanova::fail(line, "'" + date + "' isn't a date: dates are written like 2026-11-13.");
+  			fathom::fail(line, "'" + date + "' isn't a date: dates are written like 2026-11-13.");
   		y -= m <= 2;
   		long long era = (y >= 0 ? y : y - 399) / 400, yoe = y - era * 400;
   		long long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1, doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
@@ -137,7 +137,7 @@ code:
   	inline std::string date_plus_days(const std::string& date, double days, int line)
   	{
   		if (std::floor(days) != days)
-  			stellanova::fail(line, "'date plus days' needs a whole number of days, not " + stellanova::text(days) + ".");
+  			fathom::fail(line, "'date plus days' needs a whole number of days, not " + fathom::text(days) + ".");
   		return date_of(day_number(date, line) + (long long)days);
   	}
   	inline std::string weekday_of(const std::string& date, int line)
@@ -162,39 +162,39 @@ python:
           raise RunError(0, "'date plus days' needs a whole number of days, not " + text(days) + ".")
       return (day_of(date) + datetime.timedelta(days=int(days))).isoformat()
 
-to days between, given first (text) and last (text), returning a number = stellanova_time::days_between({first}, {last}, {line})
+to days between, given first (text) and last (text), returning a number = fathom_time::days_between({first}, {last}, {line})
   runs: float((day_of({last}) - day_of({first})).days)
-  web: stellanova_time::days_between({first}, {last}, {line})
-to days until, given date (text), returning a number = stellanova_time::days_between(stellanova_time::stamp("%Y-%m-%d"), {date}, {line})
+  web: fathom_time::days_between({first}, {last}, {line})
+to days until, given date (text), returning a number = fathom_time::days_between(fathom_time::stamp("%Y-%m-%d"), {date}, {line})
   runs: float((day_of({date}) - datetime.date.today()).days)
-  web: stellanova_time::days_between(stellanova_time::stamp(true), {date}, {line})
-to date plus days, given date (text) and days (a number), returning text = stellanova_time::date_plus_days({date}, {days}, {line})
+  web: fathom_time::days_between(fathom_time::stamp(true), {date}, {line})
+to date plus days, given date (text) and days (a number), returning text = fathom_time::date_plus_days({date}, {days}, {line})
   runs: date_plus_days({date}, {days})
-  web: stellanova_time::date_plus_days({date}, {days}, {line})
-to weekday of, given date (text), returning text = stellanova_time::weekday_of({date}, {line})
+  web: fathom_time::date_plus_days({date}, {days}, {line})
+to weekday of, given date (text), returning text = fathom_time::weekday_of({date}, {line})
   runs: ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[day_of({date}).weekday()]
-  web: stellanova_time::weekday_of({date}, {line})
+  web: fathom_time::weekday_of({date}, {line})
 
 javascript:
-  Object.assign(stellanova_time, {
+  Object.assign(fathom_time, {
     day_number(date, line) {
       const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
       const t = m && Date.UTC(+m[1], +m[2] - 1, +m[3]);
       if (!m || new Date(t).getUTCDate() !== +m[3] || new Date(t).getUTCMonth() !== +m[2] - 1)
-        stellanova.fail(line, `'${date}' isn't a date: dates are written like 2026-11-13.`);
+        fathom.fail(line, `'${date}' isn't a date: dates are written like 2026-11-13.`);
       return Math.round(t / 86400000);
     },
-    days_between: (a, b, line) => stellanova_time.day_number(b, line) - stellanova_time.day_number(a, line),
+    days_between: (a, b, line) => fathom_time.day_number(b, line) - fathom_time.day_number(a, line),
     date_plus_days(date, days, line) {
-      if (Math.floor(days) !== days) stellanova.fail(line, `'date plus days' needs a whole number of days, not ${days}.`);
-      return new Date((stellanova_time.day_number(date, line) + days) * 86400000).toISOString().slice(0, 10);
+      if (Math.floor(days) !== days) fathom.fail(line, `'date plus days' needs a whole number of days, not ${days}.`);
+      return new Date((fathom_time.day_number(date, line) + days) * 86400000).toISOString().slice(0, 10);
     },
-    weekday_of: (date, line) => ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"][((stellanova_time.day_number(date, line) % 7) + 7) % 7],
+    weekday_of: (date, line) => ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"][((fathom_time.day_number(date, line) % 7) + 7) % 7],
   });
 
 note: A moment is seconds since 1970.
 code:
-  namespace stellanova_time
+  namespace fathom_time
   {
   	inline const char* month_names[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
   	inline std::string date_in_words(const std::string& date, int line)
@@ -207,7 +207,7 @@ code:
   	inline std::string date_plus_months(const std::string& date, double months, int line)
   	{
   		if (std::floor(months) != months)
-  			stellanova::fail(line, "'date plus months' needs a whole number of months, not " + stellanova::text(months) + ".");
+  			fathom::fail(line, "'date plus months' needs a whole number of months, not " + fathom::text(months) + ".");
   		day_number(date, line);
   		int y = 0, m = 0, d = 0;
   		std::sscanf(date.c_str(), "%d-%d-%d", &y, &m, &d);
@@ -232,7 +232,7 @@ code:
   		char extra = 0;
   		std::sscanf(date.c_str(), "%d-%d-%d", &y, &m, &d);
   		if (clock.size() != 8 || std::sscanf(clock.c_str(), "%2d:%2d:%2d%c", &h, &mi, &s, &extra) != 3 || h > 23 || mi > 59 || s > 59)
-  			stellanova::fail(line, "'" + clock + "' isn't a time: times are written like 14:05:00.");
+  			fathom::fail(line, "'" + clock + "' isn't a time: times are written like 14:05:00.");
   		std::tm parts{};
   		parts.tm_year = y - 1900, parts.tm_mon = m - 1, parts.tm_mday = d, parts.tm_hour = h, parts.tm_min = mi, parts.tm_sec = s, parts.tm_isdst = -1;
   		return (double)std::mktime(&parts);
@@ -260,32 +260,32 @@ python:
           raise RunError(0, "'" + clock + "' isn't a time: times are written like 14:05:00.")
       return float(time.mktime((d.year, d.month, d.day, int(m[1]), int(m[2]), int(m[3]), 0, 0, -1)))
 
-to date in words, given date (text), returning text = stellanova_time::date_in_words({date}, {line})
+to date in words, given date (text), returning text = fathom_time::date_in_words({date}, {line})
   runs: date_in_words({date})
-  web: stellanova_time::date_in_words({date}, {line})
-to date plus months, given date (text) and months (a number), returning text = stellanova_time::date_plus_months({date}, {months}, {line})
+  web: fathom_time::date_in_words({date}, {line})
+to date plus months, given date (text) and months (a number), returning text = fathom_time::date_plus_months({date}, {months}, {line})
   runs: date_plus_months({date}, {months})
-  web: stellanova_time::date_plus_months({date}, {months}, {line})
-to date at, given seconds (a number), returning text = stellanova_time::moment({seconds}, true)
+  web: fathom_time::date_plus_months({date}, {months}, {line})
+to date at, given seconds (a number), returning text = fathom_time::moment({seconds}, true)
   runs: moment({seconds}, True)
-  web: stellanova_time::moment({seconds}, true)
-to time at, given seconds (a number), returning text = stellanova_time::moment({seconds}, false)
+  web: fathom_time::moment({seconds}, true)
+to time at, given seconds (a number), returning text = fathom_time::moment({seconds}, false)
   runs: moment({seconds}, False)
-  web: stellanova_time::moment({seconds}, false)
-to seconds at, given date (text) and clock (text), returning a number = stellanova_time::seconds_at({date}, {clock}, {line})
+  web: fathom_time::moment({seconds}, false)
+to seconds at, given date (text) and clock (text), returning a number = fathom_time::seconds_at({date}, {clock}, {line})
   runs: seconds_at({date}, {clock})
-  web: stellanova_time::seconds_at({date}, {clock}, {line})
+  web: fathom_time::seconds_at({date}, {clock}, {line})
 
 javascript:
-  Object.assign(stellanova_time, {
+  Object.assign(fathom_time, {
     month_names: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     date_in_words(date, line) {
-      const day = stellanova_time.weekday_of(date, line), [y, m, d] = date.split("-").map(Number);
-      return `${day} ${d} ${stellanova_time.month_names[m - 1]} ${y}`;
+      const day = fathom_time.weekday_of(date, line), [y, m, d] = date.split("-").map(Number);
+      return `${day} ${d} ${fathom_time.month_names[m - 1]} ${y}`;
     },
     date_plus_months(date, months, line) {
-      if (Math.floor(months) !== months) stellanova.fail(line, `'date plus months' needs a whole number of months, not ${months}.`);
-      stellanova_time.day_number(date, line);
+      if (Math.floor(months) !== months) fathom.fail(line, `'date plus months' needs a whole number of months, not ${months}.`);
+      fathom_time.day_number(date, line);
       const [y, m, d] = date.split("-").map(Number), k = y * 12 + m - 1 + months, ny = Math.floor(k / 12), nm = k - ny * 12;
       const at = (day) => { const t = new Date(0); t.setUTCFullYear(ny, nm, day); return t; };  // setUTCFullYear: years below 100 stay as they are
       const last = 32 - at(32).getUTCDate();  // day 32 runs over into the next month by as many days as it is short
@@ -297,9 +297,9 @@ javascript:
       return day ? `${t.getFullYear()}-${two(t.getMonth() + 1)}-${two(t.getDate())}` : `${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}`;
     },
     seconds_at(date, clock, line) {
-      stellanova_time.day_number(date, line);
+      fathom_time.day_number(date, line);
       const c = /^(\d\d):(\d\d):(\d\d)$/.exec(clock);
-      if (!c || +c[1] > 23 || +c[2] > 59 || +c[3] > 59) stellanova.fail(line, `'${clock}' isn't a time: times are written like 14:05:00.`);
+      if (!c || +c[1] > 23 || +c[2] > 59 || +c[3] > 59) fathom.fail(line, `'${clock}' isn't a time: times are written like 14:05:00.`);
       const [y, m, d] = date.split("-").map(Number), t = new Date(0);
       t.setFullYear(y, m - 1, d);
       t.setHours(+c[1], +c[2], +c[3], 0);

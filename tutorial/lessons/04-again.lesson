@@ -1,9 +1,9 @@
 title: Doing things again
 card: Chapter 4 | Doing things again | Repeat, for each, as long as, every and whenever
-say: Computers are good at doing things again and again. Stellanova has a few ways to say how many times.
+say: Computers are good at doing things again and again. Fathom has a few ways to say how many times.
 uncard
 
-new: loops.stella
+new: loops.fathom
 type:
   genesis:
     repeat 3 times:

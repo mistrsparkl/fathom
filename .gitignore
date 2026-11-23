@@ -1,7 +1,7 @@
 generated/
 __pycache__/
 *.exe
-mygame.stella
+mygame.fathom
 *.json
 !editor/vscode/**/*.json
 *.vsix
@@ -12,13 +12,13 @@ runtime/built/
 editor/studia/node_modules/
 editor/studia/generated/
 editor/studia/ui/screens.js
-editor/studia/ui/stellanova.js
+editor/studia/ui/fathom.js
 
 # the tutorial film: everything made while filming
 tutorial/out/
 tutorial/__pycache__/
 
-# libraries 'stellanova get' got
+# libraries 'fathom get' got
 libraries/got/
 
 # local tool caches

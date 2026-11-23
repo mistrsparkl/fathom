@@ -5,7 +5,7 @@ say:
   Putting a job in its own command gives it a name, so the program reads like a list of what happens.
 uncard
 
-new: greet.stella
+new: greet.fathom
 type:
   genesis:
     greet with "Sam"

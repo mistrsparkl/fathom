@@ -1,43 +1,43 @@
-# Stellanova
+# Fathom
 
 This is the full reference. If you're just starting, TUTORIAL.md is friendlier.
 
-Scripts end in `.stella`. Most of them are programs: they start at `genesis:` and you run them like this:
+Scripts end in `.fathom`. Most of them are programs: they start at `genesis:` and you run them like this:
 
 ```
-stellanova examples/guess.stella
+fathom examples/guess.fathom
 ```
 
 That runs the script as it is. To get a fast `.exe` that runs on its own, build it. You'll need LLVM for that (`winget install LLVM.LLVM`, or `sudo apt install clang` on Linux):
 
 ```
-stellanova build examples/guess.stella
+fathom build examples/guess.fathom
 ```
 
 The program does the same thing either way. The tests check that by running everything both ways and comparing the output.
 
 There are a few other ways to run a script:
 
-- `stellanova wasm examples/pets.stella` builds WebAssembly. You get `pets.wasm`, and `pets.mjs` so you can run it with `node pets.mjs` (`wasmtime --dir . pets.wasm` works too). It can use files in its folder, ask and print, use hashing, encryption and zip, and `meanwhile` works. It can't use C libraries, Python packages, or the libraries that need the operating system (window, sound, forms, web, network, database, computer, email, pictures). It needs the WASI sysroot. Get `wasi-sysroot-34.0.tar.gz` and `libclang_rt-34.0.tar.gz` from the wasi-sdk-34 release on github.com/WebAssembly/wasi-sdk and unpack them into `~/.stellanova/wasi`.
-- `stellanova web examples/pets.stella site` turns it into JavaScript. You get `site/pets.js` plus `site/stellanova.js`. Put both in a page with `<script src="stellanova.js"></script><script src="pets.js"></script>`, or run it with `node pets.js`. There's more on this under Programs for web pages.
-- A script can also be part of something else, like Unreal code for a creature. Those start with `this is part of: <thing>`. `py -3 stellanova.py <scripts folder> <output folder>` turns a folder of them into C++ (`<name>.stella.cpp`, which you don't edit).
+- `fathom wasm examples/pets.fathom` builds WebAssembly. You get `pets.wasm`, and `pets.mjs` so you can run it with `node pets.mjs` (`wasmtime --dir . pets.wasm` works too). It can use files in its folder, ask and print, use hashing, encryption and zip, and `meanwhile` works. It can't use C libraries, Python packages, or the libraries that need the operating system (window, sound, forms, web, network, database, computer, email, pictures). It needs the WASI sysroot. Get `wasi-sysroot-34.0.tar.gz` and `libclang_rt-34.0.tar.gz` from the wasi-sdk-34 release on github.com/WebAssembly/wasi-sdk and unpack them into `~/.fathom/wasi`.
+- `fathom web examples/pets.fathom site` turns it into JavaScript. You get `site/pets.js` plus `site/fathom.js`. Put both in a page with `<script src="fathom.js"></script><script src="pets.js"></script>`, or run it with `node pets.js`. There's more on this under Programs for web pages.
+- A script can also be part of something else, like Unreal code for a creature. Those start with `this is part of: <thing>`. `py -3 fathom.py <scripts folder> <output folder>` turns a folder of them into C++ (`<name>.fathom.cpp`, which you don't edit).
 
 And some tools:
 
-- `stellanova check examples/guess.stella` looks for mistakes without running anything.
-- `stellanova test examples/maths.stella` runs every `to test ...:` command instead of genesis and tells you which passed. A line like `check double with 2 is 4` fails with `this check failed: double with 2 is 4` if it isn't true. You can use `check` anywhere, not just in tests.
-- `stellanova debug examples/guess.stella 12 30` stops before lines 12 and 30. Leave the numbers off and it stops before the first line. When it stops, Enter (or `step`) runs one line, `over` runs the line and whatever commands it calls, `out` runs until the current command finishes, and `go` runs to the next stop. `names` shows everything, `look score` shows one name, `stop at 40` and `forget 12` change the stops, and `quit` ends it. In Studia, click next to a line number to put a stop there and press Debug.
-- `stellanova profile examples/pong.stella` runs the program and then lists the 20 slowest lines. For each one you get how many times it ran, its own time, its share of the total, and its time including the commands it called.
-- `stellanova watch examples/guess.stella` shows each line as it runs, the names it changed, and which way each `if` went.
-- `stellanova` by itself lets you type lines and run them one at a time. Names stick around between lines. Type a value like `5 plus 3` to see it. A line ending in `:` takes the pushed-in lines after it, until an empty line. `bye` quits.
+- `fathom check examples/guess.fathom` looks for mistakes without running anything.
+- `fathom test examples/maths.fathom` runs every `to test ...:` command instead of genesis and tells you which passed. A line like `check double with 2 is 4` fails with `this check failed: double with 2 is 4` if it isn't true. You can use `check` anywhere, not just in tests.
+- `fathom debug examples/guess.fathom 12 30` stops before lines 12 and 30. Leave the numbers off and it stops before the first line. When it stops, Enter (or `step`) runs one line, `over` runs the line and whatever commands it calls, `out` runs until the current command finishes, and `go` runs to the next stop. `names` shows everything, `look score` shows one name, `stop at 40` and `forget 12` change the stops, and `quit` ends it. In Studia, click next to a line number to put a stop there and press Debug.
+- `fathom profile examples/pong.fathom` runs the program and then lists the 20 slowest lines. For each one you get how many times it ran, its own time, its share of the total, and its time including the commands it called.
+- `fathom watch examples/guess.fathom` shows each line as it runs, the names it changed, and which way each `if` went.
+- `fathom` by itself lets you type lines and run them one at a time. Names stick around between lines. Type a value like `5 plus 3` to see it. A line ending in `:` takes the pushed-in lines after it, until an empty line. `bye` quits.
 
 When there's a mistake, the message tells you where and tries to tell you how to fix it:
 
 ```
-follow.stella line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
+follow.fathom line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
-Some examples to look at: `examples/guess.stella` is a guessing game, `examples/pets.stella` uses lists and kinds of things, `examples/clock.stella` uses libraries, `examples/dodge.stella` is a window game, and `examples/follow.stella` is a script that's part of a creature, which makes a deer follow the player.
+Some examples to look at: `examples/guess.fathom` is a guessing game, `examples/pets.fathom` uses lists and kinds of things, `examples/clock.fathom` uses libraries, `examples/dodge.fathom` is a window game, and `examples/follow.fathom` is a script that's part of a creature, which makes a deer follow the player.
 
 ## A program, top to bottom
 
@@ -138,7 +138,7 @@ and the universe said i love you
 
 **Commands for a kind of thing, as values.** You can store one of these too. `set older to the command grow` keeps `to grow, for a pet, given years (a number):` as a value of kind `a command given a pet and a number returning a pet`. It changes a copy of the pet and gives that copy back, so you'd write `set tom to invoke older with (tom, 3)` to keep the change. If the command returns something itself, like `to summary, for a pet, returning text:`, you get that instead.
 
-**Python packages.** When a program runs directly (`stellanova program.stella`), it can use any Python package, with a word for each function:
+**Python packages.** When a program runs directly (`fathom program.fathom`), it can use any Python package, with a word for each function:
 
 ```
 use python "statistics":
@@ -148,7 +148,7 @@ and the universe said i love you
 
 After the `=` goes the function's name in the package, or something like `linalg.norm` if it's inside part of the package. Inputs get passed to Python as they are, so lists become lists and tables become dictionaries, and the answer gets turned into whatever kind the word returns. If the package isn't installed, the message tells you how to get it. These words only work when running straight from the script, not built or on the web.
 
-**Getting libraries.** `stellanova get <address>` downloads a library someone else made and keeps it, so any of your programs can `use:` it. The address can be a `.words` file (online or on your computer), a `.zip` of `.words` files, or a GitHub project written as `user/project`. `stellanova got` lists what you've got and where each one came from, and `stellanova drop <name>` gets rid of one. A library can run any code it likes on your computer, so only get them from people you trust.
+**Getting libraries.** `fathom get <address>` downloads a library someone else made and keeps it, so any of your programs can `use:` it. The address can be a `.words` file (online or on your computer), a `.zip` of `.words` files, or a GitHub project written as `user/project`. `fathom got` lists what you've got and where each one came from, and `fathom drop <name>` gets rid of one. A library can run any code it likes on your computer, so only get them from people you trust.
 
 **C functions from any library.** A program can call the functions in any C library (a `.dll` on Windows, `.so` elsewhere), with a word for each:
 
@@ -158,7 +158,7 @@ use the library "user32.dll":
 and the universe said i love you
 ```
 
-After the `=` goes the C function: what it returns, its name, and the C type of each input. The types are `int`, `unsigned`, `long long`, `unsigned long long`, `double`, `float` and `pointer`, which are all numbers in Stellanova. Then there's `text` (a UTF-8 `char*`), `wide text` (a `wchar_t*`, for Windows' `...W` functions), `yes or no` (a `bool`), and `void` if it returns nothing. This works when running directly and when built, but not on the web. You can put the same words in a library of your own (`mine.words`, next to the script) after a `c library: user32.dll` line, writing each as `... = c: int MessageBoxA(pointer, text, text, int)`.
+After the `=` goes the C function: what it returns, its name, and the C type of each input. The types are `int`, `unsigned`, `long long`, `unsigned long long`, `double`, `float` and `pointer`, which are all numbers in Fathom. Then there's `text` (a UTF-8 `char*`), `wide text` (a `wchar_t*`, for Windows' `...W` functions), `yes or no` (a `bool`), and `void` if it returns nothing. This works when running directly and when built, but not on the web. You can put the same words in a library of your own (`mine.words`, next to the script) after a `c library: user32.dll` line, writing each as `... = c: int MessageBoxA(pointer, text, text, int)`.
 
 **Kinds for any kind.** A kind of thing can be described once for every kind it may hold, with `anything` standing for that kind:
 
@@ -214,7 +214,7 @@ and the universe said i love you
 1. **`this is part of:`** goes on the first line (after any notes) and says what thing the script belongs to. The words that thing already knows, like `fallen` or `walk speed`, are listed in `<name>.words` next to the script. See `examples/creature body.words`.
 2. **`settings:`** are numbers with names, for tuning. Whatever comes after the number (`degrees`, `cm per second`) is just for you to read.
 3. **`to ...:`** is a command, with its lines pushed in under it. Its inputs come after `given`, each with its kind in brackets.
-4. **`and the universe said i love you`** has to come after every command, not pushed in. It's how Stellanova knows the command is over, and leaving it out is a mistake.
+4. **`and the universe said i love you`** has to come after every command, not pushed in. It's how Fathom knows the command is over, and leaving it out is a mistake.
 
 ## Kinds of things
 
@@ -378,10 +378,10 @@ They start empty (0, no, "", an empty list), and any command can read and set th
 A program can use another script's commands and kinds of things:
 
 ```
-use: shapes.stella
+use: shapes.fathom
 ```
 
-Stellanova looks for the other script next to this one. It can have its own `genesis:` so you can run it by itself to try it out, and that part gets skipped when another script uses it. If a script gets used more than once, even by scripts it uses itself, it's only read once. Mistakes in a used script say which script they're in, like `shapes.stella line 13: ...`.
+Fathom looks for the other script next to this one. It can have its own `genesis:` so you can run it by itself to try it out, and that part gets skipped when another script uses it. If a script gets used more than once, even by scripts it uses itself, it's only read once. Mistakes in a used script say which script they're in, like `shapes.fathom line 13: ...`.
 
 If only the script itself needs a command, you can keep it private with `to tidy up, privately:` (or `to tidy up, privately, given ...:`). Other scripts can't use it, and they can have a `tidy up` of their own. If two scripts both have a command with the same name and neither is private, that's a mistake, and the message tells you where both of them are.
 
@@ -409,17 +409,17 @@ and the universe said i love you
 | `window` | A window to etch in, for games and pictures. See below. |
 | `web` | `web page "https://example.com"` (returns the page as text), `download with "https://example.com/cat.png", "cat.png"` (into a file), `send to the web page with (address, message)` (sends text, returns the answer). Any other request: `ask the web with (address, "DELETE")`, with a message and headers if it needs them, `ask the web with (address, "PUT", message, "Content-Type: application/json")` (more headers go on lines of their own). It returns the answer even when the page says no, and `the last web status` is its number (200 is fine, 404 is not found); `the last web header "Content-Type"` is one of the headers the answer came with |
 | `sound` | `play the sound with "boom.wav"`, `play the sound and wait with "boom.wav"`, `play the sound again and again with "music.wav"`, `stop the sound` (stops them all). Sounds play on top of each other, so a game can have many at once. .wav or .mp3 files. |
-| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `the output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `stellanova game.stella easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number). Programs running alongside: `set p to start the program with ("py -3 game.py", "C:\Games")` (the command and the folder it runs in. Gives a number for it), `latest output of the program p` / `latest errors of the program p` (what it printed since you last asked), `type into the program with (p, "yes")` (a line for its `ask`), `the program is running p`, `exit code of the program p`, `stop the program p` (and anything it started) |
+| `computer` | `beep with 440, 0.5` (pitch, seconds), `run the command "dir"` (returns its exit number), `open "notes.txt"` (opens a file or web address), `user name`, `the output of the command "dir"` (what it printed, as text), `the words given` (a list of the words typed after the program's name: `fathom game.fathom easy 3`), `environment value of "PATH"`, `current folder`, `end the program with 0` (stops at once, giving that exit number). Programs running alongside: `set p to start the program with ("py -3 game.py", "C:\Games")` (the command and the folder it runs in. Gives a number for it), `latest output of the program p` / `latest errors of the program p` (what it printed since you last asked), `type into the program with (p, "yes")` (a line for its `ask`), `the program is running p`, `exit code of the program p`, `stop the program p` (and anything it started) |
 | `email` | Sending email: `send an email with ("smtp.gmail.com:587", "me@gmail.com", app password, "friend@example.com", "Hello", "The message")`. The server is its address and port (587 switches to TLS; 465 is TLS from the start), and the user is the address it is sent from. Mail always goes over TLS, except to a server on this computer (`"localhost:2525"`, for testing). Many mail services want an app password here, not your usual one. On the web it works with node. |
 | `encryption` | Keeping text secret with a password. `set secret to encrypted with ("meet at noon", password)` gives text that can be kept or sent anywhere, and `decrypted with (secret, password)` gives the message back. A wrong password, or any change to the encrypted text, is a problem (so changes are always noticed). Each time is different (a fresh random salt), but any way of running can decrypt text from any other. `a random code of 16` is 16 random bytes as hexadecimal text, for keys and names nobody can guess. (ChaCha20-Poly1305, with the key made by PBKDF2-SHA256. On the web it works with node.) |
 | `folders` | `files in the folder "saves"`, `folders in the folder "saves"` (lists of names, in order), `folder "saves" exists`, `make the folder "saves/old"`, `erase the file "a.txt"`, `erase the folder "old"` (and everything in it), `move the file with "a.txt", "b.txt"` (moves or renames), `copy the file with "a.txt", "b.txt"`, `bytes in the file "a.txt"`, `the bytes of the file "cat.png"` (the file as a list of numbers from 0 to 255, for files that aren't text), `fill the file with ("out.bin", numbers)` (the other way), `last change of the file "a.txt"` (the moment it was last written, for the time library's `date at`). The parts of a path: `file name of "saves/slot 1.json"` (`slot 1.json`), `extension of` it (`json`) and `folder holding` it (`saves`) |
 | `animation` | Moving things smoothly. Progress goes from 0 (the start) to 1 (the end): `progress of with (start, seconds, now)` works it out from the time. `eased with ("out", progress)` bends it: "linear", "in", "out", "in out", "back" (pulls back first), "overshoot", "bounce", "elastic". `tweened with (from, to, progress, "in out")` is the number that far along (and `tweened place` for places). `ping pong t` goes 0 to 1 and back as t grows, `wave of with (seconds, every)` swings smoothly from 0 to 1 and back every so many seconds, and `sheet frame with (frames, per second, seconds)` is which frame of a sprite sheet to show (1 to frames, looping). Draw that frame with the window's `etch the sheet frame`. |
-| `markup.stella` | Reading XML and HTML, written in Stellanova itself (`use: markup.stella`). `read markup page` is the whole of it: a `markup part` with no name, holding the outermost parts. Each part has a `name`, `attributes` (a table of text), `content` (its own text, with `&amp;` and the like made plain) and `parts`. `parts named with (whole, "a")` finds every part with that name, however deep; `attribute with (link, "href")` is one attribute (`""` if it has none); `all words in p` is its text and the text of everything inside. HTML's loose ways work: `<br>` and `<img>` need no closing, a closing that doesn't fit ends the parts open inside it, and `<script>` and `<style>` are kept as they are. |
-| `options.stella` | Options typed after a program's name, like `stellanova tool.stella --size=3 --loud notes.txt`, written in Stellanova itself (`use: options.stella`). `has option "loud"` says whether `--loud` was typed; `option value "size"` is what came after `--size=` (`""` if nothing, or `option value with ("size", "10")` for another fallback); `plain words` is a list of the words that aren't options. After `--` on its own, every word is a plain word. |
-| `physics.stella` | Boxes that fall, slide, land and bounce, written in Stellanova itself (`use: physics.stella`. It is in Stellanova's libraries folder, so a script needs no copy). `set w to conjure a physics world` and `set the gravity of w to 1000`; `include the body with (w, a box at with (x, y, width, height))` (one that moves) or `a wall at with (...)` (one that never does); `push the body with (w, 1, across, down)` sets the first body's speed; `step the physics with (w, 1 divided by 60)` moves everything on by that many seconds, stopping bodies at what they hit (their `bounciness`, 0 to 1, says how much they bounce back). `the body numbered with (w, 1)` is a copy of a body (its `x`, `y`, `speed across`, `speed down`, `landed`...), `change the body with (w, 1, b)` puts one back, and `touching with (a, b)` says whether two overlap. |
+| `markup.fathom` | Reading XML and HTML, written in Fathom itself (`use: markup.fathom`). `read markup page` is the whole of it: a `markup part` with no name, holding the outermost parts. Each part has a `name`, `attributes` (a table of text), `content` (its own text, with `&amp;` and the like made plain) and `parts`. `parts named with (whole, "a")` finds every part with that name, however deep; `attribute with (link, "href")` is one attribute (`""` if it has none); `all words in p` is its text and the text of everything inside. HTML's loose ways work: `<br>` and `<img>` need no closing, a closing that doesn't fit ends the parts open inside it, and `<script>` and `<style>` are kept as they are. |
+| `options.fathom` | Options typed after a program's name, like `fathom tool.fathom --size=3 --loud notes.txt`, written in Fathom itself (`use: options.fathom`). `has option "loud"` says whether `--loud` was typed; `option value "size"` is what came after `--size=` (`""` if nothing, or `option value with ("size", "10")` for another fallback); `plain words` is a list of the words that aren't options. After `--` on its own, every word is a plain word. |
+| `physics.fathom` | Boxes that fall, slide, land and bounce, written in Fathom itself (`use: physics.fathom`. It is in Fathom's libraries folder, so a script needs no copy). `set w to conjure a physics world` and `set the gravity of w to 1000`; `include the body with (w, a box at with (x, y, width, height))` (one that moves) or `a wall at with (...)` (one that never does); `push the body with (w, 1, across, down)` sets the first body's speed; `step the physics with (w, 1 divided by 60)` moves everything on by that many seconds, stopping bodies at what they hit (their `bounciness`, 0 to 1, says how much they bounce back). `the body numbered with (w, 1)` is a copy of a body (its `x`, `y`, `speed across`, `speed down`, `landed`...), `change the body with (w, 1, b)` puts one back, and `touching with (a, b)` says whether two overlap. |
 | `big numbers` | Whole numbers of any size, kept as text: `big power with ("2", 100)` ("1267650600228229401496703205376"), `big plus`, `big minus`, `big times`, `big divided by` (rounded down) and `big remainder`, each `with ("123", "456")`, and `big compare with (a, b)` (-1, 0 or 1) |
 | `network` | Talking to other programs. TCP: `connect to with ("example.com", 80)` and `accept a connection on listener` (after `set listener to listen on port 8080`) each give a connection (a number). Then `send on with (c, "hi")`, `send a line on with (c, "hi")`, `send bytes on with (c, numbers)`, `receive from c` (what has arrived, "" once it is closed), `receive a line from c`, `receive bytes from c`, `close the connection c`. UDP: `open the udp port 9000` (0 for any), `send udp with (u, "127.0.0.1", 9000, "hi")`, `receive udp from u`. WebSockets: `connect a websocket to "ws://localhost:8080/chat"`, then `send on`, `receive from` (one whole message) and `close the connection`. These also work on the web. |
-| `forms` | Desktop forms: a window with buttons, fields to type in, labels, lists and tick boxes. `open a form with ("Pets", 320, 240)`, then `add a button with ("add", "Add", x, y, width, height)` (also `add a field`, `add a label`, `add a tick box`; `add a list box with (name, x, y, width, height)`). Each part has a name of your own. `wait for a click` waits until a button is clicked and gives its name (`""` once the form is closed). `the words in "name"` is what a field holds (or a list's chosen item), `set the words in with (name, words)` changes it, `put in the list with (name, item)` and `empty the list name` change a list, `is ticked "loud"` says whether a tick box is ticked, and `close the form` closes it. For tests and demos, the environment value STELLANOVA_FORM_SCRIPT can name a file of lines that act by themselves, one for each wait: `type name Rex`, `choose pets Rex`, `tick loud`, `click add` or `close`. On the web the form is a box of real buttons and fields in the page. |
+| `forms` | Desktop forms: a window with buttons, fields to type in, labels, lists and tick boxes. `open a form with ("Pets", 320, 240)`, then `add a button with ("add", "Add", x, y, width, height)` (also `add a field`, `add a label`, `add a tick box`; `add a list box with (name, x, y, width, height)`). Each part has a name of your own. `wait for a click` waits until a button is clicked and gives its name (`""` once the form is closed). `the words in "name"` is what a field holds (or a list's chosen item), `set the words in with (name, words)` changes it, `put in the list with (name, item)` and `empty the list name` change a list, `is ticked "loud"` says whether a tick box is ticked, and `close the form` closes it. For tests and demos, the environment value FATHOM_FORM_SCRIPT can name a file of lines that act by themselves, one for each wait: `type name Rex`, `choose pets Rex`, `tick loud`, `click add` or `close`. On the web the form is a box of real buttons and fields in the page. |
 | `hashing` | Fingerprints of text: `the hash of with ("sha256", "hello")` is "2cf24dba...", and changes completely if one letter does. Kinds: "sha256", "sha512", "sha1" and "md5" (old: for spotting changes, not for safety). `the hash of the bytes with ("sha256", numbers)` does bytes, and `the signature of with ("sha256", key, message)` is an HMAC: only someone with the key can make it, so it proves a message came from them. |
 | `json` | Reaching into JSON text (what web services send) with a path: names with dots between, and items in brackets counted from 1. `the json at with (answer, "weather.days[2].high")` is that part: text parts come back as the text itself, anything else as JSON text (which these words read again). `the json number at` gives a number, `the json list at` a list (each item as `the json at` gives it), `the json names at` the names in a part, and `there is json at` says whether the part is there. `the json changed at with (json, "days[3]", "12")` is the JSON with that part changed or added (the new part is JSON text; `as json text "hi"` makes text into JSON text). The path `""` is the whole of it. |
 | `zip` | .zip files. `pack the zip with (a list of ("saves", "notes.txt"), "backup.zip")` packs files and folders (with everything in them) into one; `the files in the zip "backup.zip"` lists what it holds (like "saves/1.txt"); `unpack the zip with ("backup.zip", "restored")` puts them all into a folder (it won't unpack a file that would land outside that folder). On the web these work with node. |
@@ -496,7 +496,7 @@ Places are counted in dots (pixels) from the top left corner: `x` goes right, `y
 | `start keeping the shapes as "house"` … `stop keeping the shapes` | The 3D shapes etched in between aren't drawn now: they are kept under that name. `etch the kept shapes "house"` then draws them all at once, every frame, far faster than etching each one again, so worlds of many thousands of blocks stay smooth. Keeping under the same name again replaces them, and `forget the kept shapes "house"` lets them go. |
 | `screen place of 3 horizontal 1 vertical 5 depth` | Where a place shows on the window, as a flat place (`not a number` when it is behind the eye). |
 
-3D shapes get drawn right before anything flat is etched or the frame is revealed, so things like a score that you etch afterwards stay on top. The **graphics card** draws them, using OpenGL, which every Windows computer has. That means things hide behind each other properly and balls get smooth lighting. When running straight from the script you also need Pillow (`py -3 -m pip install pillow`). Without those, it draws the shapes far ones first instead, which looks a bit plainer. `the graphics card draws` tells you yes or no once a world is open, and setting the environment value `STELLANOVA_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` gives you a sky. `examples/walk3d.stella` is a small 3D game. `examples/driftstone.stella` is a bigger one, an island of blocks you can dig, build on and craft with, and it has day and night. Left button digs, right button places, 1 to 9 or the wheel picks a block, C opens the workbench and K saves the island.
+3D shapes get drawn right before anything flat is etched or the frame is revealed, so things like a score that you etch afterwards stay on top. The **graphics card** draws them, using OpenGL, which every Windows computer has. That means things hide behind each other properly and balls get smooth lighting. When running straight from the script you also need Pillow (`py -3 -m pip install pillow`). Without those, it draws the shapes far ones first instead, which looks a bit plainer. `the graphics card draws` tells you yes or no once a world is open, and setting the environment value `FATHOM_NO_GPU` to 1 turns the graphics card off. `consume the window with "#87ceeb"` gives you a sky. `examples/walk3d.fathom` is a small 3D game. `examples/driftstone.fathom` is a bigger one, an island of blocks you can dig, build on and craft with, and it has day and night. Left button digs, right button places, 1 to 9 or the wheel picks a block, C opens the workbench and K saves the island.
 
 Colours can be names (`black`, `white`, `red`, `green`, `blue`, `yellow`, `orange`, `purple`, `pink`, `brown`, `grey`) or codes like `"#ff8800"`, which is red, green and blue, each from 00 to ff.
 
@@ -515,7 +515,7 @@ For web programs, a word also gets an indented `web:` line saying what it means 
 
 ## Programs for web pages
 
-`stellanova web` makes a program into JavaScript, so it can be the inside of a web page or an app made with Electron. The `page` library gives it the page:
+`fathom web` makes a program into JavaScript, so it can be the inside of a web page or an app made with Electron. The `page` library gives it the page:
 
 ```
 use: page
@@ -534,7 +534,7 @@ genesis:
 and the universe said i love you
 ```
 
-Programs with a window (`use: window`, 2D or 3D) or a screen (`use: screen`) work in a web page without changes. The window becomes a canvas in the page, inside the element with the id `stellanova-window` if there is one, and a screen becomes a canvas covering the whole page. Keys and the mouse work like they do on the desktop. Pictures and models load from the page's own address, so keep them next to it. Under node there's no screen, so the window is one nobody sees. Everything still gets checked, but nothing shows up.
+Programs with a window (`use: window`, 2D or 3D) or a screen (`use: screen`) work in a web page without changes. The window becomes a canvas in the page, inside the element with the id `fathom-window` if there is one, and a screen becomes a canvas covering the whole page. Keys and the mouse work like they do on the desktop. Pictures and models load from the page's own address, so keep them next to it. Under node there's no screen, so the window is one nobody sees. Everything still gets checked, but nothing shows up.
 
 Every element of the page is a number, and 0 means there isn't one. That way elements fit in names, lists and kinds of things. `the element "#count"` finds one by its CSS selector, and `listen for an event` hands a command each event as it happens, as a number the event words can read. Commands answering the page run one after another. `wait`, `web page` and words that wait, like `play the media`, let the page keep going in the meantime.
 
@@ -632,7 +632,7 @@ if that went wrong:
 
 The lines under `try:` stop at the first problem, even one deep inside a command they use.
 
-Checking the translator itself: `py -3 test_stellanova.py`.
+Checking the translator itself: `py -3 test_fathom.py`.
 
 ## Reading like English
 

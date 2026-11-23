@@ -1,4 +1,4 @@
-"""Starts Stellanova: runs a kept built copy if nothing changed, else stellanova.py."""
+"""Starts Fathom: runs a kept built copy if nothing changed, else fathom.py."""
 import hashlib
 import json
 import os
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUNS = Path.home() / ".stellanova" / "runs"  # built copies of scripts that were run, and what each was built from
+RUNS = Path.home() / ".fathom" / "runs"  # built copies of scripts that were run, and what each was built from
 
 
 def stamp(path):
@@ -16,11 +16,11 @@ def stamp(path):
 
 
 def install_stamp():
-    """Stellanova's own files: when any changes, every script is built again."""
-    files = [HERE / "stellanova.py", HERE / "machine.py"] + [HERE / "runtime" / f for f in ("machine.cpp", "machine.h", "stellanova.h")]
+    """Fathom's own files: when any changes, every script is built again."""
+    files = [HERE / "fathom.py", HERE / "machine.py"] + [HERE / "runtime" / f for f in ("machine.cpp", "machine.h", "fathom.h")]
     files += sorted(p for p in (HERE / "libraries").rglob("*") if p.is_file())
-    if os.environ.get("STELLANOVA_GOT"):
-        files += sorted(p for p in Path(os.environ["STELLANOVA_GOT"]).rglob("*") if p.is_file())
+    if os.environ.get("FATHOM_GOT"):
+        files += sorted(p for p in Path(os.environ["FATHOM_GOT"]).rglob("*") if p.is_file())
     return [stamp(p) for p in files]
 
 
@@ -45,15 +45,15 @@ def main(argv):
     args = argv[1:]
     if args[:1] == ["run"]:
         args = args[1:]
-    if args and args[0].lower().endswith(".stella") and not os.environ.get("STELLANOVA_DIRECT"):
+    if args and args[0].lower().endswith(".fathom") and not os.environ.get("FATHOM_DIRECT"):
         exe = kept_copy(Path(args[0]))
         if exe:
             try:
                 return subprocess.run([str(exe), *args[1:]]).returncode
             except KeyboardInterrupt:
                 return 130
-    import stellanova  # (imported, not run, so Python keeps it ready-made)
-    return stellanova.main(argv)
+    import fathom  # (imported, not run, so Python keeps it ready-made)
+    return fathom.main(argv)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ say:
   When a program does something you didn't expect, it helps to stop it partway, and look at what its names hold.
 uncard
 
-new: average.stella
+new: average.fathom
 type fast:
   to the average of, given scores (a list of numbers), returning a number:
     set total to 0
@@ -56,7 +56,7 @@ card: Chapter 15 | Profiling | Finding what is slow
 say:
   When a program is slow, the profiler shows where the time goes: which lines ran most, and how long each took.
 uncard
-new: primes.stella
+new: primes.fathom
 type fast:
   to is prime, given n (a number), returning yes or no:
     if n falls below 2: return no

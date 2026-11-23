@@ -10,7 +10,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 NUMBER, YESNO, TEXT, PLACE, FLAT = "number", "yes or no", "text", "place", "flat"
 THINGS = {}  # 'thing pet' -> [(C++ name, words, kind)]
-HAS_KINDS_OF = lambda kind: True  # kinds of this kind? Set by stellanova.py
+HAS_KINDS_OF = lambda kind: True  # kinds of this kind? Set by fathom.py
 
 
 # library functions that may fail: check cn_failed() after each
@@ -24,8 +24,8 @@ class Unsupported(Exception):
     """This part of the language can't be made into machine code yet."""
 
 
-TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm": WebAssembly (WASI), for 'stellanova wasm'
-WASI = Path.home() / ".stellanova" / "wasi"  # from github.com/WebAssembly/wasi-sdk
+TARGET = "linux" if sys.platform.startswith("linux") else "windows"  # or "wasm": WebAssembly (WASI), for 'fathom wasm'
+WASI = Path.home() / ".fathom" / "wasi"  # from github.com/WebAssembly/wasi-sdk
 
 
 # libraries that never wait: no registers kept
@@ -53,7 +53,7 @@ def emit(f, x, what="a part of the language"):
         x = getattr(x, "inner", x)
         made_by = getattr(x, "__qualname__", "")  # a statement's run: which reader made it ('say.<locals>.run')
         if hasattr(x, "__code__"):
-            made_by += f", stellanova.py line {x.__code__.co_firstlineno}"
+            made_by += f", fathom.py line {x.__code__.co_firstlineno}"
         raise Unsupported(f"{what}: {code[:60]}" if code else f"{what} ({made_by})" if made_by else what)
     return write(f)
 
@@ -237,7 +237,7 @@ class Module:
             self.declared.append(line)
 
     def finish(self, files, plugin=None):
-        """The module's LLVM code; plugins start with stellanova_start."""
+        """The module's LLVM code; plugins start with fathom_start."""
         start = Fn(self, "main", [], None)
         start.here = "entry"  # (its lines go straight after main's entry:)
         for cpp, kind in self.shared.items():
@@ -250,8 +250,8 @@ class Module:
         for words, name, count, gives in plugin or []:
             start.put(f"call void @cn_plugin_command(ptr {self.text(words)[0]}, ptr @cn_user_{name}, i32 {count}, i32 {int(gives)})")
         genesis = any("@cn_user_Start(" in f for f in self.functions)
-        if plugin is not None:  # stellanova_start(output, engine): 0, or 2 when genesis went wrong
-            main = ["define dllexport i32 @stellanova_start(ptr %out, ptr %engine) {", "entry:",
+        if plugin is not None:  # fathom_start(output, engine): 0, or 2 when genesis went wrong
+            main = ["define dllexport i32 @fathom_start(ptr %out, ptr %engine) {", "entry:",
                     "  call void @cn_plugin_begin(ptr %out, ptr %engine)", "  call void @cn_begin(i32 0, ptr null)"]
         else:
             entry_name = "__main_argc_argv" if TARGET == "wasm" else "main"  # (what WASI's start calls)
@@ -1254,7 +1254,7 @@ ONE_STEP = {"remainder_of": "frem", "round": "llvm.round.f64", "floor": "llvm.fl
 
 def wrap(f, unit, head, template, args, gives, cpp_type, line):
     """Calls the C function for a built-in or library word."""
-    simple = re.fullmatch(r"(?:std|stellanova)::(\w+)\(\{[as]0\}(?:, \{[as]1\})?\)", template)
+    simple = re.fullmatch(r"(?:std|fathom)::(\w+)\(\{[as]0\}(?:, \{[as]1\})?\)", template)
     if simple and simple.group(1) in ONE_STEP and gives == NUMBER and all(a.kind == NUMBER for a in args):
         op = ONE_STEP[simple.group(1)]  # one machine instruction, not a call (the same answers)
         given = [emit(f, a) for a in args]
@@ -1286,7 +1286,7 @@ def wrap(f, unit, head, template, args, gives, cpp_type, line):
         result = f"return static_cast<{ret}>({body});"
     fallback = {"double": "0.0", "bool": "false", "V*": "cn_box_number(0)"}.get(ret, "")
     code = (f'extern "C" {ret} {name}({", ".join(params + ["int line"])})\n'
-            "{\n" + ("" if unit in NEVER_WAIT else "\tCnParked parked;\n") + f"\ttry {{ {result} }}\n\tcatch (const stellanova::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n"
+            "{\n" + ("" if unit in NEVER_WAIT else "\tCnParked parked;\n") + f"\ttry {{ {result} }}\n\tcatch (const fathom::Problem& problem) {{ cn_set_problem(problem); return {fallback}; }}\n"
             f"#ifdef __wasm__\n\tcatch (const std::system_error&) {{ cn_set_problem({{line, ONE_THREAD}}); return {fallback}; }}\n#endif\n}}\n")
     f.module.units.setdefault(unit, [head, {}])[1][name] = code
     ll_ret = ll_type(gives) if gives else "void"
@@ -1312,8 +1312,8 @@ def unit_file(unit, head, wrappers):
     if all(n in have for n in wrappers):
         return path
     have.update(wrappers)
-    top = [mark, "// Made by machine.py: Stellanova's own words as C functions for machine code. Not a program's code.",
-           '#include "stellanova.h"', head, "#define STELLANOVA_CONVERSIONS", '#include "machine.h"', ""]
+    top = [mark, "// Made by machine.py: Fathom's own words as C functions for machine code. Not a program's code.",
+           '#include "fathom.h"', head, "#define FATHOM_CONVERSIONS", '#include "machine.h"', ""]
     path.parent.mkdir(exist_ok=True)
     path.write_text("\n".join(top) + "".join(f"// wrapper {n}\n{c}// end\n" for n, c in sorted(have.items())), encoding="utf-8")
     return path
@@ -1322,7 +1322,7 @@ def unit_file(unit, head, wrappers):
 # ---- making the .exe
 
 def find_clang():
-    for place in [os.environ.get("STELLANOVA_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe", shutil.which("clang++")]:
+    for place in [os.environ.get("FATHOM_CLANG"), r"C:\Program Files\LLVM\bin\clang++.exe", shutil.which("clang++")]:
         if place and Path(place).exists():
             return place
     if sys.platform.startswith("linux"):
@@ -1339,7 +1339,7 @@ def compile_once(src, out, newer_than):
         if done.returncode:
             if src.name.startswith("w_"):  # a wrapper that can't compile: start that file again
                 src.unlink(missing_ok=True)
-            raise RuntimeError(f"Stellanova's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
+            raise RuntimeError(f"Fathom's machine-code library ({src.name}) didn't compile:\n" + done.stderr)
     return out
 
 
@@ -1366,10 +1366,10 @@ def object_suffix():
 
 
 def runtime_object():
-    """runtime/machine.cpp compiled once (again only when it or stellanova.h changes)."""
+    """runtime/machine.cpp compiled once (again only when it or fathom.h changes)."""
     runtime = HERE / "runtime"
-    return compile_once(runtime / "machine.cpp", runtime / "built" / f"stellanova_machine{object_suffix()}",
-                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "stellanova.h", HERE / "machine.py"])
+    return compile_once(runtime / "machine.cpp", runtime / "built" / f"fathom_machine{object_suffix()}",
+                        [runtime / "machine.cpp", runtime / "machine.h", runtime / "fathom.h", HERE / "machine.py"])
 
 
 def make_exe(ll_text_, exe, work, units=None, plugin=False):
@@ -1385,12 +1385,12 @@ def make_exe(ll_text_, exe, work, units=None, plugin=False):
                 if unit.startswith("c library"):
                     return f"C libraries ({unit[len('c library'):].strip()}) can't be used in a WebAssembly program."
                 try:
-                    objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+                    objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "fathom.h"])))
                 except RuntimeError:
                     return f"The {unit} words can't be used in a WebAssembly program yet."
                 continue
             try:
-                objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "stellanova.h"])))
+                objects.append(str(compile_once(src, src.with_suffix(object_suffix()), [src, runtime / "machine.h", runtime / "fathom.h"])))
             except RuntimeError:
                 if TARGET != "linux":
                     raise
@@ -1407,10 +1407,10 @@ def make_exe(ll_text_, exe, work, units=None, plugin=False):
     elif TARGET == "linux":
         link = ["-pthread", "-fPIC"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
     if plugin:
-        link += ["-shared"] + (["-Wl,/EXPORT:stellanova_call", "-Wl,/EXPORT:stellanova_has"] if TARGET == "windows" else [])
+        link += ["-shared"] + (["-Wl,/EXPORT:fathom_call", "-Wl,/EXPORT:fathom_has"] if TARGET == "windows" else [])
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
     if done.returncode:
-        return ("Stellanova wrote machine code LLVM didn't accept. That is a bug in Stellanova, not in your script.\n"
+        return ("Fathom wrote machine code LLVM didn't accept. That is a bug in Fathom, not in your script.\n"
                 + done.stderr + f"\n(the LLVM code is in {ll})")
     return None

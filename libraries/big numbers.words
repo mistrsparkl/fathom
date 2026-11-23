@@ -1,7 +1,7 @@
 note: Whole numbers of any size, as text. Use: use: big numbers
 
 code:
-  namespace stellanova_big
+  namespace fathom_big
   {
   	struct Big
   	{
@@ -17,10 +17,10 @@ code:
   		if (!s.empty() && (s[0] == '-' || s[0] == '+'))
   			b.negative = s[0] == '-', start = 1;
   		if (start >= s.size())
-  			stellanova::fail(line, "'" + s + "' isn't a whole number.");
+  			fathom::fail(line, "'" + s + "' isn't a whole number.");
   		for (size_t k = start; k < s.size(); ++k)
   			if (s[k] < '0' || s[k] > '9')
-  				stellanova::fail(line, "'" + s + "' isn't a whole number.");
+  				fathom::fail(line, "'" + s + "' isn't a whole number.");
   		for (long long end = (long long)s.size(); end > (long long)start; end -= 9)
   		{
   			long long from = std::max((long long)start, end - 9);
@@ -140,7 +140,7 @@ code:
   	inline void divide(const Big& a, const Big& b, Big& quotient, Big& left, int line)  // rounded down, as Python does
   	{
   		if (b.parts.empty())
-  			stellanova::fail(line, "I can't divide by zero.");
+  			fathom::fail(line, "I can't divide by zero.");
   		std::vector<unsigned> q(a.parts.size(), 0), r;
   		for (long long k = (long long)a.parts.size() - 1; k >= 0; --k)
   		{
@@ -187,7 +187,7 @@ code:
   	inline std::string power(const std::string& a, double n, int line)
   	{
   		if (n < 0 || n != std::floor(n) || n > 100000)
-  			stellanova::fail(line, "'big power' needs a whole number from 0 to 100000, not " + stellanova::text(n) + ".");
+  			fathom::fail(line, "'big power' needs a whole number from 0 to 100000, not " + fathom::text(n) + ".");
   		Big base = read(a, line), out;
   		out.parts = {1};
   		for (long long k = (long long)n; k > 0; k >>= 1)
@@ -225,44 +225,44 @@ python:
       a, b = big_read(a), big_read(b)
       return float((a > b) - (a < b))
 
-to big plus, given first (text) and second (text), returning text = stellanova_big::sum({first}, {second}, {line})
+to big plus, given first (text) and second (text), returning text = fathom_big::sum({first}, {second}, {line})
   runs: str(big_read({first}) + big_read({second}))
-  web: stellanova_big.op({first}, {second}, (x, y) => x + y, {line})
-to big minus, given first (text) and second (text), returning text = stellanova_big::difference({first}, {second}, {line})
+  web: fathom_big.op({first}, {second}, (x, y) => x + y, {line})
+to big minus, given first (text) and second (text), returning text = fathom_big::difference({first}, {second}, {line})
   runs: str(big_read({first}) - big_read({second}))
-  web: stellanova_big.op({first}, {second}, (x, y) => x - y, {line})
-to big times, given first (text) and second (text), returning text = stellanova_big::product({first}, {second}, {line})
+  web: fathom_big.op({first}, {second}, (x, y) => x - y, {line})
+to big times, given first (text) and second (text), returning text = fathom_big::product({first}, {second}, {line})
   runs: str(big_read({first}) * big_read({second}))
-  web: stellanova_big.op({first}, {second}, (x, y) => x * y, {line})
-to big divided by, given first (text) and second (text), returning text = stellanova_big::quotient({first}, {second}, {line})
+  web: fathom_big.op({first}, {second}, (x, y) => x * y, {line})
+to big divided by, given first (text) and second (text), returning text = fathom_big::quotient({first}, {second}, {line})
   runs: big_div({first}, {second}, False)
-  web: stellanova_big.divide({first}, {second}, false, {line})
-to big remainder, given first (text) and second (text), returning text = stellanova_big::remainder({first}, {second}, {line})
+  web: fathom_big.divide({first}, {second}, false, {line})
+to big remainder, given first (text) and second (text), returning text = fathom_big::remainder({first}, {second}, {line})
   runs: big_div({first}, {second}, True)
-  web: stellanova_big.divide({first}, {second}, true, {line})
-to big power, given base (text) and times (a number), returning text = stellanova_big::power({base}, {times}, {line})
+  web: fathom_big.divide({first}, {second}, true, {line})
+to big power, given base (text) and times (a number), returning text = fathom_big::power({base}, {times}, {line})
   runs: big_power({base}, {times})
-  web: stellanova_big.power({base}, {times}, {line})
-to big compare, given first (text) and second (text), returning a number = stellanova_big::compared({first}, {second}, {line})
+  web: fathom_big.power({base}, {times}, {line})
+to big compare, given first (text) and second (text), returning a number = fathom_big::compared({first}, {second}, {line})
   runs: big_compare({first}, {second})
-  web: stellanova_big.compare({first}, {second}, {line})
+  web: fathom_big.compare({first}, {second}, {line})
 
 javascript:
-  const stellanova_big = {
+  const fathom_big = {
     read(s, line) {
-      if (!/^[-+]?[0-9]+$/.test(s)) stellanova.fail(line, `'${s}' isn't a whole number.`);
+      if (!/^[-+]?[0-9]+$/.test(s)) fathom.fail(line, `'${s}' isn't a whole number.`);
       return BigInt(s);
     },
     op(a, b, f, line) { return f(this.read(a, line), this.read(b, line)).toString(); },
     divide(a, b, remainder, line) {
       const x = this.read(a, line), y = this.read(b, line);
-      if (y === 0n) stellanova.fail(line, "I can't divide by zero.");
+      if (y === 0n) fathom.fail(line, "I can't divide by zero.");
       let q = x / y;
       if (x % y !== 0n && (x < 0n) !== (y < 0n)) q -= 1n;  // rounded down, as Python does
       return (remainder ? x - q * y : q).toString();
     },
     power(a, n, line) {
-      if (n < 0 || n !== Math.floor(n) || n > 100000) stellanova.fail(line, `'big power' needs a whole number from 0 to 100000, not ${stellanova.text(n)}.`);
+      if (n < 0 || n !== Math.floor(n) || n > 100000) fathom.fail(line, `'big power' needs a whole number from 0 to 100000, not ${fathom.text(n)}.`);
       return (this.read(a, line) ** BigInt(n)).toString();
     },
     compare(a, b, line) { const x = this.read(a, line), y = this.read(b, line); return x > y ? 1 : x < y ? -1 : 0; },

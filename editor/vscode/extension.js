@@ -1,4 +1,4 @@
-// Mistakes, completion and hover help for .stella files.
+// Mistakes, completion and hover help for .fathom files.
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
@@ -6,29 +6,29 @@ const { execFile } = require("child_process");
 const words = require("./words");
 
 function activate(context) {
-  const where = () => words.home(vscode.workspace.getConfiguration("stellanova").get("home"));
+  const where = () => words.home(vscode.workspace.getConfiguration("fathom").get("home"));
   let library = null;
   const libraryWords = () => {
     if (!library && where()) library = words.libraryWords(path.join(where(), "libraries"));
     return library || [];
   };
-  const problems = vscode.languages.createDiagnosticCollection("stellanova");
+  const problems = vscode.languages.createDiagnosticCollection("fathom");
   const waiting = new Map();
 
   // Checked as a copy next to the file, so 'use:' works.
   function check(doc) {
-    if (doc.languageId !== "stellanova" || doc.uri.scheme !== "file" || !where()) return;
+    if (doc.languageId !== "fathom" || doc.uri.scheme !== "file" || !where()) return;
     const file = doc.uri.fsPath;
-    const draft = path.join(path.dirname(file), "." + path.basename(file, ".stella") + ".checking.stella");
+    const draft = path.join(path.dirname(file), "." + path.basename(file, ".fathom") + ".checking.fathom");
     fs.writeFileSync(draft, doc.getText(), "utf8");
     const python = process.platform === "win32" ? "py" : "python3";
-    const args = [...(process.platform === "win32" ? ["-3"] : []), path.join(where(), "stellanova.py"), "check", draft];
+    const args = [...(process.platform === "win32" ? ["-3"] : []), path.join(where(), "fathom.py"), "check", draft];
     execFile(python, args, { cwd: path.dirname(file), timeout: 20000 }, (_, out, err) => {
       fs.rmSync(draft, { force: true });
       problems.set(doc.uri, words.mistakes(out + err).map((m) => {
         const line = Math.min(Math.max(m.line - 1, 0), doc.lineCount - 1);
         const shown = new vscode.Diagnostic(doc.lineAt(line).range, m.message, vscode.DiagnosticSeverity.Error);
-        shown.source = "stellanova";
+        shown.source = "fathom";
         return shown;
       }));
     });
@@ -45,7 +45,7 @@ function activate(context) {
     vscode.workspace.onDidSaveTextDocument(check),
     vscode.workspace.onDidChangeTextDocument((e) => soon(e.document)),
     vscode.workspace.onDidCloseTextDocument((doc) => problems.delete(doc.uri)),
-    vscode.languages.registerCompletionItemProvider("stellanova", {
+    vscode.languages.registerCompletionItemProvider("fathom", {
       provideCompletionItems(doc) {
         return all(doc).map((w) => {
           const item = new vscode.CompletionItem(w.phrase, w.library ? vscode.CompletionItemKind.Function : vscode.CompletionItemKind.Method);
@@ -55,7 +55,7 @@ function activate(context) {
         });
       },
     }),
-    vscode.languages.registerHoverProvider("stellanova", {
+    vscode.languages.registerHoverProvider("fathom", {
       provideHover(doc, at) {
         const w = words.wordAt(all(doc), doc.lineAt(at.line).text, at.character);
         return w && new vscode.Hover(new vscode.MarkdownString().appendCodeblock(words.describe(w), "text"));

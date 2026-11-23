@@ -1,8 +1,8 @@
 {
-  "name": "stellanova-studia",
-  "productName": "Stellanova Studia",
+  "name": "fathom-studia",
+  "productName": "Fathom Studia",
   "version": "0.1.0",
-  "description": "A place to write, check and run Stellanova programs.",
+  "description": "A place to write, check and run Fathom programs.",
   "main": "main.js",
   "private": true,
   "scripts": {

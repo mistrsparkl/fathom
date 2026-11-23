@@ -1,10 +1,10 @@
 title: Building, web pages, and grammar
 card: Chapter 11 | Building | A program of its own
 say:
-  So far Stellanova has run our programs directly. But a program can also be built: made into a dot exe file that runs on its own, and fast, on any Windows computer, without Stellanova.
+  So far Fathom has run our programs directly. But a program can also be built: made into a dot exe file that runs on its own, and fast, on any Windows computer, without Fathom.
 uncard
 
-new: count.stella
+new: count.fathom
 type:
   genesis:
     set total to 0
@@ -27,7 +27,7 @@ say:
   The Web button makes a program into JavaScript instead, so it can be the inside of a web page, or an app.
   The page library gives it the page.
 uncard
-new: clicker.stella
+new: clicker.fathom
 type:
   use: page
 
@@ -59,8 +59,8 @@ zoom: out
 web
 zoom: output
 say:
-  It made clicker dot j s, and Stellanova's own runtime next to it. A page that loads them both runs the program.
-  This studia is made this way: its screens are written in Stellanova, and so is the part that reads and writes your files.
+  It made clicker dot j s, and Fathom's own runtime next to it. A page that loads them both runs the program.
+  This studia is made this way: its screens are written in Fathom, and so is the part that reads and writes your files.
 wait
 zoom: out
 
@@ -68,7 +68,7 @@ card: Chapter 11 | WebAssembly | Machine code that runs anywhere
 say:
   There's one more way. WebAssembly is machine code that isn't for any one kind of computer, so the same file runs on Windows, Mac and Linux, and in browsers and servers.
 uncard
-open: count.stella
+open: count.fathom
 wasm
 zoom: output
 say:
@@ -79,9 +79,9 @@ zoom: out
 
 card: Chapter 11 | Grammar for people | Reading like English
 say:
-  Stellanova is written for people to read. So in a few places, it asks for grammar, even though the computer skips it.
+  Fathom is written for people to read. So in a few places, it asks for grammar, even though the computer skips it.
 uncard
-new: grammar.stella
+new: grammar.fathom
 type:
   a notice has:
     title (text)

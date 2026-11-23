@@ -10,11 +10,11 @@ public static class PlayCheck
     {
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
-        var program = AssetDatabase.LoadAssetAtPath<StellanovaProgram>("Assets/words.stella");
+        var program = AssetDatabase.LoadAssetAtPath<FathomProgram>("Assets/words.fathom");
         Shape(PrimitiveType.Cube, "Box", new Vector3(8, 0, 0));
-        Shape(PrimitiveType.Cube, "Target", Vector3.zero).AddComponent<StellanovaScript>().program = program;
+        Shape(PrimitiveType.Cube, "Target", Vector3.zero).AddComponent<FathomScript>().program = program;
         Shape(PrimitiveType.Sphere, "Player", new Vector3(0, 4, 0)).AddComponent<Rigidbody>();
-        Shape(PrimitiveType.Cube, "Mover", new Vector3(1, 2, 3)).AddComponent<StellanovaScript>().program = program;
+        Shape(PrimitiveType.Cube, "Mover", new Vector3(1, 2, 3)).AddComponent<FathomScript>().program = program;
         new GameObject("Report").AddComponent<CheckReport>();
         EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), "Assets/Check.unity");
     }

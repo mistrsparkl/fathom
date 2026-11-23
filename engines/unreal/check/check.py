@@ -1,4 +1,4 @@
-"""Plays words.stella in Unreal, then in a packaged game. Run: py -3 engines/unreal/check/check.py"""
+"""Plays words.fathom in Unreal, then in a packaged game. Run: py -3 engines/unreal/check/check.py"""
 import shutil
 import subprocess
 import sys
@@ -13,10 +13,10 @@ import check  # noqa: E402  (what every engine check shares)
 ENGINE = Path(r"C:\Program Files\Epic Games\UE_5.8\Engine")
 if not ENGINE.exists():
     sys.exit("Unreal Engine 5.8 isn't installed (the Epic Games Launcher installs it).")
-project = Path(tempfile.mkdtemp(prefix="stellanova_unreal_")) / "Check"
+project = Path(tempfile.mkdtemp(prefix="fathom_unreal_")) / "Check"
 shutil.copytree(HERE / "Project", project)
-subprocess.run([sys.executable, str(HOME / "stellanova.py"), "unreal", str(project)], check=True)
-shutil.copy(check.PROGRAM, project / "Stellanova")
+subprocess.run([sys.executable, str(HOME / "fathom.py"), "unreal", str(project)], check=True)
+shutil.copy(check.PROGRAM, project / "Fathom")
 quiet = dict(capture_output=True, text=True, errors="replace", stdin=subprocess.DEVNULL)
 
 
@@ -43,7 +43,7 @@ assert built.returncode == 0, built.stdout[-3000:]
 ran = subprocess.run([str(ENGINE / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe"), str(project / "Check.uproject"), "/Engine/Maps/Entry",
                       "-game", "-nullrhi", "-nosound", "-unattended", "-nosplash", "-stdout", "-FullStdOutLogOutput"], timeout=900, **quiet)
 read(project / "check.txt", "Unreal editor", ran.stdout)
-(project / "Stellanova" / "words.dll").unlink()  # (packaging makes it again)
+(project / "Fathom" / "words.dll").unlink()  # (packaging makes it again)
 archive = project.parent / "game"
 packaged = subprocess.run([str(ENGINE / "Build" / "BatchFiles" / "RunUAT.bat"), "BuildCookRun", f"-project={project / 'Check.uproject'}",
                            "-noP4", "-platform=Win64", "-clientconfig=Development", "-build", "-cook", "-stage", "-pak", "-archive",

@@ -5,7 +5,7 @@ include: <random>
 include: "digest.h"
 
 code:
-  namespace stellanova_encryption
+  namespace fathom_encryption
   {
   	typedef unsigned char u8;
   	typedef unsigned long long u64;
@@ -101,7 +101,7 @@ code:
   	}
   	inline void key_of(const std::string& password, const u8 salt[16], u8 key[32])
   	{
-  		std::vector<uint8_t> made = stellanova_digest::pbkdf2_sha256(password, salt, 16, 100000, 32);
+  		std::vector<uint8_t> made = fathom_digest::pbkdf2_sha256(password, salt, 16, 100000, 32);
   		std::memcpy(key, made.data(), 32);
   	}
   	inline void random_bytes(u8* out, size_t n)  // the system's own randomness (Windows', or WASI's)
@@ -154,7 +154,7 @@ code:
   	{
   		std::string all;
   		if (!unbase64(secret, all) || all.size() < 44)
-  			stellanova::fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
+  			fathom::fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
   		u8 key[32], tag[16];
   		key_of(password, (const u8*)all.data(), key);
   		const u8* nonce = (const u8*)all.data() + 16;
@@ -164,13 +164,13 @@ code:
   		for (int k = 0; k < 16; ++k)
   			diff |= tag[k] ^ (u8)all[all.size() - 16 + k];
   		if (diff)
-  			stellanova::fail(line, "the password is wrong, or the encrypted text was changed.");
+  			fathom::fail(line, "the password is wrong, or the encrypted text was changed.");
   		return chacha(key, nonce, sealed);
   	}
   	inline std::string random_code(double n, int line)
   	{
   		if (n < 1 || n > 1024 || n != std::floor(n))
-  			stellanova::fail(line, "a random code is 1 to 1024 bytes long, not " + stellanova::text(n) + ".");
+  			fathom::fail(line, "a random code is 1 to 1024 bytes long, not " + fathom::text(n) + ".");
   		std::vector<u8> b((size_t)n);
   		random_bytes(b.data(), b.size());
   		static const char* digits = "0123456789abcdef";
@@ -237,20 +237,20 @@ python:
           raise RunError(0, "a random code is 1 to 1024 bytes long, not " + text(n) + ".")
       return _os.urandom(int(n)).hex()
 
-to encrypted with, given message (text) and password (text), returning text = stellanova_encryption::encrypt({message}, {password})
+to encrypted with, given message (text) and password (text), returning text = fathom_encryption::encrypt({message}, {password})
   runs: encrypt({message}, {password})
-  web: stellanova_encryption.encrypt({message}, {password}, {line})
-to decrypted with, given secret (text) and password (text), returning text = stellanova_encryption::decrypt({secret}, {password}, {line})
+  web: fathom_encryption.encrypt({message}, {password}, {line})
+to decrypted with, given secret (text) and password (text), returning text = fathom_encryption::decrypt({secret}, {password}, {line})
   runs: decrypt({secret}, {password})
-  web: stellanova_encryption.decrypt({secret}, {password}, {line})
-to a random code of, given bytes (a number), returning text = stellanova_encryption::random_code({bytes}, {line})
+  web: fathom_encryption.decrypt({secret}, {password}, {line})
+to a random code of, given bytes (a number), returning text = fathom_encryption::random_code({bytes}, {line})
   runs: random_code({bytes})
-  web: stellanova_encryption.randomCode({bytes}, {line})
+  web: fathom_encryption.randomCode({bytes}, {line})
 
 javascript:
-  const stellanova_encryption = {
+  const fathom_encryption = {
     crypto(line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can't encrypt yet (it works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page can't encrypt yet (it works with node).");
       return require("crypto");
     },
     encrypt(message, password, line) {
@@ -262,18 +262,18 @@ javascript:
     },
     decrypt(secret, password, line) {
       const c = this.crypto(line), all = Buffer.from(secret, "base64");
-      if (!/^[A-Za-z0-9+/]*=*$/.test(secret) || all.length < 44) stellanova.fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
+      if (!/^[A-Za-z0-9+/]*=*$/.test(secret) || all.length < 44) fathom.fail(line, "that isn't encrypted text (it comes from 'encrypted with').");
       const key = c.pbkdf2Sync(password, all.subarray(0, 16), 100000, 32, "sha256");
       const d = c.createDecipheriv("chacha20-poly1305", key, all.subarray(16, 28), { authTagLength: 16 });
       d.setAuthTag(all.subarray(all.length - 16));
       try {
         return Buffer.concat([d.update(all.subarray(28, all.length - 16)), d.final()]).toString("utf8");
       } catch {
-        stellanova.fail(line, "the password is wrong, or the encrypted text was changed.");
+        fathom.fail(line, "the password is wrong, or the encrypted text was changed.");
       }
     },
     randomCode(n, line) {
-      if (n < 1 || n > 1024 || n !== Math.floor(n)) stellanova.fail(line, `a random code is 1 to 1024 bytes long, not ${stellanova.text(n)}.`);
+      if (n < 1 || n > 1024 || n !== Math.floor(n)) fathom.fail(line, `a random code is 1 to 1024 bytes long, not ${fathom.text(n)}.`);
       return this.crypto(line).randomBytes(n).toString("hex");
     },
   };

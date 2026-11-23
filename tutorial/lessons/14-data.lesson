@@ -4,7 +4,7 @@ say:
   Web services answer in JSON: names, values and lists inside each other. The json library reaches straight in, with a path.
 uncard
 
-new: weather.stella
+new: weather.fathom
 type fast:
   use: json
 
@@ -42,7 +42,7 @@ say:
   A hash is a fingerprint of some text. It's always the same for the same text, and completely different if one letter changes.
   Encryption keeps text secret: only someone with the password can read it.
 uncard
-new: secret.stella
+new: secret.fathom
 type fast:
   use: hashing
   use: encryption
@@ -78,7 +78,7 @@ zoom: out
 
 card: Chapter 14 | Zip files | Many files in one
 uncard
-new: backup.stella
+new: backup.fathom
 type fast:
   use: zip
 

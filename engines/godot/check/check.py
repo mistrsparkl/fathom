@@ -1,4 +1,4 @@
-"""Plays words.stella in Godot, then in an exported game. Run: py -3 engines/godot/check/check.py"""
+"""Plays words.fathom in Godot, then in an exported game. Run: py -3 engines/godot/check/check.py"""
 import os
 import shutil
 import subprocess
@@ -15,10 +15,10 @@ found = shutil.which("godot") or next(iter(sorted(
     (Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Packages").glob("GodotEngine.GodotEngine_*/*_console.exe"))), None)
 if not found:
     sys.exit("Godot isn't installed: winget install GodotEngine.GodotEngine")
-project = Path(tempfile.mkdtemp(prefix="stellanova_godot_")) / "Check"
+project = Path(tempfile.mkdtemp(prefix="fathom_godot_")) / "Check"
 shutil.copytree(HERE, project, ignore=shutil.ignore_patterns("check.py", "__pycache__"))
 shutil.copy(check.PROGRAM, project)
-subprocess.run([sys.executable, str(HOME / "stellanova.py"), "godot", str(project)], check=True)
+subprocess.run([sys.executable, str(HOME / "fathom.py"), "godot", str(project)], check=True)
 
 
 def run(program, *a):
@@ -37,8 +37,8 @@ def play(program, *a, engine):
         elif line.strip() and not line.startswith("Godot Engine"):
             said.append(line)
     for line in done.stderr.splitlines():
-        if line.startswith("ERROR: Stellanova: "):
-            problems.append("problem: " + line[len("ERROR: Stellanova: "):])
+        if line.startswith("ERROR: Fathom: "):
+            problems.append("problem: " + line[len("ERROR: Fathom: "):])
         elif line.startswith(("ERROR", "SCRIPT ERROR")):
             sys.exit(f"{engine}: Godot said: {line}\n{done.stderr[-3000:]}")
     print(f"{engine}:\n  " + "\n  ".join(said + problems))

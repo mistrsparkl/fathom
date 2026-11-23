@@ -18,7 +18,7 @@ to tangent of, given angle (a number), returning a number = std::tan({angle} * 3
 
 to round, given x (a number), returning a number = std::round({x})
   runs: (lambda a: math.copysign(math.floor(abs(a)) + (abs(a) - math.floor(abs(a)) >= 0.5), a))({x})
-  web: stellanova_maths::round({x})
+  web: fathom_maths::round({x})
 to round down, given x (a number), returning a number = std::floor({x})
   runs: float(math.floor({x}))
   web: Math.floor({x})
@@ -29,7 +29,7 @@ to round up, given x (a number), returning a number = std::ceil({x})
 to power of, given x (a number) and power (a number), returning a number = std::pow({x}, {power})
   runs: power_of({x}, {power})
   web: Math.pow({x}, {power})
-to remainder of, given x (a number) and divided by (a number), returning a number = stellanova::remainder_of({x}, {divided by})
+to remainder of, given x (a number) and divided by (a number), returning a number = fathom::remainder_of({x}, {divided by})
   runs: math.fmod({x}, {divided by}) if {divided by} != 0 else math.nan
   web: (({x}) % ({divided by}))
 
@@ -63,6 +63,6 @@ to whole part of, given x (a number), returning a number = std::trunc({x})
   web: Math.trunc({x})
 
 javascript:
-  const stellanova_maths = {
+  const fathom_maths = {
     round: (x) => Math.sign(x) * Math.round(Math.abs(x)),  // halves go away from zero, as C++ does
   };

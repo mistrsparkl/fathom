@@ -12,7 +12,7 @@ include: <deque>
 link: ws2_32
 
 code:
-  namespace stellanova_server
+  namespace fathom_server
   {
   	inline std::string message;  // what was sent with the request being answered ('the web message')
   	inline std::string file_asked;  // 'answer with the file': sent instead of the answer's text
@@ -21,9 +21,9 @@ code:
   	inline std::string header(const std::string& name)
   	{
   		std::istringstream lines(request_head);
-  		std::string want = stellanova::lower(name) + ":";
+  		std::string want = fathom::lower(name) + ":";
   		for (std::string h; std::getline(lines, h);)
-  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			if (fathom::lower(h.substr(0, want.size())) == want)
   			{
   				std::string v = h.substr(want.size());
   				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
@@ -59,7 +59,7 @@ code:
   			{".ico", "image/x-icon"}, {".woff2", "font/woff2"}, {".woff", "font/woff"}, {".ttf", "font/ttf"}, {".mp3", "audio/mpeg"},
   			{".wav", "audio/wav"}, {".txt", "text/plain; charset=utf-8"}, {".webp", "image/webp"}};
   		for (const auto& [e, k] : kinds)
-  			if (stellanova::lower(end) == e)
+  			if (fathom::lower(end) == e)
   				return k;
   		return "text/html; charset=utf-8";
   	}
@@ -137,7 +137,7 @@ code:
   		}
   		size_t head_end = r.asked.find("\r\n\r\n");
   		size_t length = 0;
-  		std::string low = stellanova::lower(r.asked.substr(0, head_end));
+  		std::string low = fathom::lower(r.asked.substr(0, head_end));
   		size_t at = low.find("content-length:");
   		if (at != std::string::npos)
   			length = (size_t)std::strtoul(low.c_str() + at + 15, nullptr, 10);
@@ -180,7 +180,7 @@ code:
   		where.sin_port = htons((u_short)port);
   		where.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // this computer only, so Windows doesn't ask about its firewall
   		if (listener == INVALID_SOCKET || bind(listener, (sockaddr*)&where, sizeof where) != 0 || listen(listener, 64) != 0)
-  			stellanova::fail(line, "I couldn't serve the web on port " + stellanova::text(port) + " (is something else using it?).");
+  			fathom::fail(line, "I couldn't serve the web on port " + fathom::text(port) + " (is something else using it?).");
   		static std::mutex held;
   		static std::condition_variable ready;
   		static std::deque<Asking> waiting;
@@ -218,7 +218,7 @@ code:
   			if (!file_for(folder, path, page))
   			{
   				file_asked.clear();
-  				page = stellanova::invoke(answer, line, path);
+  				page = fathom::invoke(answer, line, path);
   				if (kind.rfind("text/html", 0) == 0 && looks_like_data(page))
   					kind = "application/json; charset=utf-8";
   				if (!file_asked.empty())
@@ -237,13 +237,13 @@ code:
   	{
   		std::error_code e;
   		if (!std::filesystem::is_regular_file(std::filesystem::u8path(name), e))
-  			stellanova::fail(line, "there is no file called " + name + ".");
+  			fathom::fail(line, "there is no file called " + name + ".");
   		file_asked = name;
   	}
   	inline void answer_with_status(double code, int line)
   	{
   		if (std::floor(code) != code || code < 100 || code > 599)
-  			stellanova::fail(line, "a web status is a whole number from 100 to 599, like 404, not " + stellanova::text(code) + ".");
+  			fathom::fail(line, "a web status is a whole number from 100 to 599, like 404, not " + fathom::text(code) + ".");
   		status = code;
   	}
   	inline void serve(double port, const std::function<std::string(std::string)>& answer, int line) { serve_from(port, "", answer, line); }
@@ -324,36 +324,36 @@ python:
           raise RunError(0, "I couldn't serve the web on port " + text(port) + " (is something else using it?).")
       server.serve_forever()
 
-to serve the web, given port (a number) and answer (a command given text returning text) = stellanova_server::serve({port}, {answer}, {line})
+to serve the web, given port (a number) and answer (a command given text returning text) = fathom_server::serve({port}, {answer}, {line})
   runs: serve_from({port}, "", {answer})
-  web: await stellanova_server_web.serve({port}, "", {answer}, {line})
-to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text returning text) = stellanova_server::serve_from({port}, {folder}, {answer}, {line})
+  web: await fathom_server_web.serve({port}, "", {answer}, {line})
+to serve the web from the folder, given port (a number) and folder (text) and answer (a command given text returning text) = fathom_server::serve_from({port}, {folder}, {answer}, {line})
   runs: serve_from({port}, {folder}, {answer})
-  web: await stellanova_server_web.serve({port}, {folder}, {answer}, {line})
-the web message = stellanova_server::message, text, read only
+  web: await fathom_server_web.serve({port}, {folder}, {answer}, {line})
+the web message = fathom_server::message, text, read only
   runs: MESSAGE[0]
-  web: stellanova_server_web.message
-the web way = stellanova_server::way, text, read only
+  web: fathom_server_web.message
+the web way = fathom_server::way, text, read only
   runs: WAY[0]
-  web: stellanova_server_web.way
-to the web header, given name (text), returning text = stellanova_server::header({name})
+  web: fathom_server_web.way
+to the web header, given name (text), returning text = fathom_server::header({name})
   runs: HEADERS[0].get({name}.lower(), "")
-  web: stellanova_server_web.header({name})
-to answer with the status, given code (a number) = stellanova_server::answer_with_status({code}, {line})
+  web: fathom_server_web.header({name})
+to answer with the status, given code (a number) = fathom_server::answer_with_status({code}, {line})
   runs: answer_with_status({code})
-  web: stellanova_server_web.answerWithStatus({code}, {line})
-to web decoded, given piece (text), returning text = stellanova_server::decoded({piece})
+  web: fathom_server_web.answerWithStatus({code}, {line})
+to web decoded, given piece (text), returning text = fathom_server::decoded({piece})
   runs: urllib.parse.unquote_plus({piece})
-  web: stellanova_server_web::decoded({piece})
-to web encoded, given piece (text), returning text = stellanova_server::encoded({piece})
+  web: fathom_server_web::decoded({piece})
+to web encoded, given piece (text), returning text = fathom_server::encoded({piece})
   runs: urllib.parse.quote({piece}, safe="-_.~")
   web: encodeURIComponent({piece})
-to answer with the file, given name (text) = stellanova_server::answer_with({name}, {line})
+to answer with the file, given name (text) = fathom_server::answer_with({name}, {line})
   runs: answer_with({name})
-  web: stellanova_server_web.answerWith({name}, {line})
+  web: fathom_server_web.answerWith({name}, {line})
 
 javascript:
-  const stellanova_server_web = {
+  const fathom_server_web = {
     message: "",
     asked: "",
     way: "GET",
@@ -362,7 +362,7 @@ javascript:
     status: 200,
     answerWithStatus(code, line) {
       if (Math.floor(code) !== code || code < 100 || code > 599)
-        stellanova.fail(line, `a web status is a whole number from 100 to 599, like 404, not ${stellanova.text(code)}.`);
+        fathom.fail(line, `a web status is a whole number from 100 to 599, like 404, not ${fathom.text(code)}.`);
       this.status = code;
     },
     decoded(piece) {
@@ -384,7 +384,7 @@ javascript:
       const fs = require("fs");
       let file = false;
       try { file = fs.statSync(name).isFile(); } catch {}
-      if (!file) stellanova.fail(line, `there is no file called ${name}.`);
+      if (!file) fathom.fail(line, `there is no file called ${name}.`);
       this.asked = name;
     },
     fileFor(folder, path) {
@@ -395,7 +395,7 @@ javascript:
       try { return require("fs").readFileSync(folder + name); } catch { return null; }
     },
     serve(port, folder, answer, line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can't serve the web (this works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page can't serve the web (this works with node).");
       const http = require("http"), fs = require("fs");
       let turn = Promise.resolve();  // one request at a time, so 'the web message' is the one being answered
       const server = http.createServer((request, response) => {
@@ -415,7 +415,7 @@ javascript:
                 if (kind.startsWith("text/html") && /^\s*[\[{]/.test(said)) kind = "application/json; charset=utf-8";
                 page = Buffer.from(said, "utf8");
               } catch (e) {
-                stellanova.report(e);
+                fathom.report(e);
                 page = Buffer.from("", "utf8");
               }
               if (this.asked) page = fs.readFileSync(this.asked), kind = this.kindOf(this.asked);
@@ -426,7 +426,7 @@ javascript:
         });
       });
       return new Promise((resolve, reject) => {  // it never ends: serving is all it does
-        server.once("error", () => reject(new stellanova.Problem(line, `I couldn't serve the web on port ${stellanova.text(port)} (is something else using it?).`)));
+        server.once("error", () => reject(new fathom.Problem(line, `I couldn't serve the web on port ${fathom.text(port)} (is something else using it?).`)));
         server.listen(port, "127.0.0.1");
       });
     },

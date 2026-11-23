@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs Fathom on Linux.
+exec python3 "$(dirname "$(readlink -f "$0")")/start.py" "$@"

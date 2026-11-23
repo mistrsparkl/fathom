@@ -3,7 +3,7 @@ card: Chapter 3 | Choosing | If, otherwise, and depending on
 say: A program often has to choose what to do. That's what if is for.
 uncard
 
-new: weather.stella
+new: weather.fathom
 type:
   genesis:
     set temperature to 31
@@ -119,7 +119,7 @@ keys: backspace
 type: 1
 test: expect a failure
 zoom: output
-say: The test failed, and Stellanova says which line, and the check that wasn't so.
+say: The test failed, and Fathom says which line, and the check that wasn't so.
 wait
 zoom: out
 

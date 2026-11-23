@@ -17,13 +17,13 @@ linux link: pulse-simple
 linux link: pulse
 
 code:
-  namespace stellanova_making
+  namespace fathom_making
   {
   	constexpr double RATE = 44100;
   	inline std::vector<double> tone(const std::string& shape, double pitch, double seconds, double loudness, int line)
   	{
   		if (!(seconds >= 0 && seconds <= 600))
-  			stellanova::fail(line, "a tone lasts 0 to 600 seconds, not " + stellanova::text(seconds) + ".");
+  			fathom::fail(line, "a tone lasts 0 to 600 seconds, not " + fathom::text(seconds) + ".");
   		static std::mt19937 random{12345};
   		std::uniform_real_distribution<double> any(-1.0, 1.0);
   		size_t n = (size_t)std::llround(seconds * RATE);
@@ -36,7 +36,7 @@ code:
   			else if (shape == "saw") v = 2 * phase - 1;
   			else if (shape == "triangle") v = phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase;
   			else if (shape == "noise") v = any(random);
-  			else stellanova::fail(line, "there is no tone shape called \"" + shape + "\". Shapes: sine, square, saw, triangle, noise.");
+  			else fathom::fail(line, "there is no tone shape called \"" + shape + "\". Shapes: sine, square, saw, triangle, noise.");
   			out[k] = v * loudness;
   		}
   		return out;
@@ -45,13 +45,13 @@ code:
   	{
   		static const int steps[] = {9, 11, 0, 2, 4, 5, 7};  // A B C D E F G, from C
   		if (name.size() < 2 || name[0] < 'A' || name[0] > 'G')
-  			stellanova::fail(line, "a note looks like \"A4\", \"C#5\" or \"Bb3\", not \"" + name + "\".");
+  			fathom::fail(line, "a note looks like \"A4\", \"C#5\" or \"Bb3\", not \"" + name + "\".");
   		int step = steps[name[0] - 'A'];
   		size_t k = 1;
   		if (name[k] == '#') step += 1, ++k;
   		else if (name[k] == 'b') step -= 1, ++k;
   		if (k >= name.size() || name.find_first_not_of("-0123456789", k) != std::string::npos)
-  			stellanova::fail(line, "a note looks like \"A4\", \"C#5\" or \"Bb3\", not \"" + name + "\".");
+  			fathom::fail(line, "a note looks like \"A4\", \"C#5\" or \"Bb3\", not \"" + name + "\".");
   		int octave = std::stoi(name.substr(k));
   		return 440.0 * std::pow(2.0, (step - 9 + 12 * (octave - 4)) / 12.0);
   	}
@@ -87,7 +87,7 @@ code:
   	inline std::vector<double> echoed(const std::vector<double>& a, double delay, double strength, int line)
   	{
   		if (!(delay > 0 && delay <= 10))
-  			stellanova::fail(line, "an echo comes back after more than 0 and at most 10 seconds, not " + stellanova::text(delay) + ".");
+  			fathom::fail(line, "an echo comes back after more than 0 and at most 10 seconds, not " + fathom::text(delay) + ".");
   		size_t gap = (size_t)std::llround(delay * RATE);
   		std::vector<double> out(a);
   		out.resize(a.size() + gap * 4, 0.0);
@@ -109,17 +109,17 @@ code:
   		                 + word(44100, 4) + word(88200, 4) + word(2, 2) + word(16, 2) + "data" + word((uint32_t)data.size(), 4);
   		std::ofstream f(std::filesystem::u8path(file), std::ios::binary);
   		if (!f || !f.write((head + data).data(), (std::streamsize)(head.size() + data.size())))
-  			stellanova::fail(line, "I couldn't write the file \"" + file + "\".");
+  			fathom::fail(line, "I couldn't write the file \"" + file + "\".");
   	}
   	inline std::vector<double> load(const std::string& file, int line)
   	{
   		std::ifstream f(std::filesystem::u8path(file), std::ios::binary);
   		std::string all((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
   		if (!f && all.empty())
-  			stellanova::fail(line, "there is no file called \"" + file + "\".");
+  			fathom::fail(line, "there is no file called \"" + file + "\".");
   		auto num = [&](size_t at, int n) { uint32_t v = 0; for (int k = n - 1; k >= 0; --k) v = (v << 8) | (unsigned char)all[at + k]; return v; };
   		if (all.size() < 12 || all.compare(0, 4, "RIFF") || all.compare(8, 4, "WAVE"))
-  			stellanova::fail(line, "\"" + file + "\" isn't a .wav file.");
+  			fathom::fail(line, "\"" + file + "\" isn't a .wav file.");
   		int channels = 1, bits = 16;
   		for (size_t at = 12; at + 8 <= all.size();)
   		{
@@ -128,13 +128,13 @@ code:
   			if (id == "fmt " && at + 24 <= all.size())
   			{
   				if (num(at + 8, 2) != 1)
-  					stellanova::fail(line, "\"" + file + "\" isn't plain PCM sound (only those .wav files can be read).");
+  					fathom::fail(line, "\"" + file + "\" isn't plain PCM sound (only those .wav files can be read).");
   				channels = (int)num(at + 10, 2), bits = (int)num(at + 22, 2);
   			}
   			if (id == "data")
   			{
   				if (bits != 16)
-  					stellanova::fail(line, "\"" + file + "\" has " + std::to_string(bits) + "-bit sound; only 16-bit .wav files can be read.");
+  					fathom::fail(line, "\"" + file + "\" has " + std::to_string(bits) + "-bit sound; only 16-bit .wav files can be read.");
   				std::vector<double> out;
   				size_t end = std::min(all.size(), at + 8 + size);
   				for (size_t k = at + 8; k + 2 * channels <= end; k += 2 * channels)
@@ -143,23 +143,23 @@ code:
   			}
   			at += 8 + size + (size & 1);
   		}
-  		stellanova::fail(line, "\"" + file + "\" has no sound in it.");
+  		fathom::fail(line, "\"" + file + "\" has no sound in it.");
   	}
   	inline std::vector<double> record(double seconds, int line)
   	{
   		if (!(seconds > 0 && seconds <= 600))
-  			stellanova::fail(line, "a recording lasts more than 0 and at most 600 seconds, not " + stellanova::text(seconds) + ".");
+  			fathom::fail(line, "a recording lasts more than 0 and at most 600 seconds, not " + fathom::text(seconds) + ".");
   #ifdef __linux__
   		pa_sample_spec format{PA_SAMPLE_S16LE, 44100, 1};
   		int why = 0;
-  		pa_simple* mic = pa_simple_new(nullptr, "Stellanova", PA_STREAM_RECORD, nullptr, "recording", &format, nullptr, nullptr, &why);
+  		pa_simple* mic = pa_simple_new(nullptr, "Fathom", PA_STREAM_RECORD, nullptr, "recording", &format, nullptr, nullptr, &why);
   		if (!mic)
-  			stellanova::fail(line, "I couldn't open a microphone.");
+  			fathom::fail(line, "I couldn't open a microphone.");
   		std::vector<int16_t> data((size_t)(seconds * 44100));
   		bool heard = pa_simple_read(mic, data.data(), data.size() * 2, &why) == 0;
   		pa_simple_free(mic);
   		if (!heard)
-  			stellanova::fail(line, "I couldn't record from the microphone.");
+  			fathom::fail(line, "I couldn't record from the microphone.");
   		std::vector<double> out;
   		for (int16_t x : data)
   			out.push_back(x / 32768.0);
@@ -168,7 +168,7 @@ code:
   		WAVEFORMATEX format{WAVE_FORMAT_PCM, 1, 44100, 88200, 2, 16, 0};
   		HWAVEIN in = nullptr;
   		if (waveInOpen(&in, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR)
-  			stellanova::fail(line, "I couldn't open a microphone.");
+  			fathom::fail(line, "I couldn't open a microphone.");
   		std::vector<int16_t> data((size_t)(seconds * 44100));
   		WAVEHDR header{};
   		header.lpData = (LPSTR)data.data();
@@ -294,7 +294,7 @@ python:
           pulse.pa_simple_read.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
           pulse.pa_simple_free.argtypes = [ctypes.c_void_p]
           spec = SPEC(3, 44100, 1)  # PA_SAMPLE_S16LE
-          mic = pulse.pa_simple_new(None, b"Stellanova", 2, None, b"recording", ctypes.byref(spec), None, None, None)  # PA_STREAM_RECORD
+          mic = pulse.pa_simple_new(None, b"Fathom", 2, None, b"recording", ctypes.byref(spec), None, None, None)  # PA_STREAM_RECORD
           if not mic:
               raise RunError(0, "I couldn't open a microphone.")
           buffer = ctypes.create_string_buffer(int(seconds * 44100) * 2)
@@ -328,43 +328,43 @@ python:
       raw = buffer.raw[:head.recorded]
       return [_struct.unpack("<h", raw[k:k + 2])[0] / 32768.0 for k in range(0, len(raw) - 1, 2)]
 
-to a tone, given shape (text) and pitch (a number) and seconds (a number) and loudness (a number), returning a list of numbers = stellanova_making::tone({shape}, {pitch}, {seconds}, {loudness}, {line})
+to a tone, given shape (text) and pitch (a number) and seconds (a number) and loudness (a number), returning a list of numbers = fathom_making::tone({shape}, {pitch}, {seconds}, {loudness}, {line})
   runs: tone({shape}, {pitch}, {seconds}, {loudness})
-  web: stellanova_making.tone({shape}, {pitch}, {seconds}, {loudness}, {line})
-to the pitch of the note, given name (text), returning a number = stellanova_making::note({name}, {line})
+  web: fathom_making.tone({shape}, {pitch}, {seconds}, {loudness}, {line})
+to the pitch of the note, given name (text), returning a number = fathom_making::note({name}, {line})
   runs: note({name})
-  web: stellanova_making.note({name}, {line})
-to mixed, given first (a list of numbers) and second (a list of numbers), returning a list of numbers = stellanova_making::mixed({first}, {second})
+  web: fathom_making.note({name}, {line})
+to mixed, given first (a list of numbers) and second (a list of numbers), returning a list of numbers = fathom_making::mixed({first}, {second})
   runs: mixed({first}, {second})
-  web: stellanova_making.mixed({first}, {second})
-to followed by, given first (a list of numbers) and second (a list of numbers), returning a list of numbers = stellanova_making::followed({first}, {second})
+  web: fathom_making.mixed({first}, {second})
+to followed by, given first (a list of numbers) and second (a list of numbers), returning a list of numbers = fathom_making::followed({first}, {second})
   runs: list({first}) + list({second})
   web: [...{first}, ...{second}]
-to louder, given sound (a list of numbers) and times (a number), returning a list of numbers = stellanova_making::louder({sound}, {times})
+to louder, given sound (a list of numbers) and times (a number), returning a list of numbers = fathom_making::louder({sound}, {times})
   runs: [x * {times} for x in {sound}]
   web: {sound}.map((x) => x * {times})
-to faded, given sound (a list of numbers) and fade in (a number) and fade out (a number), returning a list of numbers = stellanova_making::faded({sound}, {fade in}, {fade out})
+to faded, given sound (a list of numbers) and fade in (a number) and fade out (a number), returning a list of numbers = fathom_making::faded({sound}, {fade in}, {fade out})
   runs: faded({sound}, {fade in}, {fade out})
-  web: stellanova_making.faded({sound}, {fade in}, {fade out})
-to echoed, given sound (a list of numbers) and delay (a number) and strength (a number), returning a list of numbers = stellanova_making::echoed({sound}, {delay}, {strength}, {line})
+  web: fathom_making.faded({sound}, {fade in}, {fade out})
+to echoed, given sound (a list of numbers) and delay (a number) and strength (a number), returning a list of numbers = fathom_making::echoed({sound}, {delay}, {strength}, {line})
   runs: echoed({sound}, {delay}, {strength})
-  web: stellanova_making.echoed({sound}, {delay}, {strength}, {line})
-to save the sound, given sound (a list of numbers) and file (text) = stellanova_making::save({sound}, {file}, {line})
+  web: fathom_making.echoed({sound}, {delay}, {strength}, {line})
+to save the sound, given sound (a list of numbers) and file (text) = fathom_making::save({sound}, {file}, {line})
   runs: save_sound({sound}, {file})
-  web: stellanova_making.save({sound}, {file}, {line})
-to the sound in the file, given file (text), returning a list of numbers = stellanova_making::load({file}, {line})
+  web: fathom_making.save({sound}, {file}, {line})
+to the sound in the file, given file (text), returning a list of numbers = fathom_making::load({file}, {line})
   runs: load_sound({file})
-  web: stellanova_making.load({file}, {line})
-to record the sound, given seconds (a number), returning a list of numbers = stellanova_making::record({seconds}, {line})
+  web: fathom_making.load({file}, {line})
+to record the sound, given seconds (a number), returning a list of numbers = fathom_making::record({seconds}, {line})
   runs: record({seconds})
-  web: await stellanova_recording.record({seconds}, {line})
+  web: await fathom_recording.record({seconds}, {line})
 
 javascript:
-  const stellanova_making = {
+  const fathom_making = {
     RATE: 44100,
     seed: 12345,
     tone(shape, pitch, seconds, loudness, line) {
-      if (!(seconds >= 0 && seconds <= 600)) stellanova.fail(line, `a tone lasts 0 to 600 seconds, not ${stellanova.text(seconds)}.`);
+      if (!(seconds >= 0 && seconds <= 600)) fathom.fail(line, `a tone lasts 0 to 600 seconds, not ${fathom.text(seconds)}.`);
       const n = Math.round(seconds * this.RATE), out = new Array(n);
       const shapes = {
         sine: (p) => Math.sin(p * 6.283185307179586), square: (p) => (p < 0.5 ? 1 : -1), saw: (p) => 2 * p - 1,
@@ -372,13 +372,13 @@ javascript:
         noise: () => { this.seed = (this.seed * 1103515245 + 12345) % 2147483648; return this.seed / 1073741824 - 1; },
       };
       const f = shapes[shape];
-      if (!f) stellanova.fail(line, `there is no tone shape called "${shape}". Shapes: sine, square, saw, triangle, noise.`);
+      if (!f) fathom.fail(line, `there is no tone shape called "${shape}". Shapes: sine, square, saw, triangle, noise.`);
       for (let k = 0; k < n; k++) out[k] = f((pitch * k / this.RATE) % 1) * loudness;
       return out;
     },
     note(name, line) {
       const m = /^([A-G])([#b]?)(-?\d+)$/.exec(name);
-      if (!m) stellanova.fail(line, `a note looks like "A4", "C#5" or "Bb3", not "${name}".`);
+      if (!m) fathom.fail(line, `a note looks like "A4", "C#5" or "Bb3", not "${name}".`);
       const step = { A: 9, B: 11, C: 0, D: 2, E: 4, F: 5, G: 7 }[m[1]] + ({ "#": 1, b: -1, "": 0 })[m[2]];
       return 440 * Math.pow(2, (step - 9 + 12 * (Number(m[3]) - 4)) / 12);
     },
@@ -399,7 +399,7 @@ javascript:
       });
     },
     echoed(a, delay, strength, line) {
-      if (!(delay > 0 && delay <= 10)) stellanova.fail(line, `an echo comes back after more than 0 and at most 10 seconds, not ${stellanova.text(delay)}.`);
+      if (!(delay > 0 && delay <= 10)) fathom.fail(line, `an echo comes back after more than 0 and at most 10 seconds, not ${fathom.text(delay)}.`);
       const gap = Math.round(delay * this.RATE), out = a.concat(new Array(gap * 4).fill(0));
       for (let k = gap; k < out.length; k++) out[k] += out[k - gap] * strength;
       return out;
@@ -415,39 +415,39 @@ javascript:
       data.writeUInt32LE(88200, 28); data.writeUInt16LE(2, 32); data.writeUInt16LE(16, 34); data.write("data", 36); data.writeUInt32LE(a.length * 2, 40);
       a.forEach((x, k) => data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, x)) * 32767), 44 + 2 * k));
       const fs = this.fs();
-      if (!fs) stellanova.fail(line, "a web page can't save files.");
-      try { fs.writeFileSync(file, data); } catch { stellanova.fail(line, `I couldn't write the file "${file}".`); }
+      if (!fs) fathom.fail(line, "a web page can't save files.");
+      try { fs.writeFileSync(file, data); } catch { fathom.fail(line, `I couldn't write the file "${file}".`); }
     },
     load(file, line) {
       const fs = this.fs();
-      if (!fs) stellanova.fail(line, "a web page can't read files.");
+      if (!fs) fathom.fail(line, "a web page can't read files.");
       let d;
-      try { d = fs.readFileSync(file); } catch { stellanova.fail(line, `there is no file called "${file}".`); }
-      if (d.toString("latin1", 0, 4) !== "RIFF" || d.toString("latin1", 8, 12) !== "WAVE") stellanova.fail(line, `"${file}" isn't a .wav file.`);
+      try { d = fs.readFileSync(file); } catch { fathom.fail(line, `there is no file called "${file}".`); }
+      if (d.toString("latin1", 0, 4) !== "RIFF" || d.toString("latin1", 8, 12) !== "WAVE") fathom.fail(line, `"${file}" isn't a .wav file.`);
       let at = 12, channels = 1, bits = 16;
       while (at + 8 <= d.length) {
         const id = d.toString("latin1", at, at + 4), size = d.readUInt32LE(at + 4);
         if (id === "fmt ") {
-          if (d.readUInt16LE(at + 8) !== 1) stellanova.fail(line, `"${file}" isn't plain PCM sound (only those .wav files can be read).`);
+          if (d.readUInt16LE(at + 8) !== 1) fathom.fail(line, `"${file}" isn't plain PCM sound (only those .wav files can be read).`);
           channels = d.readUInt16LE(at + 10); bits = d.readUInt16LE(at + 22);
         }
         if (id === "data") {
-          if (bits !== 16) stellanova.fail(line, `"${file}" has ${bits}-bit sound; only 16-bit .wav files can be read.`);
+          if (bits !== 16) fathom.fail(line, `"${file}" has ${bits}-bit sound; only 16-bit .wav files can be read.`);
           const out = [], end = Math.min(d.length, at + 8 + size);
           for (let k = at + 8; k + 2 * channels <= end; k += 2 * channels) out.push(d.readInt16LE(k) / 32768);
           return out;
         }
         at += 8 + size + (size & 1);
       }
-      stellanova.fail(line, `"${file}" has no sound in it.`);
+      fathom.fail(line, `"${file}" has no sound in it.`);
     },
   };
-  const stellanova_recording = {
+  const fathom_recording = {
     async record(seconds, line) {  // the page's microphone
-      if (!(seconds > 0 && seconds <= 600)) stellanova.fail(line, `a recording lasts more than 0 and at most 600 seconds, not ${stellanova.text(seconds)}.`);
-      if (typeof navigator === "undefined" || !navigator.mediaDevices) stellanova.fail(line, "recording needs a web page with a microphone (node has none).");
+      if (!(seconds > 0 && seconds <= 600)) fathom.fail(line, `a recording lasts more than 0 and at most 600 seconds, not ${fathom.text(seconds)}.`);
+      if (typeof navigator === "undefined" || !navigator.mediaDevices) fathom.fail(line, "recording needs a web page with a microphone (node has none).");
       let stream;
-      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { stellanova.fail(line, "I couldn't use the microphone (it may be missing, or not allowed)."); }
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { fathom.fail(line, "I couldn't use the microphone (it may be missing, or not allowed)."); }
       const parts = [], recorder = new MediaRecorder(stream);
       recorder.ondataavailable = (e) => parts.push(e.data);
       const stopped = new Promise((r) => (recorder.onstop = r));

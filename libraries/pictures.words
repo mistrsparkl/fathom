@@ -16,7 +16,7 @@ link: gdiplus
 linux link: png16
 
 code:
-  namespace stellanova_pictures
+  namespace fathom_pictures
   {
   	struct Picture
   	{
@@ -38,7 +38,7 @@ code:
   		std::lock_guard<std::mutex> hold(lock);
   		auto at = all.find((int)n);
   		if (at == all.end())
-  			stellanova::fail(line, "there is no picture " + stellanova::text(n) + ".");
+  			fathom::fail(line, "there is no picture " + fathom::text(n) + ".");
   		return at->second;
   	}
   	inline std::array<unsigned char, 4> colour(const std::string& c, int line)
@@ -47,7 +47,7 @@ code:
   			{"black", {0, 0, 0, 255}}, {"white", {255, 255, 255, 255}}, {"red", {255, 0, 0, 255}}, {"green", {0, 128, 0, 255}},
   			{"blue", {0, 0, 255, 255}}, {"yellow", {255, 255, 0, 255}}, {"grey", {128, 128, 128, 255}}, {"gray", {128, 128, 128, 255}},
   			{"clear", {0, 0, 0, 0}}};
-  		auto named = names.find(stellanova::lower(c));
+  		auto named = names.find(fathom::lower(c));
   		if (named != names.end())
   			return named->second;
   		if ((c.size() == 7 || c.size() == 9) && c[0] == '#' && c.find_first_not_of("0123456789abcdefABCDEF", 1) == std::string::npos)
@@ -57,7 +57,7 @@ code:
   				out[k] = (unsigned char)std::stoi(c.substr(1 + 2 * k, 2), nullptr, 16);
   			return out;
   		}
-  		stellanova::fail(line, "\"" + c + "\" isn't a colour. Write it like \"#ff8800\", or a name: black, white, red, green, blue, yellow, grey, clear.");
+  		fathom::fail(line, "\"" + c + "\" isn't a colour. Write it like \"#ff8800\", or a name: black, white, red, green, blue, yellow, grey, clear.");
   	}
   	inline std::string colour_text(const unsigned char* d)
   	{
@@ -70,7 +70,7 @@ code:
   	inline void check_size(double w, double h, int line)
   	{
   		if (w < 1 || h < 1 || w > 20000 || h > 20000 || w != std::floor(w) || h != std::floor(h))
-  			stellanova::fail(line, "a picture is a whole number of dots across and down (1 to 20000), not " + stellanova::text(w) + " by " + stellanova::text(h) + ".");
+  			fathom::fail(line, "a picture is a whole number of dots across and down (1 to 20000), not " + fathom::text(w) + " by " + fathom::text(h) + ".");
   	}
   	inline double blank(double w, double h, const std::string& c, int line)
   	{
@@ -88,7 +88,7 @@ code:
   	inline double load(const std::string& file, int line)
   	{
   		if (!std::filesystem::exists(std::filesystem::u8path(file)))
-  			stellanova::fail(line, "there is no picture called \"" + file + "\".");
+  			fathom::fail(line, "there is no picture called \"" + file + "\".");
   		png_image png{};
   		png.version = PNG_IMAGE_VERSION;
   		Picture p;
@@ -102,7 +102,7 @@ code:
   		}
   		png_image_free(&png);
   		if (!ok)
-  			stellanova::fail(line, "I couldn't read the picture \"" + file + "\".");
+  			fathom::fail(line, "I couldn't read the picture \"" + file + "\".");
   		return add(std::move(p));
   	}
   	inline void save(double n, const std::string& file, int line)
@@ -112,7 +112,7 @@ code:
   		png.version = PNG_IMAGE_VERSION;
   		png.width = p.width, png.height = p.height, png.format = PNG_FORMAT_RGBA;
   		if (!png_image_write_to_file(&png, file.c_str(), 0, p.dots.data(), 0, nullptr))
-  			stellanova::fail(line, "I couldn't save the picture \"" + file + "\".");
+  			fathom::fail(line, "I couldn't save the picture \"" + file + "\".");
   	}
   #else
   	inline void gdiplus()
@@ -130,10 +130,10 @@ code:
   	{
   		gdiplus();
   		if (!std::filesystem::exists(std::filesystem::u8path(file)))
-  			stellanova::fail(line, "there is no picture called \"" + file + "\".");
+  			fathom::fail(line, "there is no picture called \"" + file + "\".");
   		Gdiplus::Bitmap image(wide(file).c_str());
   		if (image.GetLastStatus() != Gdiplus::Ok)
-  			stellanova::fail(line, "I couldn't read the picture \"" + file + "\".");
+  			fathom::fail(line, "I couldn't read the picture \"" + file + "\".");
   		Picture p;
   		p.width = (int)image.GetWidth(), p.height = (int)image.GetHeight();
   		p.dots.resize((size_t)p.width * p.height * 4);
@@ -168,13 +168,13 @@ code:
   		image.UnlockBits(&data);
   		const CLSID png = {0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
   		if (image.Save(wide(file).c_str(), &png, nullptr) != Gdiplus::Ok)
-  			stellanova::fail(line, "I couldn't save the picture \"" + file + "\".");
+  			fathom::fail(line, "I couldn't save the picture \"" + file + "\".");
   	}
   #endif
   	inline unsigned char* dot(Picture& p, double x, double y, int line)
   	{
   		if (x < 0 || y < 0 || x >= p.width || y >= p.height || x != std::floor(x) || y != std::floor(y))
-  			stellanova::fail(line, "there is no dot at " + stellanova::text(x) + ", " + stellanova::text(y) + " in a picture " +
+  			fathom::fail(line, "there is no dot at " + fathom::text(x) + ", " + fathom::text(y) + " in a picture " +
   			                       std::to_string(p.width) + " by " + std::to_string(p.height) + " (dots go from 0, 0).");
   		return &p.dots[((size_t)y * p.width + (size_t)x) * 4];
   	}
@@ -195,14 +195,14 @@ code:
   	{
   		check_size(w, h, line);
   		if (dots.size() != (size_t)(w * h * 4))
-  			stellanova::fail(line, "a picture " + stellanova::text(w) + " by " + stellanova::text(h) + " needs " + stellanova::text(w * h * 4) +
+  			fathom::fail(line, "a picture " + fathom::text(w) + " by " + fathom::text(h) + " needs " + fathom::text(w * h * 4) +
   			                       " numbers (red, green, blue and how solid, for each dot), not " + std::to_string(dots.size()) + ".");
   		Picture p;
   		p.width = (int)w, p.height = (int)h;
   		for (double x : dots)
   		{
   			if (x < 0 || x > 255 || x != std::floor(x))
-  				stellanova::fail(line, "each part of a dot is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  				fathom::fail(line, "each part of a dot is a whole number from 0 to 255, not " + fathom::text(x) + ".");
   			p.dots.push_back((unsigned char)x);
   		}
   		return add(std::move(p));
@@ -335,39 +335,39 @@ python:
       w, h, dots = _get(n)
       return _add([w, h, bytearray(dots)])
 
-to a blank picture, given width (a number) and height (a number) and colour (text), returning a number = stellanova_pictures::blank({width}, {height}, {colour}, {line})
+to a blank picture, given width (a number) and height (a number) and colour (text), returning a number = fathom_pictures::blank({width}, {height}, {colour}, {line})
   runs: picture_blank({width}, {height}, {colour})
-  web: stellanova_pictures.blank({width}, {height}, {colour}, {line})
-to the picture in the file, given file (text), returning a number = stellanova_pictures::load({file}, {line})
+  web: fathom_pictures.blank({width}, {height}, {colour}, {line})
+to the picture in the file, given file (text), returning a number = fathom_pictures::load({file}, {line})
   runs: picture_load({file})
-  web: stellanova_pictures.load({file}, {line})
-to save the picture, given picture (a number) and file (text) = stellanova_pictures::save({picture}, {file}, {line})
+  web: fathom_pictures.load({file}, {line})
+to save the picture, given picture (a number) and file (text) = fathom_pictures::save({picture}, {file}, {line})
   runs: picture_save({picture}, {file})
-  web: stellanova_pictures.save({picture}, {file}, {line})
-to the dots across, given picture (a number), returning a number = (double)stellanova_pictures::get({picture}, {line}).width
+  web: fathom_pictures.save({picture}, {file}, {line})
+to the dots across, given picture (a number), returning a number = (double)fathom_pictures::get({picture}, {line}).width
   runs: float(_get({picture})[0])
-  web: stellanova_pictures.get({picture}, {line}).width
-to the dots down, given picture (a number), returning a number = (double)stellanova_pictures::get({picture}, {line}).height
+  web: fathom_pictures.get({picture}, {line}).width
+to the dots down, given picture (a number), returning a number = (double)fathom_pictures::get({picture}, {line}).height
   runs: float(_get({picture})[1])
-  web: stellanova_pictures.get({picture}, {line}).height
-to the dot at, given picture (a number) and x (a number) and y (a number), returning text = stellanova_pictures::dot_at({picture}, {x}, {y}, {line})
+  web: fathom_pictures.get({picture}, {line}).height
+to the dot at, given picture (a number) and x (a number) and y (a number), returning text = fathom_pictures::dot_at({picture}, {x}, {y}, {line})
   runs: picture_dot({picture}, {x}, {y})
-  web: stellanova_pictures.dotAt({picture}, {x}, {y}, {line})
-to colour the dot, given picture (a number) and x (a number) and y (a number) and colour (text) = stellanova_pictures::set_dot({picture}, {x}, {y}, {colour}, {line})
+  web: fathom_pictures.dotAt({picture}, {x}, {y}, {line})
+to colour the dot, given picture (a number) and x (a number) and y (a number) and colour (text) = fathom_pictures::set_dot({picture}, {x}, {y}, {colour}, {line})
   runs: picture_set({picture}, {x}, {y}, {colour})
-  web: stellanova_pictures.setDot({picture}, {x}, {y}, {colour}, {line})
-to the dots of the picture, given picture (a number), returning a list of numbers = stellanova_pictures::dots({picture}, {line})
+  web: fathom_pictures.setDot({picture}, {x}, {y}, {colour}, {line})
+to the dots of the picture, given picture (a number), returning a list of numbers = fathom_pictures::dots({picture}, {line})
   runs: [float(v) for v in _get({picture})[2]]
-  web: Array.from(stellanova_pictures.get({picture}, {line}).dots)
-to a picture from the dots, given width (a number) and height (a number) and dots (a list of numbers), returning a number = stellanova_pictures::from_dots({width}, {height}, {dots}, {line})
+  web: Array.from(fathom_pictures.get({picture}, {line}).dots)
+to a picture from the dots, given width (a number) and height (a number) and dots (a list of numbers), returning a number = fathom_pictures::from_dots({width}, {height}, {dots}, {line})
   runs: picture_from({width}, {height}, {dots})
-  web: stellanova_pictures.fromDots({width}, {height}, {dots}, {line})
-to a copy of the picture, given picture (a number), returning a number = stellanova_pictures::copy({picture}, {line})
+  web: fathom_pictures.fromDots({width}, {height}, {dots}, {line})
+to a copy of the picture, given picture (a number), returning a number = fathom_pictures::copy({picture}, {line})
   runs: picture_copy({picture})
-  web: stellanova_pictures.copy({picture}, {line})
+  web: fathom_pictures.copy({picture}, {line})
 
 javascript:
-  const stellanova_pictures = {
+  const fathom_pictures = {
     all: new Map(),
     next: 0,
     names: { black: [0, 0, 0, 255], white: [255, 255, 255, 255], red: [255, 0, 0, 255], green: [0, 128, 0, 255], blue: [0, 0, 255, 255],
@@ -375,7 +375,7 @@ javascript:
     add(p) { this.all.set(++this.next, p); return this.next; },
     get(n, line) {
       const p = this.all.get(n);
-      if (!p) stellanova.fail(line, `there is no picture ${stellanova.text(n)}.`);
+      if (!p) fathom.fail(line, `there is no picture ${fathom.text(n)}.`);
       return p;
     },
     colour(c, line) {
@@ -386,11 +386,11 @@ javascript:
         while (parts.length < 4) parts.push(255);
         return parts;
       }
-      stellanova.fail(line, `"${c}" isn't a colour. Write it like "#ff8800", or a name: black, white, red, green, blue, yellow, grey, clear.`);
+      fathom.fail(line, `"${c}" isn't a colour. Write it like "#ff8800", or a name: black, white, red, green, blue, yellow, grey, clear.`);
     },
     checkSize(w, h, line) {
       if (w < 1 || h < 1 || w > 20000 || h > 20000 || w !== Math.floor(w) || h !== Math.floor(h))
-        stellanova.fail(line, `a picture is a whole number of dots across and down (1 to 20000), not ${stellanova.text(w)} by ${stellanova.text(h)}.`);
+        fathom.fail(line, `a picture is a whole number of dots across and down (1 to 20000), not ${fathom.text(w)} by ${fathom.text(h)}.`);
     },
     blank(w, h, c, line) {
       this.checkSize(w, h, line);
@@ -399,14 +399,14 @@ javascript:
       return this.add({ width: w, height: h, dots });
     },
     node(line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can't read or save picture files yet.");
+      if (typeof require !== "function") fathom.fail(line, "a web page can't read or save picture files yet.");
       return { fs: require("fs"), zlib: require("zlib") };
     },
     load(file, line) {
       const { fs, zlib } = this.node(line);
       let data;
-      try { data = fs.readFileSync(file); } catch { stellanova.fail(line, `there is no picture called "${file}".`); }
-      if (data.toString("latin1", 1, 4) !== "PNG") stellanova.fail(line, `I couldn't read the picture "${file}" (when running directly, only .png pictures can be read).`);
+      try { data = fs.readFileSync(file); } catch { fathom.fail(line, `there is no picture called "${file}".`); }
+      if (data.toString("latin1", 1, 4) !== "PNG") fathom.fail(line, `I couldn't read the picture "${file}" (when running directly, only .png pictures can be read).`);
       let at = 8, w = 0, h = 0, depth = 0, ctype = 0, interlace = 0, palette = Buffer.alloc(0), clear = Buffer.alloc(0);
       const parts = [];
       while (at + 8 <= data.length) {
@@ -418,7 +418,7 @@ javascript:
         at += 12 + size;
       }
       if (depth !== 8 || interlace || ![0, 2, 3, 4, 6].includes(ctype))
-        stellanova.fail(line, `I couldn't read the picture "${file}": only 8-bit, not interlaced .png pictures can be read when running directly.`);
+        fathom.fail(line, `I couldn't read the picture "${file}": only 8-bit, not interlaced .png pictures can be read when running directly.`);
       const per = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[ctype], stride = w * per, raw = zlib.inflateSync(Buffer.concat(parts));
       const dots = new Uint8Array(w * h * 4);
       let prev = new Uint8Array(stride), k = 0;
@@ -461,11 +461,11 @@ javascript:
       const ihdr = Buffer.alloc(13);
       ihdr.writeUInt32BE(p.width, 0); ihdr.writeUInt32BE(p.height, 4); ihdr[8] = 8; ihdr[9] = 6;
       const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
-      try { fs.writeFileSync(file, png); } catch { stellanova.fail(line, `I couldn't save the picture "${file}".`); }
+      try { fs.writeFileSync(file, png); } catch { fathom.fail(line, `I couldn't save the picture "${file}".`); }
     },
     at(p, x, y, line) {
       if (x < 0 || y < 0 || x >= p.width || y >= p.height || x !== Math.floor(x) || y !== Math.floor(y))
-        stellanova.fail(line, `there is no dot at ${stellanova.text(x)}, ${stellanova.text(y)} in a picture ${p.width} by ${p.height} (dots go from 0, 0).`);
+        fathom.fail(line, `there is no dot at ${fathom.text(x)}, ${fathom.text(y)} in a picture ${p.width} by ${p.height} (dots go from 0, 0).`);
       return (y * p.width + x) * 4;
     },
     dotAt(n, x, y, line) {
@@ -478,8 +478,8 @@ javascript:
     },
     fromDots(w, h, dots, line) {
       this.checkSize(w, h, line);
-      if (dots.length !== w * h * 4) stellanova.fail(line, `a picture ${stellanova.text(w)} by ${stellanova.text(h)} needs ${stellanova.text(w * h * 4)} numbers (red, green, blue and how solid, for each dot), not ${dots.length}.`);
-      for (const x of dots) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `each part of a dot is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
+      if (dots.length !== w * h * 4) fathom.fail(line, `a picture ${fathom.text(w)} by ${fathom.text(h)} needs ${fathom.text(w * h * 4)} numbers (red, green, blue and how solid, for each dot), not ${dots.length}.`);
+      for (const x of dots) if (x < 0 || x > 255 || x !== Math.floor(x)) fathom.fail(line, `each part of a dot is a whole number from 0 to 255, not ${fathom.text(x)}.`);
       return this.add({ width: w, height: h, dots: Uint8Array.from(dots) });
     },
     copy(n, line) { const p = this.get(n, line); return this.add({ width: p.width, height: p.height, dots: Uint8Array.from(p.dots) }); },

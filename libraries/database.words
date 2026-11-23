@@ -34,7 +34,7 @@ linux link: :libsqlite3.so.0
 
 code:
   #include <array>
-  namespace stellanova_database
+  namespace fathom_database
   {
   	inline std::string plainly(const std::string& why)  // what failed, in plain words, then the database's own
   	{
@@ -66,7 +66,7 @@ code:
   		{
   			std::string why = db ? sqlite3_errmsg(db) : "no memory";
   			sqlite3_close(db);
-  			stellanova::fail(line, "I couldn't open the database \"" + file + "\": " + why + ".");
+  			fathom::fail(line, "I couldn't open the database \"" + file + "\": " + why + ".");
   		}
   		std::vector<std::vector<std::string>> rows;
   		const char* rest = command.c_str();
@@ -79,7 +79,7 @@ code:
   			{
   				std::string why = sqlite3_errmsg(db);
   				sqlite3_close(db);
-  				stellanova::fail(line, plainly(why));
+  				fathom::fail(line, plainly(why));
   			}
   			rest = next;
   			if (!step)
@@ -96,8 +96,8 @@ code:
   				{
   					int type = sqlite3_column_type(step, c);
   					const unsigned char* cell = sqlite3_column_text(step, c);
-  					if (type == SQLITE_INTEGER || type == SQLITE_FLOAT)  // numbers written as Stellanova writes them
-  						row.push_back(stellanova::text(sqlite3_column_double(step, c)));
+  					if (type == SQLITE_INTEGER || type == SQLITE_FLOAT)  // numbers written as Fathom writes them
+  						row.push_back(fathom::text(sqlite3_column_double(step, c)));
   					else
   						row.push_back(cell ? reinterpret_cast<const char*>(cell) : "");
   				}
@@ -108,12 +108,12 @@ code:
   			{
   				std::string why = sqlite3_errmsg(db);
   				sqlite3_close(db);
-  				stellanova::fail(line, plainly(why));
+  				fathom::fail(line, plainly(why));
   			}
   		}
   		sqlite3_close(db);
   		if (used != values.size())
-  			stellanova::fail(line, "the command has " + std::to_string(used) + " ?, but there are " + std::to_string(values.size()) + " values.");
+  			fathom::fail(line, "the command has " + std::to_string(used) + " ?, but there are " + std::to_string(values.size()) + " values.");
   		return rows;
   	}
   }
@@ -162,21 +162,21 @@ python:
           parts.append(now)
       return parts
 
-to change the database, given file (text) and command (text) = stellanova_database::run({file}, {command}, {}, {line})
+to change the database, given file (text) and command (text) = fathom_database::run({file}, {command}, {}, {line})
   runs: database({file}, {command}, [])
-  web: stellanova_database.run({file}, {command}, [], {line})
-to change the database with values, given file (text) and command (text) and values (a list of text) = stellanova_database::run({file}, {command}, {values}, {line})
+  web: fathom_database.run({file}, {command}, [], {line})
+to change the database with values, given file (text) and command (text) and values (a list of text) = fathom_database::run({file}, {command}, {values}, {line})
   runs: database({file}, {command}, {values})
-  web: stellanova_database.run({file}, {command}, {values}, {line})
-to rows from the database, given file (text) and question (text), returning a list of lists of text = stellanova_database::run({file}, {question}, {}, {line})
+  web: fathom_database.run({file}, {command}, {values}, {line})
+to rows from the database, given file (text) and question (text), returning a list of lists of text = fathom_database::run({file}, {question}, {}, {line})
   runs: database({file}, {question}, [])
-  web: stellanova_database.run({file}, {question}, [], {line})
-to rows from the database with values, given file (text) and question (text) and values (a list of text), returning a list of lists of text = stellanova_database::run({file}, {question}, {values}, {line})
+  web: fathom_database.run({file}, {question}, [], {line})
+to rows from the database with values, given file (text) and question (text) and values (a list of text), returning a list of lists of text = fathom_database::run({file}, {question}, {values}, {line})
   runs: database({file}, {question}, {values})
-  web: stellanova_database.run({file}, {question}, {values}, {line})
+  web: fathom_database.run({file}, {question}, {values}, {line})
 
 javascript:
-  const stellanova_database = {
+  const fathom_database = {
     split(command) {  // shortcut: splits at ; so BEGIN ... END breaks
       const parts = [];
       let now = "", quote = null;
@@ -202,36 +202,36 @@ javascript:
       return `the database couldn't do it (it said: ${why}).`;
     },
     run(file, command, values, line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page has no databases (this works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page has no databases (this works with node).");
       let db;
       try {
         const { DatabaseSync } = require("node:sqlite");
         db = new DatabaseSync(file);
       } catch (e) {
-        stellanova.fail(line, `I couldn't open the database "${file}": ${e.message}.`);
+        fathom.fail(line, `I couldn't open the database "${file}": ${e.message}.`);
       }
       const rows = [];
       let used = 0;
       try {
         for (const part of this.split(command)) {
           let step;
-          try { step = db.prepare(part); } catch (e) { stellanova.fail(line, stellanova_database.plainly(e.message)); }
+          try { step = db.prepare(part); } catch (e) { fathom.fail(line, fathom_database.plainly(e.message)); }
           const holes = (part.match(/\?/g) || []).length;
-          if (used + holes > values.length) stellanova.fail(line, `the command has ${(command.match(/\?/g) || []).length} ?, but there are ${values.length} values.`);
+          if (used + holes > values.length) fathom.fail(line, `the command has ${(command.match(/\?/g) || []).length} ?, but there are ${values.length} values.`);
           const given = values.slice(used, used + holes);
           used += holes;
           let got;
           try {
             if (step.columns().length) { step.setReturnArrays(true); got = step.all(...given); }
             else { step.run(...given); got = []; }
-          } catch (e) { stellanova.fail(line, stellanova_database.plainly(e.message)); }
+          } catch (e) { fathom.fail(line, fathom_database.plainly(e.message)); }
           for (const row of got)
-            rows.push(row.map((c) => (c === null ? "" : typeof c === "number" || typeof c === "bigint" ? stellanova.text(Number(c)) : c instanceof Uint8Array ? Buffer.from(c).toString("latin1") : String(c))));
+            rows.push(row.map((c) => (c === null ? "" : typeof c === "number" || typeof c === "bigint" ? fathom.text(Number(c)) : c instanceof Uint8Array ? Buffer.from(c).toString("latin1") : String(c))));
         }
       } finally {
         db.close();
       }
-      if (used !== values.length) stellanova.fail(line, `the command has ${used} ?, but there are ${values.length} values.`);
+      if (used !== values.length) fathom.fail(line, `the command has ${used} ?, but there are ${values.length} values.`);
       return rows;
     },
   };

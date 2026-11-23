@@ -1,0 +1,80 @@
+{
+  "scopeName": "source.fathom",
+  "name": "Fathom",
+  "patterns": [
+    {
+      "name": "comment.line.fathom",
+      "match": "^\\s*whisper:.*$"
+    },
+    {
+      "name": "keyword.control.closing.fathom",
+      "match": "^and the universe said i love you\\s*$"
+    },
+    {
+      "name": "string.quoted.double.fathom",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "constant.numeric.fathom",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    {
+      "match": "^(genesis)(:)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.genesis.fathom"
+        }
+      }
+    },
+    {
+      "match": "^(to)\\s+([a-z ]+?)(?=,|:)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.fathom"
+        },
+        "2": {
+          "name": "entity.name.function.fathom"
+        }
+      }
+    },
+    {
+      "match": "^(an?)\\s+([a-z ]+?)\\s+(has|is a kind of [a-z ]+?(?: that (?:also )?has)?)(:)",
+      "captures": {
+        "1": {
+          "name": "keyword.other.fathom"
+        },
+        "2": {
+          "name": "entity.name.type.fathom"
+        },
+        "3": {
+          "name": "keyword.other.fathom"
+        }
+      }
+    },
+    {
+      "name": "keyword.other.use.fathom",
+      "match": "^use:"
+    },
+    {
+      "name": "keyword.control.fathom",
+      "match": "\\b(if that went wrong|if|otherwise|as long as|repeat|times|for each|in|from|try|break free|move on|cease|return|returning|given|raise an error with|whether|meanwhile|wait for the others|for a)\\b"
+    },
+    {
+      "name": "support.function.fathom",
+      "match": "\\b(scrawl|etch|consume|reveal|set|to|ask|into|add|remove|inscribe|save|load|move|toward|conjure|as|invoke|the command)\\b"
+    },
+    {
+      "name": "keyword.operator.fathom",
+      "match": "\\b(plus|minus|times|divided by|is within|exceeds|falls below|is at least|is at most|is not|is|not|and|or|of|contains|with|touches|begins with|ends with|trimmed|as saved text|as text)\\b"
+    },
+    {
+      "name": "constant.language.fathom",
+      "match": "\\b(yes|no|birth|existence|horizontal|vertical|depth|quote mark|new line|the wound|the world lives)\\b"
+    },
+    {
+      "name": "storage.type.fathom",
+      "match": "\\((a number|text|yes or no|a place|a flat place|an? [a-z ]+|a list of [a-z ]+|a table of [a-z ]+)\\)"
+    }
+  ]
+}

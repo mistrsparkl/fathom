@@ -2,7 +2,7 @@
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROGRAM = HERE / "words.stella"
+PROGRAM = HERE / "words.fathom"
 EXPECTED = (HERE / "expected.txt").read_text(encoding="utf-8").splitlines()
 
 

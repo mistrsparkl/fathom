@@ -1,14 +1,14 @@
 title: Welcome
-card: Stellanova | Learning the language | Every part of it, from the first line to a game of your own
+card: Fathom | Learning the language | Every part of it, from the first line to a game of your own
 say:
-  Welcome to Stellanova, a programming language that reads like English.
+  Welcome to Fathom, a programming language that reads like English.
   In this film we'll go through every part of the language: what each piece does, and how to use it.
   At the end, we'll make a whole platform game together, and take it apart to see how it works.
 uncard
 
-say: This is Stellanova Studia, where we'll write everything. Let's take a quick look around.
+say: This is Fathom Studia, where we'll write everything. Let's take a quick look around.
 point: #files
-say: On the left are the files in our folder. Programs are files whose names end in dot stella.
+say: On the left are the files in our folder. Programs are files whose names end in dot fathom.
 point: #word-search
 say: Below them is a list of every word the language knows. You can search it, and click a word to see what it does.
 point: #run
@@ -23,7 +23,7 @@ card: Chapter 1 | Saying something | Your first program
 say: Every program starts somewhere. Let's write the smallest one.
 uncard
 
-new: hello.stella
+new: hello.fathom
 type:
   genesis:
     scrawl "Hello!"
@@ -38,7 +38,7 @@ say:
   Text goes between quote marks.
 spot: line 3
 say:
-  And every block ends with this line: and the universe said I love you. It tells Stellanova that genesis is finished.
+  And every block ends with this line: and the universe said I love you. It tells Fathom that genesis is finished.
 spot: off
 zoom: out
 say: Let's run it.

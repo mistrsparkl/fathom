@@ -1,0 +1,382 @@
+whisper: Hop! A small platformer. Left and right run, space jumps.
+whisper: Pick up every coin, keep away from the spikes and the bees, then touch the flag at the far end.
+
+use: window
+use: maths
+use: records.fathom
+
+a platform has:
+  x (a number)
+  y (a number)
+  width (a number)
+  height (a number)
+and the universe said i love you
+
+a coin has:
+  birth (a flat place)
+and the universe said i love you
+
+a spike has:
+  x (a number)
+  width (a number)
+and the universe said i love you
+
+a bee has:
+  birth (a flat place)
+  reach (a number)
+and the universe said i love you
+
+a queen bee is a kind of bee that has:
+  crown (text)
+and the universe said i love you
+
+a danger is anything that can hurt and appear.
+
+a trail of anything has:
+  items (a list of anything)
+and the universe said i love you
+
+the world remembers:
+  player x (a number)
+  player y (a number)
+  speed x (a number)
+  speed y (a number)
+  on ground (yes or no)
+  facing (a number)
+  platforms (a list of platforms)
+  coins (a list of coins)
+  coins taken (a number)
+  spikes (a list of spikes)
+  bees (a list of bees)
+  queen (a queen bee)
+  dust (a trail of flat places)
+  palette (a table of text)
+  score (a number)
+  lives (a number)
+  camera (a number)
+  ticks (a number)
+  seconds (a number)
+  points (a number)
+  won (yes or no)
+  blink (yes or no)
+and the universe said i love you
+
+whisper: ---- making the level
+
+to platform at, given x (a number) and y (a number) and width (a number) and height (a number), returning a platform:
+  conjure a platform as made
+  set the x of made to x
+  set the y of made to y
+  set the width of made to width
+  set the height of made to height
+  return made
+and the universe said i love you
+
+to coin at, given x (a number) and y (a number), returning a coin:
+  conjure a coin as made
+  set the birth of made to x horizontal y vertical
+  return made
+and the universe said i love you
+
+to spike at, given x (a number) and width (a number), returning a spike:
+  conjure a spike as made
+  set the x of made to x
+  set the width of made to width
+  return made
+and the universe said i love you
+
+to build the level:
+  add platform at with (0, 460, 760, 80) to platforms
+  add platform at with (880, 460, 720, 80) to platforms
+  add platform at with (1720, 460, 300, 80) to platforms
+  add platform at with (2160, 460, 1040, 80) to platforms
+  add platform at with (330, 360, 160, 24) to platforms
+  add platform at with (1180, 340, 140, 24) to platforms
+  add platform at with (1400, 250, 140, 24) to platforms
+  add platform at with (1840, 330, 120, 24) to platforms
+  add platform at with (2400, 380, 60, 80) to platforms
+  add platform at with (2640, 330, 60, 130) to platforms
+  add coin at with (410, 320) to coins
+  add coin at with (820, 380) to coins
+  add coin at with (1250, 300) to coins
+  add coin at with (1470, 210) to coins
+  add coin at with (1900, 290) to coins
+  add coin at with (2430, 340) to coins
+  add coin at with (2670, 290) to coins
+  add spike at with (1490, 72) to spikes
+  add spike at with (1990, 24) to spikes
+  conjure a bee as worker
+  set the birth of worker to 1600 horizontal 120 vertical
+  set the reach of worker to 60
+  add worker to bees
+  set the birth of queen to 2920 horizontal 190 vertical
+  set the reach of queen to 70
+  set the crown of queen to "#ffd54f"
+and the universe said i love you
+
+to choose the colours:
+  set the entry "sky" of palette to "#8fd3ff"
+  set the entry "hills" of palette to "#7fc8a9"
+  set the entry "earth" of palette to "#8a5a33"
+  set the entry "grass" of palette to "#4caf50"
+  set the entry "gold" of palette to "#ffc107"
+  set the entry "ink" of palette to "#1b2a49"
+and the universe said i love you
+
+whisper: ---- moving the player: speed changes the place, gravity changes the speed
+
+to run and jump:
+  if key held "left":
+    set speed x to speed x minus 0.8
+    set facing to -1
+  otherwise if key held "right":
+    set speed x to speed x plus 0.8
+    set facing to 1
+  otherwise:
+    set speed x to speed x times 0.8
+  set speed x to clamp speed x between -6 and 6
+  if key pressed "space" and on ground:
+    set speed y to -13
+  set speed y to smaller of (speed y plus 0.6) and 14
+and the universe said i love you
+
+to overlaps, given p (a platform), returning yes or no:
+  return player x plus 30 exceeds the x of p and player x falls below the x of p plus the width of p and player y plus 40 exceeds the y of p and player y falls below the y of p plus the height of p
+and the universe said i love you
+
+to test overlapping:
+  set player x to 100
+  set player y to 430
+  check overlaps with platform at with (0, 460, 760, 80)
+  set player y to 380
+  check not overlaps with platform at with (0, 460, 760, 80)
+and the universe said i love you
+
+to move across:
+  set player x to player x plus speed x
+  for each p in platforms:
+    if overlaps with p:
+      if speed x exceeds 0: set player x to the x of p minus 30
+      otherwise: set player x to the x of p plus the width of p
+      set speed x to 0
+  set player x to clamp player x between 0 and 3170
+and the universe said i love you
+
+to move up and down:
+  set on ground to no
+  set player y to player y plus speed y
+  for each p in platforms:
+    if overlaps with p:
+      if speed y exceeds 0:
+        set player y to the y of p minus 40
+        set on ground to yes
+      otherwise:
+        set player y to the y of p plus the height of p
+      set speed y to 0
+and the universe said i love you
+
+whisper: ---- coins: which ones are taken is kept in the bits of one number
+
+to is taken, given n (a number), returning yes or no:
+  return ((coins taken shifted right by (n minus 1)) bitwise and 1) is 1
+and the universe said i love you
+
+to pick up coins:
+  set middle to (player x plus 15) horizontal (player y plus 20) vertical
+  for each n from 1 to the size of coins:
+    if not is taken with n and the existence of item n of coins is within 30 of middle:
+      set coins taken to coins taken bitwise or (1 shifted left by (n minus 1))
+      set score to score plus 1
+and the universe said i love you
+
+whisper: ---- dangers: spikes and bees are different kinds of things, but both can hurt and appear
+
+to hurt, for a spike, returning yes or no:
+  return player x plus 30 exceeds x and player x falls below x plus width and player y plus 40 exceeds 440
+and the universe said i love you
+
+to appear, for a spike:
+  set left to x minus camera
+  for each k from 0 to width divided by 12 minus 1:
+    etch a box with left plus k times 12 plus 3, 446, 6, 14, "#90a4ae"
+    etch a box with left plus k times 12 plus 5, 440, 2, 6, "#cfd8dc"
+and the universe said i love you
+
+to hurt, for a bee, returning yes or no:
+  return existence is within 26 of (player x plus 15) horizontal (player y plus 20) vertical
+and the universe said i love you
+
+to appear, for a bee:
+  set spot to existence minus camera horizontal 0 vertical
+  etch a circle with spot of horizontal, spot of vertical, 12, "#fdd835"
+  etch a box with spot of horizontal minus 4, spot of vertical minus 12, 3, 24, "#212121"
+  etch a box with spot of horizontal plus 3, spot of vertical minus 12, 3, 24, "#212121"
+  set flap to 4 plus 3 times sine of (ticks times 2000)
+  etch a circle with spot of horizontal, spot of vertical minus 12 minus flap, 7, "#e3f2fd"
+and the universe said i love you
+
+to appear, for a queen bee:
+  set spot to existence minus camera horizontal 0 vertical
+  etch a circle with spot of horizontal, spot of vertical, 16, "#fbc02d"
+  etch a box with spot of horizontal minus 5, spot of vertical minus 16, 4, 32, "#212121"
+  etch a box with spot of horizontal plus 3, spot of vertical minus 16, 4, 32, "#212121"
+  etch a box with spot of horizontal minus 9, spot of vertical minus 30, 18, 8, crown
+and the universe said i love you
+
+to fly, for a bee, given t (a number):
+  set existence to birth plus (sine of (t times 90) times reach) horizontal (sine of (t times 240) times 10) vertical
+and the universe said i love you
+
+to the dangers, returning a list of dangers:
+  set all to a list of dangers
+  for each s in spikes: add s to all
+  for each b in bees: add b to all
+  add queen to all
+  return all
+and the universe said i love you
+
+to the danger touching, returning a danger:
+  for each d in the dangers:
+    if hurt d: return d
+  return no danger
+and the universe said i love you
+
+whisper: ---- starting again, and losing a life
+
+to start again:
+  set player x to 60
+  set player y to 400
+  set speed x to 0
+  set speed y to 0
+and the universe said i love you
+
+to lose a life:
+  set lives to lives minus 1
+  if lives is 0:
+    set lives to 3
+    set score to 0
+    set coins taken to 0
+    set seconds to 0
+  start again
+and the universe said i love you
+
+whisper: ---- the dust the player kicks up: a trail keeps the last few places
+
+to leave, for a trail of anything, given x (anything):
+  add x to items
+  if the size of items exceeds 10: remove item 1 from items
+and the universe said i love you
+
+whisper: ---- drawing: the camera follows the player, and everything is etched where the camera sees it
+
+to etch the sky:
+  consume the window with the entry "sky" of palette
+  for each n from 0 to 6:
+    set hill x to n times 520 minus remainder of (camera times 0.3, 520)
+    etch a circle with hill x, 560, 260, the entry "hills" of palette
+  for each n from 0 to 8:
+    set cloud x to n times 400 minus remainder of (camera times 0.15, 400)
+    etch a circle with cloud x, 90 plus (remainder of (n, 3)) times 25, 26, "white"
+    etch a circle with cloud x plus 30, 80 plus (remainder of (n, 3)) times 25, 32, "white"
+    etch a circle with cloud x plus 62, 92 plus (remainder of (n, 3)) times 25, 24, "white"
+and the universe said i love you
+
+to etch the level:
+  for each p in platforms:
+    set left to the x of p minus camera
+    etch a box with left, the y of p, the width of p, the height of p, the entry "earth" of palette
+    etch a box with left, the y of p, the width of p, 10, the entry "grass" of palette
+  for each n from 1 to the size of coins:
+    if not is taken with n:
+      set c to item n of coins
+      set bob to sine of (ticks times 4 plus (the existence of c of horizontal)) times 4
+      etch a circle with (the existence of c of horizontal) minus camera, (the existence of c of vertical) plus bob, 11, the entry "gold" of palette
+      etch a circle with (the existence of c of horizontal) minus camera minus 3, (the existence of c of vertical) plus bob minus 3, 4, "#fff3c4"
+  etch a box with 3060 minus camera, 300, 6, 160, "#5d4037"
+  set flag colour to "#e53935"
+  if score is the size of coins:
+    set flag colour to "#43a047"
+    if blink: set flag colour to "#a5d6a7"
+  etch a box with 3066 minus camera, 300, 46, 30, flag colour
+and the universe said i love you
+
+to etch the dangers:
+  for each d in the dangers: appear d
+and the universe said i love you
+
+to etch the player:
+  for each spot in the items of dust:
+    etch a circle with spot of horizontal minus camera, spot of vertical, 3, "#d7ccc8"
+  set left to player x minus camera
+  set squash to 0
+  if not on ground: set squash to 4
+  depending on lives:
+    3: set body colour to "#3f51b5"
+    2: set body colour to "#7e57c2"
+    anything else: set body colour to "#e53935"
+  etch a box with left, player y plus squash, 30, 40 minus squash, body colour
+  set eye x to left plus 15 plus facing times 6
+  etch a circle with eye x minus 5, player y plus 14, 4, "white"
+  etch a circle with eye x plus 5, player y plus 14, 4, "white"
+  etch a circle with eye x minus 5 plus facing, player y plus 14, 2, "black"
+  etch a circle with eye x plus 5 plus facing, player y plus 14, 2, "black"
+and the universe said i love you
+
+to etch a heart, given x (a number) and y (a number) and size (a number, usually 9):
+  etch a circle with x minus size divided by 2, y, size divided by 2 plus 1, "#e53935"
+  etch a circle with x plus size divided by 2, y, size divided by 2 plus 1, "#e53935"
+  etch a box with x minus size, y, size times 2, size divided by 2, "#e53935"
+  etch a circle with x, y plus size, size divided by 2, "#e53935"
+and the universe said i love you
+
+to etch the score:
+  set the text size to 26
+  etch words with "Coins: [score] of [the size of coins]   Time: [seconds rounded to 1 decimal place]", 22, 18, the entry "ink" of palette
+  set heart x to 900
+  repeat lives times:
+    etch a heart with heart x, 34
+    set heart x to heart x minus 30
+  if best time exceeds 0:
+    set the text size to 18
+    etch words with "Best: [best time rounded to 1 decimal place]   Points ever: [points ever]", 22, 52, the entry "ink" of palette
+  if won:
+    set the text size to 64
+    etch words with "You win!", 340, 160, the entry "ink" of palette
+    set the text size to 26
+    etch words with "[points] points", 400, 240, the entry "ink" of palette
+and the universe said i love you
+
+genesis:
+  open a world with "Hop!", 960, 540
+  choose the colours
+  build the level
+  fingerprint the level with platforms as saved text
+  load the record
+  start again
+  set facing to 1
+  set lives to 3
+  set flying to the command fly
+  set layers to a list containing (the command etch the sky, the command etch the level, the command etch the dangers, the command etch the player, the command etch the score)
+  every frame:
+    if not won:
+      run and jump
+      move across
+      move up and down
+      pick up coins
+      if player y exceeds 700 or the danger touching is something: lose a life
+      if score is the size of coins and player x exceeds 3030: set won to yes
+      set seconds to seconds plus frame time
+    if on ground and (speed x exceeds 3 or speed x falls below -3): leave with (dust, (player x plus 15) horizontal (player y plus 38) vertical)
+    otherwise if the size of the items of dust exceeds 0: remove item 1 from the items of dust
+    for each n from 1 to the size of bees:
+      set item n of bees to invoke flying with (item n of bees, ticks)
+    fly with (queen, ticks)
+    set camera to clamp (player x minus 360) between 0 and 2240
+    set ticks to ticks plus frame time
+    for each layer in layers: invoke layer
+  whenever won:
+    set points to round (3000 times 0.97 to the power seconds) plus score times 100
+    meanwhile save the record with (seconds, points)
+  every 0.5 seconds:
+    set blink to not blink
+and the universe said i love you

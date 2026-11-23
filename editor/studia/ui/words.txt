@@ -7,7 +7,7 @@ a … has:|Describes a new kind of thing and its parts.
 is a kind of|A kind of thing that has everything another kind has: a dog is a kind of pet:
 is anything that can|A shared ability: a speaker is anything that can speak.
 the world remembers:|Names every command can use and change.
-use:|Brings in a library (use: window) or another script (use: shapes.stella).
+use:|Brings in a library (use: window) or another script (use: shapes.fathom).
 whisper:|A note for people. The computer skips it.
 set … to|Gives a name a value.
 scrawl|Shows text or values.
@@ -41,7 +41,7 @@ conjure a … as|Makes a new thing of a kind and names it.
 no …|Nothing there: set target to no enemy.
 is nothing|Whether a name holds nothing.
 is something|Whether a name holds something.
-check|Fails if this isn't true. stellanova test runs every 'to test …:' command.
+check|Fails if this isn't true. fathom test runs every 'to test …:' command.
 save … to file|Saves any value to a file, as JSON.
 load … from file|Puts a saved value back into a name.
 as saved text|A value written out as JSON text.
@@ -113,13 +113,13 @@ listen on port|A TCP server (library network). set listener to listen on port 80
 connect a websocket to|A WebSocket (library network). connect a websocket to "ws://localhost:8080". Send on and receive from take whole messages.
 open the udp port|UDP (library network). open the udp port 9000. Send udp with (u, host, port, text). Receive udp from u.
 holding the lock|Only one command at a time runs the indented lines: holding the lock "total":
-stellanova get|Gets a library (.words file, .zip, or GitHub user/project) for any program to use: (in a terminal) stellanova get user/project
+fathom get|Gets a library (.words file, .zip, or GitHub user/project) for any program to use: (in a terminal) fathom get user/project
 eased with|Bends progress 0 to 1 (library animation). eased with ("out", progress). Styles linear, in, out, in out, back, overshoot, bounce, elastic.
 tweened with|A number part way (library animation). tweened with (from, to, progress, "in out").
 progress of with|How far along, 0 to 1 (library animation). progress of with (start, seconds, now).
 sheet frame with|Which sprite sheet frame to show now (library animation). sheet frame with (frames, per second, seconds).
 etch the sheet frame|One frame of a sprite sheet: etch the sheet frame with ("walk.png", frame, across, down, x, y).
-step the physics with|Moves every body on (use: physics.stella). step the physics with (world, 1 divided by 60).
+step the physics with|Moves every body on (use: physics.fathom). step the physics with (world, 1 divided by 60).
 include the body with|Adds a body to a physics world: include the body with (w, a box at with (x, y, width, height)).
 a tone with|A sound wave (library sound making). a tone with ("sine", 440, seconds, loudness).
 save the sound with|Writes a sound to a .wav file (library sound making). save the sound with (sound, "beep.wav").

@@ -1,7 +1,7 @@
-// What machine code calls: plain C functions over stellanova.h.
+// What machine code calls: plain C functions over fathom.h.
 //
 // Numbers are doubles; everything else is a V*, copied when stored.
-#include "stellanova.h"
+#include "fathom.h"
 #include "machine.h"
 #include <cstddef>
 static_assert(sizeof(ThingValue) == 16 + 2 * sizeof(void*) && sizeof(Part) == 8, "machine.py's parts_at needs changing");
@@ -90,9 +90,9 @@ namespace gc
 	static int size_of(char tag) { return is_small(tag) ? 0 : tag == 't' ? 1 : 2; }  // (things: 3 + their parts)
 	static std::vector<std::pair<const char*, size_t>> roots;
 	static std::vector<V*> kept;  // values held by library C++
-	static const size_t least = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
+	static const size_t least = std::getenv("FATHOM_COLLECT_OFTEN") ? 2 : 1 << 14;  // set it to test the collector hard
 	static std::atomic<size_t> made_since{0};
-	static const size_t batch = std::getenv("STELLANOVA_COLLECT_OFTEN") ? 1 : 64;
+	static const size_t batch = std::getenv("FATHOM_COLLECT_OFTEN") ? 1 : 64;
 	static size_t limit = least;
 	static std::mutex collecting;
 	static std::atomic<bool>& stopping = cn_stopping;
@@ -339,7 +339,7 @@ namespace gc
 				}
 			}
 		made_since = 0;
-		limit = std::getenv("STELLANOVA_COLLECT_OFTEN") ? least : std::max(least, kept);
+		limit = std::getenv("FATHOM_COLLECT_OFTEN") ? least : std::max(least, kept);
 	}
 
 	static void collect(Thread* self)
@@ -635,9 +635,9 @@ V* cn_make_text(std::string s)
 // ---- problems: kept here; machine code checks cn_failed() after each step
 extern "C" thread_local bool cn_failed_flag = false;  // one per thread
 #define failed cn_failed_flag
-static thread_local stellanova::Problem pending;
+static thread_local fathom::Problem pending;
 
-void cn_set_problem(const stellanova::Problem& p)
+void cn_set_problem(const fathom::Problem& p)
 {
 	if (!failed)
 		pending = p;
@@ -649,11 +649,11 @@ void cn_rethrow()
 	if (failed)
 	{
 		failed = false;
-		throw stellanova::Problem(pending);
+		throw fathom::Problem(pending);
 	}
 }
 
-#define GUARDED(fallback, body) try { body } catch (const stellanova::Problem& problem) { cn_set_problem(problem); return fallback; }
+#define GUARDED(fallback, body) try { body } catch (const fathom::Problem& problem) { cn_set_problem(problem); return fallback; }
 
 static std::string thing_name(const V* v);
 
@@ -669,11 +669,11 @@ static std::string show(const V* v)
 		return "nothing";  // a thing that isn't there ('no enemy')
 	switch (v->tag)
 	{
-	case 'n': return stellanova::text(v->d);
+	case 'n': return fathom::text(v->d);
 	case 'y': return v->d != 0 ? "yes" : "no";
 	case 't': return text_of(v);
-	case 'p': return stellanova::text(full(v)->x) + " horizontal " + stellanova::text(full(v)->y) + " vertical " + stellanova::text(full(v)->z) + " depth";
-	case 'f': return stellanova::text(full(v)->x) + " horizontal " + stellanova::text(full(v)->y) + " vertical";
+	case 'p': return fathom::text(full(v)->x) + " horizontal " + fathom::text(full(v)->y) + " vertical " + fathom::text(full(v)->z) + " depth";
+	case 'f': return fathom::text(full(v)->x) + " horizontal " + fathom::text(full(v)->y) + " vertical";
 	case 'c': return "a command";
 	case 'l':
 	{
@@ -823,7 +823,7 @@ static V* deep_copy(const V* v)  // for a command going alongside: nothing share
 	return out;
 }
 
-// A value as JSON, like stellanova.h's save().
+// A value as JSON, like fathom.h's save().
 static std::string saved_of(const V* v, const V* shape, int line)  // shape: the kind it is saved as (nullptr: as it is)
 {
 	std::string out;
@@ -832,12 +832,12 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 	const V* inner = shape && !is_small(shape->tag) && shape->tag == 'l' && !cn_items(shape).empty() ? cn_items(shape)[0] : nullptr;
 	switch (v->tag)
 	{
-	case 'n': stellanova::save(out, v->d, line); break;
-	case 'y': stellanova::save(out, v->d != 0, line); break;
-	case 't': stellanova::save(out, text_of(v), line); break;
-	case 'p': stellanova::save(out, FVector(full(v)->x, full(v)->y, full(v)->z), line); break;
-	case 'f': stellanova::save(out, FVector2D(full(v)->x, full(v)->y), line); break;
-	case 'c': stellanova::fail(line, "I can't save a command in a file."); break;
+	case 'n': fathom::save(out, v->d, line); break;
+	case 'y': fathom::save(out, v->d != 0, line); break;
+	case 't': fathom::save(out, text_of(v), line); break;
+	case 'p': fathom::save(out, FVector(full(v)->x, full(v)->y, full(v)->z), line); break;
+	case 'f': fathom::save(out, FVector2D(full(v)->x, full(v)->y), line); break;
+	case 'c': fathom::fail(line, "I can't save a command in a file."); break;
 	case 'l':
 		out += "[";
 		for (size_t k = 0; k < cn_items(v).size(); ++k)
@@ -851,7 +851,7 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 		auto part = [&](const std::string& key, const V* x, const V* within) {
 			out += first ? "" : ", ";
 			first = false;
-			stellanova::save(out, key, line);
+			fathom::save(out, key, line);
 			out += ": " + saved_of(x, within, line);
 		};
 		if (v->tag == 'm')
@@ -867,7 +867,7 @@ static std::string saved_of(const V* v, const V* shape, int line)  // shape: the
 				if (auto able = able_kinds.find(thing_of(own)->kind->name); able != able_kinds.end())
 				{
 					out += "\"is a\": ";  // a speaker: which kind of thing it is, so loading can make one again
-					stellanova::save(out, thing_of(v)->kind->name, line);
+					fathom::save(out, thing_of(v)->kind->name, line);
 					first = false;
 					auto it = able->second.find(thing_of(v)->kind->name);
 					own = it == able->second.end() ? nullptr : it->second;
@@ -895,9 +895,9 @@ static V* empty_like(const V* shape)
 	return v;
 }
 
-static bool loaded_into(const stellanova::SavedData& d, const V* shape, V*& out)
+static bool loaded_into(const fathom::SavedData& d, const V* shape, V*& out)
 {
-	using D = stellanova::SavedData;
+	using D = fathom::SavedData;
 	switch (shape->tag)
 	{
 	case 'n': if (d.type != D::Number) return false; out = cn_box_number(d.number); return true;
@@ -1063,7 +1063,7 @@ static size_t index_of(const V* list, double number, int line)
 {
 	size_t size = count_of(list);
 	if (number != std::floor(number) || number < 1 || number > static_cast<double>(size))
-		stellanova::fail(line, "there is no item " + stellanova::text(number) + " in a list of " + stellanova::text(static_cast<double>(size))
+		fathom::fail(line, "there is no item " + fathom::text(number) + " in a list of " + fathom::text(static_cast<double>(size))
 			+ " item" + (size == 1 ? "" : "s") + ". Items are counted from 1.");
 	unflat(list);
 	return static_cast<size_t>(number) - 1;
@@ -1100,7 +1100,7 @@ extern "C"
 #endif
 	void cn_begin(int count, char** given)
 	{
-		stellanova::begin({}, count, given);
+		fathom::begin({}, count, given);
 #ifdef _WIN32
 		ULONG room = 64 * 1024;  // kept back so the message can still be written
 		SetThreadStackGuarantee(&room);
@@ -1121,18 +1121,18 @@ extern "C"
 		sigaction(SIGSEGV, &on, nullptr);
 #endif
 	}
-	void cn_add_file(const char* name) { stellanova::files.push_back(name); }
+	void cn_add_file(const char* name) { fathom::files.push_back(name); }
 	int cn_end()
 	{
 		if (!failed)
 		{
 			Parked waiting;
-			stellanova::wait_for_others();
+			fathom::wait_for_others();
 		}
 		std::cout << std::flush;
 		if (!failed)
 			return 0;
-		stellanova::report(pending);
+		fathom::report(pending);
 		std::cerr << std::flush;
 		std::_Exit(1);  // commands still going alongside stop too
 	}
@@ -1140,18 +1140,18 @@ extern "C"
 	void cn_meanwhile(void (*command)(void*), void* names, long long size)  // 'meanwhile ...': names holds its own copy of every name it uses
 	{
 		cn_root(static_cast<const char*>(names), size);  // kept until the command is done with them
-		stellanova::meanwhile([command, names] {
+		fathom::meanwhile([command, names] {
 			gc::me();
 			command(names);
 			unroot(static_cast<const char*>(names));
 			std::free(names);
 			if (failed)
-				throw stellanova::Problem(pending);
+				throw fathom::Problem(pending);
 		});
 	}
-	void cn_wait_for_others() { Parked waiting; stellanova::wait_for_others(); }
+	void cn_wait_for_others() { Parked waiting; fathom::wait_for_others(); }
 
-	// ---- plugins for game engines: stellanova_start, stellanova_call, stellanova_has
+	// ---- plugins for game engines: fathom_start, fathom_call, fathom_has
 	using EngineOutput = void (*)(const char* text, int is_problem);  // what the program shows, and what went wrong
 	// An engine word: name, numbers, text; answers come back in answers and answer_text.
 	using EngineWord = double (*)(const char* word, const double* numbers, int count, const char* text, double* answers, char* answer_text, int room);
@@ -1164,19 +1164,19 @@ extern "C"
 	{
 		cn_engine = engine;
 		if (out)
-			stellanova::show_hook = [out](const std::string& s, bool problem) { out(s.c_str(), problem ? 1 : 0); };
+			fathom::show_hook = [out](const std::string& s, bool problem) { out(s.c_str(), problem ? 1 : 0); };
 		gc::me();
 	}
 	int cn_plugin_settle()  // 0, or 2 if something went wrong
 	{
 		if (!failed)
 			return 0;
-		stellanova::report(pending);
+		fathom::report(pending);
 		failed = false;
 		return 2;
 	}
 	// 0 ran, 1 no such command, 2 something went wrong.
-	int stellanova_call(const char* name, double me, const double* numbers, int count, double* answer)
+	int fathom_call(const char* name, double me, const double* numbers, int count, double* answer)
 	{
 		auto found = plugin_commands.find(name);
 		if (found == plugin_commands.end() || found->second.count != count || count > 4)
@@ -1209,7 +1209,7 @@ extern "C"
 				default: reinterpret_cast<void (*)(double, double, double, double)>(c)(a[0], a[1], a[2], a[3]); break;
 				}
 		}
-		catch (const stellanova::Problem& problem)
+		catch (const fathom::Problem& problem)
 		{
 			cn_set_problem(problem);
 		}
@@ -1217,7 +1217,7 @@ extern "C"
 			*answer = out;
 		return cn_plugin_settle();
 	}
-	int stellanova_has(const char* name, int count)  // 1 when the program has that command, with that many numbers
+	int fathom_has(const char* name, int count)  // 1 when the program has that command, with that many numbers
 	{
 		auto found = plugin_commands.find(name);
 		return found != plugin_commands.end() && found->second.count == count ? 1 : 0;
@@ -1229,14 +1229,14 @@ extern "C"
 	bool cn_problem_is(V* kind) { return pending.kind == text_of(kind); }
 	void cn_lock(V* name)  // 'holding the lock': waits parked
 	{
-		std::recursive_mutex& m = stellanova::named_lock(text_of(name));
+		std::recursive_mutex& m = fathom::named_lock(text_of(name));
 		if (!m.try_lock())
 		{
 			Parked waiting;
 			m.lock();
 		}
 	}
-	void cn_unlock(V* name) { stellanova::named_lock(text_of(name)).unlock(); }
+	void cn_unlock(V* name) { fathom::named_lock(text_of(name)).unlock(); }
 	V* cn_problem_text()  // what went wrong (and it's dealt with)
 	{
 		failed = false;
@@ -1245,13 +1245,13 @@ extern "C"
 
 	// text
 	V* cn_text(const char* bytes, long long size) { return cn_make_text(std::string(bytes, static_cast<size_t>(size))); }
-	V* cn_text_number(double d) { return cn_make_text(stellanova::text(d)); }
+	V* cn_text_number(double d) { return cn_make_text(fathom::text(d)); }
 	V* cn_text_yesno(bool b) { return cn_make_text(b ? "yes" : "no"); }
 	V* cn_show(V* v) { return cn_make_text(show(v)); }
 	V* cn_join(V* a, V* b) { return cn_make_text(text_of(a) + text_of(b)); }
-	V* cn_join_number(V* a, double b) { return cn_make_text(text_of(a) + stellanova::text(b)); }
+	V* cn_join_number(V* a, double b) { return cn_make_text(text_of(a) + fathom::text(b)); }
 	V* cn_join_on(V* a, V* b) { text_of(a) += text_of(b); return a; }  // a: made by the join just before, held by nothing else
-	V* cn_join_number_on(V* a, double b) { text_of(a) += stellanova::text(b); return a; }
+	V* cn_join_number_on(V* a, double b) { text_of(a) += fathom::text(b); return a; }
 	void cn_share(V* v)  // a text name was read: what it holds may be held elsewhere now
 	{
 		if (v)
@@ -1270,28 +1270,28 @@ extern "C"
 		*slot = grown;
 	}
 	bool cn_same_text(V* a, V* b) { return text_of(a) == text_of(b); }
-	void cn_say(V* t) { stellanova::say({text_of(t)}); }
+	void cn_say(V* t) { fathom::say({text_of(t)}); }
 	V* cn_ask_text(V* question)
 	{
 		std::string answer;
 		{
 			Parked waiting;
-			answer = stellanova::ask_text(text_of(question));
+			answer = fathom::ask_text(text_of(question));
 		}
 		return cn_make_text(answer);
 	}
-	double cn_ask_number(V* question) { Parked waiting; return stellanova::ask_number(text_of(question)); }
-	bool cn_ask_yes_no(V* question) { Parked waiting; return stellanova::ask_yes_no(text_of(question)); }
-	double cn_letters(V* t) { return stellanova::letters(text_of(t)); }
-	double cn_to_number(V* t, int line) { GUARDED(0.0, return stellanova::to_number(text_of(t), line);) }
+	double cn_ask_number(V* question) { Parked waiting; return fathom::ask_number(text_of(question)); }
+	bool cn_ask_yes_no(V* question) { Parked waiting; return fathom::ask_yes_no(text_of(question)); }
+	double cn_letters(V* t) { return fathom::letters(text_of(t)); }
+	double cn_to_number(V* t, int line) { GUARDED(0.0, return fathom::to_number(text_of(t), line);) }
 
 	// numbers
 	long long cn_repeats(double count) { return std::isfinite(count) ? static_cast<long long>(count) : 0; }
-	double cn_power(double a, double b, int line) { GUARDED(0.0, return stellanova::power(a, b, line);) }
-	double cn_bits(int op, double a, double b, int line) { GUARDED(0.0, return stellanova::bits(op, a, b, line);) }
-	double cn_random(double lo, double hi, int line) { GUARDED(0.0, return stellanova::random(lo, hi, line);) }
-	double cn_random_fraction() { return stellanova::random_fraction(); }
-	double cn_rounded(double x, double places, int line) { GUARDED(0.0, return stellanova::rounded(x, places, line);) }
+	double cn_power(double a, double b, int line) { GUARDED(0.0, return fathom::power(a, b, line);) }
+	double cn_bits(int op, double a, double b, int line) { GUARDED(0.0, return fathom::bits(op, a, b, line);) }
+	double cn_random(double lo, double hi, int line) { GUARDED(0.0, return fathom::random(lo, hi, line);) }
+	double cn_random_fraction() { return fathom::random_fraction(); }
+	double cn_rounded(double x, double places, int line) { GUARDED(0.0, return fathom::rounded(x, places, line);) }
 
 	// any value
 	V* cn_box_number(double d)
@@ -1578,8 +1578,8 @@ extern "C"
 	{
 		GUARDED(cn_box_number(0),
 			if (count_of(list) == 0)
-				stellanova::fail(line, "the list is empty, so I can't pick a random item.");
-			size_t k = static_cast<size_t>(stellanova::random(1, static_cast<double>(count_of(list)), line)) - 1;
+				fathom::fail(line, "the list is empty, so I can't pick a random item.");
+			size_t k = static_cast<size_t>(fathom::random(1, static_cast<double>(count_of(list)), line)) - 1;
 			unflat(list);
 			return full(list)->numbers ? cn_box_number(full(list)->nums[k]) : full(list)->boxed[k];)
 	}
@@ -1587,7 +1587,7 @@ extern "C"
 	{
 		GUARDED(cn_box_number(0),
 			if (count_of(list) == 0)
-				stellanova::fail(line, "the list is empty, so it has no last item.");
+				fathom::fail(line, "the list is empty, so it has no last item.");
 			unflat(list);
 			return full(list)->numbers ? cn_box_number(full(list)->nums.back()) : full(list)->boxed.back();)
 	}
@@ -1597,7 +1597,7 @@ extern "C"
 		GUARDED(0.0,
 			size_t size = count_of(list);
 			if (size == 0 && which != 0)
-				stellanova::fail(line, std::string("the list is empty, so it has no ") + names[which] + ".");
+				fathom::fail(line, std::string("the list is empty, so it has no ") + names[which] + ".");
 			double out = which == 2 ? -INFINITY : which == 3 ? INFINITY : 0;
 			for (size_t k = 0; k < size; ++k)  // one at a time, in order, as Python does
 			{
@@ -1611,7 +1611,7 @@ extern "C"
 		GUARDED(cn_box_number(0),
 			auto* e = entry_of(table, key);
 			if (!e)
-				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
+				fathom::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
 			return e->second;)
 	}
 	void cn_entry_put(V* table, V* key, V* x)
@@ -1644,7 +1644,7 @@ extern "C"
 		GUARDED(nullptr,
 			auto* e = entry_of(table, key);
 			if (!e)
-				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
+				fathom::fail(line, "there is no entry \"" + text_of(key) + "\" in the table.");
 			if (e->second && e->second->shared)
 			{
 				release(e->second);
@@ -1658,7 +1658,7 @@ extern "C"
 		full(table)->last_key = nullptr;
 		GUARDED(,
 			if (!full(table)->table.erase(text_of(key)))
-				stellanova::fail(line, "there is no entry \"" + text_of(key) + "\" in the table to remove.");)
+				fathom::fail(line, "there is no entry \"" + text_of(key) + "\" in the table to remove.");)
 	}
 	V* cn_keys(V* table)
 	{
@@ -1785,18 +1785,18 @@ extern "C"
 	V* cn_load(V* from, V* shape, int is_file, V* kind, int line)  // from: the text itself, or the file's name
 	{
 		GUARDED(nullptr,
-			std::string all = is_file ? stellanova::read_file(text_of(from), line) : text_of(from);
-			stellanova::SavedReader reader{all};
-			stellanova::SavedData d;
+			std::string all = is_file ? fathom::read_file(text_of(from), line) : text_of(from);
+			fathom::SavedReader reader{all};
+			fathom::SavedData d;
 			V* out = nullptr;
 			bool ok = reader.value(d);
 			reader.space();
 			if (!ok || reader.i != all.size() || !loaded_into(d, shape, out))
-				stellanova::fail(line, (is_file ? "the file \"" + text_of(from) + "\"" : std::string("the text")) + " doesn't hold " + text_of(kind) + ".");
+				fathom::fail(line, (is_file ? "the file \"" + text_of(from) + "\"" : std::string("the text")) + " doesn't hold " + text_of(kind) + ".");
 			return out;)
 	}
 	V* cn_saved_text(V* v, V* shape, int line) { GUARDED(nullptr, return cn_make_text(saved_of(v, shape, line));) }
-	void cn_save_file(V* v, V* path, V* shape, int line) { GUARDED(, stellanova::write_file(text_of(path), saved_of(v, shape, line) + "\n", line);) }
+	void cn_save_file(V* v, V* path, V* shape, int line) { GUARDED(, fathom::write_file(text_of(path), saved_of(v, shape, line) + "\n", line);) }
 	void cn_able_kind(const char* able, V* shape)  // at the start: a kind a saved speaker may be loaded as
 	{
 		std::string name(able);
@@ -1825,7 +1825,7 @@ extern "C"
 		V* out = copy_of(list);
 		for (const V* x : cn_items(out))
 			if (!x)
-				{ GUARDED(out, stellanova::fail(line, "a list sorted by a part can't hold nothing.");) }
+				{ GUARDED(out, fathom::fail(line, "a list sorted by a part can't hold nothing.");) }
 		Items& xs = cn_items(out);
 		const size_t at = static_cast<size_t>(k);
 		auto text_part = [at](V* x) -> V* { return x->numbers && thing_of(x)->kind->types[at] == 'n' ? nullptr : part_slot(x, at); };
@@ -1920,7 +1920,7 @@ extern "C"
 	{
 		const std::string& s = text_of(text);
 		const std::string& b = text_of(by);
-		GUARDED(cn_list_new(), if (b.empty()) stellanova::fail(line, "I can't split text by empty text.");)
+		GUARDED(cn_list_new(), if (b.empty()) fathom::fail(line, "I can't split text by empty text.");)
 		V* out = cn_list_new();
 		Items& items = full(out)->boxed;
 		size_t start = 0;
@@ -1945,7 +1945,7 @@ extern "C"
 	}
 	V* cn_repeated(V* x, double n, int line)  // '"ab" repeated 3 times', or a list
 	{
-		GUARDED(x, stellanova::need_times(n, line);)
+		GUARDED(x, fathom::need_times(n, line);)
 		if (x->tag == 't')
 		{
 			std::string out;
@@ -2007,14 +2007,14 @@ extern "C"
 		std::stringstream in(spec);
 		for (std::string w; std::getline(in, w, '\x01');)
 			words.push_back(w);
-		GUARDED(nullptr, stellanova::fail(line, "this " + words[0] + " is nothing, so it has no " + words[static_cast<size_t>(k) + 1] + ".");)
+		GUARDED(nullptr, fathom::fail(line, "this " + words[0] + " is nothing, so it has no " + words[static_cast<size_t>(k) + 1] + ".");)
 		return nullptr;
 	}
 	V* cn_able(V* thing, const char* able, const char* what, int line)  // 'speak s': s must be something
 	{
 		if (!thing)
 		{
-			GUARDED(nullptr, stellanova::fail(line, std::string("this ") + able + " is nothing, so it can't " + what + ".");)
+			GUARDED(nullptr, fathom::fail(line, std::string("this ") + able + " is nothing, so it can't " + what + ".");)
 		}
 		return thing;
 	}
@@ -2089,7 +2089,7 @@ extern "C"
 		if (thing->tag == 'k' || fresh_copy->tag == 'k')  // (a thing is a smaller value: only its own parts are copied)
 		{
 			if (thing->tag != fresh_copy->tag)
-				stellanova::fail(0, "a thing can only be set to another thing.");
+				fathom::fail(0, "a thing can only be set to another thing.");
 			ThingValue* t = thing_of(thing);  // (its parts on the side: the other kind may have more parts than it has room for)
 			Items parts = cn_items(fresh_copy);
 			t->kind = thing_of(fresh_copy)->kind;

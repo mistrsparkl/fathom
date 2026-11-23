@@ -7,7 +7,7 @@ include: <chrono>
 include: <cmath>
 
 code:
-  namespace stellanova_folders
+  namespace fathom_folders
   {
   	namespace fs = std::filesystem;
   	inline fs::path path(const std::string& name) { return fs::path(std::u8string(name.begin(), name.end())); }
@@ -16,11 +16,11 @@ code:
   	{
   		std::error_code problem;
   		if (!fs::is_directory(path(folder), problem))
-  			stellanova::fail(line, "there is no folder called \"" + folder + "\".");
+  			fathom::fail(line, "there is no folder called \"" + folder + "\".");
   		std::vector<std::string> found;
   		fs::directory_iterator it(path(folder), fs::directory_options::skip_permission_denied, problem);
   		if (problem)
-  			stellanova::fail(line, "I couldn't look inside the folder \"" + folder + "\".");
+  			fathom::fail(line, "I couldn't look inside the folder \"" + folder + "\".");
   		for (; it != fs::directory_iterator(); it.increment(problem))
   		{
   			if (problem)
@@ -37,51 +37,51 @@ code:
   		std::error_code problem;
   		fs::create_directories(path(folder), problem);
   		if (problem)
-  			stellanova::fail(line, "I couldn't make the folder \"" + folder + "\".");
+  			fathom::fail(line, "I couldn't make the folder \"" + folder + "\".");
   	}
   	inline void erase(const std::string& name, int line)
   	{
   		std::error_code problem;
   		if (!fs::is_regular_file(path(name), problem) || !fs::remove(path(name), problem))
-  			stellanova::fail(line, "I couldn't erase the file \"" + name + "\".");
+  			fathom::fail(line, "I couldn't erase the file \"" + name + "\".");
   	}
   	inline void erase_folder(const std::string& name, int line)
   	{
   		std::error_code problem;
   		if (!fs::is_directory(path(name), problem))
-  			stellanova::fail(line, "I couldn't erase the folder \"" + name + "\".");
+  			fathom::fail(line, "I couldn't erase the folder \"" + name + "\".");
   		fs::remove_all(path(name), problem);
   		if (problem)
-  			stellanova::fail(line, "I couldn't erase the folder \"" + name + "\".");
+  			fathom::fail(line, "I couldn't erase the folder \"" + name + "\".");
   	}
   	inline void move(const std::string& from, const std::string& to, int line)
   	{
   		std::error_code problem;
   		if (!fs::exists(path(from), problem) || fs::exists(path(to), problem))
-  			stellanova::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
+  			fathom::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
   		fs::rename(path(from), path(to), problem);
   		if (problem)
-  			stellanova::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
+  			fathom::fail(line, "I couldn't move \"" + from + "\" to \"" + to + "\".");
   	}
   	inline void copy(const std::string& from, const std::string& to, int line)
   	{
   		std::error_code problem;
   		if (!fs::is_regular_file(path(from), problem) || !fs::copy_file(path(from), path(to), fs::copy_options::overwrite_existing, problem))
-  			stellanova::fail(line, "I couldn't copy \"" + from + "\" to \"" + to + "\".");
+  			fathom::fail(line, "I couldn't copy \"" + from + "\" to \"" + to + "\".");
   	}
   	inline double bytes(const std::string& name, int line)
   	{
   		std::error_code problem;
   		auto size = fs::file_size(path(name), problem);
   		if (problem)
-  			stellanova::fail(line, "there is no file called \"" + name + "\".");
+  			fathom::fail(line, "there is no file called \"" + name + "\".");
   		return (double)size;
   	}
   	inline std::vector<double> bytes_of(const std::string& name, int line)
   	{
   		std::ifstream in(path(name), std::ios::binary);
   		if (!in)
-  			stellanova::fail(line, "there is no file called \"" + name + "\".");
+  			fathom::fail(line, "there is no file called \"" + name + "\".");
   		std::vector<double> out;
   		for (char c; in.get(c);)
   			out.push_back((double)(unsigned char)c);
@@ -93,12 +93,12 @@ code:
   		for (double x : numbers)
   		{
   			if (x < 0 || x > 255 || x != (double)(int)x)
-  				stellanova::fail(line, "a byte is a whole number from 0 to 255, not " + stellanova::text(x) + ".");
+  				fathom::fail(line, "a byte is a whole number from 0 to 255, not " + fathom::text(x) + ".");
   			all += (char)(unsigned char)x;
   		}
   		std::ofstream out(path(name), std::ios::binary);
   		if (!out || !out.write(all.data(), (std::streamsize)all.size()))
-  			stellanova::fail(line, "I couldn't write the file \"" + name + "\".");
+  			fathom::fail(line, "I couldn't write the file \"" + name + "\".");
   	}
   }
 
@@ -166,89 +166,89 @@ python:
       except OSError:
           raise RunError(0, "I couldn't write the file \"" + name + "\".")
 
-to files in the folder, given folder (text), returning a list of text = stellanova_folders::inside({folder}, false, {line})
+to files in the folder, given folder (text), returning a list of text = fathom_folders::inside({folder}, false, {line})
   runs: inside({folder}, False)
-  web: stellanova_folders.inside({folder}, false, {line})
-to folders in the folder, given folder (text), returning a list of text = stellanova_folders::inside({folder}, true, {line})
+  web: fathom_folders.inside({folder}, false, {line})
+to folders in the folder, given folder (text), returning a list of text = fathom_folders::inside({folder}, true, {line})
   runs: inside({folder}, True)
-  web: stellanova_folders.inside({folder}, true, {line})
-to make the folder, given folder (text) = stellanova_folders::make({folder}, {line})
+  web: fathom_folders.inside({folder}, true, {line})
+to make the folder, given folder (text) = fathom_folders::make({folder}, {line})
   runs: make({folder})
-  web: stellanova_folders.make({folder}, {line})
-to erase the file, given name (text) = stellanova_folders::erase({name}, {line})
+  web: fathom_folders.make({folder}, {line})
+to erase the file, given name (text) = fathom_folders::erase({name}, {line})
   runs: erase({name})
-  web: stellanova_folders.erase({name}, {line})
-to erase the folder, given name (text) = stellanova_folders::erase_folder({name}, {line})
+  web: fathom_folders.erase({name}, {line})
+to erase the folder, given name (text) = fathom_folders::erase_folder({name}, {line})
   runs: erase_folder({name})
-  web: stellanova_folders.eraseFolder({name}, {line})
-to move the file, given from (text) and to (text) = stellanova_folders::move({from}, {to}, {line})
+  web: fathom_folders.eraseFolder({name}, {line})
+to move the file, given from (text) and to (text) = fathom_folders::move({from}, {to}, {line})
   runs: move({from}, {to})
-  web: stellanova_folders.move({from}, {to}, {line})
-to copy the file, given from (text) and to (text) = stellanova_folders::copy({from}, {to}, {line})
+  web: fathom_folders.move({from}, {to}, {line})
+to copy the file, given from (text) and to (text) = fathom_folders::copy({from}, {to}, {line})
   runs: copy({from}, {to})
-  web: stellanova_folders.copy({from}, {to}, {line})
-to bytes in the file, given name (text), returning a number = stellanova_folders::bytes({name}, {line})
+  web: fathom_folders.copy({from}, {to}, {line})
+to bytes in the file, given name (text), returning a number = fathom_folders::bytes({name}, {line})
   runs: size({name})
-  web: stellanova_folders.size({name}, {line})
-to the bytes of the file, given name (text), returning a list of numbers = stellanova_folders::bytes_of({name}, {line})
+  web: fathom_folders.size({name}, {line})
+to the bytes of the file, given name (text), returning a list of numbers = fathom_folders::bytes_of({name}, {line})
   runs: bytes_of({name})
-  web: stellanova_folders.bytesOf({name}, {line})
-to fill the file, given name (text) and numbers (a list of numbers) = stellanova_folders::fill({name}, {numbers}, {line})
+  web: fathom_folders.bytesOf({name}, {line})
+to fill the file, given name (text) and numbers (a list of numbers) = fathom_folders::fill({name}, {numbers}, {line})
   runs: fill({name}, {numbers})
-  web: stellanova_folders.fill({name}, {numbers}, {line})
+  web: fathom_folders.fill({name}, {numbers}, {line})
 
 javascript:
-  const stellanova_folders = {
+  const fathom_folders = {
     fs(line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page has no folders (this works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page has no folders (this works with node).");
       return require("fs");
     },
     isDir(fs, p) { try { return fs.statSync(p).isDirectory(); } catch { return false; } },
     isFile(fs, p) { try { return fs.statSync(p).isFile(); } catch { return false; } },
     inside(folder, folders, line) {
       const fs = this.fs(line), path = require("path");
-      if (!this.isDir(fs, folder)) stellanova.fail(line, `there is no folder called "${folder}".`);
+      if (!this.isDir(fs, folder)) fathom.fail(line, `there is no folder called "${folder}".`);
       let names;
-      try { names = fs.readdirSync(folder); } catch { stellanova.fail(line, `I couldn't look inside the folder "${folder}".`); }
+      try { names = fs.readdirSync(folder); } catch { fathom.fail(line, `I couldn't look inside the folder "${folder}".`); }
       return names.filter((n) => this.isDir(fs, path.join(folder, n)) === folders).sort();
     },
     isFolder(folder, line) { return this.isDir(this.fs(line), folder); },
     make(folder, line) {
-      try { this.fs(line).mkdirSync(folder, { recursive: true }); } catch { stellanova.fail(line, `I couldn't make the folder "${folder}".`); }
+      try { this.fs(line).mkdirSync(folder, { recursive: true }); } catch { fathom.fail(line, `I couldn't make the folder "${folder}".`); }
     },
     erase(name, line) {
       const fs = this.fs(line);
-      try { if (!this.isFile(fs, name)) throw 0; fs.unlinkSync(name); } catch { stellanova.fail(line, `I couldn't erase the file "${name}".`); }
+      try { if (!this.isFile(fs, name)) throw 0; fs.unlinkSync(name); } catch { fathom.fail(line, `I couldn't erase the file "${name}".`); }
     },
     eraseFolder(name, line) {
       const fs = this.fs(line);
-      try { if (!this.isDir(fs, name)) throw 0; fs.rmSync(name, { recursive: true }); } catch { stellanova.fail(line, `I couldn't erase the folder "${name}".`); }
+      try { if (!this.isDir(fs, name)) throw 0; fs.rmSync(name, { recursive: true }); } catch { fathom.fail(line, `I couldn't erase the folder "${name}".`); }
     },
     move(a, b, line) {
       const fs = this.fs(line);
-      try { if (!fs.existsSync(a) || fs.existsSync(b)) throw 0; fs.renameSync(a, b); } catch { stellanova.fail(line, `I couldn't move "${a}" to "${b}".`); }
+      try { if (!fs.existsSync(a) || fs.existsSync(b)) throw 0; fs.renameSync(a, b); } catch { fathom.fail(line, `I couldn't move "${a}" to "${b}".`); }
     },
     copy(a, b, line) {
       const fs = this.fs(line);
-      try { if (!this.isFile(fs, a)) throw 0; fs.copyFileSync(a, b); } catch { stellanova.fail(line, `I couldn't copy "${a}" to "${b}".`); }
+      try { if (!this.isFile(fs, a)) throw 0; fs.copyFileSync(a, b); } catch { fathom.fail(line, `I couldn't copy "${a}" to "${b}".`); }
     },
     size(name, line) {
-      try { return this.fs(line).statSync(name).size; } catch { stellanova.fail(line, `there is no file called "${name}".`); }
+      try { return this.fs(line).statSync(name).size; } catch { fathom.fail(line, `there is no file called "${name}".`); }
     },
     bytesOf(name, line) {
       let b;
-      try { b = this.fs(line).readFileSync(name); } catch { stellanova.fail(line, `there is no file called "${name}".`); }
+      try { b = this.fs(line).readFileSync(name); } catch { fathom.fail(line, `there is no file called "${name}".`); }
       return Array.from(b);
     },
     fill(name, numbers, line) {
-      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) stellanova.fail(line, `a byte is a whole number from 0 to 255, not ${stellanova.text(x)}.`);
-      try { this.fs(line).writeFileSync(name, Buffer.from(numbers)); } catch { stellanova.fail(line, `I couldn't write the file "${name}".`); }
+      for (const x of numbers) if (x < 0 || x > 255 || x !== Math.floor(x)) fathom.fail(line, `a byte is a whole number from 0 to 255, not ${fathom.text(x)}.`);
+      try { this.fs(line).writeFileSync(name, Buffer.from(numbers)); } catch { fathom.fail(line, `I couldn't write the file "${name}".`); }
     },
   };
 
 note: Parts of a path.
 code:
-  namespace stellanova_folders
+  namespace fathom_folders
   {
   	inline std::string path_part(const std::string& p, int which)  // 0: file name, 1: extension, 2: folder holding it
   	{
@@ -266,7 +266,7 @@ code:
   		std::error_code problem;
   		auto when = fs::last_write_time(path(name), problem);
   		if (problem || !fs::is_regular_file(path(name), problem))
-  			stellanova::fail(line, "there is no file called \"" + name + "\".");
+  			fathom::fail(line, "there is no file called \"" + name + "\".");
   		auto now = std::chrono::system_clock::now() + (when - fs::file_time_type::clock::now());
   		return std::floor(std::chrono::duration<double>(now.time_since_epoch()).count());
   	}
@@ -287,21 +287,21 @@ python:
           raise RunError(0, 'there is no file called "' + name + '".')
       return float(int(os.path.getmtime(name)))
 
-to file name of, given path (text), returning text = stellanova_folders::path_part({path}, 0)
+to file name of, given path (text), returning text = fathom_folders::path_part({path}, 0)
   runs: path_part({path}, 0)
-  web: stellanova_folders.pathPart({path}, 0)
-to extension of, given path (text), returning text = stellanova_folders::path_part({path}, 1)
+  web: fathom_folders.pathPart({path}, 0)
+to extension of, given path (text), returning text = fathom_folders::path_part({path}, 1)
   runs: path_part({path}, 1)
-  web: stellanova_folders.pathPart({path}, 1)
-to folder holding, given path (text), returning text = stellanova_folders::path_part({path}, 2)
+  web: fathom_folders.pathPart({path}, 1)
+to folder holding, given path (text), returning text = fathom_folders::path_part({path}, 2)
   runs: path_part({path}, 2)
-  web: stellanova_folders.pathPart({path}, 2)
-to last change of the file, given name (text), returning a number = stellanova_folders::last_change({name}, {line})
+  web: fathom_folders.pathPart({path}, 2)
+to last change of the file, given name (text), returning a number = fathom_folders::last_change({name}, {line})
   runs: last_change({name})
-  web: stellanova_folders.lastChange({name}, {line})
+  web: fathom_folders.lastChange({name}, {line})
 
 javascript:
-  Object.assign(stellanova_folders, {
+  Object.assign(fathom_folders, {
     pathPart(p, which) {
       const cut = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")), file = p.slice(cut + 1);
       if (which === 2) return cut >= 0 ? p.slice(0, cut) : "";
@@ -311,7 +311,7 @@ javascript:
     },
     lastChange(name, line) {
       const fs = this.fs(line);
-      if (!this.isFile(fs, name)) stellanova.fail(line, `there is no file called "${name}".`);
+      if (!this.isFile(fs, name)) fathom.fail(line, `there is no file called "${name}".`);
       return Math.floor(fs.statSync(name).mtimeMs / 1000);
     },
   });

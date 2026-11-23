@@ -39,7 +39,7 @@ linux link: :libmpg123.so.0
 
 code:
   #ifdef __linux__
-  namespace stellanova_sound
+  namespace fathom_sound
   {
   	// Linux: everything playing, mixed into one PulseAudio stream
   	struct Clip { std::vector<float> frames; };  // left, right, left, right...
@@ -150,13 +150,13 @@ code:
   		}
   		std::ifstream in(file, std::ios::binary);
   		if (!in)
-  			stellanova::fail(line, "there is no sound file called \"" + file + "\".");
+  			fathom::fail(line, "there is no sound file called \"" + file + "\".");
   		std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
   		auto made = read_wav(all);
   		if (!made)
   			made = read_mp3(file);
   		if (!made)
-  			stellanova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  			fathom::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
   		std::lock_guard<std::mutex> hold(lock);
   		return loaded[file] = made;
   	}
@@ -164,7 +164,7 @@ code:
   	{
   		pa_sample_spec spec{PA_SAMPLE_FLOAT32LE, 44100, 2};
   		pa_buffer_attr wanted{(uint32_t)-1, 44100 * 2 * 4 / 20, (uint32_t)-1, (uint32_t)-1, (uint32_t)-1};  // a 20th of a second ahead
-  		pa_simple* out = pa_simple_new(nullptr, "Stellanova", PA_STREAM_PLAYBACK, nullptr, "sound", &spec, nullptr, &wanted, nullptr);
+  		pa_simple* out = pa_simple_new(nullptr, "Fathom", PA_STREAM_PLAYBACK, nullptr, "sound", &spec, nullptr, &wanted, nullptr);
   		std::vector<float> mix(1024 * 2);
   		for (;;)
   		{
@@ -271,7 +271,7 @@ code:
   	}
   }
   #else
-  namespace stellanova_sound
+  namespace fathom_sound
   {
   	inline std::wstring wide(const std::string& s)
   	{
@@ -294,7 +294,7 @@ code:
   	{
   		std::wstring path = wide(file);
   		if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES)
-  			stellanova::fail(line, "there is no sound file called \"" + file + "\".");
+  			fathom::fail(line, "there is no sound file called \"" + file + "\".");
   		for (size_t k = 0; k < playing.size();)  // close the ones that have finished
   			if (done(playing[k]))
   			{
@@ -305,9 +305,9 @@ code:
   				++k;
   		wchar_t full[MAX_PATH * 4];
   		GetFullPathNameW(path.c_str(), MAX_PATH * 4, full, nullptr);
-  		std::wstring alias = L"stellanova_sound_" + std::to_wstring(++made);
+  		std::wstring alias = L"fathom_sound_" + std::to_wstring(++made);
   		if (mciSendStringW((L"open \"" + std::wstring(full) + L"\" type mpegvideo alias " + alias).c_str(), nullptr, 0, nullptr) != 0)
-  			stellanova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  			fathom::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
   		playing.push_back(alias);
   		mciSendStringW((L"play " + alias + (loop ? L" repeat" : L"") + (wait ? L" wait" : L"")).c_str(), nullptr, 0, nullptr);
   	}
@@ -325,25 +325,25 @@ code:
   	{
   		wchar_t said[128] = L"";
   		if (song_open)
-  			mciSendStringW((std::wstring(L"status stellanova_song ") + what).c_str(), said, 128, nullptr);
+  			mciSendStringW((std::wstring(L"status fathom_song ") + what).c_str(), said, 128, nullptr);
   		return said;
   	}
   	inline void song_stop()
   	{
   		if (song_open)
-  			mciSendStringW(L"close stellanova_song", nullptr, 0, nullptr);
+  			mciSendStringW(L"close fathom_song", nullptr, 0, nullptr);
   		song_open = false;
   	}
   	inline void song_play(const std::string& file, int line)
   	{
   		song_stop();
   		if (GetFileAttributesW(wide(file).c_str()) == INVALID_FILE_ATTRIBUTES)
-  			stellanova::fail(line, "there is no sound file called \"" + file + "\".");
-  		if (mciSendStringW((L"open \"" + wide(file) + L"\" type mpegvideo alias stellanova_song").c_str(), nullptr, 0, nullptr) != 0)
-  			stellanova::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
+  			fathom::fail(line, "there is no sound file called \"" + file + "\".");
+  		if (mciSendStringW((L"open \"" + wide(file) + L"\" type mpegvideo alias fathom_song").c_str(), nullptr, 0, nullptr) != 0)
+  			fathom::fail(line, "I couldn't play \"" + file + "\" (it must be a .wav or .mp3 file).");
   		song_open = true;
-  		mciSendStringW(L"set stellanova_song time format milliseconds", nullptr, 0, nullptr);
-  		mciSendStringW(L"play stellanova_song", nullptr, 0, nullptr);
+  		mciSendStringW(L"set fathom_song time format milliseconds", nullptr, 0, nullptr);
+  		mciSendStringW(L"play fathom_song", nullptr, 0, nullptr);
   	}
   	inline void song_say(const std::wstring& what)
   	{
@@ -354,16 +354,16 @@ code:
   	inline void song_seek(double seconds)
   	{
   		bool was = song_status(L"mode") == L"playing";
-  		song_say(L"seek stellanova_song to " + std::to_wstring((long long)(seconds * 1000)));
+  		song_say(L"seek fathom_song to " + std::to_wstring((long long)(seconds * 1000)));
   		if (was)
-  			song_say(L"play stellanova_song");
+  			song_say(L"play fathom_song");
   	}
-  	inline void song_pause(bool paused) { song_say(paused ? L"pause stellanova_song" : L"resume stellanova_song"); }
+  	inline void song_pause(bool paused) { song_say(paused ? L"pause fathom_song" : L"resume fathom_song"); }
   	inline bool song_playing() { return song_status(L"mode") == L"playing"; }
   	inline bool song_ended() { return song_open && song_status(L"mode") == L"stopped" && song_number(L"position") + 0.3 >= song_number(L"length"); }
   	inline double song_time() { return song_number(L"position"); }
   	inline double song_length() { return song_number(L"length"); }
-  	inline void song_loudness(double level) { song_say(L"setaudio stellanova_song volume to " + std::to_wstring((int)(std::clamp(level, 0.0, 1.0) * 1000))); }
+  	inline void song_loudness(double level) { song_say(L"setaudio fathom_song volume to " + std::to_wstring((int)(std::clamp(level, 0.0, 1.0) * 1000))); }
   }
   #endif
 
@@ -476,7 +476,7 @@ python:
                                               ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
               pulse.pa_simple_write.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
               spec, attr = SPEC(5, 44100, 2), ATTR(0xFFFFFFFF, 44100 * 2 * 4 // 20, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)  # FLOAT32LE
-              out = pulse.pa_simple_new(None, b"Stellanova", 1, None, b"sound", ctypes.byref(spec), None, ctypes.byref(attr), None)
+              out = pulse.pa_simple_new(None, b"Fathom", 1, None, b"sound", ctypes.byref(spec), None, ctypes.byref(attr), None)
           except OSError:
               pass
           while True:
@@ -569,7 +569,7 @@ python:
               mci(f"close {alias}", None, 0, None)
               playing.remove(alias)
           made[0] += 1
-          alias = f"stellanova_sound_{made[0]}"
+          alias = f"fathom_sound_{made[0]}"
           if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias {alias}', None, 0, None) != 0:
               raise RunError(0, f'I couldn\'t play "{file}" (it must be a .wav or .mp3 file).')
           playing.append(alias)
@@ -582,21 +582,21 @@ python:
       def song_status(what):
           said = ctypes.create_unicode_buffer(128)
           if song["open"]:
-              mci(f"status stellanova_song {what}", said, 128, None)
+              mci(f"status fathom_song {what}", said, 128, None)
           return said.value
       def song_stop():
           if song["open"]:
-              mci("close stellanova_song", None, 0, None)
+              mci("close fathom_song", None, 0, None)
           song["open"] = False
       def song_play(file):
           song_stop()
           if not os.path.exists(file):
               raise RunError(0, f'there is no sound file called "{file}".')
-          if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias stellanova_song', None, 0, None) != 0:
+          if mci(f'open "{os.path.abspath(file)}" type mpegvideo alias fathom_song', None, 0, None) != 0:
               raise RunError(0, f"I couldn't play '{file}' (it must be a .wav or .mp3 file).")
           song["open"] = True
-          mci("set stellanova_song time format milliseconds", None, 0, None)
-          mci("play stellanova_song", None, 0, None)
+          mci("set fathom_song time format milliseconds", None, 0, None)
+          mci("play fathom_song", None, 0, None)
       def song_say(what):
           if song["open"]:
               mci(what, None, 0, None)
@@ -607,11 +607,11 @@ python:
               return 0.0
       def song_seek(seconds):
           was = song_status("mode") == "playing"
-          song_say(f"seek stellanova_song to {int(max(0, seconds) * 1000)}")
+          song_say(f"seek fathom_song to {int(max(0, seconds) * 1000)}")
           if was:
-              song_say("play stellanova_song")
+              song_say("play fathom_song")
       def song_pause(paused):
-          song_say("pause stellanova_song" if paused else "resume stellanova_song")
+          song_say("pause fathom_song" if paused else "resume fathom_song")
       def song_playing():
           return song_status("mode") == "playing"
       def song_ended():
@@ -621,53 +621,53 @@ python:
       def song_length():
           return song_number("length")
       def song_loudness(level):
-          song_say(f"setaudio stellanova_song volume to {int(max(0, min(1, level)) * 1000)}")
+          song_say(f"setaudio fathom_song volume to {int(max(0, min(1, level)) * 1000)}")
 
-to play the sound, given file (text) = stellanova_sound::play({file}, false, false, {line})
+to play the sound, given file (text) = fathom_sound::play({file}, false, false, {line})
   runs: play({file}, False, False)
-  web: await stellanova_sound_web.play({file}, false, false, {line})
-to play the sound and wait, given file (text) = stellanova_sound::play({file}, true, false, {line})
+  web: await fathom_sound_web.play({file}, false, false, {line})
+to play the sound and wait, given file (text) = fathom_sound::play({file}, true, false, {line})
   runs: play({file}, True, False)
-  web: await stellanova_sound_web.play({file}, true, false, {line})
-to play the sound again and again, given file (text) = stellanova_sound::play({file}, false, true, {line})
+  web: await fathom_sound_web.play({file}, true, false, {line})
+to play the sound again and again, given file (text) = fathom_sound::play({file}, false, true, {line})
   runs: play({file}, False, True)
-  web: await stellanova_sound_web.play({file}, false, true, {line})
-to stop the sound = stellanova_sound::stop()
+  web: await fathom_sound_web.play({file}, false, true, {line})
+to stop the sound = fathom_sound::stop()
   runs: stop()
-  web: stellanova_sound_web.stop()
-to play the song, given file (text) = stellanova_sound::song_play({file}, {line})
+  web: fathom_sound_web.stop()
+to play the song, given file (text) = fathom_sound::song_play({file}, {line})
   runs: song_play({file})
-  web: await stellanova_sound_web.songPlay({file}, {line})
-to pause the song = stellanova_sound::song_pause(true)
+  web: await fathom_sound_web.songPlay({file}, {line})
+to pause the song = fathom_sound::song_pause(true)
   runs: song_pause(True)
-  web: stellanova_sound_web.songPause()
-to carry on the song = stellanova_sound::song_pause(false)
+  web: fathom_sound_web.songPause()
+to carry on the song = fathom_sound::song_pause(false)
   runs: song_pause(False)
-  web: stellanova_sound_web.songResume()
-to stop the song = stellanova_sound::song_stop()
+  web: fathom_sound_web.songResume()
+to stop the song = fathom_sound::song_stop()
   runs: song_stop()
-  web: stellanova_sound_web.songStop()
-the song is playing = stellanova_sound::song_playing(), yes or no, read only
+  web: fathom_sound_web.songStop()
+the song is playing = fathom_sound::song_playing(), yes or no, read only
   runs: song_playing()
-  web: stellanova_sound_web.songPlaying()
-the song has ended = stellanova_sound::song_ended(), yes or no, read only
+  web: fathom_sound_web.songPlaying()
+the song has ended = fathom_sound::song_ended(), yes or no, read only
   runs: song_ended()
-  web: stellanova_sound_web.songEnded()
-song time = stellanova_sound::song_time(), number, read only
+  web: fathom_sound_web.songEnded()
+song time = fathom_sound::song_time(), number, read only
   runs: song_time()
-  web: stellanova_sound_web.songTime()
-song length = stellanova_sound::song_length(), number, read only
+  web: fathom_sound_web.songTime()
+song length = fathom_sound::song_length(), number, read only
   runs: song_length()
-  web: stellanova_sound_web.songLength()
-to set the song time to, given seconds (a number) = stellanova_sound::song_seek({seconds})
+  web: fathom_sound_web.songLength()
+to set the song time to, given seconds (a number) = fathom_sound::song_seek({seconds})
   runs: song_seek({seconds})
-  web: stellanova_sound_web.songSeek({seconds})
-to set the song loudness to, given level (a number) = stellanova_sound::song_loudness({level})
+  web: fathom_sound_web.songSeek({seconds})
+to set the song loudness to, given level (a number) = fathom_sound::song_loudness({level})
   runs: song_loudness({level})
-  web: stellanova_sound_web.songLoudness({level})
+  web: fathom_sound_web.songLoudness({level})
 
 javascript:
-  const stellanova_sound_web = {
+  const fathom_sound_web = {
     // On the web sounds play through the browser.
     page: typeof document !== "undefined",
     playing: [],
@@ -676,11 +676,11 @@ javascript:
       let b;
       if (this.page) {
         const r = await fetch(file).catch(() => null);
-        if (!r || !r.ok) stellanova.fail(line, `there is no sound file called "${file}".`);
+        if (!r || !r.ok) fathom.fail(line, `there is no sound file called "${file}".`);
         b = new Uint8Array(await r.arrayBuffer());
       } else {
         const fs = require("fs");
-        if (!fs.existsSync(file)) stellanova.fail(line, `there is no sound file called "${file}".`);
+        if (!fs.existsSync(file)) fathom.fail(line, `there is no sound file called "${file}".`);
         b = fs.readFileSync(file);  // a Buffer is bytes too
       }
       const ascii = (at, n) => String.fromCharCode(...b.slice(at, at + n));
@@ -695,7 +695,7 @@ javascript:
         return rate ? size / rate : 0;
       }
       if (ascii(0, 3) === "ID3" || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return 0;
-      stellanova.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`);
+      fathom.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`);
     },
     async play(file, wait, loop, line) {
       const seconds = await this.check(file, line);
@@ -707,7 +707,7 @@ javascript:
       a.loop = loop;
       this.playing = this.playing.filter((p) => !p.ended);
       this.playing.push(a);
-      try { await a.play(); } catch { stellanova.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`); }
+      try { await a.play(); } catch { fathom.fail(line, `I couldn't play "${file}" (it must be a .wav or .mp3 file).`); }
       if (wait && !loop) await new Promise((r) => (a.onended = r));
     },
     stop() {
@@ -720,7 +720,7 @@ javascript:
       const length = await this.check(file, line);
       if (this.page) {
         const a = new Audio(file);
-        try { await a.play(); } catch { stellanova.fail(line, `I couldn't play '${file}' (it must be a .wav or .mp3 file).`); }
+        try { await a.play(); } catch { fathom.fail(line, `I couldn't play '${file}' (it must be a .wav or .mp3 file).`); }
         this.song = { a };
       } else this.song = { length, at: 0, since: this.now(), paused: false, loud: 1 };
     },

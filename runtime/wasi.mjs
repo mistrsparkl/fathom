@@ -1,5 +1,5 @@
 // Runs PROGRAM.wasm with Node's WASI: node PROGRAM.mjs [words...]  (any WASI runner works too: wasmtime --dir . PROGRAM.wasm)
-// Made by 'stellanova wasm' from runtime/wasi.mjs.
+// Made by 'fathom wasm' from runtime/wasi.mjs.
 import { readFile } from "node:fs/promises";
 import { readdirSync, lstatSync } from "node:fs";
 import { join } from "node:path";

@@ -1,10 +1,10 @@
 title: Shared abilities, nothing, and kinds of problems
 card: Chapter 13 | Shared abilities | Different things that can do the same thing
 say:
-  A dog and a robot are different kinds of things. But both can speak. Stellanova can keep them together, as things that can speak.
+  A dog and a robot are different kinds of things. But both can speak. Fathom can keep them together, as things that can speak.
 uncard
 
-new: speakers.stella
+new: speakers.fathom
 type fast:
   a speaker is anything that can speak.
 
@@ -60,7 +60,7 @@ card: Chapter 13 | Nothing | When there isn't one
 say:
   Sometimes a command looks for something, and doesn't find it. A name for a kind of thing can hold nothing.
 uncard
-new: nothing.stella
+new: nothing.fathom
 type fast:
   an enemy has:
     health (a number)
@@ -100,7 +100,7 @@ card: Chapter 13 | Kinds of problems | Catching only some mistakes
 say:
   In chapter eight, try caught every problem. A problem can also have a kind of its own, named in your own words, and be caught on its own.
 uncard
-new: fuel.stella
+new: fuel.fathom
 type fast:
   to drive, given fuel (a number):
     if fuel is 0: raise a fuel problem with "the tank is empty"

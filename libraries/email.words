@@ -15,13 +15,13 @@ code:
 include: <fstream>
 
 code:
-  namespace stellanova_email
+  namespace fathom_email
   {
   	inline void where(const std::string& server, std::string& host, int& port, int line)
   	{
   		size_t colon = server.rfind(':');
   		if (colon == std::string::npos || colon == 0 || server.find_first_not_of("0123456789", colon + 1) != std::string::npos || colon + 1 == server.size())
-  			stellanova::fail(line, "a mail server is its address and port, like \"smtp.gmail.com:587\", not \"" + server + "\".");
+  			fathom::fail(line, "a mail server is its address and port, like \"smtp.gmail.com:587\", not \"" + server + "\".");
   		host = server.substr(0, colon), port = std::stoi(server.substr(colon + 1));
   	}
   	inline bool here(const std::string& host) { return host == "localhost" || host == "127.0.0.1"; }
@@ -50,14 +50,14 @@ code:
   		int port = 0;
   		where(server, host, port, line);
   		if (to.find('@') == std::string::npos)
-  			stellanova::fail(line, "\"" + to + "\" isn't an email address.");
-  		std::string from = user.empty() ? "stellanova@localhost" : user;
+  			fathom::fail(line, "\"" + to + "\" isn't an email address.");
+  		std::string from = user.empty() ? "fathom@localhost" : user;
   #ifdef _WIN32
   		char folder[MAX_PATH];
   		GetTempPathA(MAX_PATH, folder);
-  		std::string file = std::string(folder) + "stellanova_mail_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetTickCount64()) + ".eml";
+  		std::string file = std::string(folder) + "fathom_mail_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetTickCount64()) + ".eml";
   #else
-  		std::string file = "/tmp/stellanova_mail_" + std::to_string(getpid()) + "_"
+  		std::string file = "/tmp/fathom_mail_" + std::to_string(getpid()) + "_"
   		                 + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".eml";
   #endif
   		{
@@ -148,12 +148,12 @@ code:
   		unlink(file.c_str());
   #endif
   		if (!started)
-  			stellanova::fail(line, "I couldn't send email: this computer has no curl.");
+  			fathom::fail(line, "I couldn't send email: this computer has no curl.");
   		if (code != 0)
   		{
   			while (!said.empty() && (said.back() == '\n' || said.back() == '\r'))
   				said.pop_back();
-  			stellanova::fail(line, "I couldn't send the email through " + server + " (" + (said.empty() ? "curl stopped with " + std::to_string(code) : said) + ").");
+  			fathom::fail(line, "I couldn't send the email through " + server + " (" + (said.empty() ? "curl stopped with " + std::to_string(code) : said) + ").");
   		}
   	}
   }
@@ -170,7 +170,7 @@ python:
           raise RunError(0, '"' + to + '" isn\'t an email address.')
       here = host in ("localhost", "127.0.0.1")
       m = _EmailMessage()
-      m["From"], m["To"], m["Subject"] = user or "stellanova@localhost", to, subject
+      m["From"], m["To"], m["Subject"] = user or "fathom@localhost", to, subject
       m.set_content(body)
       try:
           if int(port) == 465:
@@ -186,19 +186,19 @@ python:
       except (OSError, _smtplib.SMTPException) as err:
           raise RunError(0, "I couldn't send the email through " + server + " (" + str(err) + ").")
 
-to send an email, given server (text) and user (text) and password (text) and to (text) and subject (text) and message (text) = stellanova_email::send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
+to send an email, given server (text) and user (text) and password (text) and to (text) and subject (text) and message (text) = fathom_email::send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
   runs: send_email({server}, {user}, {password}, {to}, {subject}, {message})
-  web: await stellanova_email.send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
+  web: await fathom_email.send({server}, {user}, {password}, {to}, {subject}, {message}, {line})
 
 javascript:
-  const stellanova_email = {
+  const fathom_email = {
     async send(server, user, password, to, subject, body, line) {
-      if (typeof require !== "function") stellanova.fail(line, "a web page can't send email (it works with node).");
+      if (typeof require !== "function") fathom.fail(line, "a web page can't send email (it works with node).");
       const net = require("net"), tls = require("tls");
       const m = /^(.+):(\d+)$/.exec(server);
-      if (!m) stellanova.fail(line, `a mail server is its address and port, like "smtp.gmail.com:587", not "${server}".`);
-      if (!to.includes("@")) stellanova.fail(line, `"${to}" isn't an email address.`);
-      const host = m[1], port = Number(m[2]), here = host === "localhost" || host === "127.0.0.1", from = user || "stellanova@localhost";
+      if (!m) fathom.fail(line, `a mail server is its address and port, like "smtp.gmail.com:587", not "${server}".`);
+      if (!to.includes("@")) fathom.fail(line, `"${to}" isn't an email address.`);
+      const host = m[1], port = Number(m[2]), here = host === "localhost" || host === "127.0.0.1", from = user || "fathom@localhost";
       let socket = port === 465 ? tls.connect({ host, port, servername: host }) : net.connect({ host, port });
       let kept = "", waiting = null, failed = null;
       const listen = (s) => {
@@ -225,13 +225,13 @@ javascript:
       };
       try {
         await say(null, "220");
-        await say("EHLO stellanova", "250");
+        await say("EHLO fathom", "250");
         if (port !== 465 && !here) {
           await say("STARTTLS", "220");
           socket.removeAllListeners("data");
           socket = tls.connect({ socket, servername: host });
           listen(socket);
-          await say("EHLO stellanova", "250");
+          await say("EHLO fathom", "250");
         }
         if (user && !(here && !password)) {
           await say("AUTH LOGIN", "334");
@@ -245,7 +245,7 @@ javascript:
         await say(`From: ${from}\r\nTo: ${to}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n.`, "250");
         await say("QUIT", "221");
       } catch (e) {
-        stellanova.fail(line, `I couldn't send the email through ${server} (${e.message || e}).`);
+        fathom.fail(line, `I couldn't send the email through ${server} (${e.message || e}).`);
       } finally {
         socket.destroy();
       }

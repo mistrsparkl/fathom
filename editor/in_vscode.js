@@ -16,9 +16,9 @@ function vscodeProgram() {
 // Inside VS Code: the checks themselves
 async function run() {
   const vscode = require("vscode");
-  const folder = process.env.STELLANOVA_TRY_FOLDER;
-  await vscode.workspace.getConfiguration("stellanova").update("home", HERE, vscode.ConfigurationTarget.Global);
-  const file = path.join(folder, "try.stella");
+  const folder = process.env.FATHOM_TRY_FOLDER;
+  await vscode.workspace.getConfiguration("fathom").update("home", HERE, vscode.ConfigurationTarget.Global);
+  const file = path.join(folder, "try.fathom");
   const doc = await vscode.workspace.openTextDocument(file);
   await vscode.window.showTextDocument(doc);
   const said = [];
@@ -41,11 +41,11 @@ function main() {
     console.log("VS Code isn't on this computer, so the extension can't be tried in it.");
     return 0;
   }
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "stellanova-vscode-"));
-  fs.writeFileSync(path.join(folder, "try.stella"),
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "fathom-vscode-"));
+  fs.writeFileSync(path.join(folder, "try.fathom"),
     "genesis:\n  cheer\n  scrawl 1 plus\n  cheer\nand the universe said i love you\n\n" +
     "to cheer:\n  scrawl \"hooray\"\nand the universe said i love you\n", "utf8");
-  const env = { ...process.env, STELLANOVA_TRY_FOLDER: folder };
+  const env = { ...process.env, FATHOM_TRY_FOLDER: folder };
   delete env.ELECTRON_RUN_AS_NODE;  // (set by some editors' terminals: VS Code would start as plain Node)
   const ran = spawnSync(program, [
     `--extensionDevelopmentPath=${path.join(HERE, "editor", "vscode")}`, `--extensionTestsPath=${__filename}`,

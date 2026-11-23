@@ -19,12 +19,12 @@ link: wininet
 
 code:
   #ifndef _WIN32
-  namespace stellanova_web
+  namespace fathom_web
   {
   	// Linux: the system's curl, never through a shell
   	inline bool curl(std::vector<std::string> words, std::string* out, bool fail_on_error = true)
   	{
-  		words.insert(words.begin(), {"curl", fail_on_error ? "-sSfL" : "-sSL", "-A", "Stellanova", "--max-time", "60"});
+  		words.insert(words.begin(), {"curl", fail_on_error ? "-sSfL" : "-sSL", "-A", "Fathom", "--max-time", "60"});
   		std::vector<char*> argv;
   		for (auto& w : words)
   			argv.push_back(w.data());
@@ -55,17 +55,17 @@ code:
   	{
   		std::string all;
   		if (!curl({"--", address}, &all))
-  			stellanova::fail(line, "I couldn't get the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't get the web page \"" + address + "\".");
   		return all;
   	}
   	inline void download(const std::string& address, const std::string& name, int line)
   	{
   		if (!curl({"-o", name, "--", address}, nullptr))
-  			stellanova::fail(line, "I couldn't download \"" + address + "\".");
+  			fathom::fail(line, "I couldn't download \"" + address + "\".");
   	}
   	inline std::string send(const std::string& address, const std::string& body, int line)
   	{
-  		char held[] = "/tmp/stellanova_sendXXXXXX";
+  		char held[] = "/tmp/fathom_sendXXXXXX";
   		int fd = mkstemp(held);
   		bool wrote = fd >= 0 && write(fd, body.data(), body.size()) == (ssize_t)body.size();
   		if (fd >= 0)
@@ -74,7 +74,7 @@ code:
   		bool ok = wrote && curl({"-H", "Content-Type: text/plain; charset=utf-8", "--data-binary", std::string("@") + held, "--", address}, &all);
   		unlink(held);
   		if (!ok)
-  			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't send to the web page \"" + address + "\".");
   		return all;
   	}
   	inline double last_status = 0;
@@ -82,9 +82,9 @@ code:
   	inline std::string header_in(const std::string& raw, const std::string& name)  // one header's value, any capitals
   	{
   		std::istringstream lines(raw);
-  		std::string want = stellanova::lower(name) + ":";
+  		std::string want = fathom::lower(name) + ":";
   		for (std::string h; std::getline(lines, h);)
-  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			if (fathom::lower(h.substr(0, want.size())) == want)
   			{
   				std::string v = h.substr(want.size());
   				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
@@ -94,7 +94,7 @@ code:
   	}
   	inline std::string ask(const std::string& address, const std::string& way, const std::string& message, const std::string& headers, int line)
   	{
-  		char heads[] = "/tmp/stellanova_headsXXXXXX";
+  		char heads[] = "/tmp/fathom_headsXXXXXX";
   		int hfd = mkstemp(heads);
   		if (hfd >= 0)
   			close(hfd);
@@ -107,7 +107,7 @@ code:
   				typed = typed || h.rfind("Content-Type", 0) == 0 || h.rfind("content-type", 0) == 0;
   				words.insert(words.end(), {"-H", h});
   			}
-  		char held[] = "/tmp/stellanova_askXXXXXX";
+  		char held[] = "/tmp/fathom_askXXXXXX";
   		bool sending = !message.empty(), wrote = true;
   		if (sending)
   		{
@@ -132,13 +132,13 @@ code:
   		last_headers = read_heads.str();
   		size_t cut = all.rfind('\n');
   		if (!ok || cut == std::string::npos)
-  			stellanova::fail(line, "I couldn't reach the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't reach the web page \"" + address + "\".");
   		last_status = std::atof(all.c_str() + cut + 1);
   		return all.substr(0, cut);
   	}
   }
   #else
-  namespace stellanova_web
+  namespace fathom_web
   {
   	inline std::string get(const std::string& address, int line)
   	{
@@ -151,7 +151,7 @@ code:
   		if (URLDownloadToFileW(nullptr, w.c_str(), file, 0, nullptr) != S_OK)
   		{
   			DeleteFileW(file);
-  			stellanova::fail(line, "I couldn't get the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't get the web page \"" + address + "\".");
   		}
   		std::ifstream in(file, std::ios::binary);
   		std::ostringstream all;
@@ -171,7 +171,7 @@ code:
   		std::wstring w = wide(address);
   		DeleteUrlCacheEntryW(w.c_str());
   		if (URLDownloadToFileW(nullptr, w.c_str(), wide(name).c_str(), 0, nullptr) != S_OK)
-  			stellanova::fail(line, "I couldn't download \"" + address + "\".");
+  			fathom::fail(line, "I couldn't download \"" + address + "\".");
   	}
   	inline std::string send(const std::string& address, const std::string& body, int line)
   	{
@@ -186,7 +186,7 @@ code:
   		bool ok = false;
   		if (InternetCrackUrlW(w.c_str(), 0, 0, &parts))
   		{
-  			HINTERNET net = InternetOpenW(L"Stellanova", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+  			HINTERNET net = InternetOpenW(L"Fathom", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
   			HINTERNET site = net ? InternetConnectW(net, host, parts.nPort, nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0) : nullptr;
   			DWORD flags = INTERNET_FLAG_RELOAD | (parts.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0);
   			HINTERNET ask = site ? HttpOpenRequestW(site, L"POST", path, nullptr, nullptr, nullptr, flags, 0) : nullptr;
@@ -205,7 +205,7 @@ code:
   					InternetCloseHandle(h);
   		}
   		if (!ok)
-  			stellanova::fail(line, "I couldn't send to the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't send to the web page \"" + address + "\".");
   		return all;
   	}
   	inline double last_status = 0;
@@ -213,9 +213,9 @@ code:
   	inline std::string header_in(const std::string& raw, const std::string& name)  // one header's value, any capitals
   	{
   		std::istringstream lines(raw);
-  		std::string want = stellanova::lower(name) + ":";
+  		std::string want = fathom::lower(name) + ":";
   		for (std::string h; std::getline(lines, h);)
-  			if (stellanova::lower(h.substr(0, want.size())) == want)
+  			if (fathom::lower(h.substr(0, want.size())) == want)
   			{
   				std::string v = h.substr(want.size());
   				size_t a = v.find_first_not_of(" \t"), b = v.find_last_not_of(" \t\r");
@@ -249,7 +249,7 @@ code:
   		if (InternetCrackUrlW(wide(address).c_str(), 0, 0, &parts))
   		{
   			std::wstring target = std::wstring(path) + extra;
-  			HINTERNET net = InternetOpenW(L"Stellanova", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+  			HINTERNET net = InternetOpenW(L"Fathom", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
   			HINTERNET site = net ? InternetConnectW(net, host, parts.nPort, nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0) : nullptr;
   			DWORD flags = INTERNET_FLAG_RELOAD | (parts.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0);
   			HINTERNET ask = site ? HttpOpenRequestW(site, wide(way).c_str(), target.c_str(), nullptr, nullptr, nullptr, flags, 0) : nullptr;
@@ -274,7 +274,7 @@ code:
   					InternetCloseHandle(h);
   		}
   		if (!ok)
-  			stellanova::fail(line, "I couldn't reach the web page \"" + address + "\".");
+  			fathom::fail(line, "I couldn't reach the web page \"" + address + "\".");
   		return all;
   	}
   }
@@ -284,14 +284,14 @@ python:
   import urllib.request
   def get(address):
       try:
-          request = urllib.request.Request(address, headers={"User-Agent": "Stellanova"})
+          request = urllib.request.Request(address, headers={"User-Agent": "Fathom"})
           with urllib.request.urlopen(request, timeout=30) as reply:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
           raise RunError(0, f'I couldn\'t get the web page "{address}".')
   def download(address, name):
       try:
-          request = urllib.request.Request(address, headers={"User-Agent": "Stellanova"})
+          request = urllib.request.Request(address, headers={"User-Agent": "Fathom"})
           with urllib.request.urlopen(request, timeout=60) as reply, open(name, "wb") as out:
               out.write(reply.read())
       except Exception:
@@ -299,7 +299,7 @@ python:
   def send(address, message):
       try:
           request = urllib.request.Request(address, data=message.encode("utf-8"), method="POST",
-                                           headers={"User-Agent": "Stellanova", "Content-Type": "text/plain; charset=utf-8"})
+                                           headers={"User-Agent": "Fathom", "Content-Type": "text/plain; charset=utf-8"})
           with urllib.request.urlopen(request, timeout=30) as reply:
               return reply.read().decode("utf-8", errors="replace")
       except Exception:
@@ -309,7 +309,7 @@ python:
   def last_header(name):
       return last_headers[0].get(name.lower(), "")
   def ask(address, way, message, headers):
-      sent = {"User-Agent": "Stellanova"}
+      sent = {"User-Agent": "Fathom"}
       for h in headers.splitlines():
           if ":" in h:
               sent[h.split(":", 1)[0].strip()] = h.split(":", 1)[1].strip()
@@ -328,44 +328,44 @@ python:
       except Exception:
           raise RunError(0, f'I couldn\'t reach the web page "{address}".')
 
-to web page, given address (text), returning text = stellanova_web::get({address}, {line})
+to web page, given address (text), returning text = fathom_web::get({address}, {line})
   runs: get({address})
-  web: (await stellanova_web::get({address}, {line}))
-to download, given address (text) and file (text) = stellanova_web::download({address}, {file}, {line})
+  web: (await fathom_web::get({address}, {line}))
+to download, given address (text) and file (text) = fathom_web::download({address}, {file}, {line})
   runs: download({address}, {file})
-  web: (await stellanova_web::download({address}, {file}, {line}))
-to send to the web page, given address (text) and message (text), returning text = stellanova_web::send({address}, {message}, {line})
+  web: (await fathom_web::download({address}, {file}, {line}))
+to send to the web page, given address (text) and message (text), returning text = fathom_web::send({address}, {message}, {line})
   runs: send({address}, {message})
-  web: (await stellanova_web::send({address}, {message}, {line}))
-to ask the web, given address (text) and way (text) and message (text, usually "") and headers (text, usually ""), returning text = stellanova_web::ask({address}, {way}, {message}, {headers}, {line})
+  web: (await fathom_web::send({address}, {message}, {line}))
+to ask the web, given address (text) and way (text) and message (text, usually "") and headers (text, usually ""), returning text = fathom_web::ask({address}, {way}, {message}, {headers}, {line})
   runs: ask({address}, {way}, {message}, {headers})
-  web: (await stellanova_web::ask({address}, {way}, {message}, {headers}, {line}))
-the last web status = stellanova_web::last_status, number, read only
+  web: (await fathom_web::ask({address}, {way}, {message}, {headers}, {line}))
+the last web status = fathom_web::last_status, number, read only
   runs: last_status[0]
-  web: stellanova_web.status
-to the last web header, given name (text), returning text = stellanova_web::header_in(stellanova_web::last_headers, {name})
+  web: fathom_web.status
+to the last web header, given name (text), returning text = fathom_web::header_in(fathom_web::last_headers, {name})
   runs: last_header({name})
-  web: stellanova_web.header({name})
+  web: fathom_web.header({name})
 
 javascript:
-  const stellanova_web = {
+  const fathom_web = {
     async fetched(address, options, line, problem) {
       try {
         const reply = await fetch(address, options);
         if (!reply.ok) throw new Error(String(reply.status));
         return reply;
       } catch {
-        stellanova.fail(line, problem);
+        fathom.fail(line, problem);
       }
     },
-    get: async (address, line) => (await stellanova_web.fetched(address, {}, line, `I couldn't get the web page "${address}".`)).text(),
+    get: async (address, line) => (await fathom_web.fetched(address, {}, line, `I couldn't get the web page "${address}".`)).text(),
     async send(address, message, line) {
       const options = { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8" }, body: message };
-      return (await stellanova_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
+      return (await fathom_web.fetched(address, options, line, `I couldn't send to the web page "${address}".`)).text();
     },
     status: 0,
     headers: new Map(),
-    header: (name) => stellanova_web.headers.get(name) ?? "",
+    header: (name) => fathom_web.headers.get(name) ?? "",
     async ask(address, way, message, headers, line) {
       const sent = {};
       for (const h of headers.split(/\r?\n/)) if (h.includes(":")) sent[h.slice(0, h.indexOf(":")).trim()] = h.slice(h.indexOf(":") + 1).trim();
@@ -374,19 +374,19 @@ javascript:
       try {
         reply = await fetch(address, { method: way, headers: sent, body: message || undefined });
       } catch {
-        stellanova.fail(line, `I couldn't reach the web page "${address}".`);
+        fathom.fail(line, `I couldn't reach the web page "${address}".`);
       }
-      stellanova_web.status = reply.status;
-      stellanova_web.headers = reply.headers;
+      fathom_web.status = reply.status;
+      fathom_web.headers = reply.headers;
       return reply.text();
     },
     async download(address, file, line) {
       const problem = `I couldn't download "${address}".`;
-      const bytes = new Uint8Array(await (await stellanova_web.fetched(address, {}, line, problem)).arrayBuffer());
+      const bytes = new Uint8Array(await (await fathom_web.fetched(address, {}, line, problem)).arrayBuffer());
       try {
         require("fs").writeFileSync(file, bytes);
       } catch {
-        stellanova.fail(line, problem);
+        fathom.fail(line, problem);
       }
     },
   };

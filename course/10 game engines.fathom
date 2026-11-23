@@ -1,0 +1,26 @@
+whisper: Lesson 10: Unity, Unreal and Godot
+whisper:
+whisper: You can also write what objects do in a real game engine with Fathom.
+whisper: This file won't run here on its own, since there's no engine around it. That's fine.
+whisper:
+whisper: In a terminal, set your project up once with one of these:
+whisper:   fathom unity C:\path\to\MyUnityProject
+whisper:   fathom unreal C:\path\to\MyUnrealProject
+whisper:   fathom godot C:\path\to\MyGodotProject
+whisper: Then put a .fathom file like this one in the project and add a Fathom Script to an object.
+whisper:
+whisper: The engine calls "begin" when the object starts, "every frame" each frame, and "touched"
+whisper: when it bumps into something. This one spins, and turns whatever touches it red.
+whisper:
+whisper: That's the end of the course. Thanks for sticking with it! LANGUAGE.md has every word there is,
+whisper: and the examples folder has bigger programs you can pull apart.
+
+use: engine
+
+to every frame, given seconds (a number):
+  turn the object with (me, 90 times seconds)
+and the universe said i love you
+
+to touched, given other (a number):
+  colour the object with (other, "red")
+and the universe said i love you

@@ -1,0 +1,16 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "Fathom",
+  "Description": "Fathom programs on actors: add a Fathom Component and name a .fathom file in the project's Fathom folder.",
+  "Category": "Scripting",
+  "CanContainContent": false,
+  "Modules": [
+    {
+      "Name": "Fathom",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

@@ -13,8 +13,8 @@ public class CheckReport : MonoBehaviour
     {
         if (type == LogType.Log)
             said += "SAID " + message + "\n";
-        else if (type == LogType.Error && message.StartsWith("Stellanova: "))
-            said += "SAID problem: " + message.Substring("Stellanova: ".Length) + "\n";
+        else if (type == LogType.Error && message.StartsWith("Fathom: "))
+            said += "SAID problem: " + message.Substring("Fathom: ".Length) + "\n";
         else if (type != LogType.Warning)
             said += "BAD " + type + ": " + message.Replace("\n", " ") + "\n";
     }

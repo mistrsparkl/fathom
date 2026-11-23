@@ -4,7 +4,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 PARTS = HERE / "out" / "parts"
-FILM = HERE / "out" / "Stellanova Tutorial.mp4"
+FILM = HERE / "out" / "Fathom Tutorial.mp4"
 
 
 def seconds_of(film):
@@ -26,7 +26,7 @@ missing = [f.name for f in films if not f.exists()]
 if missing:
     raise SystemExit("not filmed yet: " + ", ".join(missing))
 
-chapters, at = [";FFMETADATA1", "title=Stellanova: every part of the language"], 0.0
+chapters, at = [";FFMETADATA1", "title=Fathom: every part of the language"], 0.0
 for lesson, film in zip(lessons, films):
     length = seconds_of(film)
     chapters += ["[CHAPTER]", "TIMEBASE=1/1000", f"START={int(at * 1000)}", f"END={int((at + length) * 1000)}", f"title={title_of(lesson)}"]

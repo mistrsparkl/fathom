@@ -1,9 +1,0 @@
-[configuration]
-
-entry_symbol = "stellanova_godot_init"
-compatibility_minimum = "4.4"
-
-[libraries]
-
-windows.x86_64 = "res://addons/stellanova/stellanova_godot.dll"
-linux.x86_64 = "res://addons/stellanova/stellanova_godot.so"

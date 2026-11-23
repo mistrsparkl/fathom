@@ -1,16 +1,16 @@
-# Learning Stellanova
+# Learning Fathom
 
 This goes from your first line all the way to a small game. Every program in here actually runs. The tests run each one and check it prints what's written underneath.
 
-Save a program in a file that ends in `.stella`, like `hello.stella`, and run it with:
+Save a program in a file that ends in `.fathom`, like `hello.fathom`, and run it with:
 
 ```
-stellanova hello.stella
+fathom hello.fathom
 ```
 
 ## 1. Saying something
 
-```stellanova
+```fathom
 genesis:
   scrawl "Hello!"
 and the universe said i love you
@@ -26,7 +26,7 @@ Programs are made of commands. Every program starts at `genesis:`. The lines tha
 
 If you put a name in square brackets inside some text, you get whatever that name holds:
 
-```stellanova
+```fathom
 genesis:
   set name to "Sam"
   set coins to 3
@@ -42,7 +42,7 @@ It only does that when there are words in the brackets, so something like `"[0-9
 
 ## 2. Remembering things
 
-```stellanova
+```fathom
 genesis:
   set name to "Sam"
   set age to 11
@@ -60,7 +60,7 @@ Next year Sam will be 12.
 
 ## 3. Choosing
 
-```stellanova
+```fathom
 genesis:
   set temperature to 31
   if temperature exceeds 30:
@@ -76,11 +76,11 @@ and the universe said i love you
 It's hot.
 ```
 
-`if` only runs its pushed-in lines when what comes after it is true. If it isn't, Stellanova tries the `otherwise if`, and then the `otherwise`.
+`if` only runs its pushed-in lines when what comes after it is true. If it isn't, Fathom tries the `otherwise if`, and then the `otherwise`.
 
 When you're choosing based on one value, `depending on` is nicer:
 
-```stellanova
+```fathom
 genesis:
   set weather to "snow"
   depending on weather:
@@ -103,7 +103,7 @@ Each line under it has a value, or a few with commas, then a `:` and what to do.
 
 A `check` line says something that ought to be true. Put your checks in commands whose names start with `test`:
 
-```stellanova
+```fathom
 to double, given x (a number), returning a number:
   return x times 2
 and the universe said i love you
@@ -122,7 +122,7 @@ and the universe said i love you
 42
 ```
 
-`stellanova test maths.stella` runs the tests instead of genesis and tells you how they went:
+`fathom test maths.fathom` runs the tests instead of genesis and tells you how they went:
 
 ```
 ✓ test doubling
@@ -133,10 +133,10 @@ When a check fails you get the line and what went wrong, like `✗ test doubling
 
 ### Watching a program run
 
-`stellanova watch` runs a program one line at a time and shows you the names that change:
+`fathom watch` runs a program one line at a time and shows you the names that change:
 
 ```
-> stellanova watch hot.stella
+> fathom watch hot.fathom
 ▸ line 2: set temperature to 31
     temperature: 31
 ▸ line 3: if temperature exceeds 30:   → yes
@@ -146,7 +146,7 @@ It's hot.
 
 ## 4. Doing things again
 
-```stellanova
+```fathom
 genesis:
   repeat 3 times:
     scrawl "Hip hip hooray!"
@@ -172,7 +172,7 @@ Hip hip hooray!
 
 You can tell a command what to do whenever something happens, or every so often. Those lines kick in after the rest of the command is done and keep going until the program ends:
 
-```stellanova
+```fathom
 genesis:
   set ticks to 0
   every 0.1 seconds:
@@ -197,7 +197,7 @@ Games use this a lot. `every frame:` is where moving and drawing go, and `whenev
 
 ## 5. Lists
 
-```stellanova
+```fathom
 genesis:
   set shopping to a list of ("milk", "eggs")
   add "bread" to shopping
@@ -222,7 +222,7 @@ A list holds a bunch of values in order. The first item is item 1, not 0.
 
 ## 6. Your own commands
 
-```stellanova
+```fathom
 genesis:
   greet with "Sam"
   greet with "Ann"
@@ -250,7 +250,7 @@ Commands can take inputs. They go after `given`, with what kind they are in brac
 
 You can give an input a usual value. If you leave it out when you call the command, it uses that:
 
-```stellanova
+```fathom
 to greet, given name (text, usually "friend") and count (a number, usually 1):
   repeat count times:
     scrawl "Hello, [name]!"
@@ -274,7 +274,7 @@ Inputs with usual values have to go last, and the value has to be written out: s
 
 ## 7. Your own kinds of things
 
-```stellanova
+```fathom
 a pet has:
   name (text)
   age (a number)
@@ -315,12 +315,12 @@ and the universe said i love you
 Mistakes in your script get caught before it runs, and the message tries to say what to do about it:
 
 ```
-guess.stella line 4: I don't know 'scroe'. Did you mean 'score'?
+guess.fathom line 4: I don't know 'scroe'. Did you mean 'score'?
 ```
 
 If something goes wrong while it's running, it stops and tells you the line. Wrap it in `try:` if you'd rather keep going:
 
-```stellanova
+```fathom
 genesis:
   try:
     scrawl contents of file "missing.txt"
@@ -337,7 +337,7 @@ Still going.
 
 You can make your own commands fail on purpose with `raise an error`, and `try:` catches those too:
 
-```stellanova
+```fathom
 to fly, given fuel (a number):
   if fuel falls below 10: raise an error with "not enough fuel (only " plus fuel plus ")"
   scrawl "Up we go!"
@@ -357,7 +357,7 @@ Grounded: not enough fuel (only 3)
 
 ## 10. A game
 
-A program can open a window, which Stellanova calls a world, and draw in it. Here's a whole game. It's a ball you move around with the arrow keys:
+A program can open a window, which Fathom calls a world, and draw in it. Here's a whole game. It's a ball you move around with the arrow keys:
 
 ```
 genesis:
@@ -382,13 +382,13 @@ Space sends the ball back to where it started, which is the little white dot. `c
 
 The window words come from a library, which is just a set of extra words. You don't have to load it. Using one of its words is enough.
 
-For a bigger game, look at `examples/dodge.stella`. You dodge falling balls.
+For a bigger game, look at `examples/dodge.fathom`. You dodge falling balls.
 
 ## 11. Kinds of kinds
 
 A dog is a kind of pet. It has everything a pet has, plus some more. Any command that works on pets works on dogs too, unless you've written a dog version:
 
-```stellanova
+```fathom
 a pet has:
   name (text)
 and the universe said i love you
@@ -425,7 +425,7 @@ Rex barks and knows 1 tricks.
 
 `the command double` gives you the command itself instead of running it. You can store it, pass it to another command, and run it later with `invoke`:
 
-```stellanova
+```fathom
 to double, given x (a number), returning a number:
   return x times 2
 and the universe said i love you
@@ -451,7 +451,7 @@ and the universe said i love you
 
 `meanwhile` starts a command and moves on without waiting for it. `wait for the others` waits until they've all finished:
 
-```stellanova
+```fathom
 to note down, given name (text):
   inscribe "hello from " plus name into file name plus ".txt"
 and the universe said i love you
@@ -472,7 +472,7 @@ hello from first / hello from second
 
 A lot of websites and programs talk in JSON. `as saved text` turns anything into JSON, and `load ... from the text` reads it back in. Patterns let you find bits of text by what they look like:
 
-```stellanova
+```fathom
 genesis:
   set scores to a table of numbers
   set entry "Sam" of scores to 31
@@ -496,11 +496,11 @@ There's more in the libraries. `web` fetches and sends pages, `server` turns you
 
 ## 15. Grammar for people
 
-Stellanova is meant to be read by people, so it wants proper grammar in a few spots. You need `the` before a part, as in `the size of` or `the title of`. You need `a` or `an` after `conjure` and before `list containing`.
+Fathom is meant to be read by people, so it wants proper grammar in a few spots. You need `the` before a part, as in `the size of` or `the title of`. You need `a` or `an` after `conjure` and before `list containing`.
 The computer checks they're there and then ignores them. They don't change what the program does.
 If a command has a lot of inputs, you can put them on their own lines under `use:`:
 
-```stellanova
+```fathom
 a notice has:
   title (text)
 and the universe said i love you
@@ -533,11 +533,11 @@ and the universe said i love you
 5
 ```
 
-Write `scrawl size of kept notices` without the `the` and Stellanova will tell you: Write 'the size of', not 'size of'.
+Write `scrawl size of kept notices` without the `the` and Fathom will tell you: Write 'the size of', not 'size of'.
 
 ## 16. Tidy programs
 
-```stellanova
+```fathom
 a cost has:
   kind (text)
   amount (a number)
@@ -575,4 +575,4 @@ Two things that help with bigger programs. If you write a part as `amount (a num
 
 ## Where next
 
-LANGUAGE.md has everything the language can do. Type `stellanova` by itself to try lines out one at a time. And `stellanova build game.stella` turns your program into an `.exe` that runs fast and on its own.
+LANGUAGE.md has everything the language can do. Type `fathom` by itself to try lines out one at a time. And `fathom build game.fathom` turns your program into an `.exe` that runs fast and on its own.

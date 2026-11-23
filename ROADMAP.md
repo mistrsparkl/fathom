@@ -1,6 +1,6 @@
 # Roadmap
 
-Everything here has to work three ways (run straight from the script, built into an .exe, and on the web) unless it says otherwise. It also needs tests in `test_stellanova.py` and a write-up in LANGUAGE.md.
+Everything here has to work three ways (run straight from the script, built into an .exe, and on the web) unless it says otherwise. It also needs tests in `test_fathom.py` and a write-up in LANGUAGE.md.
 
 ## Done
 
@@ -21,7 +21,7 @@ Reaching other stuff
 - [x] Calling Python packages (only when running straight from the script)
 - [x] Sockets: TCP, UDP and WebSockets
 - [x] Threads that share things, with locks
-- [x] `stellanova get <library>`
+- [x] `fathom get <library>`
 
 Libraries
 - [x] Animation, physics, sound making, pictures
@@ -40,11 +40,11 @@ Tools
 - [x] WebAssembly, `meanwhile` included
 - [x] Linux, with windows, sound, forms and pictures
 - [x] VS Code: mistakes while you type, word suggestions, help when you hover
-- [x] `stellanova tidy`
+- [x] `fathom tidy`
 - [x] Every whole program in LANGUAGE.md gets checked by the tests
 - [x] Mistake messages never show C++, Python or JavaScript words
 
-Things real programs needed (from writing `todo.stella`, `guestbook.stella` and `spending.stella`)
+Things real programs needed (from writing `todo.fathom`, `guestbook.fathom` and `spending.fathom`)
 - [x] `folder "saves" exists`
 - [x] Output shows up straight away, even when it's going to a file
 - [x] `sorted totals by amount, biggest first`, and sorting by anything (`by each n becomes ...`)

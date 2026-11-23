@@ -1,13 +1,13 @@
-// Where Stellanova is, its library words and its mistakes.
+// Where Fathom is, its library words and its mistakes.
 const fs = require("fs");
 const path = require("path");
 
-// The folder with stellanova.py.
+// The folder with fathom.py.
 function home(setting) {
   const made = path.join(__dirname, "home.txt");
   const places = [setting, ...(process.env.PATH || "").split(path.delimiter),
                   fs.existsSync(made) ? fs.readFileSync(made, "utf8").trim() : path.join(__dirname, "..", "..")].filter(Boolean);
-  return places.find((p) => fs.existsSync(path.join(p, "stellanova.py"))) || null;
+  return places.find((p) => fs.existsSync(path.join(p, "fathom.py"))) || null;
 }
 
 // Every library word, from libraries/*.words.

@@ -1,10 +1,10 @@
 title: Remembering and working things out
 card: Chapter 2 | Remembering things | Names, numbers, text, and working things out
 say:
-  Programs need to remember things. In Stellanova, you give a value a name with the word set.
+  Programs need to remember things. In Fathom, you give a value a name with the word set.
 uncard
 
-new: shop.stella
+new: shop.fathom
 type:
   genesis:
     set price to 4.5
@@ -106,7 +106,7 @@ type:
 run: expect a mistake
 zoom: output
 say:
-  Stellanova finds the mistake before the program even starts, and says it plainly:
+  Fathom finds the mistake before the program even starts, and says it plainly:
   count holds a number, not text. It even says which line.
 wait
 zoom: out

@@ -1,10 +1,10 @@
-# Stellanova: a programming language you can read out loud
+# Fathom: a programming language you can read out loud
 
-I wanted a language where the code just says what it does, in normal words. Stellanova is what I ended up with. You can run a script straight away, build it into a fast `.exe`, turn it into WebAssembly, or turn it into JavaScript for a web page. This post goes through most of it with small examples.
+I wanted a language where the code just says what it does, in normal words. Fathom is what I ended up with. You can run a script straight away, build it into a fast `.exe`, turn it into WebAssembly, or turn it into JavaScript for a web page. This post goes through most of it with small examples.
 
 ## Hello
 
-A Stellanova program is a text file ending in `.stella`:
+A Fathom program is a text file ending in `.fathom`:
 
 ```
 genesis:
@@ -12,22 +12,22 @@ genesis:
 and the universe said i love you
 ```
 
-Run it with `stellanova hello.stella`. There's no project file and no compile step you have to think about.
+Run it with `fathom hello.fathom`. There's no project file and no compile step you have to think about.
 
 Every program starts at `genesis:`. Every block, whether it's genesis, a command or a kind of thing, ends with `and the universe said i love you`. It's a bit sentimental, I know. I like it.
 
 The other ways to run things:
 
 ```
-stellanova build game.stella          a real .exe (or a Linux program if you're on Linux)
-stellanova wasm game.stella           WebAssembly, plus a .mjs so node can run it
-stellanova web game.stella site       JavaScript for a web page
-stellanova check game.stella          look for mistakes without running
-stellanova test maths.stella          run the commands whose names start with test
-stellanova debug game.stella 12 30    stop before lines 12 and 30 so you can poke around
-stellanova profile game.stella        see which lines are slow
-stellanova watch game.stella          show each line as it runs
-stellanova                            type lines and they run right away (bye to leave)
+fathom build game.fathom          a real .exe (or a Linux program if you're on Linux)
+fathom wasm game.fathom           WebAssembly, plus a .mjs so node can run it
+fathom web game.fathom site       JavaScript for a web page
+fathom check game.fathom          look for mistakes without running
+fathom test maths.fathom          run the commands whose names start with test
+fathom debug game.fathom 12 30    stop before lines 12 and 30 so you can poke around
+fathom profile game.fathom        see which lines are slow
+fathom watch game.fathom          show each line as it runs
+fathom                            type lines and they run right away (bye to leave)
 ```
 
 Whichever way you run a program, it does the same thing. The tests make sure of that by running everything both ways and comparing the output.
@@ -37,7 +37,7 @@ On speed: built programs keep up with C++ for number crunching, function calls a
 When you get something wrong, it tells you in plain words:
 
 ```
-follow.stella line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
+follow.fathom line 31: I don't know 'walk sped'. Did you mean 'walk speed'?
 ```
 
 ## Values
@@ -240,7 +240,7 @@ There are libraries for lots more: sound, pictures, physics, animation, database
 
 ## The web
 
-`stellanova web game.stella site` turns a program into a web page. Window games just work there, since the window turns into a canvas. You can also deal with the page directly:
+`fathom web game.fathom site` turns a program into a web page. Window games just work there, since the window turns into a canvas. You can also deal with the page directly:
 
 ```
 the world remembers:
@@ -259,4 +259,4 @@ and the universe said i love you
 
 ## That's most of it
 
-If you want to keep going, look in the examples folder. `guess.stella` is a guessing game, `pets.stella` has lists and kinds of things, `dodge.stella` and `pong.stella` are window games, and `driftstone.stella` is an island made of blocks that you can dig, build on and craft with. LANGUAGE.md has everything else.
+If you want to keep going, look in the examples folder. `guess.fathom` is a guessing game, `pets.fathom` has lists and kinds of things, `dodge.fathom` and `pong.fathom` are window games, and `driftstone.fathom` is an island made of blocks that you can dig, build on and craft with. LANGUAGE.md has everything else.

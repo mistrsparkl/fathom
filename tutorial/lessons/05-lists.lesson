@@ -3,7 +3,7 @@ card: Chapter 5 | Lists and tables | Keeping many things together
 say: One name can hold many values, in a list. A list keeps them in order.
 uncard
 
-new: lists.stella
+new: lists.fathom
 type:
   genesis:
     set shopping to a list of ("milk", "eggs")
