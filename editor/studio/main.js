@@ -1,4 +1,4 @@
-// Studia's shell: rebuilds the screens and system side if changed, then opens the window.
+// Studio's shell: rebuilds the screens and system side if changed, then opens the window.
 
 const { app, BrowserWindow } = require("electron");
 const { spawn, execFileSync } = require("child_process");
@@ -62,22 +62,22 @@ async function start() {
   system = spawn(systemExe, [String(port), screens, home, python.join(" ")], { windowsHide: true, stdio: "ignore" });
   await answering(port);
   const win = new BrowserWindow({
-    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Fathom Studia",
+    width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Fathom Studio", icon: path.join(here, windows ? "icon.ico" : "icon.png"),
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
-  // For tests: STUDIA_PLAY runs a script, STUDIA_SHOT saves a picture and closes.
+  // For tests: STUDIO_PLAY runs a script, STUDIO_SHOT saves a picture and closes.
   win.webContents.once("did-finish-load", () => {
-    if (process.env.STUDIA_PLAY) win.webContents.on("console-message", (e) => console.log(e.message));
-    if (process.env.STUDIA_PLAY) setTimeout(() => require(process.env.STUDIA_PLAY)(win), 1500);
-    if (process.env.STUDIA_SHOT)
+    if (process.env.STUDIO_PLAY) win.webContents.on("console-message", (e) => console.log(e.message));
+    if (process.env.STUDIO_PLAY) setTimeout(() => require(process.env.STUDIO_PLAY)(win), 1500);
+    if (process.env.STUDIO_SHOT)
       setTimeout(async () => {
         try {
-          fs.writeFileSync(process.env.STUDIA_SHOT, (await win.webContents.capturePage()).toPNG());
+          fs.writeFileSync(process.env.STUDIO_SHOT, (await win.webContents.capturePage()).toPNG());
         } finally {
           app.quit();
         }
-      }, Number(process.env.STUDIA_SHOT_WAIT || 4000));
+      }, Number(process.env.STUDIO_SHOT_WAIT || 4000));
   });
 }
 

@@ -6,7 +6,7 @@ say:
   At the end, we'll make a whole platform game together, and take it apart to see how it works.
 uncard
 
-say: This is Fathom Studia, where we'll write everything. Let's take a quick look around.
+say: This is Fathom Studio, where we'll write everything. Let's take a quick look around.
 point: #files
 say: On the left are the files in our folder. Programs are files whose names end in dot fathom.
 point: #word-search

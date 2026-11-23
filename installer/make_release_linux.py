@@ -14,18 +14,18 @@ from pathlib import Path
 
 HOME = Path(__file__).resolve().parents[1]
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "dev"
-electron = json.loads((HOME / "editor" / "studia" / "node_modules" / "electron" / "package.json").read_text())["version"]
+electron = json.loads((HOME / "editor" / "studio" / "node_modules" / "electron" / "package.json").read_text())["version"]
 
 with tempfile.TemporaryDirectory() as d:
     src = Path(d) / "src"
     src.mkdir()
     archive = subprocess.run(["git", "archive", "HEAD"], cwd=HOME, capture_output=True, check=True).stdout
     tarfile.open(fileobj=io.BytesIO(archive)).extractall(src, filter="tar")
-    studia = src / "editor" / "studia"
-    subprocess.run([sys.executable, str(src / "fathom.py"), "web", "screens.fathom", "ui"], cwd=studia, check=True)
-    subprocess.run([sys.executable, str(src / "fathom.py"), "build", "system.fathom"], cwd=studia, check=True)
-    later = time.time() + 60  # (newer than their .fathom files, so Studia doesn't rebuild them)
-    for f in (studia / "system", studia / "ui" / "screens.js", studia / "ui" / "fathom.js"):
+    studio = src / "editor" / "studio"
+    subprocess.run([sys.executable, str(src / "fathom.py"), "web", "screens.fathom", "ui"], cwd=studio, check=True)
+    subprocess.run([sys.executable, str(src / "fathom.py"), "build", "system.fathom"], cwd=studio, check=True)
+    later = time.time() + 60  # (newer than their .fathom files, so Studio doesn't rebuild them)
+    for f in (studio / "system", studio / "ui" / "screens.js", studio / "ui" / "fathom.js"):
         os.utime(f, (later, later))
     for skip in ("tutorial", "unreal", "blog"):
         shutil.rmtree(src / skip, ignore_errors=True)
@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory() as d:
 
     url = f"https://github.com/electron/electron/releases/download/v{electron}/electron-v{electron}-linux-x64.zip"
     print("getting", url)
-    window = src / "studia-window"
+    window = src / "studio-window"
     with zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(url).read())) as z:
         for info in z.infolist():
             z.extract(info, window)

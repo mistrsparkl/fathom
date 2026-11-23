@@ -1185,7 +1185,7 @@ def program_checks():
     assert shown == ("\u25b8 line 2: set coins to 3\n    coins: 3\n\u25b8 line 3: if coins exceeds 2:   \u2192 yes\n\u25b8 line 4: scrawl \"rich\"\nrich\n"
                      "\u25b8 line 5: for each n from 1 to 2:\n\u25b8 line 6: add n to coins\n    coins: 4\n\u25b8 line 6: add n to coins\n    coins: 6\n"), repr(shown)
 
-    # fathom debug, and Studia's marked lines
+    # fathom debug, and Studio's marked lines
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / "d.fathom").write_text('to double, given x (a number), returning a number:\n  set y to x times 2\n  return y\n'
                                           'and the universe said i love you\n\ngenesis:\n  set total to 0\n  for each n from 1 to 3:\n'
@@ -1196,7 +1196,7 @@ def program_checks():
         assert stops == ["\u25a0 line 7: set total to 0", "\u25a0 line 8: for each n from 1 to 3:", "\u25a0 line 9: set total to total plus double with n",
                          "\u25a0 line 2: set y to x times 2", "    x: 1", "\u25a0 line 9: set total to total plus double with n",
                          "\u25a0 line 9: set total to total plus double with n", "12"], stops
-        shown = subprocess.run([sys.executable, str(HERE / "fathom.py"), "debug", "--studia", "d.fathom", "3"], input="go\nforget 3\ngo\n",
+        shown = subprocess.run([sys.executable, str(HERE / "fathom.py"), "debug", "--studio", "d.fathom", "3"], input="go\nforget 3\ngo\n",
                                capture_output=True, text=True, encoding="utf-8", cwd=d).stdout
         marked = [json.loads(l[8:]) for l in shown.splitlines() if l.startswith("@@debug ")]
         assert [(m["line"], m["names"].get("y"), m["stops"]) for m in marked] == [(3, "2", [3]), (3, "4", [3]), (3, "4", [])], marked

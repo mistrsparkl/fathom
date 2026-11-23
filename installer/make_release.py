@@ -8,17 +8,17 @@ import zipfile
 from pathlib import Path
 
 HOME = Path(__file__).resolve().parents[1]
-STUDIA = HOME / "editor" / "studia"
-WINDOW = STUDIA / "node_modules" / "electron" / "dist"
+STUDIO = HOME / "editor" / "studio"
+WINDOW = STUDIO / "node_modules" / "electron" / "dist"
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "dev"
 
 if not WINDOW.exists():
-    sys.exit("Electron is missing: run npm install in editor/studia first.")
+    sys.exit("Electron is missing: run npm install in editor/studio first.")
 py = [sys.executable, str(HOME / "fathom.py")]
-subprocess.run(py + ["web", "screens.fathom", "ui"], cwd=STUDIA, check=True)
-subprocess.run(py + ["build", "system.fathom"], cwd=STUDIA, check=True)
-made = [STUDIA / "system.exe", STUDIA / "ui" / "screens.js", STUDIA / "ui" / "fathom.js"]
-now = time.time() + 60  # (newer than their .fathom files, so Studia doesn't rebuild them)
+subprocess.run(py + ["web", "screens.fathom", "ui"], cwd=STUDIO, check=True)
+subprocess.run(py + ["build", "system.fathom"], cwd=STUDIO, check=True)
+made = [STUDIO / "system.exe", STUDIO / "ui" / "screens.js", STUDIO / "ui" / "fathom.js"]
+now = time.time() + 60  # (newer than their .fathom files, so Studio doesn't rebuild them)
 for f in made:
     os.utime(f, (now, now))
 
@@ -33,7 +33,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6, strict_tim
         z.write(f, f.relative_to(HOME).as_posix())
     for f in WINDOW.rglob("*"):
         if f.is_file():
-            z.write(f, "studia-window/" + f.relative_to(WINDOW).as_posix())
+            z.write(f, "studio-window/" + f.relative_to(WINDOW).as_posix())
     z.write(HOME / "installer" / "uninstall.ps1", "uninstall.ps1")
     z.writestr("VERSION", VERSION)
 print(f"{out} ({out.stat().st_size // 1_000_000} MB)")

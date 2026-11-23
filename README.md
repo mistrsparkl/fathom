@@ -29,7 +29,7 @@ Linux:
 curl -fsSL https://raw.githubusercontent.com/mistrsparkl/fathom/main/install.sh | sh
 ```
 
-That gets you the `fathom` command and Fathom Studia, the editor. It'll grab Python if you don't have it, and the compiler stuff that makes programs fast. Open Studia and hit Learn if you're new.
+That gets you the `fathom` command and Fathom Studio, the editor. It'll grab Python if you don't have it, and the compiler stuff that makes programs fast. Open Studio and hit Learn if you're new.
 
 You can uninstall it from Apps & features on Windows, or with `sh ~/.local/share/fathom/uninstall.sh` on Linux.
 
@@ -56,7 +56,7 @@ You can also use Fathom inside Unity, Unreal and Godot. Run `fathom unity <proje
 
 New? Read TUTORIAL.md. LANGUAGE.md has everything. There are example programs in `examples/` and the libraries are in `libraries/`.
 
-Studia lives in `editor/studia`, and it's written in Fathom too. To run it from the repo: `npm install` once, then `npm start`.
+Studio lives in `editor/studio`, and it's written in Fathom too. To run it from the repo: `npm install` once, then `npm start`.
 
 There's also a VS Code extension: `py -3 editor/make_vsix.py`, then `code --install-extension editor/fathom.vsix`.
 

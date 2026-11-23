@@ -1,6 +1,6 @@
 {
-  "name": "fathom-studia",
-  "productName": "Fathom Studia",
+  "name": "fathom-studio",
+  "productName": "Fathom Studio",
   "version": "0.1.0",
   "description": "A place to write, check and run Fathom programs.",
   "main": "main.js",

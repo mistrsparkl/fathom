@@ -36,7 +36,7 @@ Libraries
 - [x] Every library word works on the web too, apart from C libraries and Python packages
 
 Tools
-- [x] Debugger and profiler, in Studia and on the command line
+- [x] Debugger and profiler, in Studio and on the command line
 - [x] WebAssembly, `meanwhile` included
 - [x] Linux, with windows, sound, forms and pictures
 - [x] VS Code: mistakes while you type, word suggestions, help when you hover

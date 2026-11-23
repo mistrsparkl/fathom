@@ -6,13 +6,13 @@ mygame.fathom
 !editor/vscode/**/*.json
 *.vsix
 runtime/built/
-!editor/studia/ui/
-!editor/studia/package.json
-!editor/studia/package-lock.json
-editor/studia/node_modules/
-editor/studia/generated/
-editor/studia/ui/screens.js
-editor/studia/ui/fathom.js
+!editor/studio/ui/
+!editor/studio/package.json
+!editor/studio/package-lock.json
+editor/studio/node_modules/
+editor/studio/generated/
+editor/studio/ui/screens.js
+editor/studio/ui/fathom.js
 
 # the tutorial film: everything made while filming
 tutorial/out/
@@ -27,5 +27,5 @@ libraries/got/
 # release zips
 dist/
 
-# Studia built on Linux
-editor/studia/system
+# Studio built on Linux
+editor/studio/system

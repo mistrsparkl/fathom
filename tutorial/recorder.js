@@ -1,4 +1,4 @@
-// Films lessons from Studia. Run in editor/studia: npx electron ../../tutorial/recorder.js <lessons>
+// Films lessons from Studio. Run in editor/studio: npx electron ../../tutorial/recorder.js <lessons>
 
 const { app, BrowserWindow } = require("electron");
 const { spawn, execFileSync } = require("child_process");
@@ -9,7 +9,7 @@ const path = require("path");
 
 const here = __dirname;
 const home = path.resolve(here, "..");
-const studia = path.join(home, "editor", "studia");
+const studio = path.join(home, "editor", "studio");
 const out = path.join(here, "out");
 const workspace = path.join(out, "workspace");
 const WIDTH = 1920, HEIGHT = 1080, FPS = 30;
@@ -43,7 +43,7 @@ function readLesson(file) {
   return { title, files, steps, name: path.basename(file, ".lesson"), folder: path.dirname(file) };
 }
 
-// ---- Studia, its system side, and a file server
+// ---- Studio, its system side, and a file server
 
 function freePort() {
   return new Promise((resolve) => {
@@ -64,7 +64,7 @@ async function answering(port) {
       await wait(150);
     }
   }
-  throw new Error("the studia's system side didn't answer");
+  throw new Error("the studio's system side didn't answer");
 }
 
 function serveOut(port) {  // games' films, for the page to play
@@ -76,7 +76,7 @@ function serveOut(port) {  // games' films, for the page to play
   }).listen(port, "127.0.0.1");
 }
 
-// ---- the layer over Studia: camera, captions, cursor, cards
+// ---- the layer over Studio: camera, captions, cursor, cards
 
 const OVERLAY = String.raw`
 (() => {
@@ -308,8 +308,8 @@ async function film(lesson, filePort) {
   fs.mkdirSync(workspace, { recursive: true });
   for (const f of lesson.files) fs.copyFileSync(path.join(lesson.folder, "files", f), path.join(workspace, path.basename(f)));
   const appdata = path.join(out, "appdata");
-  fs.mkdirSync(path.join(appdata, "Fathom Studia"), { recursive: true });
-  fs.writeFileSync(path.join(appdata, "Fathom Studia", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
+  fs.mkdirSync(path.join(appdata, "Fathom Studio"), { recursive: true });
+  fs.writeFileSync(path.join(appdata, "Fathom Studio", "settings.json"), JSON.stringify({ folder: workspace, files: [] }));
 
   // the voice first, so timings are known
   const said = lesson.steps.filter((s) => s.what === "say").map((s) => s.value);
@@ -326,7 +326,7 @@ async function film(lesson, filePort) {
   }
 
   const port = await freePort();
-  const system = spawn(path.join(studia, "system.exe"), [String(port), path.join(studia, "ui"), home], {
+  const system = spawn(path.join(studio, "system.exe"), [String(port), path.join(studio, "ui"), home], {
     windowsHide: true, stdio: "ignore", env: { ...process.env, APPDATA: appdata } });
   await answering(port);
   const win = new BrowserWindow({ width: WIDTH, height: HEIGHT, show: false, useContentSize: true,
@@ -606,9 +606,9 @@ app.disableHardwareAcceleration();
 app.on("window-all-closed", () => {});  // each lesson closes its window; keep going to the next
 app.whenReady().then(async () => {
   try {
-    execFileSync("py", ["-3", path.join(home, "fathom.py"), "web", "screens.fathom", "ui"], { cwd: studia, windowsHide: true });
-    if (!fs.existsSync(path.join(studia, "system.exe")))
-      execFileSync("py", ["-3", path.join(home, "fathom.py"), "build", "system.fathom"], { cwd: studia, windowsHide: true });
+    execFileSync("py", ["-3", path.join(home, "fathom.py"), "web", "screens.fathom", "ui"], { cwd: studio, windowsHide: true });
+    if (!fs.existsSync(path.join(studio, "system.exe")))
+      execFileSync("py", ["-3", path.join(home, "fathom.py"), "build", "system.fathom"], { cwd: studio, windowsHide: true });
     const filePort = await freePort();
     serveOut(filePort);
     const files = process.argv.slice(2).filter((a) => a.endsWith(".lesson"));

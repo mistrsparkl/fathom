@@ -11,7 +11,7 @@ url="${FATHOM_TAR:-https://github.com/mistrsparkl/fathom/releases/latest/downloa
 echo "Installing Fathom..."
 
 # Python runs it. clang and these headers make programs fast (without them they still run, just slower).
-# libnss3 and ALSA are for Studia's window.
+# libnss3 and ALSA are for Studio's window.
 want="python3 clang libx11-dev libfreetype-dev libpng-dev libpulse-dev libgl-dev libnss3"
 if command -v apt-get >/dev/null 2>&1; then
     if apt-cache show libasound2t64 >/dev/null 2>&1; then want="$want libasound2t64"; else want="$want libasound2"; fi
@@ -37,32 +37,33 @@ mkdir -p "$(dirname "$place")" "$bin"
 mv "$work/s" "$place"
 ln -sf "$place/fathom" "$bin/fathom"
 
-# Chromium's sandbox needs this helper to belong to root. If that can't be done, Studia runs without it.
+# Chromium's sandbox needs this helper to belong to root. If that can't be done, Studio runs without it.
 sandbox=""
-if ! sudo -n true 2>/dev/null; then echo "Setting up Fathom Studia (sudo may ask for your password again)..."; fi
-if ! { sudo chown root:root "$place/studia-window/chrome-sandbox" && sudo chmod 4755 "$place/studia-window/chrome-sandbox"; }; then
+if ! sudo -n true 2>/dev/null; then echo "Setting up Fathom Studio (sudo may ask for your password again)..."; fi
+if ! { sudo chown root:root "$place/studio-window/chrome-sandbox" && sudo chmod 4755 "$place/studio-window/chrome-sandbox"; }; then
     sandbox=" --no-sandbox"
 fi
 
 mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/fathom-studia.desktop" <<EOF
+cat > "$HOME/.local/share/applications/fathom-studio.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Fathom Studia
+Name=Fathom Studio
+Icon=$place/editor/studio/icon.png
 Comment=Write and run Fathom programs
-Exec="$place/studia-window/electron"$sandbox "$place/editor/studia"
-Path=$place/editor/studia
+Exec="$place/studio-window/electron"$sandbox "$place/editor/studio"
+Path=$place/editor/studio
 Terminal=false
 Categories=Development;Education;
 EOF
 # WSL's Start menu only lists apps from /usr/share/applications
 if grep -qi microsoft /proc/version 2>/dev/null; then
-    sudo cp "$HOME/.local/share/applications/fathom-studia.desktop" /usr/share/applications/ || true
+    sudo cp "$HOME/.local/share/applications/fathom-studio.desktop" /usr/share/applications/ || true
 fi
 
 echo
 echo "Fathom is installed."
-echo "  Open Fathom Studia from your apps (on WSL: the Start menu, under Ubuntu), and press Learn to start the course."
+echo "  Open Fathom Studio from your apps (on WSL: the Start menu, under Ubuntu), and press Learn to start the course."
 case ":$PATH:" in
     *":$bin:"*) echo "  Or in a terminal:  fathom hello.fathom" ;;
     *)

@@ -62,7 +62,7 @@ try {
     Expand-Archive "$work\s.zip" "$work\s"
     if (Test-Path $place) {
         try { Remove-Item $place -Recurse -Force }
-        catch { throw 'Fathom is open (or Fathom Studia is): close it, then run this again.' }
+        catch { throw 'Fathom is open (or Fathom Studio is): close it, then run this again.' }
     }
     New-Item -ItemType Directory (Split-Path $place) -Force | Out-Null
     Move-Item "$work\s" $place
@@ -78,11 +78,12 @@ if (($user -split ';') -notcontains $place) {
 
 $shell = New-Object -ComObject WScript.Shell
 foreach ($folder in [Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop')) {
-    $link = $shell.CreateShortcut((Join-Path $folder 'Fathom Studia.lnk'))
-    $link.TargetPath = "$place\studia-window\electron.exe"
-    $link.Arguments = "`"$place\editor\studia`""
-    $link.WorkingDirectory = "$place\editor\studia"
+    $link = $shell.CreateShortcut((Join-Path $folder 'Fathom Studio.lnk'))
+    $link.TargetPath = "$place\studio-window\electron.exe"
+    $link.Arguments = "`"$place\editor\studio`""
+    $link.WorkingDirectory = "$place\editor\studio"
     $link.Description = 'Write and run Fathom programs'
+    $link.IconLocation = "$place\editor\studio\icon.ico"
     $link.Save()
 }
 
@@ -90,6 +91,7 @@ foreach ($folder in [Environment]::GetFolderPath('Programs'), [Environment]::Get
 $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Fathom'
 New-Item $key -Force | Out-Null
 Set-ItemProperty $key DisplayName 'Fathom'
+Set-ItemProperty $key DisplayIcon "$place\editor\studio\icon.ico"
 Set-ItemProperty $key Publisher 'mistrsparkl'
 Set-ItemProperty $key DisplayVersion (Get-Content "$place\VERSION" -ErrorAction SilentlyContinue)
 Set-ItemProperty $key InstallLocation $place
@@ -99,5 +101,5 @@ Set-ItemProperty $key NoRepair 1
 
 Write-Host ''
 Write-Host 'Fathom is installed.'
-Write-Host '  Open Fathom Studia from the Start menu or desktop, and press Learn to start the course.'
+Write-Host '  Open Fathom Studio from the Start menu or desktop, and press Learn to start the course.'
 Write-Host '  Or, in a new terminal:  fathom hello.fathom'

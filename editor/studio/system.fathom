@@ -1,4 +1,4 @@
-whisper: Studia's system side: files, mistakes and running programs. Given: port, screens folder, Fathom folder.
+whisper: Studio's system side: files, mistakes and running programs. Given: port, screens folder, Fathom folder.
 
 use: server
 use: computer
@@ -124,7 +124,7 @@ to run, given how (text) and path (text) and stops (text), returning text:
     set program to start the program with (quoted with target, parent folder of path)
   otherwise if how is "debug":
     whisper: the stops are line numbers with spaces between, after the script
-    set program to start the program with (fathom call with ("debug --studia", target) plus " " plus stops, parent folder of path)
+    set program to start the program with (fathom call with ("debug --studio", target) plus " " plus stops, parent folder of path)
   otherwise:
     set program to start the program with (fathom call with (how, target), parent folder of path)
   set started to yes
@@ -226,8 +226,8 @@ to reply, given address (text), returning text:
   if route is "/api/words": return library words
   if route is "/api/course": return course folder as saved text
   if route is "/api/settings":
-    set place to joined with (joined with (environment value of "HOME", ".config"), "Fathom Studia")
-    if slash is "\": set place to joined with (environment value of "APPDATA", "Fathom Studia")
+    set place to joined with (joined with (environment value of "HOME", ".config"), "Fathom Studio")
+    if slash is "\": set place to joined with (environment value of "APPDATA", "Fathom Studio")
     set settings file to joined with (place, "settings.json")
     if the web message is not "":
       if not (folder place exists): make the folder place
@@ -240,7 +240,7 @@ and the universe said i love you
 genesis:
   set given to the words given
   if the size of given falls below 3:
-    scrawl "Fathom Studia's system side is started by the studia itself (it needs a port, the screens' folder and Fathom's folder)."
+    scrawl "Fathom Studio's system side is started by the studio itself (it needs a port, the screens' folder and Fathom's folder)."
     cease
   set home to item 3 of given
   set python to "py -3"
