@@ -31,7 +31,9 @@ function remake() {
     }
   };
   make(path.join(screens, "screens.js"), path.join(here, "screens.fathom"), "web", "screens.fathom", "ui");
-  make(systemExe, path.join(here, "system.fathom"), "build", "system.fathom");
+  try {
+    make(systemExe, path.join(here, "system.fathom"), "build", "system.fathom");
+  } catch (e) {} // no exe (no LLVM, or antivirus took it): start() runs system.fathom directly
 }
 
 function freePort() {
@@ -59,8 +61,23 @@ function answering(port, until = Date.now() + 15000) {
 async function start() {
   remake();
   const port = await freePort();
-  system = spawn(systemExe, [String(port), screens, home, python.join(" ")], { windowsHide: true, stdio: "ignore" });
-  await answering(port);
+  const given = [String(port), screens, home, python.join(" ")];
+  const direct = () => spawn(python[0], [...python.slice(1), compiler, "run", path.join(here, "system.fathom"), ...given], { cwd: here, windowsHide: true, stdio: "ignore" });
+  if (!fs.existsSync(systemExe)) {
+    system = direct();
+    await answering(port);
+  } else {
+    // a blocked exe: it fails to start or never answers, and the direct run takes over
+    try {
+      system = spawn(systemExe, given, { windowsHide: true, stdio: "ignore" });
+      system.on("error", () => {});
+      await answering(port, Date.now() + 8000);
+    } catch (e) {
+      if (system) system.kill();
+      system = direct();
+      await answering(port);
+    }
+  }
   const win = new BrowserWindow({
     width: 1400, height: 900, backgroundColor: "#1e1e1e", autoHideMenuBar: true, title: "Fathom Studio", icon: path.join(here, windows ? "icon.ico" : "icon.png"),
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },

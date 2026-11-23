@@ -1372,6 +1372,24 @@ def runtime_object():
                         [runtime / "machine.cpp", runtime / "machine.h", runtime / "fathom.h", HERE / "machine.py"])
 
 
+def version_info(exe, clang, work, plugin):
+    """A version resource naming the program: antivirus treats exes without one as more suspicious."""
+    rc_tool = clang.with_name("llvm-rc.exe")
+    if not rc_tool.exists():
+        return []
+    name = exe.stem.replace('"', "")
+    strings = "".join(f'      VALUE "{k}", "{v}"\n' for k, v in [("FileDescription", name), ("ProductName", name), ("InternalName", name),
+                                                             ("OriginalFilename", exe.name.replace('"', "")), ("FileVersion", "1.0.0.0"),
+                                                             ("ProductVersion", "1.0.0.0"), ("Comments", "Made with Fathom")])
+    rc = work / "version.rc"
+    rc.write_text(f"1 VERSIONINFO\nFILEVERSION 1,0,0,0\nPRODUCTVERSION 1,0,0,0\nFILEOS 0x40004\nFILETYPE {2 if plugin else 1}\nBEGIN\n"
+                  f'  BLOCK "StringFileInfo"\n  BEGIN\n    BLOCK "040904B0"\n    BEGIN\n{strings}    END\n  END\n'
+                  f'  BLOCK "VarFileInfo"\n  BEGIN\n    VALUE "Translation", 0x409, 1200\n  END\nEND\n', encoding="utf-8")
+    res = work / "version.res"
+    done = subprocess.run([str(rc_tool), "/fo", str(res), str(rc)], capture_output=True, stdin=subprocess.DEVNULL)
+    return [str(res)] if done.returncode == 0 else []
+
+
 def make_exe(ll_text_, exe, work, units=None, plugin=False):
     """LLVM code to an exe (or .dll/.so plugin). Returns an error, or None."""
     ll = Path(work) / "program.ll"
@@ -1408,6 +1426,8 @@ def make_exe(ll_text_, exe, work, units=None, plugin=False):
         link = ["-pthread", "-fPIC"] + sorted({"-l" + lib for head, _ in (units or {}).values() for lib in re.findall(r"^// linux link: (.+)$", head, re.M)})
     if plugin:
         link += ["-shared"] + (["-Wl,/EXPORT:fathom_call", "-Wl,/EXPORT:fathom_has"] if TARGET == "windows" else [])
+    if TARGET == "windows":
+        link += version_info(Path(exe), Path(clang), Path(work), plugin)
     done = subprocess.run([clang, "-O2", "-Wno-override-module", str(ll), *objects, *link, "-o", str(exe)],
                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
     if done.returncode:
